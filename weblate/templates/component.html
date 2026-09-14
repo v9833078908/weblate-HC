@@ -240,6 +240,25 @@
 
   {% include "snippets/component/state.html" %}
 
+  {% if active_loc_kit_string_draft %}
+    <div class="alert alert-info" role="status">
+      {% if active_loc_kit_string_draft.state == "completed" %}
+        {% blocktranslate trimmed with filename=active_loc_kit_string_draft.source_filename %}
+          Your loc-kit table update from “{{ filename }}” has finished.
+        {% endblocktranslate %}
+      {% elif active_loc_kit_string_draft.state == "failed" %}
+        {% blocktranslate trimmed with filename=active_loc_kit_string_draft.source_filename %}
+          Your loc-kit table update from “{{ filename }}” needs attention.
+        {% endblocktranslate %}
+      {% else %}
+        {% blocktranslate trimmed with filename=active_loc_kit_string_draft.source_filename %}
+          Your loc-kit table update from “{{ filename }}” is still running.
+        {% endblocktranslate %}
+      {% endif %}
+      <a href="{% url 'loc-kit-strings-preview' token=active_loc_kit_string_draft.token %}">{% translate "View status" %}</a>
+    </div>
+  {% endif %}
+
   {% perm 'meta:vcs.status' object as user_can_see_repository_status %}
   {% perm 'project.permissions' object as user_can_manage_acl %}
   {% perm 'translation.add' object as user_can_add_translation %}

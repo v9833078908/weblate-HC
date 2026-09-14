@@ -3881,7 +3881,19 @@ class Component(  # ruff: ignore[too-many-public-methods]
 
         filenames: list[str] = []
         components: dict[int, Component] = {}
-        for translation_id, changes in changes_by_translation.items():
+        # Explicit, not incidental: a target's ``new_unit`` template lookup
+        # can only see a source/template key once that translation's own
+        # file write has happened, regardless of which pending change
+        # happened to sort first by timestamp.
+        ordered_translation_ids = sorted(
+            changes_by_translation,
+            key=lambda translation_id: (
+                translations[translation_id].id
+                != translations[translation_id].component.source_translation.pk
+            ),
+        )
+        for translation_id in ordered_translation_ids:
+            changes = changes_by_translation[translation_id]
             translation = translations[translation_id]
             components[translation.component_id] = translation.component
             if not translation.filename:
@@ -3900,6 +3912,13 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 return False
             filenames.extend(translation.filenames)
             filenames.extend(translation.addon_commit_files)
+            # A subset can write the source/template translation and a
+            # target translation in the same call (a brand new key plus its
+            # translation, added together). ``Component.template_store`` is
+            # cached component-wide; a target parsed afterwards must not
+            # reuse a template snapshot taken before the source's write, or
+            # its own ``new_unit`` cannot find the just-created source key.
+            translation.component.drop_template_store_cache()
 
         if not filenames:
             return False

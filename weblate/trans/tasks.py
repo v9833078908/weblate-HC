@@ -55,7 +55,12 @@ from weblate.trans.models import (
     Unit,
 )
 from weblate.trans.removal import RemovalBatch, removal_batch_context
-from weblate.utils.celery import app, heartbeat_task, touch_task_liveness
+from weblate.utils.celery import (
+    INTERACTIVE_TASK_PRIORITY,
+    app,
+    heartbeat_task,
+    touch_task_liveness,
+)
 from weblate.utils.data import data_dir
 from weblate.utils.errors import report_error
 from weblate.utils.files import VCS_METADATA_DIRS, remove_tree
@@ -1668,21 +1673,727 @@ def generate_judge_candidate(
     )
 
 
+def _chain_loc_kit_apply_continuation(*, draft_id: int, task_id) -> bool:
+    """Fence the current delivery and enqueue exactly one fresh continuation."""
+    # ruff: ignore[import-outside-top-level]
+    from uuid import uuid4
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    continuation_id = uuid4()
+    with transaction.atomic():
+        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+            pk=draft_id
+        )
+        if (
+            draft.state != LocKitImportDraft.State.APPLYING
+            or draft.apply_task_id != task_id
+        ):
+            return False
+        draft.apply_task_id = continuation_id
+        draft.last_activity_at = timezone.now()
+        draft.expires_at = draft.last_activity_at + timedelta(hours=1)
+        draft.save(update_fields=["apply_task_id", "last_activity_at", "expires_at"])
+
+        def publish() -> None:
+            try:
+                apply_loc_kit_string_update_draft.apply_async(
+                    kwargs={"draft_id": draft_id},
+                    task_id=str(continuation_id),
+                    priority=INTERACTIVE_TASK_PRIORITY,
+                )
+            except Exception as error:
+                report_error(
+                    "loc-kit apply continuation dispatch failed",
+                    project=draft.target_component.project,
+                )
+                _mark_loc_kit_draft_failed(
+                    draft_id,
+                    task_id_field="apply_task_id",
+                    expected_state=LocKitImportDraft.State.APPLYING,
+                    task_id=continuation_id,
+                    error_code="apply-dispatch-failed",
+                    message=str(error),
+                    retry_phase="apply",
+                )
+
+        transaction.on_commit(publish)
+    return True
+
+
+def _mark_loc_kit_draft_failed(
+    draft_id: int,
+    *,
+    task_id_field: str,
+    expected_state: str,
+    task_id,
+    error_code: str,
+    message: str,
+    retry_phase: str,
+) -> None:
+    """Flip a draft to FAILED only if it still belongs to this task attempt."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    with transaction.atomic():
+        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+            pk=draft_id
+        )
+        if draft.state != expected_state or getattr(draft, task_id_field) != task_id:
+            return
+        draft.state = LocKitImportDraft.State.FAILED
+        draft.error_code = error_code
+        draft.error_details = message[:1000]
+        draft.retry_phase = retry_phase
+        draft.last_activity_at = timezone.now()
+        # FAILED keeps a full hour for view/retry, same as COMPLETED.
+        draft.expires_at = draft.last_activity_at + timedelta(hours=1)
+        draft.save(
+            update_fields=[
+                "state",
+                "error_code",
+                "error_details",
+                "retry_phase",
+                "last_activity_at",
+                "expires_at",
+            ]
+        )
+
+
+def _flush_loc_kit_pending_changes(
+    *,
+    draft_id: int,
+    task_id,
+    component: Component,
+    owner: User,
+    retry_phase: str,
+) -> bool:
+    """Commit only this draft's pending changes, never ambient component work."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    with transaction.atomic():
+        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+            pk=draft_id
+        )
+        if (
+            draft.state != LocKitImportDraft.State.APPLYING
+            or draft.apply_task_id != task_id
+        ):
+            return False
+        candidate_ids = set(draft.pending_change_ids)
+        owned_ids = set(
+            PendingUnitChange.objects.filter(
+                metadata__loc_kit_draft_id=str(draft.pk)
+            ).values_list("pk", flat=True)
+        )
+        unowned_ids = (
+            set(
+                PendingUnitChange.objects.filter(pk__in=candidate_ids).values_list(
+                    "pk", flat=True
+                )
+            )
+            - owned_ids
+        )
+        draft.progress = {**draft.progress, "phase": "finalizing"}
+        draft.last_activity_at = timezone.now()
+        draft.expires_at = draft.last_activity_at + timedelta(hours=1)
+        draft.save(update_fields=["progress", "last_activity_at", "expires_at"])
+
+    if unowned_ids:
+        report_error(
+            "loc-kit finalizing found unowned pending changes",
+            project=component.project,
+        )
+        _mark_loc_kit_draft_failed(
+            draft_id,
+            task_id_field="apply_task_id",
+            expected_state=LocKitImportDraft.State.APPLYING,
+            task_id=task_id,
+            error_code="finalize-failed",
+            message=(
+                "Refusing to commit pending changes without this draft's "
+                "ownership metadata."
+            ),
+            retry_phase=retry_phase,
+        )
+        return False
+
+    if owned_ids and not component.commit_pending_subset(
+        f"loc-kit table update ({component.slug})", owner, owned_ids
+    ):
+        _mark_loc_kit_draft_failed(
+            draft_id,
+            task_id_field="apply_task_id",
+            expected_state=LocKitImportDraft.State.APPLYING,
+            task_id=task_id,
+            error_code="finalize-failed",
+            message="Could not commit the applied strings to the repository.",
+            retry_phase=retry_phase,
+        )
+        return False
+
+    with transaction.atomic():
+        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+            pk=draft_id
+        )
+        if (
+            draft.state != LocKitImportDraft.State.APPLYING
+            or draft.apply_task_id != task_id
+        ):
+            return False
+        remaining_ids = set(
+            PendingUnitChange.objects.filter(
+                metadata__loc_kit_draft_id=str(draft.pk)
+            ).values_list("pk", flat=True)
+        )
+        draft.pending_change_ids = sorted(remaining_ids)
+        draft.save(update_fields=["pending_change_ids"])
+    if remaining_ids:
+        return _flush_loc_kit_pending_changes(
+            draft_id=draft_id,
+            task_id=task_id,
+            component=component,
+            owner=owner,
+            retry_phase=retry_phase,
+        )
+    return True
+
+
+@app.task(bind=True, acks_late=True)
+def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
+    """Parse a staged string-update table into a private canonical packet."""
+    # ruff: ignore[import-outside-top-level]
+    import json
+    from hashlib import sha256
+
+    # ruff: ignore[import-outside-top-level]
+    from uuid import UUID
+
+    # ruff: ignore[import-outside-top-level]
+    from django.core.files.base import ContentFile
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.infer import InferenceError, infer_profile
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.model import Severity
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.parser import parse_component
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.profile import ProfileError, parse_profile
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.reader import ReaderError, read_sheets
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.loc_kit import (
+        classify_kit_explanations,
+        find_changed_sources,
+        string_unit_to_json,
+    )
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    task_id = UUID(self.request.id)
+    with transaction.atomic():
+        draft = (
+            LocKitImportDraft.objects.select_for_update(of=("self",))
+            .select_related("target_component__source_language")
+            .get(pk=draft_id)
+        )
+        if (
+            draft.kind != LocKitImportDraft.Kind.STRING
+            or draft.state != LocKitImportDraft.State.PREPARING
+            or draft.prepare_task_id != task_id
+            or draft.target_component_id is None
+        ):
+            return
+        component = draft.target_component
+        filename = draft.uploaded.path
+
+    try:
+        sheets = read_sheets(
+            Path(filename), max_bytes=settings.TRANSLATION_UPLOAD_MAX_SIZE
+        )
+        if len(sheets) != 1:
+            msg = "The workbook must contain exactly one worksheet."
+            raise ValueError(msg)
+        sheet_name, rows = next(iter(sheets.items()))
+        document, _notes = infer_profile(
+            {sheet_name: rows},
+            kit_stem=component.slug,
+            component=component.slug,
+            source_lang=component.source_language.code,
+            min_fill=0,
+        )
+        profile = parse_profile(document)
+        parsed_component = profile.components[0]
+        if parsed_component.kind != "po":
+            msg = "The table maps to a glossary layout, not strings."
+            raise ValueError(msg)
+        result = parse_component(parsed_component, rows)
+        errors = [
+            f"row {diagnostic.row}: {diagnostic.message}"
+            for diagnostic in result.diagnostics
+            if diagnostic.severity is Severity.ERROR
+        ]
+        if errors:
+            raise ValueError("; ".join(errors[:10]))
+        rows_json = [string_unit_to_json(unit) for unit in result.units]
+        baseline = dict(
+            component.source_translation.unit_set.values_list("context", "explanation")
+        )
+        packet = {"version": 1, "rows": rows_json, "baseline": baseline}
+        encoded = json.dumps(packet, ensure_ascii=False, separators=(",", ":")).encode()
+        if len(encoded) > settings.TRANSLATION_UPLOAD_MAX_SIZE:
+            msg = "The prepared table exceeds the configured size limit."
+            raise ValueError(msg)
+    except (InferenceError, ProfileError, ReaderError, ValueError) as error:
+        _mark_loc_kit_draft_failed(
+            draft_id,
+            task_id_field="prepare_task_id",
+            expected_state=LocKitImportDraft.State.PREPARING,
+            task_id=task_id,
+            error_code="prepare-failed",
+            message=str(error),
+            retry_phase="prepare",
+        )
+        return
+    except Exception as error:
+        # Anything else (I/O, JSON, storage) is still an owned-task failure:
+        # the durable draft must never sit in PREPARING forever because an
+        # unanticipated exception skipped the specific-error branch above.
+        report_error("loc-kit string update prepare failed", project=component.project)
+        _mark_loc_kit_draft_failed(
+            draft_id,
+            task_id_field="prepare_task_id",
+            expected_state=LocKitImportDraft.State.PREPARING,
+            task_id=task_id,
+            error_code="prepare-failed",
+            message=str(error),
+            retry_phase="prepare",
+        )
+        raise
+
+    with transaction.atomic():
+        draft = (
+            LocKitImportDraft.objects.select_for_update(of=("self",))
+            .select_related("target_component")
+            .get(pk=draft_id)
+        )
+        if (
+            draft.state != LocKitImportDraft.State.PREPARING
+            or draft.prepare_task_id != task_id
+        ):
+            return
+        existing = set(
+            draft.target_component.source_translation.unit_set.values_list(
+                "context", flat=True
+            )
+        )
+        new_count = sum(row["key"] not in existing for row in rows_json)
+        explanations = classify_kit_explanations(
+            component=draft.target_component,
+            units=result.units,
+            overwrite=False,
+        )
+        changed_sources = find_changed_sources(
+            component=draft.target_component, units=result.units
+        )
+        draft.prepared_payload.save(
+            f"{draft.token}.json", ContentFile(encoded), save=False
+        )
+        draft.preview_json = json.dumps(
+            {
+                "total_rows": len(rows_json),
+                "new_count": new_count,
+                "existing_count": len(rows_json) - new_count,
+                "sample_keys": [row["key"] for row in rows_json[:10]],
+                "explanations": explanations.__dict__,
+                "changed_sources": [
+                    {
+                        "key": row.key,
+                        "old_source": row.old_source,
+                        "new_source": row.new_source,
+                    }
+                    for row in changed_sources
+                ],
+                "changed_source_count": len(changed_sources),
+            },
+            ensure_ascii=False,
+        )
+        draft.payload_checksum = sha256(encoded).hexdigest()
+        draft.payload_size = len(encoded)
+        draft.state = LocKitImportDraft.State.PREVIEW_READY
+        draft.progress = {"phase": "preview", "processed_rows": len(rows_json)}
+        draft.error_code = ""
+        draft.error_details = ""
+        draft.retry_phase = ""
+        draft.last_activity_at = timezone.now()
+        # PREVIEW_READY awaits the user's confirm; give it the same
+        # one-hour retention as an active task heartbeat.
+        draft.expires_at = draft.last_activity_at + timedelta(hours=1)
+        draft.uploaded.delete(save=False)
+        draft.save()
+
+
+@app.task(bind=True, acks_late=True)
+def apply_loc_kit_string_update_draft(self, *, draft_id: int) -> None:  # ruff: ignore[complex-structure]
+    """
+    Apply a prepared string-update packet in bounded, resumable portions.
+
+    Each portion is one call to ``apply_loc_kit_string_update``, which holds
+    the component lock only for that portion's rows; the durable cursor
+    (``next_row``) and this draft's collected ``pending_change_ids`` advance
+    together after each portion commits, so a redelivery resumes from the
+    next unprocessed row rather than the whole table, and never double-adds
+    a key already written by an earlier portion. Finalizing commits exactly
+    this draft's owned pending changes with ``commit_pending_subset``, never
+    the component's ambient ``commit_pending()`` - a concurrent manual edit
+    or another import's pending changes are never swept in.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from uuid import UUID
+
+    # ruff: ignore[import-outside-top-level]
+    from django.core.exceptions import ValidationError
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.loc_kit import (
+        LOC_KIT_STRING_UPDATE_PORTION_SIZE,
+        apply_loc_kit_string_update,
+        load_prepared_string_units,
+    )
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.loc_kit import LOC_KIT_STRING_UPDATE_APPLY_TIME_LIMIT
+
+    task_id = UUID(self.request.id)
+    delivery_started_at = time.monotonic()
+    delivery_budget = max(
+        1.0, float(getattr(settings, "CELERY_VISIBILITY_TIMEOUT", 4 * 3600)) / 2
+    )
+    with transaction.atomic():
+        draft = (
+            LocKitImportDraft.objects.select_for_update(of=("self",))
+            .select_related("target_component", "owner")
+            .get(pk=draft_id)
+        )
+        if (
+            draft.kind != LocKitImportDraft.Kind.STRING
+            or draft.state != LocKitImportDraft.State.APPLYING
+            or draft.apply_task_id != task_id
+            or draft.target_component_id is None
+        ):
+            return
+        component = draft.target_component
+        owner = draft.owner
+        overwrite_explanations = bool(
+            draft.confirmed_options.get("overwrite_explanations")
+        )
+
+    try:
+        units = load_prepared_string_units(draft)
+    except ValidationError as error:
+        _mark_loc_kit_draft_failed(
+            draft_id,
+            task_id_field="apply_task_id",
+            expected_state=LocKitImportDraft.State.APPLYING,
+            task_id=task_id,
+            error_code="apply-failed",
+            message="; ".join(error.messages),
+            retry_phase="apply",
+        )
+        return
+
+    total_rows = len(units)
+    # Rehydrate accumulated counters from the durable draft: a redelivery
+    # runs this task fresh from row zero locally, but ``next_row`` may
+    # already be mid-table, and the completed summary must reflect every
+    # portion applied across every delivery, not only this one.
+    saved_progress = draft.progress if isinstance(draft.progress, dict) else {}
+    totals = {
+        key: int(saved_progress.get(key, 0))
+        for key in (
+            "added",
+            "existing",
+            "explanations_set",
+            "explanations_unchanged",
+            "explanations_would_overwrite",
+            "explanations_unavailable",
+            "explanations_source_changed",
+        )
+    }
+    created_languages: set[str] = set(saved_progress.get("created_languages", ()))
+    unavailable_languages: set[str] = set(
+        saved_progress.get("unavailable_languages", ())
+    )
+
+    while True:
+        with transaction.atomic():
+            draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+                pk=draft_id
+            )
+            if (
+                draft.state != LocKitImportDraft.State.APPLYING
+                or draft.apply_task_id != task_id
+            ):
+                return
+            cursor = draft.next_row
+        if cursor >= total_rows:
+            break
+        if (
+            draft.apply_started_at is not None
+            and timezone.now() - draft.apply_started_at
+            >= LOC_KIT_STRING_UPDATE_APPLY_TIME_LIMIT
+        ):
+            if not _flush_loc_kit_pending_changes(
+                draft_id=draft_id,
+                task_id=task_id,
+                component=component,
+                owner=owner,
+                retry_phase="finalize",
+            ):
+                return
+            _mark_loc_kit_draft_failed(
+                draft_id,
+                task_id_field="apply_task_id",
+                expected_state=LocKitImportDraft.State.APPLYING,
+                task_id=task_id,
+                error_code="apply-time-limit",
+                message="The update reached its 24-hour limit after partial completion.",
+                retry_phase="",
+            )
+            return
+        portion = units[cursor : cursor + LOC_KIT_STRING_UPDATE_PORTION_SIZE]
+        try:
+            for attempt, retry_delay in enumerate(
+                (1, 2, 4, 8, 16, 32, 64, 128, None), start=1
+            ):
+                with transaction.atomic():
+                    current = LocKitImportDraft.objects.select_for_update(
+                        of=("self",)
+                    ).get(pk=draft_id)
+                    if (
+                        current.state != LocKitImportDraft.State.APPLYING
+                        or current.apply_task_id != task_id
+                    ):
+                        return
+                try:
+                    result = apply_loc_kit_string_update(
+                        user=owner,
+                        component=component,
+                        units=portion,
+                        overwrite_explanations=overwrite_explanations,
+                        pending_owner=str(draft.pk),
+                    )
+                    break
+                except WeblateLockTimeoutError as error:
+                    if retry_delay is None:
+                        _mark_loc_kit_draft_failed(
+                            draft_id,
+                            task_id_field="apply_task_id",
+                            expected_state=LocKitImportDraft.State.APPLYING,
+                            task_id=task_id,
+                            error_code="lock-timeout",
+                            message=str(error),
+                            retry_phase="apply",
+                        )
+                        return
+                    with transaction.atomic():
+                        current = LocKitImportDraft.objects.select_for_update(
+                            of=("self",)
+                        ).get(pk=draft_id)
+                        if (
+                            current.state != LocKitImportDraft.State.APPLYING
+                            or current.apply_task_id != task_id
+                        ):
+                            return
+                        current.progress = {
+                            **current.progress,
+                            "phase": "applying",
+                            "processed_rows": cursor,
+                            "total_rows": total_rows,
+                            "lock_retry_attempt": attempt,
+                            "next_retry_at": (
+                                timezone.now() + timedelta(seconds=retry_delay)
+                            ).isoformat(),
+                        }
+                        current.last_activity_at = timezone.now()
+                        current.expires_at = current.last_activity_at + timedelta(
+                            hours=1
+                        )
+                        current.save(
+                            update_fields=[
+                                "progress",
+                                "last_activity_at",
+                                "expires_at",
+                            ]
+                        )
+                    touch_task_liveness(str(task_id))
+                    time.sleep(retry_delay)
+        except (ValidationError, ValueError) as error:
+            _mark_loc_kit_draft_failed(
+                draft_id,
+                task_id_field="apply_task_id",
+                expected_state=LocKitImportDraft.State.APPLYING,
+                task_id=task_id,
+                error_code="apply-failed",
+                message=str(error),
+                retry_phase="apply",
+            )
+            return
+        except Exception as error:
+            report_error(
+                "loc-kit string update apply failed", project=component.project
+            )
+            _mark_loc_kit_draft_failed(
+                draft_id,
+                task_id_field="apply_task_id",
+                expected_state=LocKitImportDraft.State.APPLYING,
+                task_id=task_id,
+                error_code="apply-failed",
+                message=str(error),
+                retry_phase="apply",
+            )
+            raise
+
+        totals["added"] += result.strings.added
+        totals["existing"] += result.strings.existing
+        totals["explanations_set"] += result.explanations.set_count
+        totals["explanations_unchanged"] += result.explanations.unchanged_count
+        totals["explanations_would_overwrite"] += (
+            result.explanations.would_overwrite_count
+        )
+        totals["explanations_unavailable"] += result.explanations.unavailable_count
+        totals["explanations_source_changed"] += (
+            result.explanations.source_changed_count
+        )
+        created_languages.update(result.strings.created_languages)
+        unavailable_languages.update(result.strings.unavailable_languages)
+
+        with transaction.atomic():
+            draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+                pk=draft_id
+            )
+            if (
+                draft.state != LocKitImportDraft.State.APPLYING
+                or draft.apply_task_id != task_id
+            ):
+                return
+            draft.next_row = cursor + len(portion)
+            draft.pending_change_ids = sorted(
+                set(draft.pending_change_ids) | set(result.pending_change_ids)
+            )
+            draft.progress = {
+                "phase": "applying",
+                "processed_rows": draft.next_row,
+                "total_rows": total_rows,
+                **totals,
+                "created_languages": sorted(created_languages),
+                "unavailable_languages": sorted(unavailable_languages),
+            }
+            draft.last_activity_at = timezone.now()
+            draft.expires_at = draft.last_activity_at + timedelta(hours=1)
+            draft.save(
+                update_fields=[
+                    "next_row",
+                    "pending_change_ids",
+                    "progress",
+                    "last_activity_at",
+                    "expires_at",
+                ]
+            )
+        touch_task_liveness(str(task_id))
+        if time.monotonic() - delivery_started_at >= delivery_budget:
+            _chain_loc_kit_apply_continuation(draft_id=draft_id, task_id=task_id)
+            return
+
+    if not _flush_loc_kit_pending_changes(
+        draft_id=draft_id,
+        task_id=task_id,
+        component=component,
+        owner=owner,
+        retry_phase="finalize",
+    ):
+        return
+
+    with transaction.atomic():
+        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+            pk=draft_id
+        )
+        if (
+            draft.state != LocKitImportDraft.State.APPLYING
+            or draft.apply_task_id != task_id
+        ):
+            return
+        draft.state = LocKitImportDraft.State.COMPLETED
+        draft.progress = {
+            "phase": "completed",
+            "added": totals["added"],
+            "existing": totals["existing"],
+            "explanations_set": totals["explanations_set"],
+            "explanations_unchanged": totals["explanations_unchanged"],
+            "explanations_would_overwrite": totals["explanations_would_overwrite"],
+            "explanations_unavailable": totals["explanations_unavailable"],
+            "explanations_source_changed": totals["explanations_source_changed"],
+            "created_languages": sorted(created_languages),
+            "unavailable_languages": sorted(unavailable_languages),
+        }
+        draft.finished_at = timezone.now()
+        draft.last_activity_at = draft.finished_at
+        # COMPLETED keeps a full hour for the owner to find and view the
+        # result after navigating away.
+        draft.expires_at = draft.finished_at + timedelta(hours=1)
+        draft.error_code = ""
+        draft.error_details = ""
+        draft.retry_phase = ""
+        draft.pending_change_ids = []
+        draft.delete_storage()
+        draft.save()
+
+
 @app.task(trail=False)
 def cleanup_loc_kit_drafts() -> None:
     """
     Delete expired loc-kit import drafts and their uploaded files.
 
-    Idempotent: running it twice (or when a file is already gone) is a no-op.
-    ``FileSystemStorage.delete`` on a missing file is already safe.
+    Row-locked and re-validated per draft, not a bulk delete of a
+    previously selected set: an active task's heartbeat extends
+    ``expires_at`` concurrently with this scan, and deleting that draft's
+    files out from under it (leaving the row behind, referencing storage
+    that no longer exists) would corrupt a still-running import.
+    ``skip_locked=True`` steps over a row an active task (or a concurrent
+    cleanup run) currently holds instead of blocking on it. Idempotent:
+    running it twice, or a file already gone, is a no-op.
     """
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models import LocKitImportDraft
 
-    qs = LocKitImportDraft.objects.filter(expires_at__lt=timezone.now())
-    for draft in qs.iterator():
-        draft.delete_storage()
-    qs.delete()
+    candidate_ids = list(
+        LocKitImportDraft.objects.filter(expires_at__lt=timezone.now()).values_list(
+            "pk", flat=True
+        )
+    )
+    for draft_id in candidate_ids:
+        with transaction.atomic():
+            draft = (
+                LocKitImportDraft.objects.select_for_update(skip_locked=True)
+                .filter(pk=draft_id, expires_at__lt=timezone.now())
+                .first()
+            )
+            if draft is None:
+                continue
+            draft.delete_storage()
+            draft.delete()
 
 
 @app.task(trail=False)

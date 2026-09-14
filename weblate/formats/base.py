@@ -407,6 +407,14 @@ class TranslationFormat[S: InnerStore, U: InnerUnit, T: TranslationUnit]:
     supports_plural: bool = False
     can_add_plural_units: ClassVar[bool | None] = None
     supports_descriptions: bool = False
+    # Whether the incremental pending-flush path
+    # (``Translation.find_or_add_pending_store_unit``) can attach a source
+    # note/location to a unit it creates directly in the backend store, as
+    # opposed to only during a full ``add_units`` re-render. Separate from
+    # ``supports_descriptions``, which only describes already-parsed file
+    # content: default unsupported, enabled per format after a round-trip
+    # proof (see ``PoMonoFormat``).
+    supports_new_unit_metadata: bool = False
     supports_context: bool = False
     supports_location: bool = False
     supports_flags: bool = False

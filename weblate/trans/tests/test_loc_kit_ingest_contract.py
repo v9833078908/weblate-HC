@@ -52,9 +52,23 @@ from weblate.glossary.tasks import flag_glossary_terminology, sync_terminology
 from weblate.lang.models import Language
 from weblate.trans import loc_kit
 from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
-from weblate.trans.models import Category, Component, Project, Translation
-from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
-from weblate.trans.tasks import perform_load
+from weblate.trans.models import (
+    Category,
+    Component,
+    PendingUnitChange,
+    Project,
+    Translation,
+)
+from weblate.trans.models.loc_kit import (
+    LOC_KIT_DRAFT_STORAGE,
+    LOC_KIT_STRING_UPDATE_APPLY_TIME_LIMIT,
+    LocKitImportDraft,
+)
+from weblate.trans.tasks import (
+    apply_loc_kit_string_update_draft,
+    perform_load,
+    prepare_loc_kit_string_update,
+)
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import create_another_user
 from weblate.utils.lock import WeblateLockTimeoutError
@@ -2772,7 +2786,7 @@ class KitExplanationApplyServiceTest(ViewTestCase):
             units=(
                 StringUnit(
                     key="greeting",
-                    values={"en": "Hello"},
+                    values={"en": "Привет"},
                     comments=(),
                     references=(),
                     row=2,
@@ -2794,7 +2808,7 @@ class KitExplanationApplyServiceTest(ViewTestCase):
         source_unit = self.component.source_translation.unit_set.get(context="greeting")
         unit = StringUnit(
             key="greeting",
-            values={"en": "Hello"},
+            values={"en": "Привет"},
             comments=(),
             references=(),
             row=2,
@@ -2847,7 +2861,7 @@ class KitExplanationApplyServiceTest(ViewTestCase):
         source_unit.update_explanation("Original meaning.", self.user)
         unit = StringUnit(
             key="greeting",
-            values={},
+            values={"en": "Привет"},
             comments=(),
             references=(),
             row=2,
@@ -2874,7 +2888,7 @@ class KitExplanationApplyServiceTest(ViewTestCase):
         source_unit.save(update_fields=["note"], same_content=True)
         unit = StringUnit(
             key="greeting",
-            values={},
+            values={"en": "Привет"},
             comments=(),
             references=(),
             row=2,
@@ -2949,7 +2963,7 @@ class KitExplanationApplyServiceTest(ViewTestCase):
         source_unit = self.component.source_translation.unit_set.get(context="greeting")
         unit = StringUnit(
             key="greeting",
-            values={},
+            values={"en": "Привет"},
             comments=(),
             references=(),
             row=2,
@@ -2968,6 +2982,104 @@ class KitExplanationApplyServiceTest(ViewTestCase):
             user=self.user, component=self.component, units=(unit,), overwrite=False
         )
         self.assertEqual(applied.set_count, preview.set_count)
+
+    def test_changed_source_skips_explanation_and_is_reported(self) -> None:
+        source_unit = self.component.source_translation.unit_set.get(context="greeting")
+        unit = StringUnit(
+            key="greeting",
+            values={"en": "A completely different greeting"},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Should be skipped.",
+        )
+
+        result = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+
+        source_unit.refresh_from_db()
+        self.assertEqual(result.source_changed_count, 1)
+        self.assertEqual(result.set_count, 0)
+        self.assertEqual(source_unit.explanation, "")
+
+    def test_blank_source_cell_for_existing_key_still_counts_as_changed(self) -> None:
+        """An explicit blank source cell disagrees exactly like a different one."""
+        unit = StringUnit(
+            key="greeting",
+            values={"en": ""},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Should be skipped too.",
+        )
+
+        result = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+
+        self.assertEqual(result.source_changed_count, 1)
+        self.assertEqual(result.set_count, 0)
+
+    def test_caller_without_source_evidence_is_never_gated(self) -> None:
+        """
+        ``values={}`` means "no opinion", not "blank" - unlike an explicit
+        blank cell. ``Component.apply_loc_kit_explanations`` (the one-shot
+        apply right after a kit-derived component's translations first
+        load) only ever tracks key -> explanation and never populates
+        ``values``; it must keep applying explanations to freshly created
+        units whose real source it never even sees here.
+        """
+        unit = StringUnit(
+            key="greeting",
+            values={},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Still applies.",
+        )
+
+        result = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+
+        self.assertEqual(result.source_changed_count, 0)
+        self.assertEqual(result.set_count, 1)
+
+    def test_source_changed_between_preview_and_apply_is_still_caught(self) -> None:
+        """
+        ``classify_kit_explanations`` (preview) must never be trusted stale:
+        the real gate lives in ``apply_kit_explanations``'s own locked
+        re-classification, so a source edited after preview is still caught.
+        """
+        unit = StringUnit(
+            key="greeting",
+            values={"en": "Привет"},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Should be skipped after the source changes.",
+        )
+
+        preview = loc_kit.classify_kit_explanations(
+            component=self.component, units=(unit,), overwrite=False
+        )
+        self.assertEqual(preview.set_count, 1)
+        self.assertEqual(preview.source_changed_count, 0)
+
+        # Someone edits the source between preview and confirm.
+        source_unit = self.component.source_translation.unit_set.get(context="greeting")
+        source_unit.source = "Совершенно другой источник"
+        source_unit.save(update_fields=["source"], same_content=True)
+
+        applied = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+
+        source_unit.refresh_from_db()
+        self.assertEqual(applied.source_changed_count, 1)
+        self.assertEqual(applied.set_count, 0)
+        self.assertEqual(source_unit.explanation, "")
 
 
 # --------------------------------------------------------------------------- #
@@ -2995,7 +3107,7 @@ class LocKitStringsUpdateServiceTest(ViewTestCase):
     def _row(self, **overrides) -> StringUnit:
         base = {
             "key": "welcome_message",
-            "values": {},
+            "values": {"en": "Welcome!"},
             "comments": (),
             "references": (),
             "row": 2,
@@ -3050,6 +3162,37 @@ class LocKitStringsUpdateServiceTest(ViewTestCase):
         self.assertEqual(self.existing_unit.extra_flags, "max-length:10")
         cs_after = cs_translation.unit_set.get(context="welcome_message").target
         self.assertEqual(cs_after, cs_before)
+
+    def test_changed_source_is_reported_separately_from_new_and_existing_counts(
+        self,
+    ) -> None:
+        """
+        ``find_changed_sources`` is the discrepancy table the plan requires:
+        key/old/new, distinct from what ``append_translation_strings``
+        itself decides (it never touches an existing key regardless).
+        """
+        matching_row = self._row()  # values={"en": "Welcome!"}, matches exactly
+        changed_row = self._row(
+            key="welcome_message", values={"en": "Welcome, traveler!"}
+        )
+        new_row = self._row(key="new_key", values={"en": "Hi"})
+
+        changed = loc_kit.find_changed_sources(
+            component=self.component, units=(matching_row, new_row)
+        )
+        self.assertEqual(changed, ())
+
+        changed = loc_kit.find_changed_sources(
+            component=self.component, units=(changed_row,)
+        )
+        self.assertEqual(len(changed), 1)
+        self.assertEqual(changed[0].key, "welcome_message")
+        self.assertEqual(changed[0].old_source, "Welcome!")
+        self.assertEqual(changed[0].new_source, "Welcome, traveler!")
+
+        # Reporting the discrepancy never mutates the stored source.
+        self.existing_unit.refresh_from_db()
+        self.assertEqual(self.existing_unit.source, "Welcome!")
 
     def test_existing_and_new_key_get_explanation(self) -> None:
         table_rows = (
@@ -3396,6 +3539,172 @@ class LocKitStringsUpdateServiceTest(ViewTestCase):
         )
 
 
+class LocKitStringsUpdatePendingCommitTest(ViewTestCase):
+    """
+    New units actually reach the PO file, with draft-owned finalizing.
+
+    A raw ``Unit.save()`` on a target creates no ``PendingUnitChange``, so a
+    translation written that way is silently never committed to the file.
+    This locks in the fix: writes go through ``Unit.translate``, get
+    flushed via ``store_update_changes``, and this draft's returned
+    ``pending_change_ids`` commit through ``commit_pending_subset`` alone.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.component = self.create_po_mono(project=self.project, name="Strings")
+
+    def _row(self, **overrides) -> StringUnit:
+        base = {
+            "key": "frozen_key",
+            "values": {"en": "Hello", "cs": "Ahoj"},
+            "comments": ("Character: Sample",),
+            "references": ("42",),
+            "row": 2,
+            "explanation": "LLM-only context.",
+            "flags": "",
+        }
+        base.update(overrides)
+        return StringUnit(**base)
+
+    def test_target_and_source_metadata_survive_subset_commit_and_reparse(
+        self,
+    ) -> None:
+        result = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(self._row(),),
+            overwrite_explanations=False,
+            pending_owner="draft-token-1",
+        )
+        self.assertEqual(result.strings.added, 1)
+        self.assertEqual(result.explanations.set_count, 1)
+        self.assertTrue(result.pending_change_ids)
+        self.assertEqual(
+            set(
+                PendingUnitChange.objects.filter(
+                    pk__in=result.pending_change_ids
+                ).values_list("metadata__loc_kit_draft_id", flat=True)
+            ),
+            {"draft-token-1"},
+        )
+        pending_order = list(
+            PendingUnitChange.objects.filter(pk__in=result.pending_change_ids)
+            .select_related("unit__translation")
+            .order_by("timestamp")
+            .values_list("unit__translation__language__code", flat=True)
+        )
+        self.assertEqual(pending_order, ["en", "cs"])
+        commits_before = self.component.repository.count_outgoing()
+
+        committed = self.component.commit_pending_subset(
+            "loc-kit test", self.user, set(result.pending_change_ids)
+        )
+        self.assertEqual(
+            self.component.repository.count_outgoing() - commits_before,
+            1,
+            "finalizing must write source and target in one repository commit",
+        )
+        self.assertTrue(committed)
+        self.assertFalse(
+            PendingUnitChange.objects.filter(pk__in=result.pending_change_ids).exists()
+        )
+
+        en_translation = self.component.source_translation
+        en_translation.drop_store_cache()
+        en_content = Path(en_translation.get_filename()).read_text(encoding="utf-8")
+        self.assertIn("Character: Sample", en_content)
+        self.assertIn("#: 42", en_content)
+        self.assertNotIn("LLM-only context.", en_content)
+
+        cs_translation = self.component.translation_set.get(language__code="cs")
+        cs_translation.drop_store_cache()
+        cs_content = Path(cs_translation.get_filename()).read_text(encoding="utf-8")
+        self.assertIn("Ahoj", cs_content)
+
+        source_unit = en_translation.unit_set.get(context="frozen_key")
+        self.assertEqual(source_unit.explanation, "LLM-only context.")
+
+    def test_retried_flush_does_not_duplicate_note_or_location(self) -> None:
+        result = loc_kit.append_translation_strings(
+            user=self.user,
+            component=self.component,
+            units=(self._row(),),
+            pending_owner="draft-token-1",
+        )
+        source_translation = self.component.source_translation
+        pending_changes = list(
+            PendingUnitChange.objects.filter(pk__in=result.pending_change_ids).filter(
+                unit__translation=source_translation
+            )
+        )
+        self.assertEqual(len(pending_changes), 1)
+
+        # First flush: writes the file to disk (inside update_units) without
+        # yet running the git commit that would delete the pending row -
+        # the exact window a worker crash between subset-commit and
+        # terminal state leaves behind.
+        store = source_translation.store
+        store.ensure_index()
+        source_translation.update_units(
+            pending_changes, store, self.user.get_author_name()
+        )
+        source_translation.drop_store_cache()
+        once = Path(source_translation.get_filename()).read_text(encoding="utf-8")
+        self.assertEqual(once.count("Character: Sample"), 1)
+
+        # Retry: fresh parse from the already-written disk file, same
+        # still-pending PendingUnitChange row.
+        retried_store = source_translation.store
+        retried_store.ensure_index()
+        source_translation.update_units(
+            pending_changes, retried_store, self.user.get_author_name()
+        )
+        source_translation.drop_store_cache()
+        twice = Path(source_translation.get_filename()).read_text(encoding="utf-8")
+        self.assertEqual(twice.count("Character: Sample"), 1)
+        self.assertEqual(twice.count("#: 42"), 1)
+
+    def test_subset_commit_processes_source_first_even_with_reversed_timestamps(
+        self,
+    ) -> None:
+        """
+        A target's ``new_unit`` template lookup only succeeds once the
+        source/template translation's own file write has happened. This
+        must hold by explicit ordering, not incidentally because the
+        source's pending row usually sorts first by creation timestamp.
+        """
+        result = loc_kit.append_translation_strings(
+            user=self.user,
+            component=self.component,
+            units=(self._row(),),
+            pending_owner="draft-token-2",
+        )
+        source_translation = self.component.source_translation
+        cs_translation = self.component.translation_set.get(language__code="cs")
+        source_change = PendingUnitChange.objects.get(
+            pk__in=result.pending_change_ids, unit__translation=source_translation
+        )
+        target_change = PendingUnitChange.objects.get(
+            pk__in=result.pending_change_ids, unit__translation=cs_translation
+        )
+        # Force the opposite of natural creation order.
+        PendingUnitChange.objects.filter(pk=target_change.pk).update(
+            timestamp=source_change.timestamp - timedelta(seconds=5)
+        )
+
+        committed = self.component.commit_pending_subset(
+            "loc-kit test", self.user, set(result.pending_change_ids)
+        )
+
+        self.assertTrue(committed)
+        cs_translation.drop_store_cache()
+        cs_content = Path(cs_translation.get_filename()).read_text(encoding="utf-8")
+        self.assertIn("Ahoj", cs_content)
+
+
 class LocKitStringsUpdateViewTest(ViewTestCase):
     """The start -> preview -> confirm HTTP flow for an existing component."""
 
@@ -3430,12 +3739,27 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         )
         self.assertEqual(start.status_code, 302)
         preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
 
         preview = self.client.get(preview_url)
         self.assertContains(preview, "1")  # new_count rendered somewhere on the page
 
         confirm = self.client.post(preview_url, {"action": "confirm"}, follow=True)
         self.assertEqual(confirm.status_code, 200)
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
 
         source_translation = self.component.source_translation
         welcome = source_translation.unit_set.get(context="welcome_message")
@@ -3446,7 +3770,98 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             language__code="cs"
         ).unit_set.get(context="goodbye_message")
         self.assertEqual(cs_goodbye.target, "Sbohem")
-        self.assertFalse(LocKitImportDraft.objects.exists())
+        self.assertTrue(LocKitImportDraft.objects.filter(pk=draft.pk).exists())
+
+    def test_preview_reports_and_confirm_preserves_a_changed_source(self) -> None:
+        """
+        An existing key whose source the table disagrees with is reported
+        in its own preview section, its Explanation is skipped, and confirm
+        never touches the stored source - the plan's discrepancy table.
+        """
+        kit = (
+            "key,en,cs,Explanation\n"
+            "welcome_message,Welcome back!,Vitejte,Shown at startup.\n"
+        )
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update", kwargs={"path": self.component.get_url_path()}
+            ),
+            {"table": self._upload(kit)},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        summary = json.loads(draft.preview_json)
+        self.assertEqual(summary["changed_source_count"], 1)
+        self.assertEqual(summary["changed_sources"][0]["key"], "welcome_message")
+        self.assertEqual(summary["changed_sources"][0]["old_source"], "Welcome!")
+        self.assertEqual(summary["changed_sources"][0]["new_source"], "Welcome back!")
+        self.assertEqual(summary["explanations"]["source_changed_count"], 1)
+        self.assertEqual(summary["explanations"]["set_count"], 0)
+
+        preview = self.client.get(preview_url)
+        self.assertContains(preview, "Welcome back!")
+        self.assertContains(
+            preview, "Existing keys whose source the table disagrees with"
+        )
+
+        confirm = self.client.post(preview_url, {"action": "confirm"}, follow=True)
+        self.assertEqual(confirm.status_code, 200)
+        draft.refresh_from_db()
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
+        self.assertEqual(draft.progress["explanations_source_changed"], 1)
+
+        welcome = self.component.source_translation.unit_set.get(
+            context="welcome_message"
+        )
+        self.assertEqual(welcome.source, "Welcome!")
+        self.assertEqual(welcome.explanation, "")
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_confirm_reserves_background_application_without_unit_writes(self) -> None:
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload("key,en\nnew_key,Hello\n")},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        before = self.component.source_translation.unit_set.count()
+
+        with (
+            patch(
+                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(preview_url, {"action": "confirm"})
+
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        self.assertIsNotNone(draft.apply_task_id)
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+            priority=0,
+        )
+        self.assertEqual(self.component.source_translation.unit_set.count(), before)
 
     def test_cancel_deletes_the_draft_without_changing_anything(self) -> None:
         kit = "key,en\nnew_key,Hello\n"
@@ -3492,8 +3907,15 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             },
         )
 
-        self.assertContains(response, "single-sheet")
-        self.assertFalse(LocKitImportDraft.objects.exists())
+        self.assertEqual(response.status_code, 302)
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
+        self.assertIn("exactly one worksheet", draft.error_details)
 
     def test_glossary_component_has_no_start_route(self) -> None:
         glossary = self.project.glossaries[0]
@@ -3503,7 +3925,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_confirm_lock_timeout_keeps_draft_and_says_retry(self) -> None:
+    def test_apply_lock_timeout_fails_retryably_and_shows_retry(self) -> None:
         kit = "key,en\nnew_key,Hello\n"
         start = self.client.post(
             reverse(
@@ -3512,27 +3934,741 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             {"table": self._upload(kit)},
         )
         preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
 
         with patch.object(
             Component,
             "locked_for_update",
             side_effect=WeblateLockTimeoutError("locked", lock=None),
         ):
-            response = self.client.post(preview_url, {"action": "confirm"}, follow=True)
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk},
+                task_id=str(draft.apply_task_id),
+            )
 
-        self.assertContains(response, "retry")
-        self.assertTrue(LocKitImportDraft.objects.exists())
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
+        self.assertEqual(draft.retry_phase, "apply")
         self.assertFalse(
             self.component.source_translation.unit_set.filter(
                 context="new_key"
             ).exists()
         )
 
-    def test_start_over_limit_requests_smaller_table(self) -> None:
-        kit = "key,en,cs\nnew_key,Hello,Ahoj\n"
+        response = self.client.get(preview_url)
+        self.assertContains(response, "retry")
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_failed_apply_retry_reserves_a_new_task_and_completes(self) -> None:
+        kit = "key,en\nnew_key,Hello\n"
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update", kwargs={"path": self.component.get_url_path()}
+            ),
+            {"table": self._upload(kit)},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+        with patch.object(
+            Component,
+            "locked_for_update",
+            side_effect=WeblateLockTimeoutError("locked", lock=None),
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk},
+                task_id=str(draft.apply_task_id),
+            )
+        draft.refresh_from_db()
+        old_task_id = draft.apply_task_id
+
+        with (
+            patch(
+                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(preview_url, {"action": "retry"})
+
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        self.assertNotEqual(draft.apply_task_id, old_task_id)
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+            priority=0,
+        )
+
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
+        self.assertTrue(
+            self.component.source_translation.unit_set.filter(
+                context="new_key"
+            ).exists()
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False, CELERY_VISIBILITY_TIMEOUT=4)
+    def test_apply_delivery_budget_reserves_one_fenced_continuation(self) -> None:
+        """
+        A delivery stops after a committed portion, hands ownership to one
+        fresh UUID, and does not finish the following portion itself.
+        """
+        rows = "key,en\n" + "".join(f"chain{i},Value {i}\n" for i in range(26))
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload(rows)},
+        )
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(start["Location"], {"action": "confirm"})
+        draft.refresh_from_db()
+        original_task_id = draft.apply_task_id
+
+        with (
+            patch(
+                "weblate.trans.tasks.time.monotonic",
+                side_effect=[0.0, 3.0],
+            ),
+            patch(
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(original_task_id)
+            )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        self.assertEqual(draft.next_row, 25)
+        self.assertNotEqual(draft.apply_task_id, original_task_id)
+        self.assertEqual(
+            self.component.source_translation.unit_set.filter(
+                context__startswith="chain"
+            ).count(),
+            25,
+        )
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+            priority=0,
+        )
+
+    def test_cumulative_apply_cap_commits_completed_portions_before_stopping(
+        self,
+    ) -> None:
+        """
+        The cap never leaves this draft's already-written units pending only
+        in the database: its committed portion is flushed before reporting
+        the partial, terminal result.
+        """
+        rows = "key,en\n" + "".join(f"cap{i},Value {i}\n" for i in range(26))
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload(rows)},
+        )
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(start["Location"], {"action": "confirm"})
+        draft.refresh_from_db()
+
+        real_apply = loc_kit.apply_loc_kit_string_update
+        calls = {"count": 0}
+
+        def interrupt_before_second_portion(*args, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                raise KeyboardInterrupt
+            return real_apply(*args, **kwargs)
+
+        with (
+            patch.object(
+                loc_kit, "LOC_KIT_STRING_UPDATE_PORTION_SIZE", 25, create=True
+            ),
+            patch.object(
+                loc_kit,
+                "apply_loc_kit_string_update",
+                side_effect=interrupt_before_second_portion,
+            ),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+            )
+
+        draft.refresh_from_db()
+        draft.apply_started_at = (
+            timezone.now()
+            - LOC_KIT_STRING_UPDATE_APPLY_TIME_LIMIT
+            - timedelta(seconds=1)
+        )
+        draft.save(update_fields=["apply_started_at"])
+
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+        )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
+        self.assertEqual(draft.retry_phase, "")
+        self.assertEqual(draft.progress["processed_rows"], 25)
+        self.assertEqual(draft.progress["added"], 25)
+        self.assertEqual(
+            self.component.source_translation.unit_set.filter(
+                context__startswith="cap"
+            ).count(),
+            25,
+        )
+        self.assertFalse(
+            PendingUnitChange.objects.filter(
+                metadata__loc_kit_draft_id=str(draft.pk)
+            ).exists()
+        )
+
+    def test_apply_retries_a_transient_component_lock_timeout(self) -> None:
+        """A transient lock timeout retries the same durable portion."""
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload("key,en\nretry_lock,Value\n")},
+        )
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(start["Location"], {"action": "confirm"})
+        draft.refresh_from_db()
+
+        real_apply = loc_kit.apply_loc_kit_string_update
+        calls = {"count": 0}
+
+        def fail_once(*args, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                msg = "locked"
+                raise WeblateLockTimeoutError(msg, lock=None)
+            return real_apply(*args, **kwargs)
+
+        with (
+            patch.object(loc_kit, "apply_loc_kit_string_update", side_effect=fail_once),
+            patch("weblate.trans.tasks.time.sleep"),
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+            )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
+        self.assertEqual(draft.progress["added"], 1)
+        self.assertTrue(
+            self.component.source_translation.unit_set.filter(
+                context="retry_lock"
+            ).exists()
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_stale_applying_draft_offers_a_fenced_retry(self) -> None:
+        """A stalled APPLYING delivery can be replaced without a new upload."""
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload("key,en\nstalled,Value\n")},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+        original_task_id = draft.apply_task_id
+        draft.last_activity_at = timezone.now() - timedelta(minutes=31)
+        draft.save(update_fields=["last_activity_at"])
+
+        response = self.client.get(preview_url)
+        self.assertContains(response, 'name="action" value="retry"', html=False)
+
+        with (
+            patch(
+                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(preview_url, {"action": "retry"})
+
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        replacement_task_id = draft.apply_task_id
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        self.assertNotEqual(replacement_task_id, original_task_id)
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(replacement_task_id),
+            priority=0,
+        )
+
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(original_task_id)
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.apply_task_id, replacement_task_id)
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+
+    def test_completed_result_is_discoverable_from_the_component_page(self) -> None:
+        """
+        The plan's core UX requirement: closing the preview tab must not
+        strand the result. A fresh request for the component page -
+        without ever revisiting the preview URL - carries a link back to
+        it, bound to the same owner and session the draft was created
+        under (matching every other draft access check in this flow).
+        """
+        kit = "key,en\nnew_key,Hello\n"
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update", kwargs={"path": self.component.get_url_path()}
+            ),
+            {"table": self._upload(kit)},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
+
+        component_page = self.client.get(
+            reverse("show", kwargs={"path": self.component.get_url_path()})
+        )
+
+        self.assertContains(component_page, preview_url)
+
+    def test_completed_result_link_is_absent_for_a_different_session(self) -> None:
+        """The discovery link never renders a token the session check would 404."""
+        kit = "key,en\nnew_key,Hello\n"
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update", kwargs={"path": self.component.get_url_path()}
+            ),
+            {"table": self._upload(kit)},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+        )
+
+        self.client.session.flush()
+        self.client.force_login(self.user)
+        component_page = self.client.get(
+            reverse("show", kwargs={"path": self.component.get_url_path()})
+        )
+
+        self.assertNotContains(component_page, preview_url)
+
+    def test_apply_resumes_from_cursor_and_merges_totals_across_deliveries(
+        self,
+    ) -> None:
+        """
+        A redelivered task resumes from the durable cursor, and the
+        COMPLETED summary reflects every portion applied across every
+        delivery - not only the last one, which resets its local counters
+        to zero on every fresh task invocation.
+        """
+        rows = "key,en\n" + "".join(f"k{i},V{i}\n" for i in range(23))
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload(rows)},
+        )
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(start["Location"], {"action": "confirm"})
+        draft.refresh_from_db()
+
+        real_apply = loc_kit.apply_loc_kit_string_update
+        calls = {"n": 0}
+
+        def crash_after_first_portion(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                # Simulate a hard worker crash mid-table: no exception
+                # handler in the task ever runs, unlike a normal Python
+                # exception, so this must never leave a FAILED marking
+                # behind - only the redelivery resumes it.
+                raise KeyboardInterrupt
+            return real_apply(*args, **kwargs)
+
+        with (
+            patch.object(
+                loc_kit, "LOC_KIT_STRING_UPDATE_PORTION_SIZE", 10, create=True
+            ),
+            patch.object(
+                loc_kit,
+                "apply_loc_kit_string_update",
+                side_effect=crash_after_first_portion,
+            ),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+            )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        self.assertEqual(draft.next_row, 10)
+        self.assertEqual(draft.progress.get("added"), 10)
 
         with patch.object(
-            loc_kit, "LOC_KIT_STRING_UPDATE_MAX_MUTATIONS", 1, create=True
+            loc_kit, "LOC_KIT_STRING_UPDATE_PORTION_SIZE", 10, create=True
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+            )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
+        self.assertEqual(draft.progress["added"], 23)
+        self.assertEqual(
+            self.component.source_translation.unit_set.filter(
+                context__startswith="k"
+            ).count(),
+            23,
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_retry_view_resumes_from_cursor_and_merges_totals(self) -> None:
+        """
+        The same cursor/totals durability as a raw redelivery, but through
+        the actual failed-state retry button: a new ``apply_task_id`` must
+        still resume from the durable ``next_row`` and add the prior
+        delivery's counters to its own, not start counting from zero.
+        """
+        rows = "key,en\n" + "".join(f"r{i},V{i}\n" for i in range(23))
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload(rows)},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+
+        real_apply = loc_kit.apply_loc_kit_string_update
+        calls = {"n": 0}
+
+        def fail_after_first_portion(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                msg = "Locked components cannot be updated."
+                raise ValidationError(msg)
+            return real_apply(*args, **kwargs)
+
+        with (
+            patch.object(
+                loc_kit, "LOC_KIT_STRING_UPDATE_PORTION_SIZE", 10, create=True
+            ),
+            patch.object(
+                loc_kit,
+                "apply_loc_kit_string_update",
+                side_effect=fail_after_first_portion,
+            ),
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+            )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
+        self.assertEqual(draft.next_row, 10)
+        self.assertEqual(draft.progress.get("added"), 10)
+        old_task_id = draft.apply_task_id
+
+        with (
+            patch(
+                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(preview_url, {"action": "retry"})
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        self.assertNotEqual(draft.apply_task_id, old_task_id)
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+            priority=0,
+        )
+        # The retry view itself must not have touched the durable cursor.
+        self.assertEqual(draft.next_row, 10)
+        self.assertEqual(draft.progress.get("added"), 10)
+
+        with patch.object(
+            loc_kit, "LOC_KIT_STRING_UPDATE_PORTION_SIZE", 10, create=True
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+            )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
+        self.assertEqual(draft.progress["added"], 23)
+        self.assertEqual(draft.progress["existing"], 0)
+        self.assertEqual(
+            self.component.source_translation.unit_set.filter(
+                context__startswith="r"
+            ).count(),
+            23,
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_retry_view_resumes_with_real_portion_size_two_portions_done(
+        self,
+    ) -> None:
+        """
+        Same as ``test_retry_view_resumes_from_cursor_and_merges_totals``
+        but with the real, unpatched ``LOC_KIT_STRING_UPDATE_PORTION_SIZE``
+        and two successful portions before the failure - the exact shape
+        observed in a live E2E run (75 rows, portions of 25, failure on
+        the third portion after two succeed).
+        """
+        row_count = 75
+        rows = "key,en\n" + "".join(f"p{i},V{i}\n" for i in range(row_count))
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload(rows)},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+
+        real_apply = loc_kit.apply_loc_kit_string_update
+        calls = {"n": 0}
+
+        def fail_on_third_portion(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 3:
+                msg = "Locked components cannot be updated."
+                raise ValidationError(msg)
+            return real_apply(*args, **kwargs)
+
+        with patch.object(
+            loc_kit,
+            "apply_loc_kit_string_update",
+            side_effect=fail_on_third_portion,
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+            )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
+        self.assertEqual(draft.next_row, 50)
+        self.assertEqual(draft.progress.get("added"), 50)
+
+        with (
+            patch(
+                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(preview_url, {"action": "retry"})
+        draft.refresh_from_db()
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+            priority=0,
+        )
+        # Nothing about the retry dispatch itself may touch the cursor.
+        self.assertEqual(draft.next_row, 50)
+        self.assertEqual(draft.progress.get("added"), 50)
+
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+        )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
+        self.assertEqual(draft.progress["added"], row_count)
+        self.assertEqual(draft.progress["existing"], 0)
+        self.assertEqual(
+            self.component.source_translation.unit_set.filter(
+                context__startswith="p"
+            ).count(),
+            row_count,
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_retry_replays_a_portion_whose_append_already_committed(self) -> None:
+        """
+        ``append_translation_strings`` and ``apply_kit_explanations`` are two
+        independent transactions inside one portion (``apply_loc_kit_string_
+        update``'s own docstring). A failure between them - the append
+        already committed, the explanation call raises - never advances
+        ``next_row`` for that portion, so a retry re-attempts it. That
+        re-attempt is a correct idempotent replay: the keys already exist
+        from the first attempt, so this portion reports as ``existing`` the
+        second time, not a duplicate ``added``. The completed totals add up
+        to every row exactly once; no unit is created twice.
+        """
+        row_count = 75
+        rows = "key,en\n" + "".join(f"m{i},V{i}\n" for i in range(row_count))
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload(rows)},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.prepare_task_id)
+        )
+        self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+
+        real_explanations = loc_kit.apply_kit_explanations
+        calls = {"n": 0}
+
+        def fail_explanations_on_third_portion(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 3:
+                msg = "Locked components cannot be updated."
+                raise ValidationError(msg)
+            return real_explanations(*args, **kwargs)
+
+        with patch.object(
+            loc_kit,
+            "apply_kit_explanations",
+            side_effect=fail_explanations_on_third_portion,
+        ):
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+            )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
+        # The third portion's append already committed even though the
+        # cursor never advanced past the second portion's boundary.
+        self.assertEqual(draft.next_row, 50)
+        self.assertEqual(draft.progress.get("added"), 50)
+        self.assertEqual(
+            self.component.source_translation.unit_set.filter(
+                context__startswith="m"
+            ).count(),
+            75,
+        )
+
+        with (
+            patch(
+                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(preview_url, {"action": "retry"})
+        draft.refresh_from_db()
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+            priority=0,
+        )
+
+        apply_loc_kit_string_update_draft.apply(
+            kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+        )
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
+        # Every row landed exactly once: the replayed third portion is
+        # correctly counted as existing, not duplicated as added.
+        self.assertEqual(
+            draft.progress["added"] + draft.progress["existing"], row_count
+        )
+        self.assertEqual(draft.progress["existing"], 25)
+        self.assertEqual(draft.progress["added"], row_count - 25)
+        units = self.component.source_translation.unit_set.filter(
+            context__startswith="m"
+        )
+        self.assertEqual(units.count(), row_count)
+        self.assertEqual(len(set(units.values_list("context", flat=True))), row_count)
+        self.assertFalse(
+            PendingUnitChange.objects.filter(
+                metadata__loc_kit_draft_id=str(draft.pk)
+            ).exists()
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_start_queues_large_table_preparation_without_unit_writes(self) -> None:
+        kit = "key,en,cs\n" + "".join(
+            f"new_key_{number},Hello {number},Ahoj {number}\n"
+            for number in range(2_501)
+        )
+        before = self.component.source_translation.unit_set.count()
+
+        with (
+            patch(
+                "weblate.trans.views.create.prepare_loc_kit_string_update.apply_async"
+            ) as dispatch,
+            self.captureOnCommitCallbacks(execute=True),
         ):
             response = self.client.post(
                 reverse(
@@ -3542,11 +4678,38 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
                 {"table": self._upload(kit)},
             )
 
-        self.assertContains(response, "synchronous update limit")
-        self.assertContains(response, "smaller tables")
-        self.assertFalse(LocKitImportDraft.objects.exists())
-        self.assertFalse(
-            self.component.source_translation.unit_set.filter(
-                context="new_key"
-            ).exists()
+        self.assertEqual(response.status_code, 302)
+        draft = LocKitImportDraft.objects.get()
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREPARING)
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+            priority=0,
         )
+        self.assertEqual(self.component.source_translation.unit_set.count(), before)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_preparation_writes_private_packet_without_units(self) -> None:
+        kit = "key,en,cs,Explanation\nnew_key,Hello,Ahoj,Shown at startup.\n"
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload(kit)},
+        )
+        draft = LocKitImportDraft.objects.get()
+        before = self.component.source_translation.unit_set.count()
+
+        result = prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+
+        self.assertTrue(result.successful())
+        draft.refresh_from_db()
+        self.assertEqual(start.status_code, 302)
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        self.assertTrue(draft.prepared_payload.name)
+        self.assertFalse(draft.uploaded.name)
+        self.assertEqual(self.component.source_translation.unit_set.count(), before)

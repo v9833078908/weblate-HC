@@ -6,7 +6,9 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import uuid
 from contextlib import nullcontext, suppress
+from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 from zipfile import BadZipfile
@@ -20,10 +22,11 @@ from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
 from django.utils.http import urlencode
-from django.utils.translation import gettext, ngettext
+from django.utils.translation import gettext, gettext_lazy, ngettext
 from django.views.generic.base import TemplateView, View
 from django.views.generic.edit import CreateView
 
@@ -60,22 +63,26 @@ from weblate.trans.loc_kit import (
     ProfileProposalError,
     SampleTooLargeError,
     append_glossary_terms,
-    apply_loc_kit_string_update,
     build_glossary_structure_sample,
     cap_preview_warnings,
-    classify_kit_explanations,
-    count_judge_stale_after_explanations,
-    existing_string_keys,
     profile_document_from_envelope,
     request_profile_proposal,
     validate_glossary_profile,
-    validate_loc_kit_string_update_size,
 )
 from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LocKitImportDraft
-from weblate.trans.tasks import import_project_backup, perform_update
+from weblate.trans.tasks import (
+    apply_loc_kit_string_update_draft,
+    import_project_backup,
+    perform_update,
+    prepare_loc_kit_string_update,
+)
 from weblate.utils import messages
-from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY, store_task_metadata
+from weblate.utils.celery import (
+    INTERACTIVE_TASK_PRIORITY,
+    add_user_task,
+    store_task_metadata,
+)
 from weblate.utils.licenses import LICENSE_URLS, detect_license
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.ratelimit import check_rate_limit, session_ratelimit_post
@@ -101,8 +108,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from django.forms import Form
+    from django_stubs_ext import StrOrPromise
 
-    from loc_kit_ingest.model import StringUnit
     from weblate.auth.models import AuthenticatedHttpRequest
     from weblate.trans.forms import (
         ComponentProjectForm,
@@ -1824,36 +1831,6 @@ class LocKitGlossaryUpdateStartView(TemplateView):
 # --------------------------------------------------------------------------- #
 
 
-def _string_unit_to_json(unit: StringUnit) -> dict:
-    return {
-        "key": unit.key,
-        "values": dict(unit.values),
-        "comments": list(unit.comments),
-        "references": list(unit.references),
-        "row": unit.row,
-        "explanation": unit.explanation,
-        "flags": unit.flags,
-    }
-
-
-def _string_units_from_json(payload: str) -> tuple[StringUnit, ...]:
-    # ruff: ignore[import-outside-top-level]
-    from loc_kit_ingest.model import StringUnit as _StringUnit
-
-    return tuple(
-        _StringUnit(
-            key=row["key"],
-            values=dict(row["values"]),
-            comments=tuple(row["comments"]),
-            references=tuple(row["references"]),
-            row=row["row"],
-            explanation=row.get("explanation", ""),
-            flags=row.get("flags", ""),
-        )
-        for row in json.loads(payload)
-    )
-
-
 def _can_add_strings(user, component: Component) -> bool:
     return user.has_perm("upload.perform", component) and user.has_perm(
         "unit.add", component.source_translation
@@ -1862,6 +1839,64 @@ def _can_add_strings(user, component: Component) -> bool:
 
 def _can_apply_explanations(user, component: Component) -> bool:
     return user.has_perm("source.edit", component.source_translation)
+
+
+_LOC_KIT_ERROR_TEMPLATES: dict[str, StrOrPromise] = {
+    "prepare-failed": gettext_lazy("Could not prepare the table: %s"),
+    "apply-failed": gettext_lazy("Could not apply the table: %s"),
+    "lock-timeout": gettext_lazy(
+        "The component was busy and this step timed out; nothing further "
+        "was changed. (%s)"
+    ),
+    "finalize-failed": gettext_lazy(
+        "Could not commit the applied strings to the repository: %s"
+    ),
+}
+
+
+def _loc_kit_error_message(draft: LocKitImportDraft) -> str:
+    """
+    Render a FAILED draft's error for display, safely translated.
+
+    ``error_code`` selects a translated template; ``error_details`` (raw,
+    English, from parser/lock/VCS internals) is only ever interpolated as
+    its ``%s`` argument, mirroring the synchronous form-error wording this
+    flow replaced.
+    """
+    template = _LOC_KIT_ERROR_TEMPLATES.get(
+        draft.error_code, gettext_lazy("An unexpected error occurred: %s")
+    )
+    return str(template) % (draft.error_details or "")
+
+
+def _dispatch_loc_kit_task(
+    request: AuthenticatedHttpRequest,
+    draft: LocKitImportDraft,
+    task,
+    task_id: uuid.UUID,
+    *,
+    text: str,
+) -> None:
+    """
+    Publish a loc-kit background task after commit, and register it for
+    user discovery. ``add_user_task`` only surfaces a *running* task
+    (weblate.utils.celery.get_user_tasks drops settled ones); a completed
+    or failed draft stays discoverable afterwards through the durable
+    ``active_loc_kit_string_draft`` link on the component page instead.
+    """
+    status_url = reverse("loc-kit-strings-preview", kwargs={"token": draft.token})
+
+    def _publish() -> None:
+        task.apply_async(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(task_id),
+            priority=INTERACTIVE_TASK_PRIORITY,
+        )
+        add_user_task(
+            request.user.pk, str(task_id), text=text, label=draft.name, url=status_url
+        )
+
+    transaction.on_commit(_publish)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -1900,80 +1935,10 @@ class LocKitStringsUpdateStartView(TemplateView):
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form))
         uploaded = form.cleaned_data["table"]
-
-        # ruff: ignore[import-outside-top-level]
-        from loc_kit_ingest.infer import InferenceError, infer_profile
-
-        # ruff: ignore[import-outside-top-level]
-        from loc_kit_ingest.model import Severity
-
-        # ruff: ignore[import-outside-top-level]
-        from loc_kit_ingest.parser import parse_component as parse_kit_component
-
-        # ruff: ignore[import-outside-top-level]
-        from loc_kit_ingest.profile import ProfileError, parse_profile
-
-        # ruff: ignore[import-outside-top-level]
-        from loc_kit_ingest.reader import ReaderError, read_sheets
-
         filename = os.path.basename(getattr(uploaded, "name", "") or "")
-        uploaded.seek(0)
-        payload = uploaded.read()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            local = Path(tmpdir) / filename
-            local.write_bytes(payload)
-            try:
-                sheets = read_sheets(local)
-            except ReaderError as error:
-                form.add_error("table", gettext("Could not read the table: %s") % error)
-                return self.render_to_response(self.get_context_data(form=form))
-        if len(sheets) != 1:
-            form.add_error(
-                "table",
-                gettext("The workbook holds %d sheets; upload a single-sheet table.")
-                % len(sheets),
-            )
-            return self.render_to_response(self.get_context_data(form=form))
-        sheet_name, rows = next(iter(sheets.items()))
-
-        try:
-            document, _notes = infer_profile(
-                {sheet_name: rows}, kit_stem=component.slug, component=component.slug
-            )
-            profile = parse_profile(document)
-        except (InferenceError, ProfileError) as error:
-            form.add_error("table", gettext("Could not read the loc-kit: %s") % error)
-            return self.render_to_response(self.get_context_data(form=form))
-        if profile.components[0].kind != "po":
-            form.add_error(
-                "table", gettext("This table maps to a glossary layout, not strings.")
-            )
-            return self.render_to_response(self.get_context_data(form=form))
-
-        result = parse_kit_component(profile.components[0], rows)
-        errors = [d for d in result.diagnostics if d.severity is Severity.ERROR]
-        if errors:
-            shown = "; ".join(f"row {d.row}: {d.message}" for d in errors[:10])
-            form.add_error("table", gettext("The loc-kit has errors: %s") % shown)
-            return self.render_to_response(self.get_context_data(form=form))
-        if profile.components[0].source_lang != component.source_language.code:
-            form.add_error(
-                "table",
-                gettext(
-                    "The table's source language does not match the "
-                    "component's source language."
-                ),
-            )
-            return self.render_to_response(self.get_context_data(form=form))
-        try:
-            validate_loc_kit_string_update_size(result.units)
-        except ValidationError as error:
-            form.add_error("table", "; ".join(error.messages))
-            return self.render_to_response(self.get_context_data(form=form))
-
         if not request.session.session_key:
             request.session.create()
+        task_id = uuid.uuid4()
         draft = LocKitImportDraft(
             owner=request.user,
             session_key=request.session.session_key or "",
@@ -1984,18 +1949,23 @@ class LocKitStringsUpdateStartView(TemplateView):
             name=component.name,
             source_filename=filename,
             target_component=component,
-            state=LocKitImportDraft.State.PREVIEW_READY,
-            preview_json=json.dumps(
-                [_string_unit_to_json(unit) for unit in result.units],
-                ensure_ascii=False,
-            ),
+            state=LocKitImportDraft.State.PREPARING,
+            prepare_task_id=task_id,
+            progress={"phase": "preparing", "processed_rows": 0},
         )
-        draft.uploaded.save(filename, ContentFile(payload), save=False)
+        draft.uploaded.save(filename, uploaded, save=False)
         try:
             draft.save()
         except Exception:
             draft.delete_storage()
             raise
+        _dispatch_loc_kit_task(
+            request,
+            draft,
+            prepare_loc_kit_string_update,
+            task_id,
+            text=gettext("Preparing loc-kit table “%s”") % filename,
+        )
         return redirect("loc-kit-strings-preview", token=draft.token)
 
 
@@ -2018,32 +1988,38 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         draft = self.get_draft(self.kwargs["token"])
         component = draft.target_component
-        units = _string_units_from_json(draft.preview_json)
-        existing_keys = existing_string_keys(component)
-        new_count = sum(1 for unit in units if unit.key not in existing_keys)
-        can_add_strings = _can_add_strings(self.request.user, component)
-        can_apply_explanations = _can_apply_explanations(self.request.user, component)
-        explanation_preview = classify_kit_explanations(
-            component=component, units=units, overwrite=False
-        )
-        judge_stale_count = (
-            count_judge_stale_after_explanations(
-                component=component, units=units, overwrite=False
-            )
-            if can_apply_explanations
-            else 0
-        )
+        summary = json.loads(draft.preview_json) if draft.preview_json else {}
+        progress = draft.progress if isinstance(draft.progress, dict) else {}
         context.update(
             {
                 "draft": draft,
                 "object": component,
-                "row_count": len(units),
-                "new_count": new_count,
-                "existing_count": len(units) - new_count,
-                "can_add_strings": can_add_strings,
-                "can_apply_explanations": can_apply_explanations,
-                "explanation_preview": explanation_preview,
-                "judge_stale_count": judge_stale_count,
+                "row_count": summary.get("total_rows", 0),
+                "new_count": summary.get("new_count", 0),
+                "existing_count": summary.get("existing_count", 0),
+                "can_add_strings": _can_add_strings(self.request.user, component),
+                "can_apply_explanations": _can_apply_explanations(
+                    self.request.user, component
+                ),
+                "explanation_preview": summary.get("explanations", {}),
+                "changed_sources": summary.get("changed_sources", []),
+                "changed_source_count": summary.get("changed_source_count", 0),
+                "is_preparing": draft.state == LocKitImportDraft.State.PREPARING,
+                "is_applying": draft.state == LocKitImportDraft.State.APPLYING,
+                "is_completed": draft.state == LocKitImportDraft.State.COMPLETED,
+                "is_failed": draft.state == LocKitImportDraft.State.FAILED,
+                "stale_apply_retry": (
+                    draft.state == LocKitImportDraft.State.APPLYING
+                    and draft.last_activity_at is not None
+                    and timezone.now() - draft.last_activity_at >= timedelta(minutes=30)
+                ),
+                "apply_progress": progress,
+                "completed_summary": progress
+                if draft.state == LocKitImportDraft.State.COMPLETED
+                else {},
+                "error_message": _loc_kit_error_message(draft)
+                if draft.state == LocKitImportDraft.State.FAILED
+                else "",
                 "confirm_form": kwargs.get("confirm_form")
                 or LocKitStringsConfirmForm(),
             }
@@ -2055,13 +2031,40 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
         action = request.POST.get("action")
 
         if action == "cancel":
+            # Applying/finalizing is owned by the fenced background task; a
+            # user cancel here must never delete the payload or draft out
+            # from under it, nor orphan its owned, not-yet-committed
+            # PendingUnitChange rows once any portion has actually written
+            # units. The task's own terminal transitions are the only path
+            # out of APPLYING and out of a FAILED apply/finalize retry.
+            cannot_cancel = draft.state in (
+                LocKitImportDraft.State.APPLYING,
+                LocKitImportDraft.State.COMPLETED,
+            ) or (
+                draft.state == LocKitImportDraft.State.FAILED
+                and draft.retry_phase in ("apply", "finalize")
+            )
+            if cannot_cancel:
+                raise Http404
             draft.delete_storage()
             draft.delete()
             messages.info(request, gettext("Loc-kit strings update cancelled."))
             return redirect(draft.target_component)
 
+        if action == "retry":
+            return self._retry(request, draft)
+
         if action != "confirm":
             raise Http404
+
+        if draft.state in (
+            LocKitImportDraft.State.APPLYING,
+            LocKitImportDraft.State.COMPLETED,
+        ):
+            # Idempotent: a duplicate submit (double-click, retried POST)
+            # returns to the same status page instead of starting a second
+            # background task.
+            return redirect("loc-kit-strings-preview", token=draft.token)
         if draft.state != LocKitImportDraft.State.PREVIEW_READY:
             raise Http404
 
@@ -2071,89 +2074,117 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
                 self.get_context_data(confirm_form=confirm_form)
             )
 
-        component = draft.target_component
-        units = _string_units_from_json(draft.preview_json)
-        try:
-            result = apply_loc_kit_string_update(
-                user=request.user,
-                component=component,
-                units=units,
-                overwrite_explanations=confirm_form.cleaned_data[
+        task_id = uuid.uuid4()
+        with transaction.atomic():
+            locked = LocKitImportDraft.objects.select_for_update().get(pk=draft.pk)
+            if locked.state != LocKitImportDraft.State.PREVIEW_READY:
+                return redirect("loc-kit-strings-preview", token=draft.token)
+            locked.state = LocKitImportDraft.State.APPLYING
+            locked.apply_task_id = task_id
+            locked.confirmed_options = {
+                "overwrite_explanations": confirm_form.cleaned_data[
                     "overwrite_explanations"
                 ],
+            }
+            locked.progress = {"phase": "applying", "processed_rows": 0}
+            locked.last_activity_at = timezone.now()
+            locked.apply_started_at = locked.last_activity_at
+            locked.save(
+                update_fields=[
+                    "state",
+                    "apply_task_id",
+                    "confirmed_options",
+                    "progress",
+                    "last_activity_at",
+                    "apply_started_at",
+                ]
             )
-        except WeblateLockTimeoutError:
-            messages.error(
+            _dispatch_loc_kit_task(
                 request,
-                gettext(
-                    "The component is busy right now; nothing was changed. "
-                    "Please retry in a moment."
-                ),
+                locked,
+                apply_loc_kit_string_update_draft,
+                task_id,
+                text=gettext("Applying loc-kit table “%s”") % locked.name,
             )
-            return redirect("loc-kit-strings-preview", token=draft.token)
-        except ValidationError as error:
-            messages.error(request, "; ".join(error.messages))
-            return redirect("loc-kit-strings-preview", token=draft.token)
+        return redirect("loc-kit-strings-preview", token=draft.token)
 
-        self._report_update_outcome(request, result)
-        draft.delete_storage()
-        draft.delete()
-        return redirect(component)
+    def _retry(
+        self, request: AuthenticatedHttpRequest, draft: LocKitImportDraft
+    ) -> HttpResponse:
+        if draft.state == LocKitImportDraft.State.APPLYING:
+            if (
+                draft.last_activity_at is None
+                or timezone.now() - draft.last_activity_at < timedelta(minutes=30)
+            ):
+                raise Http404
+            task_id = uuid.uuid4()
+            task = apply_loc_kit_string_update_draft
+            reset_fields = {
+                "state": LocKitImportDraft.State.APPLYING,
+                "apply_task_id": task_id,
+            }
+            task_id_field = "apply_task_id"
+            text = gettext("Retrying stalled loc-kit table “%s”") % draft.name
+            expected_state = LocKitImportDraft.State.APPLYING
+            expected_retry_phase = None
+        elif draft.state != LocKitImportDraft.State.FAILED:
+            raise Http404
+        elif draft.retry_phase == "prepare":
+            task_id = uuid.uuid4()
+            task = prepare_loc_kit_string_update
+            reset_fields = {
+                "state": LocKitImportDraft.State.PREPARING,
+                "prepare_task_id": task_id,
+                "progress": {"phase": "preparing", "processed_rows": 0},
+            }
+            task_id_field = "prepare_task_id"
+            text = gettext("Preparing loc-kit table “%s”") % draft.source_filename
+            expected_state = LocKitImportDraft.State.FAILED
+            expected_retry_phase = draft.retry_phase
+        elif draft.retry_phase in ("apply", "finalize"):
+            task_id = uuid.uuid4()
+            task = apply_loc_kit_string_update_draft
+            reset_fields = {
+                "state": LocKitImportDraft.State.APPLYING,
+                "apply_task_id": task_id,
+            }
+            task_id_field = "apply_task_id"
+            text = gettext("Applying loc-kit table “%s”") % draft.name
+            expected_state = LocKitImportDraft.State.FAILED
+            expected_retry_phase = draft.retry_phase
+        else:
+            raise Http404
 
-    @staticmethod
-    def _report_update_outcome(request: AuthenticatedHttpRequest, result) -> None:
-        strings = result.strings
-        explanations = result.explanations
-        if strings.added:
-            messages.success(
-                request,
-                ngettext(
-                    "%d new string was added.",
-                    "%d new strings were added.",
-                    strings.added,
-                )
-                % strings.added,
+        with transaction.atomic():
+            locked = LocKitImportDraft.objects.select_for_update().get(pk=draft.pk)
+            if locked.state != expected_state:
+                return redirect("loc-kit-strings-preview", token=draft.token)
+            if (
+                expected_retry_phase is not None
+                and locked.retry_phase != expected_retry_phase
+            ):
+                return redirect("loc-kit-strings-preview", token=draft.token)
+            if expected_state == LocKitImportDraft.State.APPLYING and (
+                locked.last_activity_at is None
+                or timezone.now() - locked.last_activity_at < timedelta(minutes=30)
+            ):
+                return redirect("loc-kit-strings-preview", token=draft.token)
+            for field, value in reset_fields.items():
+                setattr(locked, field, value)
+            locked.error_code = ""
+            locked.error_details = ""
+            locked.retry_phase = ""
+            locked.last_activity_at = timezone.now()
+            locked.save(
+                update_fields=[
+                    *reset_fields.keys(),
+                    "error_code",
+                    "error_details",
+                    "retry_phase",
+                    "last_activity_at",
+                ]
             )
-        for code in strings.unavailable_languages:
-            messages.warning(
-                request,
-                gettext("Language %s could not be added; its rows were skipped.")
-                % code,
+            _dispatch_loc_kit_task(
+                request, locked, task, getattr(locked, task_id_field), text=text
             )
-        if explanations.set_count:
-            messages.success(
-                request,
-                ngettext(
-                    "%d Explanation was set.",
-                    "%d Explanations were set.",
-                    explanations.set_count,
-                )
-                % explanations.set_count,
-            )
-        if explanations.would_overwrite_count:
-            messages.info(
-                request,
-                gettext(
-                    "%d existing, non-empty Explanation was left unchanged; "
-                    "confirm again with overwrite checked to replace it."
-                )
-                % explanations.would_overwrite_count,
-            )
-        if explanations.unavailable_count:
-            messages.warning(
-                request,
-                gettext(
-                    "%d Explanation could not be set: you do not have the "
-                    "Edit source string permission on this component."
-                )
-                % explanations.unavailable_count,
-            )
-        if not any(
-            [
-                strings.added,
-                explanations.set_count,
-                explanations.would_overwrite_count,
-                explanations.unavailable_count,
-            ]
-        ):
-            messages.info(request, gettext("Nothing in the table changed anything."))
+        return redirect("loc-kit-strings-preview", token=draft.token)

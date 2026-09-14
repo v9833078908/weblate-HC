@@ -1954,6 +1954,7 @@ class PoMonoFormat(BasePoFormat):
     name = gettext_lazy("gettext PO file (monolingual)")
     format_id = "po-mono"
     monolingual = True
+    supports_new_unit_metadata = True
     autoload: tuple[str, ...] = ()
     empty_file_template = (
         'msgid ""\n'

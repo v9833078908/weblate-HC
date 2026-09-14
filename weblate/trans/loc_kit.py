@@ -15,6 +15,7 @@ local validation is the responsibility of later orchestration (Task C4).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 
 from weblate.checks.flags import Flags
+from weblate.trans.models.pending import PendingUnitChange
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.requests import fetch_validated_url
 from weblate.utils.state import STATE_TRANSLATED
@@ -39,6 +41,7 @@ if TYPE_CHECKING:
     from loc_kit_ingest.model import Diagnostic, GlossaryTerm, StringUnit
     from weblate.auth.models import AuthenticatedHttpRequest, User
     from weblate.trans.models import Component, Translation, Unit
+    from weblate.trans.models.loc_kit import LocKitImportDraft
 
 
 # Fixed OpenRouter chat-completions endpoint. Not configurable, never derived
@@ -66,6 +69,12 @@ _CELL_EXCERPT_LIMIT = 80
 # non-empty input cell which may produce a unit, target, flag, or Explanation
 # write. The largest tracked string kit has 3,960 such cells.
 LOC_KIT_STRING_UPDATE_MAX_MUTATIONS = 5_000
+
+# Background application processes the prepared table in bounded portions of
+# whole rows so the component lock and any single DB transaction never span
+# an entire large table. A crash between portions resumes from the durable
+# ``next_row`` cursor instead of repeating already-committed rows.
+LOC_KIT_STRING_UPDATE_PORTION_SIZE = 25
 
 
 class SampleTooLargeError(Exception):
@@ -854,6 +863,10 @@ class KitExplanationApplyResult:
     # whole operation on a permission check (rather than failing hard) fills
     # this in for the rows it chose not to even attempt.
     unavailable_count: int = 0
+    # A row whose key exists but whose incoming source-language value
+    # disagrees with the stored source. Never set by an apply that skips
+    # the gate itself (e.g. a hard-denied caller building its own result).
+    source_changed_count: int = 0
 
 
 def _check_explanation_apply_eligibility(component: Component) -> None:
@@ -875,6 +888,7 @@ def _classify_kit_explanations(
     source_units: Mapping[str, Unit],
     units: Sequence[StringUnit],
     overwrite: bool,
+    source_lang: str,
 ) -> tuple[list[tuple[Unit, str]], KitExplanationApplyResult]:
     """
     Classify each incoming explanation cell without mutating anything.
@@ -882,6 +896,21 @@ def _classify_kit_explanations(
     Returns the source units to actually write (paired with their new
     explanation) plus the full outcome breakdown; a preview caller uses only
     the counters, ``apply_kit_explanations`` writes the first element.
+
+    A row whose key already exists but whose source-language cell disagrees
+    with the stored source is never eligible: the context may now name a
+    different term, so its Explanation is not auto-applied. Only a row that
+    actually supplies the source-language column is compared - ``source_lang
+    in incoming.values`` - so a caller with no source evidence at all (the
+    single-shot explanation apply run right after a kit-derived component's
+    translations first load, which only ever tracks key -> explanation and
+    never populates ``values``) is unaffected; an explicit blank cell for an
+    existing key still counts as a real disagreement. This is decided here,
+    against ``source_unit.source`` from the caller's own ``source_units``
+    lookup, so an apply that locks and re-fetches immediately before writing
+    (``apply_kit_explanations``) re-evaluates it under that fresh state - a
+    stale preview snapshot can never keep a row eligible past a source that
+    changed after the preview ran.
     """
     counters = {
         "set_count": 0,
@@ -890,6 +919,7 @@ def _classify_kit_explanations(
         "missing_key_count": 0,
         "would_overwrite_count": 0,
         "already_in_note_count": 0,
+        "source_changed_count": 0,
     }
     to_apply: list[tuple[Unit, str]] = []
     for incoming in units:
@@ -901,6 +931,11 @@ def _classify_kit_explanations(
         if source_unit is None:
             counters["missing_key_count"] += 1
             continue
+        if source_lang in incoming.values:
+            new_source = incoming.values[source_lang]
+            if new_source != source_unit.source:
+                counters["source_changed_count"] += 1
+                continue
         if source_unit.explanation == explanation:
             counters["unchanged_count"] += 1
             continue
@@ -942,7 +977,10 @@ def count_judge_stale_after_explanations(
         for unit in component.source_translation.unit_set.filter(context__in=keys)
     }
     to_apply, _result = _classify_kit_explanations(
-        source_units=source_units, units=units, overwrite=overwrite
+        source_units=source_units,
+        units=units,
+        overwrite=overwrite,
+        source_lang=component.source_language.code,
     )
     if not to_apply:
         return 0
@@ -984,7 +1022,10 @@ def classify_kit_explanations(
         for unit in component.source_translation.unit_set.filter(context__in=keys)
     }
     _to_apply, counters = _classify_kit_explanations(
-        source_units=source_units, units=units, overwrite=overwrite
+        source_units=source_units,
+        units=units,
+        overwrite=overwrite,
+        source_lang=component.source_language.code,
     )
     return counters
 
@@ -1020,11 +1061,71 @@ def apply_kit_explanations(
             .order_by("pk")
         }
         to_apply, result = _classify_kit_explanations(
-            source_units=source_units, units=units, overwrite=overwrite
+            source_units=source_units,
+            units=units,
+            overwrite=overwrite,
+            source_lang=locked_component.source_language.code,
         )
         for source_unit, explanation in to_apply:
             source_unit.update_explanation(explanation, user)
     return result
+
+
+def load_prepared_string_units(draft: LocKitImportDraft) -> tuple[StringUnit, ...]:
+    """
+    Read and checksum-verify a draft's private canonical packet.
+
+    Only a background task holding the draft's current fencing task id may
+    call this: the packet's full row content is never exposed to an HTTP
+    status/preview request.
+    """
+    if not draft.prepared_payload:
+        msg = _("The prepared loc-kit data is unavailable.")
+        raise ValidationError(msg)
+    with draft.prepared_payload.open("rb") as payload:
+        encoded = payload.read()
+    if hashlib.sha256(encoded).hexdigest() != draft.payload_checksum:
+        msg = _("The prepared loc-kit data is corrupted.")
+        raise ValidationError(msg)
+    try:
+        packet = json.loads(encoded)
+        rows = packet["rows"]
+    except (json.JSONDecodeError, KeyError, TypeError) as error:
+        msg = _("The prepared loc-kit data is invalid.")
+        raise ValidationError(msg) from error
+    return string_units_from_json(json.dumps(rows, ensure_ascii=False))
+
+
+def string_unit_to_json(unit: StringUnit) -> dict[str, object]:
+    """Return a versioned-payload-safe representation of one loc-kit row."""
+    return {
+        "key": unit.key,
+        "values": dict(unit.values),
+        "comments": list(unit.comments),
+        "references": list(unit.references),
+        "row": unit.row,
+        "explanation": unit.explanation,
+        "flags": unit.flags,
+    }
+
+
+def string_units_from_json(payload: str) -> tuple[StringUnit, ...]:
+    """Restore loc-kit rows from private canonical JSON."""
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.model import StringUnit as _StringUnit
+
+    return tuple(
+        _StringUnit(
+            key=row["key"],
+            values=dict(row["values"]),
+            comments=tuple(row["comments"]),
+            references=tuple(row["references"]),
+            row=row["row"],
+            explanation=row.get("explanation", ""),
+            flags=row.get("flags", ""),
+        )
+        for row in json.loads(payload)
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -1081,6 +1182,52 @@ def existing_string_keys(component: Component) -> set[str]:
 
 
 @dataclass(frozen=True)
+class ChangedSourceRow:
+    """One existing key whose table row disagrees with the stored source."""
+
+    key: str
+    old_source: str
+    new_source: str
+
+
+def find_changed_sources(
+    *, component: Component, units: Sequence[StringUnit]
+) -> tuple[ChangedSourceRow, ...]:
+    """
+    Report existing keys whose source-language cell disagrees with Weblate.
+
+    Read-only: the table never rewrites an existing key's source (see
+    ``append_translation_strings``), so this only surfaces the discrepancy -
+    key, the stored value, and the table's value - as its own preview
+    section, distinct from the new/existing counts. Compares every existing
+    key the table also names, including a row whose source cell is blank:
+    a table that clears a previously non-empty source disagrees with
+    Weblate exactly as much as one that supplies a different value, and a
+    blank cell is never distinguished from an absent column (the real
+    parser always populates every configured language column per row, so
+    an existing key's cell is either present-and-blank or present-and-set,
+    never simply missing from ``values``).
+    """
+    source_lang = component.source_language.code
+    existing_sources = dict(
+        component.source_translation.unit_set.values_list("context", "source")
+    )
+    changed: list[ChangedSourceRow] = []
+    for unit in units:
+        old_source = existing_sources.get(unit.key)
+        if old_source is None or source_lang not in unit.values:
+            continue
+        new_source = unit.values[source_lang]
+        if new_source != old_source:
+            changed.append(
+                ChangedSourceRow(
+                    key=unit.key, old_source=old_source, new_source=new_source
+                )
+            )
+    return tuple(changed)
+
+
+@dataclass(frozen=True)
 class StringsAppendResult:
     """Outcomes of adding brand-new loc-kit rows to a string component."""
 
@@ -1089,6 +1236,7 @@ class StringsAppendResult:
     language_added: Mapping[str, int] = field(default_factory=dict)
     created_languages: tuple[str, ...] = ()
     unavailable_languages: tuple[str, ...] = ()
+    pending_change_ids: tuple[int, ...] = ()
 
 
 def _resolve_append_language(
@@ -1111,6 +1259,7 @@ def append_translation_strings(
     user: User,
     component: Component,
     units: Sequence[StringUnit],
+    pending_owner: str = "",
 ) -> StringsAppendResult:
     """
     Add loc-kit rows whose key does not exist yet, to every reachable language.
@@ -1121,6 +1270,18 @@ def append_translation_strings(
     component is created only when at least one new row needs it and the
     caller holds ``translation.add``; otherwise it is reported unavailable
     and every other language still receives its rows.
+
+    Every write goes through ``Unit.add_unit``/``Unit.translate`` with
+    ``is_batch_update=True`` and a single ``store_update_changes()`` flush
+    per touched translation, exactly like every other Weblate batch writer:
+    a raw ``Unit.save()`` on a target creates no ``PendingUnitChange`` and
+    the translation would silently never reach the backing file. When
+    ``pending_owner`` is set (the calling draft's stable token), every
+    ``PendingUnitChange`` this call creates is tagged with it in
+    ``metadata["loc_kit_draft_id"]`` and its primary key is returned in
+    ``pending_change_ids``, so a caller can later commit exactly this set
+    with ``Component.commit_pending_subset`` instead of every pending
+    change on the component.
 
     Runs under ``component.locked_for_update()``, exactly like
     ``apply_kit_explanations`` and ``append_glossary_terms``: two concurrent
@@ -1166,18 +1327,27 @@ def append_translation_strings(
                 translations_by_code[code] = translation
                 created_languages.append(code)
 
+        source_translation = locked_component.source_translation
         language_added: dict[str, int] = {}
+        row_keys: list[str] = []
+        touched_translations: dict[int, Translation] = {}
+        target_pending: list[PendingUnitChange] = []
         for unit in new_units:
-            source_unit = locked_component.source_translation.add_unit(
+            note = "; ".join(comment for comment in unit.comments if comment)
+            location = ",".join(ref for ref in unit.references if ref)
+            source_unit = source_translation.add_unit(
                 None,
                 unit.key,
                 unit.values.get(source_lang, ""),
                 [],
                 is_batch_update=True,
+                note=note,
+                location=location,
                 author=user,
             )
             if source_unit is None:
                 continue
+            row_keys.append(unit.key)
             for code, value in unit.values.items():
                 if code == source_lang or not value.strip():
                     continue
@@ -1187,9 +1357,24 @@ def append_translation_strings(
                 target_unit = translation.unit_set.filter(context=unit.key).first()
                 if target_unit is None:
                     continue
-                target_unit.target = value
-                target_unit.state = STATE_TRANSLATED
-                target_unit.save(update_fields=["target", "state"], same_content=True)
+                # For a monolingual format, ``pending = is_source`` in
+                # ``_add_unit_locked``: the component-wide ``add_unit`` cascade
+                # above creates this target unit's DB row but no pending
+                # change at all (only the source unit gets one). This
+                # ``translate`` call is therefore the first-ever pending
+                # change for a unit that has never been written to its own
+                # target file, so ``update_units`` must route it through
+                # ``find_or_add_pending_store_unit`` - flip the ``add_unit``
+                # flag ``Unit.translate`` does not know to set, after it has
+                # done its normal state/check/change-history bookkeeping.
+                target_unit.is_batch_update = True
+                target_unit.translate(
+                    user, value, STATE_TRANSLATED, author=user, propagate=False
+                )
+                if target_unit.pending_unit_change is not None:
+                    target_unit.pending_unit_change.add_unit = True
+                    target_pending.append(target_unit.pending_unit_change)
+                touched_translations[translation.pk] = translation
                 language_added[code] = language_added.get(code, 0) + 1
             # Flags land on the source unit only after every target is
             # written: a read-only flag would otherwise block the target
@@ -1197,12 +1382,46 @@ def append_translation_strings(
             if unit.flags.strip():
                 flags = Flags(unit.flags)
                 source_unit.update_extra_flags(flags.format(), user)
+
+        if pending_owner:
+            for pending_change in target_pending:
+                pending_change.metadata["loc_kit_draft_id"] = pending_owner
+        source_translation.store_update_changes()
+        for translation in touched_translations.values():
+            translation.store_update_changes()
+
+        pending_ids = [
+            pending_change.pk
+            for pending_change in target_pending
+            if pending_change.pk is not None
+        ]
+        if row_keys:
+            # The source unit's own ``add_unit=True`` pending change, plus
+            # any language the row's values did not populate: every such
+            # unit ``add_unit`` created belongs to this row's atomic
+            # finalizing commit, not only the ones this call also
+            # translated above.
+            cascade_pending_qs = PendingUnitChange.objects.filter(
+                unit__translation__component=locked_component,
+                unit__context__in=row_keys,
+                add_unit=True,
+            ).exclude(pk__in=[pc.pk for pc in target_pending if pc.pk is not None])
+            if pending_owner:
+                for pending_change in cascade_pending_qs:
+                    pending_change.metadata["loc_kit_draft_id"] = pending_owner
+                    pending_change.save(update_fields=["metadata"])
+                pending_ids.extend(
+                    pending_change.pk for pending_change in cascade_pending_qs
+                )
+            else:
+                pending_ids.extend(cascade_pending_qs.values_list("pk", flat=True))
         return StringsAppendResult(
             added=len(new_units),
             existing=existing_count,
             language_added=language_added,
             created_languages=tuple(created_languages),
             unavailable_languages=tuple(unavailable_languages),
+            pending_change_ids=tuple(pending_ids),
         )
 
 
@@ -1213,6 +1432,10 @@ class StringsUpdateResult:
     strings: StringsAppendResult
     explanations: KitExplanationApplyResult
 
+    @property
+    def pending_change_ids(self) -> tuple[int, ...]:
+        return self.strings.pending_change_ids
+
 
 def apply_loc_kit_string_update(
     *,
@@ -1220,6 +1443,7 @@ def apply_loc_kit_string_update(
     component: Component,
     units: Sequence[StringUnit],
     overwrite_explanations: bool,
+    pending_owner: str = "",
 ) -> StringsUpdateResult:
     """
     Add new loc-kit rows and set Explanations on one existing component.
@@ -1239,7 +1463,7 @@ def apply_loc_kit_string_update(
     )
     if can_add_strings:
         strings_result = append_translation_strings(
-            user=user, component=component, units=units
+            user=user, component=component, units=units, pending_owner=pending_owner
         )
     else:
         existing_keys = existing_string_keys(component)
@@ -1630,12 +1854,14 @@ def append_glossary_terms(
 __all__ = [
     "GLOSSARY_SCHEMA_VERSION",
     "LOC_KIT_STRING_UPDATE_MAX_MUTATIONS",
+    "LOC_KIT_STRING_UPDATE_PORTION_SIZE",
     "OPENROUTER_API_ROOT",
     "OPENROUTER_CHAT_COMPLETIONS_URL",
     "OPENROUTER_REQUEST_TIMEOUT",
     "PREVIEW_TERM_LIMIT",
     "PREVIEW_WARNING_LIMIT",
     "SAMPLE_TOO_LARGE",
+    "ChangedSourceRow",
     "GlossaryAppendCollisionError",
     "GlossaryAppendResult",
     "GlossaryLanguageAppendResult",
@@ -1655,6 +1881,8 @@ __all__ = [
     "cap_preview_warnings",
     "classify_kit_explanations",
     "existing_string_keys",
+    "find_changed_sources",
+    "load_prepared_string_units",
     "load_profile_prompt",
     "profile_document_from_envelope",
     "request_profile_proposal",

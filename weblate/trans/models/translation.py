@@ -1352,19 +1352,60 @@ class Translation(
         pounit.set_source_explanation(pending_change.source_unit_explanation)
 
     def find_or_add_pending_store_unit(
-        self, store: TranslationFormat, unit: Unit
+        self,
+        store: TranslationFormat,
+        unit: Unit,
+        pending_change: PendingUnitChange | None = None,
     ) -> TranslationUnit:
         try:
             pounit, add = store.find_unit(unit.context, unit.source)
         except UnitNotFoundError:
-            return store.new_unit(
+            pounit = store.new_unit(
                 unit.context,
                 unit.get_source_plurals(),
                 unit.get_target_plurals(),
             )
+            self._apply_new_unit_metadata(store, pounit, pending_change)
+            return pounit
         if add:
             store.add_unit(pounit)
+        # Also cover recovery: a retried flush finds the unit already added
+        # to the store from a previous, interrupted attempt (partial write
+        # before the commit itself failed). Idempotent: never duplicates an
+        # already-present note or location.
+        self._apply_new_unit_metadata(store, pounit, pending_change)
         return pounit
+
+    @staticmethod
+    def _apply_new_unit_metadata(
+        store: TranslationFormat,
+        pounit: TranslationUnit,
+        pending_change: PendingUnitChange | None,
+    ) -> None:
+        if not store.supports_new_unit_metadata or pending_change is None:
+            return
+        note = pending_change.metadata.get("note", "")
+        location = pending_change.metadata.get("location", "")
+        if not note and not location:
+            return
+        # ``pounit`` is Weblate's wrapper (``TranslationUnit``); the
+        # translate-toolkit note/location API lives on the raw unit it
+        # wraps (``pounit.unit``), matching every existing ``unit.unit``
+        # use in this format layer (e.g. ``ttkit.py``'s own ``add_unit``
+        # overrides). These are the toolkit's own methods, not the
+        # unrelated ``BaseExporter.add_note``/``store_unit_metadata`` used
+        # only by full-file export/re-render.
+        raw_unit = pounit.unit
+        if note:
+            existing_notes = raw_unit.getnotes(origin="developer")
+            if note not in existing_notes.split("\n"):
+                raw_unit.addnote(note, origin="developer")
+        if location:
+            existing_locations = set(raw_unit.getlocations())
+            for item in location.split(","):
+                item = item.strip()
+                if item and item not in existing_locations:
+                    raw_unit.addlocation(item)
 
     @property
     def count_pending_units(self):
@@ -1458,7 +1499,9 @@ class Translation(
             unit.target = pending_change.target
 
             if pending_change.add_unit:
-                pounit = self.find_or_add_pending_store_unit(store, unit)
+                pounit = self.find_or_add_pending_store_unit(
+                    store, unit, pending_change
+                )
                 try:
                     self.update_pending_store_unit(pounit, unit, pending_change)
                 except Exception as error:
@@ -2395,6 +2438,8 @@ class Translation(
         *,
         extra_flags: str = "",
         explanation: str = "",
+        note: str = "",
+        location: str = "",
         auto_context: bool = False,
         is_batch_update: bool = False,
         skip_existing: bool = False,
@@ -2411,6 +2456,8 @@ class Translation(
         *,
         extra_flags: str = "",
         explanation: str = "",
+        note: str = "",
+        location: str = "",
         auto_context: bool = False,
         is_batch_update: bool = False,
         skip_existing: bool = False,
@@ -2426,6 +2473,8 @@ class Translation(
         *,
         extra_flags: str = "",
         explanation: str = "",
+        note: str = "",
+        location: str = "",
         auto_context: bool = False,
         is_batch_update: bool = False,
         skip_existing: bool = False,
@@ -2440,6 +2489,8 @@ class Translation(
                 target,
                 extra_flags=extra_flags,
                 explanation=explanation,
+                note=note,
+                location=location,
                 auto_context=auto_context,
                 is_batch_update=is_batch_update,
                 skip_existing=skip_existing,
@@ -2457,6 +2508,8 @@ class Translation(
         *,
         extra_flags: str = "",
         explanation: str = "",
+        note: str = "",
+        location: str = "",
         auto_context: bool = False,
         is_batch_update: bool = False,
         skip_existing: bool = False,
@@ -2555,6 +2608,8 @@ class Translation(
             if is_source:
                 current_target = source
                 kwargs["extra_flags"] = source_extra_flags
+                kwargs["note"] = note
+                kwargs["location"] = location
             elif add_terminology and translation != self:
                 current_target = ""
             else:
@@ -2628,10 +2683,17 @@ class Translation(
                             force_insert=True,
                             sync_terminology=False,
                         )
+                        new_pending_change = None
                         if pending:
-                            PendingUnitChange.store_unit_change(
+                            new_pending_change = PendingUnitChange.store_unit_change(
                                 unit=unit, author=user, add_unit=True
                             )
+                            if is_source and (note or location):
+                                new_pending_change.metadata = {
+                                    "note": note,
+                                    "location": location,
+                                }
+                                new_pending_change.save(update_fields=["metadata"])
                         changes.append(
                             unit.generate_change(
                                 user=user,

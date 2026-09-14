@@ -22,6 +22,7 @@ from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.translation import gettext, ngettext
@@ -65,8 +66,8 @@ from weblate.trans.models import (
     Change,
     Component,
     ComponentList,
-    ProducerRun,
     JudgeVerdict,
+    ProducerRun,
     Project,
     Translation,
 )
@@ -76,6 +77,7 @@ from weblate.trans.models.component import (
     translation_prefetch_tasks,
 )
 from weblate.trans.models.judge import active_verdict, compute_context_hash
+from weblate.trans.models.loc_kit import LocKitImportDraft
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
 from weblate.trans.util import render, sort_unicode, translation_percent
@@ -817,9 +819,7 @@ def judge_queue_strip_context(
         return None
     if not user.has_perm("translation.auto", obj):
         return None
-    can_run_judge = judge_configuration_ready() and user.has_perm(
-        "unit.review", obj
-    )
+    can_run_judge = judge_configuration_ready() and user.has_perm("unit.review", obj)
     runs = recent_producer_runs(obj, user=user)
     if not can_run_judge and not runs:
         return None
@@ -888,6 +888,20 @@ def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpRes
     )
 
     judge_queue = judge_queue_strip_context(user, obj, translations=translations)
+    active_loc_kit_string_draft = (
+        LocKitImportDraft.objects.filter(
+            target_component=obj,
+            owner=user,
+            session_key=request.session.session_key or "",
+            kind=LocKitImportDraft.Kind.STRING,
+        )
+        .exclude(state=LocKitImportDraft.State.CONSUMED)
+        .filter(expires_at__gt=timezone.now())
+        .order_by("-created_at")
+        .first()
+        if user.is_authenticated
+        else None
+    )
 
     return render(
         request,
@@ -900,6 +914,7 @@ def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpRes
             "component": obj,
             "translations": translations,
             "judge_queue": judge_queue,
+            "active_loc_kit_string_draft": active_loc_kit_string_draft,
             **(
                 get_reports_context(request, obj)
                 if request.user.is_authenticated

@@ -15,80 +15,203 @@
     </div>
     <div class="panel-body">
 
-      <table class="table table-condensed">
-        <tbody>
-          <tr>
-            <th scope="row">{% translate "Rows in the table" %}</th>
-            <td>{{ row_count }}</td>
-          </tr>
-          <tr>
-            <th scope="row">{% translate "New keys" %}</th>
-            <td>{{ new_count }}</td>
-          </tr>
-          <tr>
-            <th scope="row">{% translate "Existing keys (source, targets, flags unchanged)" %}</th>
-            <td>{{ existing_count }}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      {% if not can_add_strings %}
-        <div class="alert alert-warning" role="alert">
-          {% translate "You do not have permission to add strings; new keys will be skipped." %}
+      {% if is_preparing %}
+        <div class="alert alert-info" role="status" aria-live="polite">
+          {% translate "Preparing the loc-kit table. Refresh this page in a moment to see the preview." %}
         </div>
-      {% endif %}
-      {% if not can_apply_explanations %}
-        <div class="alert alert-warning" role="alert">
-          {% translate "You do not have the Edit source string permission; Explanations will not be changed." %}
-        </div>
-      {% endif %}
+        <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="cancel" />
+          <input type="submit" value="{% translate "Cancel" %}" class="btn btn-default" />
+        </form>
 
-      <h4>{% translate "Explanation" %}</h4>
-      <table class="table table-condensed">
-        <tbody>
-          <tr>
-            <th scope="row">{% translate "Will be set" %}</th>
-            <td>{{ explanation_preview.set_count }}</td>
-          </tr>
-          <tr>
-            <th scope="row">{% translate "Already the same value" %}</th>
-            <td>{{ explanation_preview.unchanged_count }}</td>
-          </tr>
-          <tr>
-            <th scope="row">{% translate "Existing, non-empty value (needs overwrite)" %}</th>
-            <td>{{ explanation_preview.would_overwrite_count }}</td>
-          </tr>
-          <tr>
-            <th scope="row">{% translate "Blank in the table" %}</th>
-            <td>{{ explanation_preview.blank_count }}</td>
-          </tr>
-          <tr>
-            <th scope="row">{% translate "Key not found in this component" %}</th>
-            <td>{{ explanation_preview.missing_key_count }}</td>
-          </tr>
-          {% if judge_stale_count %}
-            <tr>
-              <th scope="row">{% translate "Strings with a current judge verdict that will need re-judging" %}</th>
-              <td>{{ judge_stale_count }}</td>
-            </tr>
+      {% elif is_applying %}
+        <div class="alert alert-info" role="status" aria-live="polite">
+          {% if apply_progress.total_rows %}
+            {% blocktranslate trimmed with processed=apply_progress.processed_rows total=apply_progress.total_rows %}
+              Applying the table: {{ processed }} of {{ total }} rows processed so far. Refresh
+              this page in a moment to see progress; it is safe to leave and come back later.
+            {% endblocktranslate %}
+          {% else %}
+            {% translate "Applying the table. It is safe to leave this page and come back later." %}
           {% endif %}
-        </tbody>
-      </table>
-
-      <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="cancel" />
-        <input type="submit" value="{% translate "Cancel" %}" class="btn btn-default" />
-      </form>
-
-      <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="confirm" />
-        {% if explanation_preview.would_overwrite_count %}
-          {% crispy confirm_form %}
+        </div>
+        {% if stale_apply_retry %}
+          <div class="alert alert-warning" role="alert">
+            {% translate "No update has been recorded for 30 minutes. You can retry the stalled update." %}
+          </div>
+          <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="retry" />
+            <input type="submit" value="{% translate "Retry" %}" class="btn btn-primary" />
+          </form>
         {% endif %}
-        <input type="submit" value="{% translate "Apply" %}" class="btn btn-primary" />
-      </form>
+
+
+      {% elif is_completed %}
+        <div class="alert alert-success" role="status">{% translate "The table was applied." %}</div>
+        <table class="table table-condensed">
+          <tbody>
+            <tr>
+              <th scope="row">{% translate "New strings added" %}</th>
+              <td>{{ completed_summary.added }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Existing keys left unchanged" %}</th>
+              <td>{{ completed_summary.existing }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Explanations set" %}</th>
+              <td>{{ completed_summary.explanations_set }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Explanations left unchanged (needed overwrite)" %}</th>
+              <td>{{ completed_summary.explanations_would_overwrite }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Explanations skipped (source changed)" %}</th>
+              <td>{{ completed_summary.explanations_source_changed }}</td>
+            </tr>
+          </tbody>
+        </table>
+        {% if completed_summary.created_languages %}
+          <p>
+            {% blocktranslate trimmed with languages=completed_summary.created_languages|join:", " %}
+              New languages created: {{ languages }}.
+            {% endblocktranslate %}
+          </p>
+        {% endif %}
+        {% if completed_summary.unavailable_languages %}
+          <div class="alert alert-warning" role="alert">
+            {% blocktranslate trimmed with languages=completed_summary.unavailable_languages|join:", " %}
+              Some languages could not be added; their rows were skipped: {{ languages }}.
+            {% endblocktranslate %}
+          </div>
+        {% endif %}
+        <a href="{{ object.get_absolute_url }}" class="btn btn-default">{% translate "Back to the component" %}</a>
+
+      {% elif is_failed %}
+        <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+        <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="retry" />
+          <input type="submit" value="{% translate "Retry" %}" class="btn btn-primary" />
+        </form>
+        <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="cancel" />
+          <input type="submit" value="{% translate "Cancel" %}" class="btn btn-default" />
+        </form>
+
+      {% else %}
+        <table class="table table-condensed">
+          <tbody>
+            <tr>
+              <th scope="row">{% translate "Rows in the table" %}</th>
+              <td>{{ row_count }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "New keys" %}</th>
+              <td>{{ new_count }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Existing keys (source, targets, flags unchanged)" %}</th>
+              <td>{{ existing_count }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Existing keys whose source the table disagrees with" %}</th>
+              <td>{{ changed_source_count }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {% if changed_sources %}
+          <h4>{% translate "Changed sources" %}</h4>
+          <div class="alert alert-warning" role="alert">
+            {% translate "These keys already exist with a different source. The table never overwrites an existing source, so the value below is not changing; review these separately." %}
+          </div>
+          <table class="table table-condensed">
+            <thead>
+              <tr>
+                <th scope="col">{% translate "Key" %}</th>
+                <th scope="col">{% translate "Current source (not changing)" %}</th>
+                <th scope="col">{% translate "Source in the table" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in changed_sources %}
+                <tr>
+                  <td>{{ row.key }}</td>
+                  <td>{{ row.old_source }}</td>
+                  <td>{{ row.new_source }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
+
+        {% if not can_add_strings %}
+          <div class="alert alert-warning" role="alert">
+            {% translate "You do not have permission to add strings; new keys will be skipped." %}
+          </div>
+        {% endif %}
+        {% if not can_apply_explanations %}
+          <div class="alert alert-warning" role="alert">
+            {% translate "You do not have the Edit source string permission; Explanations will not be changed." %}
+          </div>
+        {% endif %}
+
+        <h4>{% translate "Explanation" %}</h4>
+        <table class="table table-condensed">
+          <tbody>
+            <tr>
+              <th scope="row">{% translate "Will be set" %}</th>
+              <td>{{ explanation_preview.set_count }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Already the same value" %}</th>
+              <td>{{ explanation_preview.unchanged_count }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Existing, non-empty value (needs overwrite)" %}</th>
+              <td>{{ explanation_preview.would_overwrite_count }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Blank in the table" %}</th>
+              <td>{{ explanation_preview.blank_count }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Key not found in this component" %}</th>
+              <td>{{ explanation_preview.missing_key_count }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{% translate "Skipped: source changed for this key" %}</th>
+              <td>{{ explanation_preview.source_changed_count }}</td>
+            </tr>
+            {% if judge_stale_count %}
+              <tr>
+                <th scope="row">{% translate "Strings with a current judge verdict that will need re-judging" %}</th>
+                <td>{{ judge_stale_count }}</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+
+        <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="cancel" />
+          <input type="submit" value="{% translate "Cancel" %}" class="btn btn-default" />
+        </form>
+
+        <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="confirm" />
+          {% if explanation_preview.would_overwrite_count %}
+            {% crispy confirm_form %}
+          {% endif %}
+          <input type="submit" value="{% translate "Apply" %}" class="btn btn-primary" />
+        </form>
+      {% endif %}
 
     </div>
   </div>

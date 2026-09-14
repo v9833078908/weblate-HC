@@ -8,7 +8,7 @@ import pytest
 
 from loc_kit_ingest.model import Severity
 from loc_kit_ingest.profile import load_profile, parse_profile
-from loc_kit_ingest.reader import read_sheets, validate_sheet_headers
+from loc_kit_ingest.reader import ReaderError, read_sheets, validate_sheet_headers
 
 # ---------------------------------------------------------------------------
 # CSV / TSV
@@ -130,6 +130,29 @@ def test_corrupt_xlsx_raises(tmp_path):
     path.write_bytes(b"not xlsx")
     with pytest.raises(Exception):
         read_sheets(path)
+
+
+def test_xlsx_formula_is_rejected_with_its_coordinate(tmp_path):
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Strings"
+    worksheet.append(["key", "en"])
+    worksheet.append(["sum", "=SUM(1, 2)"])
+    path = tmp_path / "formula.xlsx"
+    workbook.save(path)
+
+    with pytest.raises(ReaderError, match=r"Strings!B2.*formula"):
+        read_sheets(path)
+
+
+def test_csv_byte_budget_rejects_before_materializing_all_rows(tmp_path):
+    path = tmp_path / "large.csv"
+    path.write_text("key,en\n" + ("entry,translated text\n" * 100))
+
+    with pytest.raises(ReaderError, match="input limit"):
+        read_sheets(path, max_bytes=100)
 
 
 # ---------------------------------------------------------------------------

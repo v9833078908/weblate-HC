@@ -315,45 +315,25 @@ unsupported: one source and at least one target language are required.
    `parse_component`, что и универсальная загрузка при создании; лист должен
    резолвиться ровно в один `kind: "po"` компонент с тем же source language,
    что и у целевого компонента, и без ERROR-диагностик.
-3. **Черновик.** Разобранные строки (`{key, values, comments, references,
-   explanation, flags}`) сохраняются в `LocKitImportDraft` с `kind=STRING` и
-   `target_component`, owner- и session-bound, как и глоссарный черновик; тот
-   же файл тоже сохраняется для истории/очистки, но confirm читает разобранные
-   строки из `preview_json`, не перечитывает и не парсит файл заново.
-4. **Preview.** Показывает число новых и уже существующих ключей, разбивку
-   Explanation по исходам общего сервиса (`set`/`unchanged`/`blank`/
-   `missing_key`/`would_overwrite`/`already_in_note`) и число target-юнитов
-   с актуальным judge-вердиктом, которые смена Explanation сделает
-   устаревшими и потребует повторного judge-прогона. Чекбокс «перезаписать
-   существующие, непустые Explanation» виден только при непустом
-   `would_overwrite`.
-5. **Confirm.** Один вызов `weblate.trans.loc_kit.apply_loc_kit_string_update`
-   выполняет обе оси как независимые успехи:
-   - новые ключи - `append_translation_strings`: существующий ключ никогда не
-     трогает свои source/targets/flags; для нового ключа исходный юнит
-     создаётся через `Translation.add_unit(..., is_batch_update=True)`,
-     непустые targets записываются по языкам кита, затем на исходный юнит
-     накладываются провалидированные `weblate.checks.flags.Flags` - именно в
-     этом порядке, потому что `read-only` иначе заблокировал бы запись
-     targets; отсутствующий язык создаётся только при `translation.add`,
-     иначе помечается `unavailable_languages` без остановки остальных;
-   - Explanation - общий `apply_kit_explanations` из связанного плана; без
-     `source.edit` эта ось становится `unavailable`, но разрешённые новые
-     строки всё равно добавляются, и наоборот.
-   Confirm потребляет и удаляет черновик только после успешного применения;
-   отмена (`action=cancel`) удаляет черновик без изменений в компоненте.
-6. **Right size, not right protocol.** В отличие от Celery-протокола
-   `APPLYING`/`FAILED`/`apply_task_id`, которого этот файл не описывает нигде
-   больше, `loc-kit-strings-update` выполняет обе мутации синхронно в одном
-   HTTP-запросе - тем же способом, что уже принятый и работающий
-   `append_glossary_terms`/`LocKitGlossaryPreviewView._apply_update`.
-   Допустимы не более 5 000 непустых translation/flag/Explanation cells:
-   guard проверяется до создания черновика и повторно перед service apply, а
-   превышение просит разделить кит на меньшие таблицы без какой-либо мутации.
-   Это пропускает крупнейший отслеживаемый строковый кит (396 строк, 3 960
-   cells), но отсекает работу, которую нельзя безопасно держать в одном
-   HTTP-запросе. Асинхронная задача с progress/retry остаётся отдельным
-   инкрементом, если реальный кит перестанет вмещаться в этот предел.
+3. **Черновик и preview.** Загрузка создаёт private owner- и session-bound
+   `LocKitImportDraft`; подготовка в фоне сохраняет canonical payload отдельно
+   от краткого preview. Preview показывает новые и существующие ключи,
+   расхождения source и исходы Explanation. Файл не перечитывается при confirm.
+4. **Применение.** Confirm запускает фоновую порционную задачу. Новые ключи
+   создаются с targets, контекстом и flags; существующие source, targets, flags
+   и notes не меняются. Explanation меняется только с `source.edit`, а
+   отсутствующий язык становится per-language skip без остановки остальных.
+   Отсутствующие из таблицы строки никогда не удаляются.
+5. **Результат и повтор.** Страница безопасна для закрытия: результат остаётся
+   доступным из компонента. Каждая порция имеет durable cursor, поэтому
+   повторная доставка и Retry продолжают без дубликатов. После 30 минут без
+   heartbeat предлагается fenced retry с новым UUID; поздняя задача уже не
+   может записать draft. Только owned `PendingUnitChange` этого черновика
+   попадает в `commit_pending_subset`, не чужая ручная правка.
+6. **Длительные таблицы.** Один delivery останавливается до половины broker
+   visibility timeout и ставит продолжение с interactive priority. Lock timeout
+   ограниченно повторяется; суммарный предел 24 часа завершает уже записанные
+   порции отдельным partial report после их subset commit.
 
 ### Рукописный профиль
 

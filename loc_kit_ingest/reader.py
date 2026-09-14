@@ -7,6 +7,7 @@ from __future__ import annotations
 import csv
 from itertools import islice
 from typing import TYPE_CHECKING
+from zipfile import BadZipFile, ZipFile
 
 from loc_kit_ingest.langcode import language_code
 from loc_kit_ingest.model import Diagnostic, Severity
@@ -29,28 +30,42 @@ class ReaderError(ValueError):
     """Fatal I/O or format error during reading."""
 
 
-def read_sheets(path: Path) -> dict[str, list[list[str]]]:
+def read_sheets(
+    path: Path, *, max_bytes: int | None = None
+) -> dict[str, list[list[str]]]:
     """
     Read a kit file into a dict of sheet_name -> list of rows.
 
-    Each row is a list of strings. No trimming, no inference.
-    CSV/TSV: one sheet named after the file stem.
-    XLSX: one sheet per worksheet, using its name.
+    ``max_bytes`` caps both the uploaded file and its expanded spreadsheet
+    data before the caller receives a materialized table.
     """
+    if max_bytes is not None and path.stat().st_size > max_bytes:
+        msg = "input limit exceeded"
+        raise ReaderError(msg)
     suffix = path.suffix.lower()
     if suffix == ".csv":
-        return {path.stem: _read_csv(path, _detect_delimiter(path))}
+        return {
+            path.stem: _read_csv(path, _detect_delimiter(path), max_bytes=max_bytes)
+        }
     if suffix == ".tsv":
-        return {path.stem: _read_csv(path, "\t")}
+        return {path.stem: _read_csv(path, "\t", max_bytes=max_bytes)}
     if suffix == ".xlsx":
-        return _read_xlsx(path)
+        return _read_xlsx(path, max_bytes=max_bytes)
     msg = f"unsupported file suffix: {suffix!r}"
     raise ReaderError(msg)
 
 
-def _read_csv(path: Path, delimiter: str) -> list[list[str]]:
+def _read_csv(path: Path, delimiter: str, *, max_bytes: int | None) -> list[list[str]]:
+    rows: list[list[str]] = []
+    used = 0
     with path.open(newline="", encoding="utf-8-sig") as f:
-        return [row for row in csv.reader(f, delimiter=delimiter)]
+        for row in csv.reader(f, delimiter=delimiter):
+            used += sum(max(1, len(cell.encode("utf-8"))) for cell in row)
+            if max_bytes is not None and used > max_bytes:
+                msg = "input limit exceeded"
+                raise ReaderError(msg)
+            rows.append(row)
+    return rows
 
 
 def _detect_delimiter(path: Path) -> str:
@@ -78,16 +93,42 @@ def _scan_rows(path: Path, delimiter: str) -> list[list[str]]:
         return []
 
 
-def _read_xlsx(path: Path) -> dict[str, list[list[str]]]:
+def _read_xlsx(path: Path, *, max_bytes: int | None) -> dict[str, list[list[str]]]:
+    if max_bytes is not None:
+        try:
+            with ZipFile(path) as archive:
+                members = archive.infolist()
+                if (
+                    len(members) > 1000
+                    or sum(member.file_size for member in members) > max_bytes
+                ):
+                    msg = "input limit exceeded"
+                    raise ReaderError(msg)
+        except BadZipFile as error:
+            msg = "invalid XLSX archive"
+            raise ReaderError(msg) from error
+
     from openpyxl import load_workbook
 
     result: dict[str, list[list[str]]] = {}
-    wb = load_workbook(path, read_only=True, data_only=True)
+    used = 0
+    wb = load_workbook(path, read_only=True, data_only=False)
     try:
         for ws in wb.worksheets:
             rows: list[list[str]] = []
-            for row in ws.iter_rows(values_only=True):
-                rows.append([str(cell) if cell is not None else "" for cell in row])
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.data_type == "f":
+                        msg = f"{ws.title}!{cell.coordinate} contains a formula"
+                        raise ReaderError(msg)
+                values = [
+                    str(cell.value) if cell.value is not None else "" for cell in row
+                ]
+                used += sum(max(1, len(value.encode("utf-8"))) for value in values)
+                if max_bytes is not None and used > max_bytes:
+                    msg = "input limit exceeded"
+                    raise ReaderError(msg)
+                rows.append(values)
             result[ws.title] = rows
     finally:
         wb.close()

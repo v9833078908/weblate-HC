@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import QuerySet
 from django.test import override_settings
 from django.utils import timezone
 
@@ -273,3 +275,38 @@ class LocKitDraftCleanupTest(ViewTestCase):
         # The file is gone but the row remains; cleanup must still remove the row.
         cleanup_loc_kit_drafts()
         self.assertFalse(LocKitImportDraft.objects.filter(pk=expired.pk).exists())
+
+    def test_cleanup_does_not_delete_a_draft_whose_heartbeat_renewed_mid_scan(
+        self,
+    ) -> None:
+        """
+        A row-locked recheck, not a bulk delete of a previously-selected
+        set: a still-running task's heartbeat can extend ``expires_at``
+        between this scan's initial candidate query and its per-row
+        delete, and that draft's files must never be deleted out from
+        under it.
+        """
+        active_task = make_draft(
+            owner=self.user,
+            project=self.project,
+            state=LocKitImportDraft.State.APPLYING,
+            expires_at=timezone.now() - timedelta(seconds=1),
+        )
+        name = active_task.uploaded.name
+        real_values_list = QuerySet.values_list
+
+        def renew_after_candidate_scan(self, *args, **kwargs):
+            materialized = list(real_values_list(self, *args, **kwargs))
+            # Simulate the concurrent heartbeat: it runs strictly after
+            # this task's own candidate query already read the old,
+            # expired timestamp, but strictly before its per-row lock.
+            LocKitImportDraft.objects.filter(pk=active_task.pk).update(
+                expires_at=timezone.now() + timedelta(hours=1)
+            )
+            return materialized
+
+        with patch.object(QuerySet, "values_list", renew_after_candidate_scan):
+            cleanup_loc_kit_drafts()
+
+        self.assertTrue(LocKitImportDraft.objects.filter(pk=active_task.pk).exists())
+        self.assertTrue(LOC_KIT_DRAFT_STORAGE.exists(name))
