@@ -1918,13 +1918,13 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
         component = draft.target_component
         filename = draft.uploaded.path
 
-    try:
+    try:  # ruff: ignore[too-many-statements-in-try-clause]
         sheets = read_sheets(
             Path(filename), max_bytes=settings.TRANSLATION_UPLOAD_MAX_SIZE
         )
         if len(sheets) != 1:
             msg = "The workbook must contain exactly one worksheet."
-            raise ValueError(msg)
+            raise ValueError(msg)  # ruff: ignore[raise-within-try]
         sheet_name, rows = next(iter(sheets.items()))
         document, _notes = infer_profile(
             {sheet_name: rows},
@@ -1937,7 +1937,7 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
         parsed_component = profile.components[0]
         if parsed_component.kind != "po":
             msg = "The table maps to a glossary layout, not strings."
-            raise ValueError(msg)
+            raise ValueError(msg)  # ruff: ignore[raise-within-try]
         result = parse_component(parsed_component, rows)
         errors = [
             f"row {diagnostic.row}: {diagnostic.message}"
@@ -1945,7 +1945,7 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
             if diagnostic.severity is Severity.ERROR
         ]
         if errors:
-            raise ValueError("; ".join(errors[:10]))
+            raise ValueError("; ".join(errors[:10]))  # ruff: ignore[raise-within-try]
         rows_json = [string_unit_to_json(unit) for unit in result.units]
         baseline = dict(
             component.source_translation.unit_set.values_list("context", "explanation")
@@ -1954,7 +1954,7 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
         encoded = json.dumps(packet, ensure_ascii=False, separators=(",", ":")).encode()
         if len(encoded) > settings.TRANSLATION_UPLOAD_MAX_SIZE:
             msg = "The prepared table exceeds the configured size limit."
-            raise ValueError(msg)
+            raise ValueError(msg)  # ruff: ignore[raise-within-try]
     except (InferenceError, ProfileError, ReaderError, ValueError) as error:
         _mark_loc_kit_draft_failed(
             draft_id,
@@ -2230,7 +2230,7 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
                 exc=error,
                 countdown=retry_delay,
                 max_retries=len(retry_delays),
-            )
+            ) from error
         except Retry:
             raise
         except (ValidationError, ValueError) as error:
