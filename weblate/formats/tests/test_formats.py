@@ -441,6 +441,7 @@ class FormatFeatureDocumentationTest(SimpleTestCase):
         "supports_context",
         "supports_location",
         "supports_flags",
+        "supports_new_unit_metadata",
         "additional_states",
         "supports_read_only",
         "supports_remove_obsolete_units",

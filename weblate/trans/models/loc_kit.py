@@ -26,6 +26,23 @@ LOC_KIT_DRAFT_STORAGE = FileSystemStorage(location=data_dir("loc_kit_drafts"))
 # and testable before that configuration is present.
 LOC_KIT_DRAFT_EXPIRY_CAP = 3600
 
+# A single Celery delivery never runs the whole apply: each delivery stops
+# at a portion boundary once its own share of the broker's visibility
+# timeout is spent, reserves a fresh ``apply_task_id`` under the draft's row
+# lock, and publishes its own continuation after commit
+# (``weblate.trans.tasks._chain_loc_kit_apply_continuation``). This absolute
+# limit is the cumulative wall-clock budget across every one of those
+# continuations, measured from the very first confirm
+# (``apply_started_at``, set once, never touched by a continuation - a
+# retryable failure would just re-measure against the same fixed instant
+# and fail again immediately). Exhausting it stops the draft as a terminal
+# FAILED with an explicit partial report (rows applied so far) and no
+# ``retry_phase`` - the existing Retry action is a resume-in-place contract
+# this cumulative cap cannot honor, so it is deliberately absent here, not
+# reused with different semantics. The draft is still viewable for the
+# normal one-hour FAILED retention; continuing means uploading again.
+LOC_KIT_STRING_UPDATE_APPLY_TIME_LIMIT = timedelta(hours=24)
+
 
 class LocKitImportDraft(models.Model):
     """
@@ -43,9 +60,11 @@ class LocKitImportDraft(models.Model):
 
     class State(models.TextChoices):
         UPLOADED = "uploaded", gettext_lazy("Uploaded")
+        PREPARING = "preparing", gettext_lazy("Preparing")
         SHEET_SELECTED = "sheet-selected", gettext_lazy("Sheet selected")
         PREVIEW_READY = "preview-ready", gettext_lazy("Preview ready")
         APPLYING = "applying", gettext_lazy("Applying")
+        COMPLETED = "completed", gettext_lazy("Completed")
         FAILED = "failed", gettext_lazy("Failed")
         CONSUMED = "consumed", gettext_lazy("Consumed")
 
@@ -89,6 +108,25 @@ class LocKitImportDraft(models.Model):
         max_length=20, choices=State.choices, default=State.UPLOADED
     )
     apply_task_id = models.UUIDField(null=True, blank=True)
+    prepare_task_id = models.UUIDField(null=True, blank=True)
+    confirmed_options = models.JSONField(default=dict, blank=True)
+    progress = models.JSONField(default=dict, blank=True)
+    next_row = models.PositiveIntegerField(default=0)
+    error_code = models.CharField(max_length=100, blank=True)
+    error_details = models.TextField(blank=True)
+    retry_phase = models.CharField(max_length=20, blank=True)
+    last_activity_at = models.DateTimeField(null=True, blank=True)
+    apply_started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    prepared_payload = models.FileField(
+        storage=LOC_KIT_DRAFT_STORAGE,
+        upload_to="prepared/%Y/%m/%d/",
+        max_length=FILENAME_LENGTH,
+        blank=True,
+    )
+    payload_checksum = models.CharField(max_length=64, blank=True)
+    payload_size = models.PositiveBigIntegerField(default=0)
+    pending_change_ids = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
 
@@ -118,9 +156,10 @@ class LocKitImportDraft(models.Model):
         return timezone.now() >= self.expires_at
 
     def delete_storage(self) -> None:
-        """Delete the uploaded file from storage; safe to call more than once."""
-        if self.uploaded and self.uploaded.name:
-            self.uploaded.storage.delete(self.uploaded.name)
+        """Delete all private draft files; safe to call more than once."""
+        for stored in (self.uploaded, self.prepared_payload):
+            if stored and stored.name:
+                stored.storage.delete(stored.name)
 
     @classmethod
     def get_active(cls, *, token, owner, session_key):

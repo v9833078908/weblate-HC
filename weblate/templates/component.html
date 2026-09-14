@@ -9,6 +9,7 @@
   {% perm 'component.edit' object as user_can_edit_component %}
   {% perm 'upload.perform' object as user_can_upload_translation %}
   {% perm 'source.edit' object.source_translation as user_can_edit_source_string %}
+  {% perm 'unit.add' object.source_translation as user_can_add_source_unit %}
 
   <ul class="nav nav-pills">
     <li class="nav-item">
@@ -120,7 +121,7 @@
           {% endif %}
         {% endif %}
         {% if not object.is_glossary and not object.locked and object.has_template %}
-          {% if user_can_upload_translation or user_can_edit_source_string %}
+          {% if user_can_edit_source_string or user_can_upload_translation and user_can_add_source_unit %}
             <li>
               <a class="dropdown-item"
                  href="{% url 'loc-kit-strings-update' path=object.get_url_path %}">{% translate "Update from a loc-kit table" %}</a>
@@ -239,6 +240,25 @@
   {% announcements component=object %}
 
   {% include "snippets/component/state.html" %}
+
+  {% if active_loc_kit_string_draft %}
+    <div class="alert alert-info" role="status">
+      {% if active_loc_kit_string_draft.state == "completed" %}
+        {% blocktranslate trimmed with filename=active_loc_kit_string_draft.source_filename %}
+          Your loc-kit table update from “{{ filename }}” has finished.
+        {% endblocktranslate %}
+      {% elif active_loc_kit_string_draft.state == "failed" %}
+        {% blocktranslate trimmed with filename=active_loc_kit_string_draft.source_filename %}
+          Your loc-kit table update from “{{ filename }}” needs attention.
+        {% endblocktranslate %}
+      {% else %}
+        {% blocktranslate trimmed with filename=active_loc_kit_string_draft.source_filename %}
+          Your loc-kit table update from “{{ filename }}” is still running.
+        {% endblocktranslate %}
+      {% endif %}
+      <a href="{% url 'loc-kit-strings-preview' token=active_loc_kit_string_draft.token %}">{% translate "View status" %}</a>
+    </div>
+  {% endif %}
 
   {% perm 'meta:vcs.status' object as user_can_see_repository_status %}
   {% perm 'project.permissions' object as user_can_manage_acl %}

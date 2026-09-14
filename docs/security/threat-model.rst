@@ -697,6 +697,14 @@ Size and rate assumptions:
   one-hour owner-and-session-bound draft is previewed before confirmation, then
   reparsed and compared to a server-side baseline under component and unit locks.
   No data is sent to an outbound service. *(maintainer)*
+* Loc-kit updates for an existing monolingual component are owner- and
+  session-bound, require component-scoped ``upload.perform`` or
+  ``source.edit`` as appropriate, and parse CSV/TSV/XLSX locally into a
+  private bounded payload before confirmation. The task fences every delivery
+  with a durable UUID and commits only its metadata-tagged pending changes, so
+  a stale worker cannot write after retry and ambient pending edits are not
+  committed. No uploaded table content is sent to an outbound service.
+  *(maintainer)*
 
 
 Adversary model

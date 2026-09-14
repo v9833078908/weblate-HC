@@ -5,10 +5,11 @@
 from pathlib import Path
 
 import pytest
+from openpyxl import Workbook
 
 from loc_kit_ingest.model import Severity
 from loc_kit_ingest.profile import load_profile, parse_profile
-from loc_kit_ingest.reader import read_sheets, validate_sheet_headers
+from loc_kit_ingest.reader import ReaderError, read_sheets, validate_sheet_headers
 
 # ---------------------------------------------------------------------------
 # CSV / TSV
@@ -96,7 +97,7 @@ def test_unsupported_suffix_raises(tmp_path):
 def test_csv_decode_error_raises(tmp_path):
     path = tmp_path / "Bad.csv"
     path.write_bytes(b"\xff\xfe\x00bad")
-    with pytest.raises(Exception):
+    with pytest.raises(UnicodeDecodeError):
         read_sheets(path)
 
 
@@ -107,7 +108,6 @@ def test_csv_decode_error_raises(tmp_path):
 
 @pytest.fixture
 def ui_xlsx(tmp_path):
-    from openpyxl import Workbook
 
     wb = Workbook()
     ws = wb.active
@@ -128,8 +128,30 @@ def test_xlsx_preserves_multiline_text(ui_xlsx):
 def test_corrupt_xlsx_raises(tmp_path):
     path = tmp_path / "Bad.xlsx"
     path.write_bytes(b"not xlsx")
-    with pytest.raises(Exception):
+    with pytest.raises(ReaderError):
         read_sheets(path)
+
+
+def test_xlsx_formula_is_rejected_with_its_coordinate(tmp_path):
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Strings"
+    worksheet.append(["key", "en"])
+    worksheet.append(["sum", "=SUM(1, 2)"])
+    path = tmp_path / "formula.xlsx"
+    workbook.save(path)
+
+    with pytest.raises(ReaderError, match=r"Strings!B2.*formula"):
+        read_sheets(path)
+
+
+def test_csv_byte_budget_rejects_before_materializing_all_rows(tmp_path):
+    path = tmp_path / "large.csv"
+    path.write_text("key,en\n" + ("entry,translated text\n" * 100))
+
+    with pytest.raises(ReaderError, match="input limit"):
+        read_sheets(path, max_bytes=100)
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +212,7 @@ def test_all_headers_match(temple_component, temple_rows):
 
 @pytest.fixture
 def unnamed_description_component():
-    """A record-map glossary whose description column has no header cell."""
+    """Build a record-map glossary with an unnamed description column."""
     document = {
         "schema_version": 2,
         "components": [
