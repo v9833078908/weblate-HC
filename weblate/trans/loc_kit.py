@@ -21,7 +21,7 @@ import tempfile
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, NoReturn, TypedDict
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -859,6 +859,9 @@ class KitExplanationApplyResult:
     missing_key_count: int = 0
     would_overwrite_count: int = 0
     already_in_note_count: int = 0
+    # An Explanation that changed after the preview the operator confirmed:
+    # an overwrite would silently destroy that newer edit.
+    baseline_changed_count: int = 0
     # Never set by ``apply_kit_explanations`` itself: a caller that gates the
     # whole operation on a permission check (rather than failing hard) fills
     # this in for the rows it chose not to even attempt.
@@ -889,6 +892,7 @@ def _classify_kit_explanations(
     units: Sequence[StringUnit],
     overwrite: bool,
     source_lang: str,
+    baseline: Mapping[str, str] | None = None,
 ) -> tuple[list[tuple[Unit, str]], KitExplanationApplyResult]:
     """
     Classify each incoming explanation cell without mutating anything.
@@ -920,6 +924,7 @@ def _classify_kit_explanations(
         "would_overwrite_count": 0,
         "already_in_note_count": 0,
         "source_changed_count": 0,
+        "baseline_changed_count": 0,
     }
     to_apply: list[tuple[Unit, str]] = []
     for incoming in units:
@@ -941,6 +946,15 @@ def _classify_kit_explanations(
             continue
         if source_unit.explanation and not overwrite:
             counters["would_overwrite_count"] += 1
+            continue
+        if (
+            overwrite
+            and baseline is not None
+            and source_unit.explanation != baseline.get(incoming.key, "")
+        ):
+            # The stored value is no longer what the operator saw and
+            # confirmed overwriting, so the newer edit wins.
+            counters["baseline_changed_count"] += 1
             continue
         if source_unit.note.strip() == explanation:
             counters["already_in_note_count"] += 1
@@ -1036,6 +1050,7 @@ def apply_kit_explanations(
     component: Component,
     units: Sequence[StringUnit],
     overwrite: bool,
+    baseline: Mapping[str, str] | None = None,
 ) -> KitExplanationApplyResult:
     """
     Apply parsed kit explanation cells to matching source units by context.
@@ -1065,13 +1080,16 @@ def apply_kit_explanations(
             units=units,
             overwrite=overwrite,
             source_lang=locked_component.source_language.code,
+            baseline=baseline,
         )
         for source_unit, explanation in to_apply:
             source_unit.update_explanation(explanation, user)
     return result
 
 
-def load_prepared_string_units(draft: LocKitImportDraft) -> tuple[StringUnit, ...]:
+def load_prepared_string_units(
+    draft: LocKitImportDraft,
+) -> tuple[tuple[StringUnit, ...], dict[str, str]]:
     """
     Read and checksum-verify a draft's private canonical packet.
 
@@ -1090,10 +1108,12 @@ def load_prepared_string_units(draft: LocKitImportDraft) -> tuple[StringUnit, ..
     try:
         packet = json.loads(encoded)
         rows = packet["rows"]
+        baseline = packet.get("baseline") or {}
     except (json.JSONDecodeError, KeyError, TypeError) as error:
         msg = _("The prepared loc-kit data is invalid.")
         raise ValidationError(msg) from error
-    return string_units_from_json(json.dumps(rows, ensure_ascii=False))
+    units = string_units_from_json(json.dumps(rows, ensure_ascii=False))
+    return units, {str(key): str(value) for key, value in baseline.items()}
 
 
 def string_unit_to_json(unit: StringUnit) -> dict[str, object]:
@@ -1444,6 +1464,7 @@ def apply_loc_kit_string_update(
     units: Sequence[StringUnit],
     overwrite_explanations: bool,
     pending_owner: str = "",
+    explanation_baseline: Mapping[str, str] | None = None,
 ) -> StringsUpdateResult:
     """
     Add new loc-kit rows and set Explanations on one existing component.
@@ -1477,6 +1498,7 @@ def apply_loc_kit_string_update(
             component=component,
             units=units,
             overwrite=overwrite_explanations,
+            baseline=explanation_baseline,
         )
     else:
         explanation_result = KitExplanationApplyResult(
@@ -1590,7 +1612,7 @@ def _resolve_missing_language(
     )
 
 
-def _raise_collision(collisions: Sequence[tuple[str, str, str]]) -> None:
+def _raise_collision(collisions: Sequence[tuple[str, str, str]]) -> NoReturn:
     """Abort an apply because a source collides with an existing context."""
     raise GlossaryAppendCollisionError(
         _(
@@ -1601,7 +1623,7 @@ def _raise_collision(collisions: Sequence[tuple[str, str, str]]) -> None:
     )
 
 
-def _raise_missing_target_unit(source: str) -> None:
+def _raise_missing_target_unit(source: str) -> NoReturn:
     """Abort content application because add_unit unexpectedly returned None."""
     msg = f"Could not add glossary term {source!r}"
     raise ValueError(msg)

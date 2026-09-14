@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 from loc_kit_ingest.langcode import language_code
 from loc_kit_ingest.model import Diagnostic, Severity
@@ -26,6 +27,12 @@ if TYPE_CHECKING:
 
 _CSV_DELIMITERS = (",", ";", "\t")
 _DELIMITER_SCAN_ROWS = 20
+
+# A byte budget alone does not bound work: blank CSV records cost almost
+# nothing per row, and an XLSX worksheet can declare a vast sparse
+# rectangle its iterator walks before any byte is counted.
+_MAX_ROWS = 200_000
+_MAX_CELLS = 2_000_000
 
 
 class ReaderError(ValueError):
@@ -61,7 +68,10 @@ def _read_csv(path: Path, delimiter: str, *, max_bytes: int | None) -> list[list
     rows: list[list[str]] = []
     used = 0
     with path.open(newline="", encoding="utf-8-sig") as f:
-        for row in csv.reader(f, delimiter=delimiter):
+        for index, row in enumerate(csv.reader(f, delimiter=delimiter), start=1):
+            if index > _MAX_ROWS:
+                msg = "input limit exceeded"
+                raise ReaderError(msg)
             used += sum(max(1, len(cell.encode("utf-8"))) for cell in row)
             if max_bytes is not None and used > max_bytes:
                 msg = "input limit exceeded"
@@ -115,11 +125,22 @@ def _read_xlsx(path: Path, *, max_bytes: int | None) -> dict[str, list[list[str]
 
     result: dict[str, list[list[str]]] = {}
     used = 0
-    wb = load_workbook(path, read_only=True, data_only=False)
+    try:
+        wb = load_workbook(path, read_only=True, data_only=False)
+    except (BadZipFile, InvalidFileException) as error:
+        msg = "invalid XLSX archive"
+        raise ReaderError(msg) from error
+    cells = 0
+    row_count = 0
     try:
         for ws in wb.worksheets:
             rows: list[list[str]] = []
             for row in ws.iter_rows():
+                row_count += 1
+                cells += len(row)
+                if row_count > _MAX_ROWS or cells > _MAX_CELLS:
+                    msg = "input limit exceeded"
+                    raise ReaderError(msg)
                 for cell in row:
                     if cell.data_type == "f":
                         msg = f"{ws.title}!{cell.coordinate} contains a formula"

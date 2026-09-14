@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from glob import glob
 from operator import itemgetter
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from celery import current_task
 from celery.schedules import crontab
@@ -72,6 +72,7 @@ from weblate.vcs.base import RepositoryError
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    from loc_kit_ingest.model import StringUnit
     from weblate.trans.models.change import RevertUserEditsResult
     from weblate.trans.models.unit import UnitQuerySet
     from weblate.workspaces.models import Workspace
@@ -1686,9 +1687,11 @@ def _chain_loc_kit_apply_continuation(*, draft_id: int, task_id) -> bool:
         draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
             pk=draft_id
         )
+        component = draft.target_component
         if (
             draft.state != LocKitImportDraft.State.APPLYING
             or draft.apply_task_id != task_id
+            or component is None
         ):
             return False
         draft.apply_task_id = continuation_id
@@ -1706,9 +1709,9 @@ def _chain_loc_kit_apply_continuation(*, draft_id: int, task_id) -> bool:
             except Exception as error:
                 report_error(
                     "loc-kit apply continuation dispatch failed",
-                    project=draft.target_component.project,
+                    project=component.project,
                 )
-                _mark_loc_kit_draft_failed(
+                mark_loc_kit_draft_failed(
                     draft_id,
                     task_id_field="apply_task_id",
                     expected_state=LocKitImportDraft.State.APPLYING,
@@ -1722,7 +1725,7 @@ def _chain_loc_kit_apply_continuation(*, draft_id: int, task_id) -> bool:
     return True
 
 
-def _mark_loc_kit_draft_failed(
+def mark_loc_kit_draft_failed(
     draft_id: int,
     *,
     task_id_field: str,
@@ -1806,7 +1809,7 @@ def _flush_loc_kit_pending_changes(
             "loc-kit finalizing found unowned pending changes",
             project=component.project,
         )
-        _mark_loc_kit_draft_failed(
+        mark_loc_kit_draft_failed(
             draft_id,
             task_id_field="apply_task_id",
             expected_state=LocKitImportDraft.State.APPLYING,
@@ -1820,10 +1823,28 @@ def _flush_loc_kit_pending_changes(
         )
         return False
 
+    still_authorized = owner.has_perm("source.edit", component.source_translation) or (
+        owner.has_perm("upload.perform", component)
+        and owner.has_perm("unit.add", component.source_translation)
+    )
+    if owned_ids and not still_authorized:
+        # Authorization is rechecked here because a portion may have been
+        # staged minutes or hours before the repository commit happens.
+        mark_loc_kit_draft_failed(
+            draft_id,
+            task_id_field="apply_task_id",
+            expected_state=LocKitImportDraft.State.APPLYING,
+            task_id=task_id,
+            error_code="finalize-forbidden",
+            message="The owner no longer holds permission to apply this table.",
+            retry_phase=retry_phase,
+        )
+        return False
+
     if owned_ids and not component.commit_pending_subset(
         f"loc-kit table update ({component.slug})", owner, owned_ids
     ):
-        _mark_loc_kit_draft_failed(
+        mark_loc_kit_draft_failed(
             draft_id,
             task_id_field="apply_task_id",
             expected_state=LocKitImportDraft.State.APPLYING,
@@ -1861,8 +1882,10 @@ def _flush_loc_kit_pending_changes(
     return True
 
 
-@app.task(bind=True, acks_late=True)
-def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
+@app.task(bind=True, acks_late=True, reject_on_worker_lost=True)
+def prepare_loc_kit_string_update(  # ruff: ignore[too-many-locals]
+    self, *, draft_id: int
+) -> None:
     """Parse a staged string-update table into a private canonical packet."""
     # ruff: ignore[import-outside-top-level]
     import json
@@ -1893,7 +1916,9 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
 
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.loc_kit import (
+        PREVIEW_WARNING_LIMIT,
         classify_kit_explanations,
+        count_judge_stale_after_explanations,
         find_changed_sources,
         string_unit_to_json,
     )
@@ -1908,14 +1933,14 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
             .select_related("target_component__source_language")
             .get(pk=draft_id)
         )
+        component = draft.target_component
         if (
             draft.kind != LocKitImportDraft.Kind.STRING
             or draft.state != LocKitImportDraft.State.PREPARING
             or draft.prepare_task_id != task_id
-            or draft.target_component_id is None
+            or component is None
         ):
             return
-        component = draft.target_component
         filename = draft.uploaded.path
 
     try:  # ruff: ignore[too-many-statements-in-try-clause]
@@ -1946,9 +1971,18 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
         ]
         if errors:
             raise ValueError("; ".join(errors[:10]))  # ruff: ignore[raise-within-try]
-        rows_json = [string_unit_to_json(unit) for unit in result.units]
+        # The ``kind != "po"`` guard above proves every parsed record is a
+        # StringUnit; ParseResult only knows the wider ParsedUnit protocol.
+        string_units = cast("tuple[StringUnit, ...]", result.units)
+        rows_json = [string_unit_to_json(unit) for unit in string_units]
+        # Only the keys the table actually carries matter: a component-wide
+        # baseline would both inflate the packet past its size ceiling and
+        # do component-sized work for a one-row upload.
+        incoming_keys = {unit.key for unit in string_units}
         baseline = dict(
-            component.source_translation.unit_set.values_list("context", "explanation")
+            component.source_translation.unit_set.filter(
+                context__in=incoming_keys
+            ).values_list("context", "explanation")
         )
         packet = {"version": 1, "rows": rows_json, "baseline": baseline}
         encoded = json.dumps(packet, ensure_ascii=False, separators=(",", ":")).encode()
@@ -1956,7 +1990,7 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
             msg = "The prepared table exceeds the configured size limit."
             raise ValueError(msg)  # ruff: ignore[raise-within-try]
     except (InferenceError, ProfileError, ReaderError, ValueError) as error:
-        _mark_loc_kit_draft_failed(
+        mark_loc_kit_draft_failed(
             draft_id,
             task_id_field="prepare_task_id",
             expected_state=LocKitImportDraft.State.PREPARING,
@@ -1971,7 +2005,7 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
         # the durable draft must never sit in PREPARING forever because an
         # unanticipated exception skipped the specific-error branch above.
         report_error("loc-kit string update prepare failed", project=component.project)
-        _mark_loc_kit_draft_failed(
+        mark_loc_kit_draft_failed(
             draft_id,
             task_id_field="prepare_task_id",
             expected_state=LocKitImportDraft.State.PREPARING,
@@ -1988,24 +2022,26 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
             .select_related("target_component")
             .get(pk=draft_id)
         )
+        preview_component = draft.target_component
         if (
             draft.state != LocKitImportDraft.State.PREPARING
             or draft.prepare_task_id != task_id
+            or preview_component is None
         ):
             return
         existing = set(
-            draft.target_component.source_translation.unit_set.values_list(
-                "context", flat=True
-            )
+            preview_component.source_translation.unit_set.filter(
+                context__in={row["key"] for row in rows_json}
+            ).values_list("context", flat=True)
         )
         new_count = sum(row["key"] not in existing for row in rows_json)
         explanations = classify_kit_explanations(
-            component=draft.target_component,
-            units=result.units,
+            component=preview_component,
+            units=string_units,
             overwrite=False,
         )
         changed_sources = find_changed_sources(
-            component=draft.target_component, units=result.units
+            component=preview_component, units=string_units
         )
         draft.prepared_payload.save(
             f"{draft.token}.json", ContentFile(encoded), save=False
@@ -2017,15 +2053,24 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
                 "existing_count": len(rows_json) - new_count,
                 "sample_keys": [row["key"] for row in rows_json[:10]],
                 "explanations": explanations.__dict__,
+                # Only a bounded sample is stored and rendered; the full
+                # divergence is reported by ``changed_source_count``.
                 "changed_sources": [
                     {
                         "key": row.key,
                         "old_source": row.old_source,
                         "new_source": row.new_source,
                     }
-                    for row in changed_sources
+                    for row in changed_sources[:PREVIEW_WARNING_LIMIT]
                 ],
                 "changed_source_count": len(changed_sources),
+                # Worst case, the confirm that overwrites: how many current
+                # verdicts this table would outdate.
+                "judge_stale_count": count_judge_stale_after_explanations(
+                    component=preview_component,
+                    units=string_units,
+                    overwrite=True,
+                ),
             },
             ensure_ascii=False,
         )
@@ -2041,7 +2086,7 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
         draft.save()
 
 
-@app.task(bind=True, acks_late=True)
+@app.task(bind=True, acks_late=True, reject_on_worker_lost=True)
 def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
     self, *, draft_id: int
 ) -> None:
@@ -2091,23 +2136,23 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
             .select_related("target_component", "owner")
             .get(pk=draft_id)
         )
+        component = draft.target_component
         if (
             draft.kind != LocKitImportDraft.Kind.STRING
             or draft.state != LocKitImportDraft.State.APPLYING
             or draft.apply_task_id != task_id
-            or draft.target_component_id is None
+            or component is None
         ):
             return
-        component = draft.target_component
         owner = draft.owner
         overwrite_explanations = bool(
             draft.confirmed_options.get("overwrite_explanations")
         )
 
     try:
-        units = load_prepared_string_units(draft)
+        units, explanation_baseline = load_prepared_string_units(draft)
     except ValidationError as error:
-        _mark_loc_kit_draft_failed(
+        mark_loc_kit_draft_failed(
             draft_id,
             task_id_field="apply_task_id",
             expected_state=LocKitImportDraft.State.APPLYING,
@@ -2134,6 +2179,7 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
             "explanations_would_overwrite",
             "explanations_unavailable",
             "explanations_source_changed",
+            "explanations_baseline_changed",
         )
     }
     created_languages: set[str] = set(saved_progress.get("created_languages", ()))
@@ -2167,7 +2213,7 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
                 retry_phase="finalize",
             ):
                 return
-            _mark_loc_kit_draft_failed(
+            mark_loc_kit_draft_failed(
                 draft_id,
                 task_id_field="apply_task_id",
                 expected_state=LocKitImportDraft.State.APPLYING,
@@ -2185,12 +2231,13 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
                 units=portion,
                 overwrite_explanations=overwrite_explanations,
                 pending_owner=str(draft.pk),
+                explanation_baseline=explanation_baseline,
             )
         except WeblateLockTimeoutError as error:
             retry_delays = (1, 2, 4, 8, 16, 32, 64, 128)
             retry_count = self.request.retries
             if retry_count >= len(retry_delays):
-                _mark_loc_kit_draft_failed(
+                mark_loc_kit_draft_failed(
                     draft_id,
                     task_id_field="apply_task_id",
                     expected_state=LocKitImportDraft.State.APPLYING,
@@ -2234,7 +2281,7 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
         except Retry:
             raise
         except (ValidationError, ValueError) as error:
-            _mark_loc_kit_draft_failed(
+            mark_loc_kit_draft_failed(
                 draft_id,
                 task_id_field="apply_task_id",
                 expected_state=LocKitImportDraft.State.APPLYING,
@@ -2248,7 +2295,7 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
             report_error(
                 "loc-kit string update apply failed", project=component.project
             )
-            _mark_loc_kit_draft_failed(
+            mark_loc_kit_draft_failed(
                 draft_id,
                 task_id_field="apply_task_id",
                 expected_state=LocKitImportDraft.State.APPLYING,
@@ -2270,6 +2317,9 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
         totals["explanations_source_changed"] += (
             result.explanations.source_changed_count
         )
+        totals["explanations_baseline_changed"] += (
+            result.explanations.baseline_changed_count
+        )
         created_languages.update(result.strings.created_languages)
         unavailable_languages.update(result.strings.unavailable_languages)
 
@@ -2280,7 +2330,11 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
             if (
                 draft.state != LocKitImportDraft.State.APPLYING
                 or draft.apply_task_id != task_id
+                or draft.next_row != cursor
             ):
+                # A newer delivery already advanced past this portion; its
+                # cursor and counters must never be rolled back by a stale
+                # one holding the same token.
                 return
             draft.next_row = cursor + len(portion)
             draft.pending_change_ids = sorted(
@@ -2338,6 +2392,7 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
             "explanations_would_overwrite": totals["explanations_would_overwrite"],
             "explanations_unavailable": totals["explanations_unavailable"],
             "explanations_source_changed": totals["explanations_source_changed"],
+            "explanations_baseline_changed": totals["explanations_baseline_changed"],
             "created_languages": sorted(created_languages),
             "unavailable_languages": sorted(unavailable_languages),
         }

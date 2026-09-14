@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from pathlib import Path
-from zipfile import BadZipFile
 
 import pytest
 from openpyxl import Workbook
@@ -129,7 +128,7 @@ def test_xlsx_preserves_multiline_text(ui_xlsx):
 def test_corrupt_xlsx_raises(tmp_path):
     path = tmp_path / "Bad.xlsx"
     path.write_bytes(b"not xlsx")
-    with pytest.raises(BadZipFile):
+    with pytest.raises(ReaderError):
         read_sheets(path)
 
 

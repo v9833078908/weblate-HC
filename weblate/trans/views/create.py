@@ -74,6 +74,7 @@ from weblate.trans.models.loc_kit import LocKitImportDraft
 from weblate.trans.tasks import (
     apply_loc_kit_string_update_draft,
     import_project_backup,
+    mark_loc_kit_draft_failed,
     perform_update,
     prepare_loc_kit_string_update,
 )
@@ -83,6 +84,7 @@ from weblate.utils.celery import (
     add_user_task,
     store_task_metadata,
 )
+from weblate.utils.errors import report_error
 from weblate.utils.licenses import LICENSE_URLS, detect_license
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.ratelimit import check_rate_limit, session_ratelimit_post
@@ -1887,11 +1889,32 @@ def _dispatch_loc_kit_task(
     status_url = reverse("loc-kit-strings-preview", kwargs={"token": draft.token})
 
     def _publish() -> None:
-        task.apply_async(
-            kwargs={"draft_id": draft.pk},
-            task_id=str(task_id),
-            priority=INTERACTIVE_TASK_PRIORITY,
-        )
+        try:
+            task.apply_async(
+                kwargs={"draft_id": draft.pk},
+                task_id=str(task_id),
+                priority=INTERACTIVE_TASK_PRIORITY,
+            )
+        except Exception as error:
+            # The draft row is already durable here, so a broker failure must
+            # leave a retryable state rather than a draft nobody works on.
+            report_error("loc-kit task dispatch failed", project=draft.project)
+            mark_loc_kit_draft_failed(
+                draft.pk,
+                task_id_field=(
+                    "prepare_task_id"
+                    if task is prepare_loc_kit_string_update
+                    else "apply_task_id"
+                ),
+                expected_state=draft.state,
+                task_id=task_id,
+                error_code="dispatch-failed",
+                message=str(error),
+                retry_phase=(
+                    "prepare" if task is prepare_loc_kit_string_update else "apply"
+                ),
+            )
+            return
         add_user_task(
             request.user.pk, str(task_id), text=text, label=draft.name, url=status_url
         )
@@ -2004,6 +2027,9 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
                 "explanation_preview": summary.get("explanations", {}),
                 "changed_sources": summary.get("changed_sources", []),
                 "changed_source_count": summary.get("changed_source_count", 0),
+                "judge_stale_count": summary.get("judge_stale_count", 0)
+                if _can_apply_explanations(self.request.user, component)
+                else 0,
                 "is_preparing": draft.state == LocKitImportDraft.State.PREPARING,
                 "is_applying": draft.state == LocKitImportDraft.State.APPLYING,
                 "is_completed": draft.state == LocKitImportDraft.State.COMPLETED,

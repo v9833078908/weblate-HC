@@ -3246,6 +3246,33 @@ class LocKitStringsUpdateServiceTest(ViewTestCase):
         self.assertEqual(rerun.explanations.unchanged_count, 1)
         self.assertEqual(rerun.explanations.set_count, 0)
 
+    def test_overwrite_skips_an_explanation_edited_after_the_preview(self) -> None:
+        """
+        A confirmed overwrite never discards an edit made after the preview.
+
+        The operator confirms "overwrite" against what the preview showed.
+        If a reviewer rewrites that Explanation while the apply is still
+        queued or mid-portion, applying the confirmed value would silently
+        destroy the newer human edit, so such a row is skipped and counted.
+        """
+        self.existing_unit.update_explanation("Previewed.", self.user)
+        baseline = {self.existing_unit.context: "Previewed."}
+        table_row = self._row(explanation="From the table.")
+
+        self.existing_unit.update_explanation("Reviewer's newer text.", self.user)
+
+        result = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(table_row,),
+            overwrite_explanations=True,
+            explanation_baseline=baseline,
+        )
+        self.existing_unit.refresh_from_db()
+        self.assertEqual(self.existing_unit.explanation, "Reviewer's newer text.")
+        self.assertEqual(result.explanations.set_count, 0)
+        self.assertEqual(result.explanations.baseline_changed_count, 1)
+
     def _grant_only(self, user, codenames: list[str], name: str) -> None:
         role = Role.objects.create(name=name)
         role.permissions.add(*Permission.objects.filter(codename__in=codenames))
