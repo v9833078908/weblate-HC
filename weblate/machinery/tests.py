@@ -88,6 +88,7 @@ from weblate.machinery.llm import (
     LLM_NEUTRAL_PREVIOUS_EXAMPLE_SOURCES,
     PROMPT,
     BaseLLMTranslation,
+    llm_usage_record,
 )
 from weblate.machinery.management.commands.list_machinery import (
     Command as ListMachineryCommand,
@@ -110,7 +111,7 @@ from weblate.machinery.yandexv2 import YandexV2Translation
 from weblate.machinery.youdao import YoudaoTranslation
 from weblate.memory.machine import WeblateMemory
 from weblate.trans.models import Category, Component, ProducerRun, Project, Unit
-from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.llm_usage import REPLY_EXCERPT_LENGTH, LLMUsageLog
 from weblate.trans.tests.factories import make_language, make_unit
 from weblate.trans.tests.test_views import (
     FixtureComponentTestCase,
@@ -4754,6 +4755,47 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             ),
             [(1, "applied"), (1, "applied"), (2, "refused")],
         )
+
+    @http_mock.activate
+    def test_usage_keeps_refusal_reason_and_reply_excerpt(self) -> None:
+        """
+        A refused row must say why, and keep what the model actually answered.
+
+        The reply of a refused request is otherwise only in the process log,
+        which does not survive a container restart; the ledger row does.
+        """
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_per_batch()
+        machine = self.get_machine()
+
+        machine.download_multiple_translations(
+            "en", "fr", [("Alpha", None), ("Beta", None)]
+        )
+
+        refused = LLMUsageLog.objects.get(outcome="refused")
+        self.assertTrue(
+            refused.refusal_reason.startswith("Mismatching assistant reply ids"),
+            refused.refusal_reason,
+        )
+        self.assertIn('"id": "bogus0"', refused.reply_excerpt)
+        applied = LLMUsageLog.objects.filter(outcome="applied")
+        self.assertEqual(
+            set(applied.values_list("refusal_reason", "reply_excerpt")), {("", "")}
+        )
+
+    def test_usage_reply_excerpt_is_bounded(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        log = LLMUsageLog.objects.create(model=self.TRACE_MODEL)
+        token = llm_usage_record.set(log.pk)
+        try:
+            # ruff: ignore[private-member-access]
+            BaseLLMTranslation._record_llm_outcome(
+                "refused", reason="Blank", reply="x" * (REPLY_EXCERPT_LENGTH + 1)
+            )
+        finally:
+            llm_usage_record.reset(token)
+        log.refresh_from_db()
+        self.assertEqual(len(log.reply_excerpt), REPLY_EXCERPT_LENGTH)
 
     @http_mock.activate
     def test_usage_records_applied_outcome_for_a_single_string(self) -> None:

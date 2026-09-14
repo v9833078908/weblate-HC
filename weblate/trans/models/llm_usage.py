@@ -22,6 +22,11 @@ _cost_usd_validator = DecimalValidator(
     decimal_places=COST_USD_DECIMAL_PLACES,
 )
 
+#: Characters of a refused reply the ledger keeps. Long enough for a full
+#: single-string reply with structured parts, short enough that a runaway
+#: reply cannot bloat the row.
+REPLY_EXCERPT_LENGTH = 4000
+
 
 class LLMUsageLog(models.Model):
     """
@@ -89,6 +94,13 @@ class LLMUsageLog(models.Model):
     outcome = models.CharField(
         max_length=16, choices=Outcome, blank=True, db_index=True
     )
+    #: Why the validator refused the reply, for ``partial`` and ``refused``
+    #: rows: the ``MachineTranslationError`` message. Blank otherwise.
+    refusal_reason = models.CharField(max_length=200, blank=True)
+    #: What the model actually answered, truncated to
+    #: :data:`REPLY_EXCERPT_LENGTH`, for ``partial`` and ``refused`` rows only.
+    #: The process log is the only other copy and does not survive a restart.
+    reply_excerpt = models.TextField(blank=True)
     request_attempt = models.ForeignKey(
         "trans.JudgeRequestAttempt",
         on_delete=models.deletion.SET_NULL,
@@ -177,6 +189,7 @@ def run_spend(run_id, operation: str) -> RunSpend:
         cost_usd=totals["known_cost_usd"] or Decimal(0),
         unpriced_requests=totals["unpriced_requests"] or 0,
     )
+
 
 def recent_cost_range(
     project_id_snapshot: int, service: str, model: str, operation: str

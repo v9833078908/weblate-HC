@@ -2036,7 +2036,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             translation, source_text, unit
         )
         if placeholderized is None:
-            msg = "Mismatching assistant reply."
+            msg = "Mismatching assistant reply placeholders."
             raise MachineTranslationError(msg)
         return placeholderized
 
@@ -2515,7 +2515,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             translations, sources, source_occurrences
         )
         if translation_list is None:
-            msg = "Mismatching assistant reply."
+            msg = "Mismatching assistant reply items."
             raise MachineTranslationError(msg)
 
         normalized_translations: list[str] = []
@@ -2529,12 +2529,12 @@ class BaseLLMTranslation(BatchMachineTranslation):
             if cls._extract_placeholders(
                 normalized_translation
             ) != cls._extract_placeholders(source_text):
-                msg = "Mismatching assistant reply."
+                msg = "Mismatching assistant reply placeholders."
                 raise MachineTranslationError(msg)
             if cls._extract_literal_at_suffixes(
                 normalized_translation
             ) != cls._extract_literal_at_suffixes(source_text):
-                msg = "Mismatching assistant reply."
+                msg = "Mismatching assistant reply literal suffixes."
                 raise MachineTranslationError(msg)
             normalized_translations.append(normalized_translation)
 
@@ -3008,9 +3008,15 @@ class BaseLLMTranslation(BatchMachineTranslation):
         return prompt, content, previous_content, previous_response
 
     @staticmethod
-    def _record_llm_outcome(outcome: LLMUsageOutcome) -> None:
+    def _record_llm_outcome(
+        outcome: LLMUsageOutcome, *, reason: str = "", reply: str | None = None
+    ) -> None:
         """
         Mark how the reply of the request just measured was resolved.
+
+        A refusal keeps its reason and a bounded excerpt of the reply: the
+        process log is the only other place the reply exists, and it does not
+        survive a container restart.
 
         Never raises: a broken accounting write must not break a translation.
         """
@@ -3018,10 +3024,14 @@ class BaseLLMTranslation(BatchMachineTranslation):
         if record_id is None:
             return
         # ruff: ignore[import-outside-top-level]
-        from weblate.trans.models.llm_usage import LLMUsageLog
+        from weblate.trans.models.llm_usage import REPLY_EXCERPT_LENGTH, LLMUsageLog
 
         try:
-            LLMUsageLog.objects.filter(pk=record_id).update(outcome=outcome)
+            LLMUsageLog.objects.filter(pk=record_id).update(
+                outcome=outcome,
+                refusal_reason=reason[:200],
+                reply_excerpt=(reply or "")[:REPLY_EXCERPT_LENGTH],
+            )
         except Exception:
             LOGGER.exception("Failed to record LLM outcome")
 
@@ -3037,7 +3047,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         if translations_string is None or not translations_string:
             msg = "Blank assistant reply"
             self.log_handled_error(msg, extra_log=translations_string)
-            self._record_llm_outcome("refused")
+            self._record_llm_outcome("refused", reason=msg, reply=translations_string)
             raise MachineTranslationError(msg)
 
         try:
@@ -3049,7 +3059,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
             if repaired_translations_string is None:
                 msg = "Could not parse assistant reply as JSON."
                 self.log_handled_error(msg, extra_log=translations_string)
-                self._record_llm_outcome("refused")
+                self._record_llm_outcome(
+                    "refused", reason=msg, reply=translations_string
+                )
                 raise MachineTranslationError(msg) from error
 
             try:
@@ -3057,7 +3069,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
             except json.JSONDecodeError as repaired_error:
                 msg = "Could not parse assistant reply as JSON."
                 self.log_handled_error(msg, extra_log=translations_string)
-                self._record_llm_outcome("refused")
+                self._record_llm_outcome(
+                    "refused", reason=msg, reply=translations_string
+                )
                 raise MachineTranslationError(msg) from repaired_error
 
             add_breadcrumb(self.name, "response-repaired")
@@ -3078,13 +3092,15 @@ class BaseLLMTranslation(BatchMachineTranslation):
             if prefix and len(prefix) < len(sources):
                 msg = f"Incomplete assistant reply: {len(prefix)}/{len(sources)}."
                 self.log_handled_error(msg, extra_log=translations_string)
-                self._record_llm_outcome("partial")
+                self._record_llm_outcome(
+                    "partial", reason=msg, reply=translations_string
+                )
                 raise PartialLLMReplyError(
                     self._build_translation_results(prefix, sources), len(prefix)
                 ) from error
             msg = str(error)
             self.log_handled_error(msg, extra_log=translations_string)
-            self._record_llm_outcome("refused")
+            self._record_llm_outcome("refused", reason=msg, reply=translations_string)
             raise MachineTranslationError(msg) from error
 
         self._record_llm_outcome("applied")
