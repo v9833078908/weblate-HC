@@ -7,10 +7,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # Полная loc-kit таблица: обновление существующего компонента
 
 Дата: 2026-09-11.
-Статус: реализовано в `feat/loc-kit-full-table-update`; ожидаются финальная
-проверка, commit и push. Проверка мобильного viewport и Tab-фокуса заблокирована
-ограничением доступного Lightpanda (не применяет viewport/media queries и не
-обновляет `document.activeElement` на Tab).
+Статус: реализация смёрджена в `main`; follow-up по P1 durability-находкам
+находится в `docs/product/plans/2026-09-14-loc-kit-update-durability.md`.
+Проверка мобильного viewport и Tab-фокуса заблокирована ограничением доступного
+Lightpanda (не применяет viewport/media queries и не обновляет
+`document.activeElement` на Tab).
 
 ## Цель и основания
 
