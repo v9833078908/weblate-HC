@@ -8169,16 +8169,15 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            parts = json.loads(content)["strings"][0]["parts"]
-            placeholders = [part for part in parts if part["type"] == "placeholder"]
-            self.assertEqual(len(placeholders), 2)
+            wrapper = json.loads(content)["strings"][0]["parts"][0]
             return json.dumps(
                 [
                     {
                         "parts": [
-                            placeholders[0],
-                            {"type": "text", "text": "Enregistrer le bouton"},
-                            placeholders[1],
+                            {
+                                **wrapper,
+                                "text": "Enregistrer le bouton",
+                            },
                             {"type": "text", "text": ""},
                         ]
                     }
@@ -8189,14 +8188,16 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             patch.object(
                 machine, "fetch_llm_translations", side_effect=request_callback
             ),
-            self.assertRaises(MachineTranslationError),
+            self.assertRaisesMessage(
+                MachineTranslationError, "Mismatching assistant reply items."
+            ),
         ):
             self.assert_translate(
                 "fr",
-                "&lt;strong&gt;Save&lt;/strong&gt; button",
+                "<b>Save</b> button",
                 1,
                 machine=machine,
-                unit_args={"flags": 'placeholders:r"&lt;[a-z/]+&gt;", xml-text'},
+                unit_args={"flags": "xml-text"},
             )
 
     @http_mock.activate
@@ -8646,6 +8647,287 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             str(error.exception.__cause__),
         )
 
+    def test_translate_accepts_inline_structured_placeholders(self) -> None:
+        machine = self.get_machine()
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            parts = json.loads(content)["strings"][0]["parts"]
+            tokens = [part["id"] for part in parts if part["type"] == "placeholder"]
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"아군 선원들에게 {tokens[0]}개의 치유 물약 통을 던집니다 "
+                                    f"(우선순위: 부상자). 치유량: {tokens[1]}/초, "
+                                    f"{tokens[2]}초 동안"
+                                ),
+                            }
+                        ]
+                    }
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translation = self.assert_translate(
+                "ko",
+                (
+                    "Бросает {0} бочки с лечебным зельем в союзных матросов "
+                    "(приоритет — раненым). Лечение: {1}/с в течение {2}с"
+                ),
+                1,
+                machine=machine,
+                unit_args={"flags": "python-brace-format"},
+            )
+
+        self.assertEqual(
+            translation[0][0]["text"],
+            "아군 선원들에게 {0}개의 치유 물약 통을 던집니다 "
+            "(우선순위: 부상자). 치유량: {1}/초, {2}초 동안",
+        )
+
+    def test_translate_accepts_decorated_structured_text_parts(self) -> None:
+        machine = self.get_machine()
+
+        def request_callback(
+            _prompt: str, content: str, _previous_content: str, _previous_response: str
+        ) -> str:
+            parts = json.loads(content)["strings"][0]["parts"]
+            output = []
+            for part in parts:
+                if part["type"] == "text":
+                    output.append(
+                        {
+                            "type": "text",
+                            "text": "/sec" if part["text"] == "/сек" else part["text"],
+                            "id": "",
+                            "kind": "",
+                            "role": "",
+                            "close_id": "",
+                            "translatable": True,
+                        }
+                    )
+                else:
+                    output.append(part)
+            return json.dumps([{"parts": output}])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translation = self.assert_translate(
+                "nl",
+                "+{0}/сек",
+                1,
+                machine=machine,
+                unit_args={"flags": "python-brace-format"},
+            )
+
+        self.assertEqual(translation[0][0]["text"], "+{0}/sec")
+
+    def test_translate_accepts_placeholder_part_without_metadata(self) -> None:
+        machine = self.get_machine()
+
+        def request_callback(
+            _prompt: str, content: str, _previous_content: str, _previous_response: str
+        ) -> str:
+            parts = json.loads(content)["strings"][0]["parts"]
+            token = next(part["id"] for part in parts if part["type"] == "placeholder")
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "placeholder",
+                                "text": token,
+                                "translatable": False,
+                            },
+                            {"type": "text", "text": "위"},
+                        ]
+                    }
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translation = self.assert_translate(
+                "ko",
+                "{0} место",
+                1,
+                machine=machine,
+                unit_args={"flags": "python-brace-format"},
+            )
+
+        self.assertEqual(translation[0][0]["text"], "{0}위")
+
+    def test_translate_accepts_split_structured_translatable_markup_wrapper(
+        self,
+    ) -> None:
+        machine = self.get_machine()
+
+        def request_callback(
+            _prompt: str, content: str, _previous_content: str, _previous_response: str
+        ) -> str:
+            wrapper = json.loads(content)["strings"][0]["parts"][0]
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "placeholder",
+                                "text": wrapper["id"],
+                                "kind": "markup",
+                                "close_id": wrapper["close_id"],
+                            },
+                            {"type": "text", "text": "选择战士"},
+                            {"type": "placeholder", "text": wrapper["close_id"]},
+                            {
+                                "type": "text",
+                                "text": "\n\n战士比射手拥有更多生命值，且擅长近战",
+                            },
+                        ]
+                    }
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translation = self.assert_translate(
+                "zh_Hans",
+                "<b>Выбери бойца</b>\n\nБойцы имеют больше здоровья, чем Стрелки и "
+                "сильны в ближнем бою",
+                1,
+                machine=machine,
+                unit_args={"flags": "xml-text"},
+            )
+
+        self.assertEqual(
+            translation[0][0]["text"],
+            "<b>选择战士</b>\n\n战士比射手拥有更多生命值，且擅长近战",
+        )
+
+    def test_translate_rejects_structured_wrapper_missing_close_token(self) -> None:
+        machine = self.get_machine()
+
+        def request_callback(
+            _prompt: str, content: str, _previous_content: str, _previous_response: str
+        ) -> str:
+            wrapper = json.loads(content)["strings"][0]["parts"][0]
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "placeholder",
+                                "text": wrapper["id"],
+                                "kind": "markup",
+                                "close_id": wrapper["close_id"],
+                            },
+                            {"type": "text", "text": "选择战士"},
+                        ]
+                    }
+                ]
+            )
+
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            self.assertRaisesMessage(
+                MachineTranslationError, "Mismatching assistant reply items."
+            ),
+        ):
+            self.assert_translate(
+                "zh_Hans",
+                "<b>Выбери бойца</b>",
+                1,
+                machine=machine,
+                unit_args={"flags": "xml-text"},
+            )
+
+    def test_translate_rejects_structured_placeholder_nested_in_split_wrapper(
+        self,
+    ) -> None:
+        machine = self.get_machine()
+
+        def request_callback(
+            _prompt: str, content: str, _previous_content: str, _previous_response: str
+        ) -> str:
+            wrapper = json.loads(content)["strings"][0]["parts"][0]
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "placeholder",
+                                "text": wrapper["id"],
+                                "kind": "markup",
+                                "close_id": wrapper["close_id"],
+                            },
+                            {"type": "text", "text": "选择战士"},
+                            {"type": "placeholder", "text": wrapper["id"]},
+                            {"type": "placeholder", "text": wrapper["close_id"]},
+                        ]
+                    }
+                ]
+            )
+
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            self.assertRaisesMessage(
+                MachineTranslationError, "Mismatching assistant reply items."
+            ),
+        ):
+            self.assert_translate(
+                "zh_Hans",
+                "<b>Выбери бойца</b>",
+                1,
+                machine=machine,
+                unit_args={"flags": "xml-text"},
+            )
+
+    def test_translate_rejects_structured_text_part_with_placeholder_id(self) -> None:
+        machine = self.get_machine()
+
+        def request_callback(
+            _prompt: str, content: str, _previous_content: str, _previous_response: str
+        ) -> str:
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "text",
+                                "text": "Enregistrer",
+                                "id": "@@PH1@@",
+                            }
+                        ]
+                    }
+                ]
+            )
+
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            self.assertRaisesMessage(
+                MachineTranslationError, "Mismatching assistant reply items."
+            ),
+        ):
+            self.assert_translate("fr", "Save", 1, machine=machine)
+
 
 class ConditionalDslLLMTranslationTest(TestCase):
     def test_translate_preserves_conditional_dsl_syntax(self) -> None:
@@ -8712,6 +8994,210 @@ class ConditionalDslLLMTranslationTest(TestCase):
 
         self.assertEqual(amount_translation[0][0]["text"], f"Betrag: {amount}")
         self.assertEqual(timer_translation[0][0]["text"], human_timer_de)
+
+    def test_translate_accepts_text_moved_before_syntax_placeholder(self) -> None:
+        machine = OpenAITranslation(
+            {"key": "x", "model": "auto", "persona": "", "style": ""}
+        )
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            placeholder = json.loads(content)["strings"][0]["parts"][1]
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "text",
+                                "text": "Has quedado en el puesto ",
+                            },
+                            {
+                                "type": "placeholder",
+                                "text": "",
+                                "id": placeholder["id"],
+                                "kind": "syntax",
+                                "translatable": False,
+                            },
+                        ]
+                    }
+                ]
+            )
+
+        original_check = check_models.CHECKS.get("game-markup")
+        check_models.CHECKS["game-markup"] = GameMarkupCheck()
+        try:
+            with patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ):
+                translation = machine.translate(
+                    make_unit(code="es", source="Вы заняли {0} место")
+                )
+        finally:
+            if original_check is None:
+                check_models.CHECKS.data.pop("game-markup")
+            else:
+                check_models.CHECKS["game-markup"] = original_check
+
+        self.assertEqual(translation[0][0]["text"], "Has quedado en el puesto {0}")
+
+    def test_translate_accepts_text_moved_after_syntax_placeholder(self) -> None:
+        machine = OpenAITranslation(
+            {"key": "x", "model": "auto", "persona": "", "style": ""}
+        )
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            placeholder = json.loads(content)["strings"][0]["parts"][1]
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {"type": "text", "text": "射撃精度が"},
+                            placeholder,
+                            {"type": "text", "text": "上昇"},
+                        ]
+                    }
+                ]
+            )
+
+        original_check = check_models.CHECKS.get("game-markup")
+        check_models.CHECKS["game-markup"] = GameMarkupCheck()
+        try:
+            with patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ):
+                translation = machine.translate(
+                    make_unit(code="ja", source="Увеличивает точность стрельбы на {0}")
+                )
+        finally:
+            if original_check is None:
+                check_models.CHECKS.data.pop("game-markup")
+            else:
+                check_models.CHECKS["game-markup"] = original_check
+
+        self.assertEqual(translation[0][0]["text"], "射撃精度が{0}上昇")
+
+    def test_translate_accepts_placeholder_text_echoing_own_id(self) -> None:
+        machine = OpenAITranslation(
+            {"key": "x", "model": "auto", "persona": "", "style": ""}
+        )
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            placeholder = json.loads(content)["strings"][0]["parts"][0]
+            token = placeholder["id"]
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "placeholder",
+                                "text": token,
+                                "id": token,
+                                "kind": "syntax",
+                                "translatable": False,
+                            },
+                            {
+                                "type": "text",
+                                "text": "가 부활하여 다시 명령을 수행할 준비가 되었습니다.",
+                            },
+                        ]
+                    }
+                ]
+            )
+
+        original_check = check_models.CHECKS.get("game-markup")
+        check_models.CHECKS["game-markup"] = GameMarkupCheck()
+        try:
+            with patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ):
+                translation = machine.translate(
+                    make_unit(
+                        code="ko",
+                        source="{0} возродился и снова готов выполнять приказы.",
+                    )
+                )
+        finally:
+            if original_check is None:
+                check_models.CHECKS.data.pop("game-markup")
+            else:
+                check_models.CHECKS["game-markup"] = original_check
+
+        self.assertEqual(
+            translation[0][0]["text"],
+            "{0}가 부활하여 다시 명령을 수행할 준비가 되었습니다.",
+        )
+
+    def test_translate_rejects_structured_duplicate_inline_and_part_placeholder(
+        self,
+    ) -> None:
+        machine = OpenAITranslation(
+            {"key": "x", "model": "auto", "persona": "", "style": ""}
+        )
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            placeholder = json.loads(content)["strings"][0]["parts"][1]
+            token = placeholder["id"]
+            return json.dumps(
+                [
+                    {
+                        "parts": [
+                            {
+                                "type": "text",
+                                "text": f"사격 정확도를 {token}만큼 증가시킵니다",
+                            },
+                            {
+                                "type": "placeholder",
+                                "id": token,
+                                "kind": "syntax",
+                                "text": "",
+                                "translatable": False,
+                            },
+                        ]
+                    }
+                ]
+            )
+
+        original_check = check_models.CHECKS.get("game-markup")
+        check_models.CHECKS["game-markup"] = GameMarkupCheck()
+        try:
+            with (
+                patch.object(
+                    machine, "fetch_llm_translations", side_effect=request_callback
+                ),
+                self.assertRaisesMessage(
+                    MachineTranslationError, "Mismatching assistant reply items."
+                ),
+            ):
+                machine.translate(
+                    make_unit(
+                        code="ko",
+                        source="Увеличивает точность стрельбы на {0}",
+                    )
+                )
+        finally:
+            if original_check is None:
+                check_models.CHECKS.data.pop("game-markup")
+            else:
+                check_models.CHECKS["game-markup"] = original_check
 
 
 class OpenAILLMContextTest(FixtureComponentTestCase):

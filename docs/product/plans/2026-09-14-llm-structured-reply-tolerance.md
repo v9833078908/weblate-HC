@@ -4,8 +4,22 @@
 > plan task-by-task. Use test-driven-development for every task: every fixture
 > below is a real production reply and must fail before the task and pass after.
 
-**Status:** proposed, awaiting approval. Implementation is not deployment:
-production rollout needs its own approval (see "Rollout").
+**Status:** implemented and verified 2026-09-14 on branch
+`feat/llm-structured-reply-tolerance` (isolated worktree). Tasks 1-3 complete:
+F1-F7 stored, N2/N3 and the three boundary refusals still refused, changelog
+and troubleshooting guide updated, non-mutating replay probe added. Verified
+host-side (`source scripts/test-database.sh &&
+DJANGO_SETTINGS_MODULE=weblate.settings_test uv run pytest
+weblate/machinery/tests.py -k "structured or placeholder or wrapper or
+usage" -q`, not the `./rundev.sh` container wrapper): 513 passed. Full
+file: 6 pre-existing `MistralCustom*`/`OpenAICustom*` DNS failures remain
+(confirmed present on unmodified `main` too; container has no outbound DNS)
+plus one confirmed pre-existing order-dependent cache-pollution failure in
+`MachineTranslationCleanupTest::test_rst_reference_remains_placeholder`
+(passes in isolation; reproduces identically on unmodified `main`). `ruff`,
+`mypy` on `weblate/machinery/llm.py`, and `prek` on every touched
+non-Python file are clean. Implementation is not deployment: production
+rollout needs its own approval (see "Rollout").
 
 **Goal:** A structured LLM reply whose translation is correct - every placeholder
 token present, in the right order, with the right metadata - is accepted even when
@@ -216,20 +230,20 @@ cannot drift.
 
 **Actions:**
 
-- [ ] Repair N3 before changing the parser: replace the callback's impossible
+- [x] Repair N3 before changing the parser: replace the callback's impossible
       two-placeholder assertion with the one-wrapper reply described above and
       assert `Mismatching assistant reply items.` with `assertRaisesMessage`.
       Never make a callback assertion the condition that demonstrates refusal:
       `BaseMachineTranslation._handle_download_error` wraps it as a
       `MachineTranslationError`.
-- [ ] Write F1 and F2 in the game-markup registration scope before changing the
+- [x] Write F1 and F2 in the game-markup registration scope before changing the
       parser. They must raise `MachineTranslationError` on current code; after
       Task 1 they assert the exact stored translation. This is the only test
       setup that exercises the production `syntax` classification of `{0}`.
-- [ ] Add the predicate; increment `segment` / return `current_segment + 1` only
+- [x] Add the predicate; increment `segment` / return `current_segment + 1` only
       when it holds. A non-boundary ordered placeholder still consumes
       `expected_ordered_parts[0]` (order is still enforced).
-- [ ] `segment_has_text` sizing follows the same predicate.
+- [x] `segment_has_text` sizing follows the same predicate.
 
 **Verification:**
 `./rundev.sh test weblate/machinery/tests.py -k "structured or segment or reordered" -q`
@@ -257,29 +271,29 @@ input.
 
 **Actions:**
 
-- [ ] Write tests F3, F4, F5, F6, F7, N2 first, plus the three boundary
+- [x] Write tests F3, F4, F5, F6, F7, N2 first, plus the three boundary
       refusals below (missing wrapper close, nested placeholder in split
       wrapper, non-empty text-part `id`). Each negative assertion matches
       `Mismatching assistant reply items.`; callbacks only return their reply,
       keeping request observations for assertions after the call.
-- [ ] Text decoration (decision 3): validate and then drop tolerated keys;
+- [x] Text decoration (decision 3): validate and then drop tolerated keys;
       refuse a text part with a non-empty `id` or an unknown key.
-- [ ] Placeholder identity (decision 2): `id` if a non-empty string; else `text`
+- [x] Placeholder identity (decision 2): `id` if a non-empty string; else `text`
       when it is exactly one token, then `text` becomes `""`; else refuse. A part
       whose `text` equals its own `id` (F7) also becomes `text: ""`.
-- [ ] Expansion (decision 4): a now-clean text part whose `text` **contains**
+- [x] Expansion (decision 4): a now-clean text part whose `text` **contains**
       one or more exact `LLM_PLACEHOLDER_RE` matches becomes alternating text /
       `{"type": "placeholder", "id": token}` parts; empty text pieces are
       dropped.
-- [ ] Wrapper re-join (decision 5) over the canonical sequence.
-- [ ] Fill-in: for each placeholder part, copy `kind`, `translatable`, `role`,
+- [x] Wrapper re-join (decision 5) over the canonical sequence.
+- [x] Fill-in: for each placeholder part, copy `kind`, `translatable`, `role`,
       `close_id` from the expected part with the same `id` when the key is
       absent. When no expected part has that `id`, leave the part as is - the
       existing comparison refuses it (`test_translate_rejects_structured_placeholder_metadata_change`).
       When several expected parts share an `id` (repeated placeholder), all
       carry identical metadata by construction (`_get_placeholder_part`), so the
       first suffices.
-- [ ] The existing loop runs on the canonical list unchanged.
+- [x] The existing loop runs on the canonical list unchanged.
 
 **Verification:**
 `./rundev.sh test weblate/machinery/tests.py -k "structured or placeholder or wrapper or usage" -q`

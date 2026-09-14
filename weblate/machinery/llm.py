@@ -14,7 +14,7 @@ from contextvars import ContextVar
 from itertools import chain
 from operator import itemgetter
 from secrets import token_hex
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, TypeGuard
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, TypeGuard, cast
 
 from asgiref.sync import sync_to_async
 from django.db.models import OuterRef, Subquery
@@ -2123,6 +2123,12 @@ class BaseLLMTranslation(BatchMachineTranslation):
     ) -> bool:
         return expected["kind"] == "grammar"
 
+    @staticmethod
+    def _is_structured_placeholder_segment_boundary(
+        expected: LLMPlaceholderPart,
+    ) -> bool:
+        return expected["kind"] == "markup"
+
     @classmethod
     def _has_structured_placeholder_forbidden_text(
         cls,
@@ -2260,8 +2266,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 placeholder_specs,
             )
             if normalized is not None:
-                del expected_ordered_parts[0]
-                return normalized, current_segment + 1
+                expected = expected_ordered_parts.pop(0)
+                return normalized, current_segment + int(
+                    cls._is_structured_placeholder_segment_boundary(expected)
+                )
 
             if any(
                 cls._normalize_structured_placeholder_part(
@@ -2284,6 +2292,126 @@ class BaseLLMTranslation(BatchMachineTranslation):
             placeholder_specs,
             current_segment,
         )
+
+    @classmethod
+    def _canonicalize_structured_text_part(
+        cls, raw: dict[str, JSONValue]
+    ) -> list[dict[str, JSONValue]] | None:
+        if any(
+            key not in {"type", "text", "translatable"}
+            and (
+                key not in {"id", "kind", "role", "close_id"} or value not in {"", None}
+            )
+            for key, value in raw.items()
+        ):
+            return None
+        text = cast("str", raw["text"])
+        expanded: list[dict[str, JSONValue]] = []
+        offset = 0
+        for match in LLM_PLACEHOLDER_RE.finditer(text):
+            if match.start() > offset:
+                expanded.append({"type": "text", "text": text[offset : match.start()]})
+            expanded.append({"type": "placeholder", "id": match.group(), "text": ""})
+            offset = match.end()
+        if offset < len(text) or offset == 0:
+            expanded.append({"type": "text", "text": text[offset:]})
+        return expanded
+
+    @classmethod
+    def _canonicalize_structured_placeholder_part(
+        cls, raw: dict[str, JSONValue]
+    ) -> dict[str, JSONValue] | None:
+        part = raw.copy()
+        identifier = part.get("id")
+        if not isinstance(identifier, str) or not identifier:
+            if LLM_PLACEHOLDER_RE.fullmatch(cast("str", part["text"])) is None:
+                return None
+            identifier = part["text"]
+        part["id"] = identifier
+        if part["text"] == identifier:
+            part["text"] = ""
+        return part
+
+    @classmethod
+    def _rejoin_structured_wrapper_parts(
+        cls,
+        canonical: list[dict[str, JSONValue]],
+        expected: dict[str, LLMPlaceholderPart],
+    ) -> list[dict[str, JSONValue]] | None:
+        joined: list[dict[str, JSONValue]] = []
+        index = 0
+        while index < len(canonical):
+            part = canonical[index]
+            wrapper = (
+                expected.get(cast("str", part["id"]))
+                if part["type"] == "placeholder"
+                else None
+            )
+            if (
+                wrapper is not None
+                and wrapper.get("close_id") is not None
+                and not part["text"]
+            ):
+                close_id = wrapper["close_id"]
+                inner: list[str] = []
+                next_index = index + 1
+                closed = False
+                while next_index < len(canonical):
+                    candidate = canonical[next_index]
+                    if candidate["type"] == "text":
+                        inner.append(cast("str", candidate["text"]))
+                        next_index += 1
+                        continue
+                    if candidate.get("id") != close_id:
+                        return None
+                    part = {**part, "text": "".join(inner)}
+                    index = next_index
+                    closed = True
+                    break
+                if not closed:
+                    return None
+            joined.append(part)
+            index += 1
+        return joined
+
+    @classmethod
+    def _canonicalize_structured_parts(
+        cls, parts: list[JSONValue], expected_parts: list[LLMStringPart]
+    ) -> list[dict[str, JSONValue]] | None:
+        expected = {
+            part["id"]: part for part in expected_parts if part["type"] == "placeholder"
+        }
+        canonical: list[dict[str, JSONValue]] = []
+        for raw in parts:
+            if not isinstance(raw, dict) or not isinstance(raw.get("text"), str):
+                return None
+            if raw.get("type") == "text":
+                expanded = cls._canonicalize_structured_text_part(raw)
+                if expanded is None:
+                    return None
+                canonical.extend(expanded)
+                continue
+            if raw.get("type") != "placeholder":
+                return None
+            part = cls._canonicalize_structured_placeholder_part(raw)
+            if part is None:
+                return None
+            canonical.append(part)
+
+        joined = cls._rejoin_structured_wrapper_parts(canonical, expected)
+        if joined is None:
+            return None
+
+        for part in joined:
+            if part["type"] != "placeholder":
+                continue
+            source = expected.get(cast("str", part["id"]))
+            if source is None:
+                continue
+            for key in ("kind", "translatable", "role", "close_id"):
+                if key in source and key not in part:
+                    part[key] = source[key]
+        return joined
 
     @classmethod
     def _get_structured_expected_part_state(
@@ -2312,8 +2440,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 reorderable_placeholder_parts.append((expected, segment))
             else:
                 ordered_placeholder_parts.append(expected)
-                segment += 1
-                segment_has_text.append(False)
+                if cls._is_structured_placeholder_segment_boundary(expected):
+                    segment += 1
+                    segment_has_text.append(False)
 
         return (
             text_atomic_counts,
@@ -2359,6 +2488,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
             source_occurrence,
             placeholder_specs=placeholder_specs,
         )
+        canonical_parts = cls._canonicalize_structured_parts(parts, expected_parts)
+        if canonical_parts is None:
+            return None
+
         protected_texts = cls._get_protected_highlight_texts(placeholder_specs)
         (
             expected_text_atomic_counts,
@@ -2371,7 +2504,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         actual_segment_has_text = [False for _segment in expected_segment_has_text]
         actual_text_atomic_counts: Counter[str] = Counter()
         result: list[str] = []
-        for actual in parts:
+        for actual in canonical_parts:
             if not isinstance(actual, dict):
                 return None
             actual_type = actual.get("type")
