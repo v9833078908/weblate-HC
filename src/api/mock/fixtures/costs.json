@@ -1,0 +1,20 @@
+{
+  "pirate-ships": {
+    "total_usd": "41.20",
+    "by_run": [
+      { "run": "#12 · Перевод", "usd": "35.10" },
+      { "run": "#13 · Оценка", "usd": "9.10" },
+      { "run": "#11 · Перевод", "usd": "6.10" }
+    ],
+    "by_language": [
+      { "language": "Английский", "usd": "3.42" },
+      { "language": "Японский", "usd": "4.42" },
+      { "language": "Китайский (упр.)", "usd": "4.24" }
+    ],
+    "by_model": [
+      { "model": "gpt-5.2", "usd": "22.14" },
+      { "model": "claude-sonnet-4.5", "usd": "12.96" },
+      { "model": "gpt-5.2-judge", "usd": "9.10" }
+    ]
+  }
+}
