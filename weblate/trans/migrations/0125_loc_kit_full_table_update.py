@@ -11,7 +11,7 @@ import weblate.trans.models.loc_kit
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("trans", "0123_loc_kit_import_draft_application"),
+        ("trans", "0124_llm_usage_refusal_evidence"),
     ]
 
     operations = [

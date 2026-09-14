@@ -9,7 +9,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("trans", "0124_loc_kit_full_table_update"),
+        ("trans", "0125_loc_kit_full_table_update"),
     ]
 
     operations = [
