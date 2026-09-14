@@ -1866,6 +1866,8 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
     """Parse a staged string-update table into a private canonical packet."""
     # ruff: ignore[import-outside-top-level]
     import json
+
+    # ruff: ignore[import-outside-top-level]
     from hashlib import sha256
 
     # ruff: ignore[import-outside-top-level]
@@ -2031,9 +2033,6 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
         draft.payload_size = len(encoded)
         draft.state = LocKitImportDraft.State.PREVIEW_READY
         draft.progress = {"phase": "preview", "processed_rows": len(rows_json)}
-        draft.error_code = ""
-        draft.error_details = ""
-        draft.retry_phase = ""
         draft.last_activity_at = timezone.now()
         # PREVIEW_READY awaits the user's confirm; give it the same
         # one-hour retention as an active task heartbeat.
@@ -2043,7 +2042,9 @@ def prepare_loc_kit_string_update(self, *, draft_id: int) -> None:
 
 
 @app.task(bind=True, acks_late=True)
-def apply_loc_kit_string_update_draft(self, *, draft_id: int) -> None:  # ruff: ignore[complex-structure]
+def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
+    self, *, draft_id: int
+) -> None:
     """
     Apply a prepared string-update packet in bounded, resumable portions.
 
@@ -2059,6 +2060,9 @@ def apply_loc_kit_string_update_draft(self, *, draft_id: int) -> None:  # ruff: 
     """
     # ruff: ignore[import-outside-top-level]
     from uuid import UUID
+
+    # ruff: ignore[import-outside-top-level]
+    from celery.exceptions import Retry
 
     # ruff: ignore[import-outside-top-level]
     from django.core.exceptions import ValidationError
@@ -2175,71 +2179,60 @@ def apply_loc_kit_string_update_draft(self, *, draft_id: int) -> None:  # ruff: 
             return
         portion = units[cursor : cursor + LOC_KIT_STRING_UPDATE_PORTION_SIZE]
         try:
-            for attempt, retry_delay in enumerate(
-                (1, 2, 4, 8, 16, 32, 64, 128, None), start=1
-            ):
-                with transaction.atomic():
-                    current = LocKitImportDraft.objects.select_for_update(
-                        of=("self",)
-                    ).get(pk=draft_id)
-                    if (
-                        current.state != LocKitImportDraft.State.APPLYING
-                        or current.apply_task_id != task_id
-                    ):
-                        return
-                try:
-                    result = apply_loc_kit_string_update(
-                        user=owner,
-                        component=component,
-                        units=portion,
-                        overwrite_explanations=overwrite_explanations,
-                        pending_owner=str(draft.pk),
-                    )
-                    break
-                except WeblateLockTimeoutError as error:
-                    if retry_delay is None:
-                        _mark_loc_kit_draft_failed(
-                            draft_id,
-                            task_id_field="apply_task_id",
-                            expected_state=LocKitImportDraft.State.APPLYING,
-                            task_id=task_id,
-                            error_code="lock-timeout",
-                            message=str(error),
-                            retry_phase="apply",
-                        )
-                        return
-                    with transaction.atomic():
-                        current = LocKitImportDraft.objects.select_for_update(
-                            of=("self",)
-                        ).get(pk=draft_id)
-                        if (
-                            current.state != LocKitImportDraft.State.APPLYING
-                            or current.apply_task_id != task_id
-                        ):
-                            return
-                        current.progress = {
-                            **current.progress,
-                            "phase": "applying",
-                            "processed_rows": cursor,
-                            "total_rows": total_rows,
-                            "lock_retry_attempt": attempt,
-                            "next_retry_at": (
-                                timezone.now() + timedelta(seconds=retry_delay)
-                            ).isoformat(),
-                        }
-                        current.last_activity_at = timezone.now()
-                        current.expires_at = current.last_activity_at + timedelta(
-                            hours=1
-                        )
-                        current.save(
-                            update_fields=[
-                                "progress",
-                                "last_activity_at",
-                                "expires_at",
-                            ]
-                        )
-                    touch_task_liveness(str(task_id))
-                    time.sleep(retry_delay)
+            result = apply_loc_kit_string_update(
+                user=owner,
+                component=component,
+                units=portion,
+                overwrite_explanations=overwrite_explanations,
+                pending_owner=str(draft.pk),
+            )
+        except WeblateLockTimeoutError as error:
+            retry_delays = (1, 2, 4, 8, 16, 32, 64, 128)
+            retry_count = self.request.retries
+            if retry_count >= len(retry_delays):
+                _mark_loc_kit_draft_failed(
+                    draft_id,
+                    task_id_field="apply_task_id",
+                    expected_state=LocKitImportDraft.State.APPLYING,
+                    task_id=task_id,
+                    error_code="lock-timeout",
+                    message=str(error),
+                    retry_phase="apply",
+                )
+                return
+            retry_delay = retry_delays[retry_count]
+            with transaction.atomic():
+                current = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+                    pk=draft_id
+                )
+                if (
+                    current.state != LocKitImportDraft.State.APPLYING
+                    or current.apply_task_id != task_id
+                ):
+                    return
+                current.progress = {
+                    **current.progress,
+                    "phase": "applying",
+                    "processed_rows": cursor,
+                    "total_rows": total_rows,
+                    "lock_retry_attempt": retry_count + 1,
+                    "next_retry_at": (
+                        timezone.now() + timedelta(seconds=retry_delay)
+                    ).isoformat(),
+                }
+                current.last_activity_at = timezone.now()
+                current.expires_at = current.last_activity_at + timedelta(hours=1)
+                current.save(
+                    update_fields=["progress", "last_activity_at", "expires_at"]
+                )
+            touch_task_liveness(str(task_id))
+            raise self.retry(
+                exc=error,
+                countdown=retry_delay,
+                max_retries=len(retry_delays),
+            )
+        except Retry:
+            raise
         except (ValidationError, ValueError) as error:
             _mark_loc_kit_draft_failed(
                 draft_id,

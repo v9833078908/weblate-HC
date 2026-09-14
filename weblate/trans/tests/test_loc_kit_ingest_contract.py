@@ -3951,6 +3951,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             apply_loc_kit_string_update_draft.apply(
                 kwargs={"draft_id": draft.pk},
                 task_id=str(draft.apply_task_id),
+                retries=8,
             )
 
         draft.refresh_from_db()
@@ -4178,12 +4179,18 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
                 raise WeblateLockTimeoutError(msg, lock=None)
             return real_apply(*args, **kwargs)
 
-        with (
-            patch.object(loc_kit, "apply_loc_kit_string_update", side_effect=fail_once),
-            patch("weblate.trans.tasks.time.sleep"),
+        with patch.object(
+            loc_kit, "apply_loc_kit_string_update", side_effect=fail_once
         ):
             apply_loc_kit_string_update_draft.apply(
-                kwargs={"draft_id": draft.pk}, task_id=str(draft.apply_task_id)
+                kwargs={"draft_id": draft.pk},
+                task_id=str(draft.apply_task_id),
+                throw=False,
+            )
+            apply_loc_kit_string_update_draft.apply(
+                kwargs={"draft_id": draft.pk},
+                task_id=str(draft.apply_task_id),
+                retries=1,
             )
 
         draft.refresh_from_db()

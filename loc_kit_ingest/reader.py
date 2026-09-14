@@ -9,6 +9,8 @@ from itertools import islice
 from typing import TYPE_CHECKING
 from zipfile import BadZipFile, ZipFile
 
+from openpyxl import load_workbook
+
 from loc_kit_ingest.langcode import language_code
 from loc_kit_ingest.model import Diagnostic, Severity
 from loc_kit_ingest.profile import RecordMapGrammar
@@ -108,7 +110,8 @@ def _read_xlsx(path: Path, *, max_bytes: int | None) -> dict[str, list[list[str]
             msg = "invalid XLSX archive"
             raise ReaderError(msg) from error
 
-    from openpyxl import load_workbook
+    # ``openpyxl`` is a required dependency; importing at module level keeps
+    # malformed workbook errors consistent with the standalone CLI.
 
     result: dict[str, list[list[str]]] = {}
     used = 0
