@@ -3701,6 +3701,14 @@ class LocKitStringsUpdatePendingCommitTest(ViewTestCase):
         content = Path(source_translation.get_filename()).read_text(encoding="utf-8")
         self.assertIn('#, read-only\nmsgid "frozen_flag_key"', content)
 
+        # A true reparse through Weblate's own PoMonoFormat, not only the
+        # raw bytes: proves the file round-trips as a recognized flag, not
+        # just a matching substring.
+        reparsed_pounit, _add = source_translation.store.find_unit(
+            "frozen_flag_key", "Hello"
+        )
+        self.assertIn("read-only", reparsed_pounit.flags)
+
         source_unit = source_translation.unit_set.get(context="frozen_flag_key")
         self.assertEqual(source_unit.extra_flags, "read-only")
 
