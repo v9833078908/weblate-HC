@@ -24,7 +24,10 @@ import regex
 from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy, ngettext
 
-from weblate.checks.base import Highlight, TargetCheck
+# Mandatory, never guarded: a registered check without its shared rule module
+# must break configuration loading, not silently report no defects.
+from loc_kit_ingest.source_markup import source_markup_defects
+from weblate.checks.base import Highlight, SourceCheck, TargetCheck
 from weblate.checks.chars import MaxLengthCheck
 from weblate.checks.parser import single_value_flag
 from weblate.checks.source import SourceMaxLengthCheck
@@ -938,3 +941,37 @@ class GameSourceMaxLengthCheck(SourceMaxLengthCheck):
     def get_replacement_function(self, unit):
         replace = super().get_replacement_function(unit)
         return lambda text: _length_budget_text(replace(text))
+
+
+class GameSourceMarkupCheck(SourceCheck):
+    """
+    The source itself carries a broken closing tag that honest targets repeat.
+
+    The first rule (defect 525591): a closing Unity rich-text tag that carries
+    an attribute, such as ``</color=yellow>``; a closing tag must be plain.
+    The rule lives in ``loc_kit_ingest.source_markup``, shared with the
+    offline kit intake, so both layers state one verdict.
+    """
+
+    check_id = "game-source-markup"
+    name = gettext_lazy("Game source closing tag")
+    description = gettext_lazy(
+        "Source uses a closing rich-text tag with an attribute, such as "
+        "</color=yellow>; a closing tag must be plain."
+    )
+    # Always on: the broken source repeats into every language through the
+    # translator and judge prompts, which treat it as the reference.
+    default_disabled = False
+
+    def check_source_unit(self, sources: list[str], unit) -> bool:
+        # Every source plural form is checked: a defect in any of them is a
+        # defect the translation copies. An empty source states nothing.
+        return any(source_markup_defects(source) for source in sources)
+
+    def check_highlight(self, source: str, unit):
+        if self.should_skip(unit):
+            return []
+        return [
+            Highlight(start, end, source[start:end], kind="markup")
+            for start, end in (defect.span for defect in source_markup_defects(source))
+        ]

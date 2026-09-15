@@ -283,6 +283,76 @@ def test_keyed_parser_keeps_explanation_and_flags_outside_comments():
 
 
 # ---------------------------------------------------------------------------
+# Source markup defects (plan 2026-09-11-loc-kit-source-validation)
+# ---------------------------------------------------------------------------
+
+
+BAD_525591 = "Заказчики приходят в </color=yellow>{0}</color> раза реже."
+
+
+def test_source_closing_tag_with_attribute_is_one_warning(
+    temple_component, temple_rows
+):
+    temple_rows[3][2] = BAD_525591
+    result = parse_component(temple_component, temple_rows)
+    markup = [
+        d for d in result.diagnostics if d.code == "source.tag_closing_has_attribute"
+    ]
+    assert len(markup) == 1
+    assert markup[0].severity.name == "WARNING"
+    assert markup[0].row == 4
+    assert "key 'sample_key'" in markup[0].message
+    assert "</color=yellow>" in markup[0].message
+    # The import itself still happens; the defect is a warning.
+    assert len(result.units) == 1
+
+
+def test_source_markup_rule_ignores_target_and_blank_source(
+    temple_component, temple_rows
+):
+    temple_rows[3][3] = BAD_525591
+    result = parse_component(temple_component, temple_rows)
+    assert not [
+        d for d in result.diagnostics if d.code == "source.tag_closing_has_attribute"
+    ]
+    temple_rows[3][2] = "   "
+    result = parse_component(temple_component, temple_rows)
+    assert not [
+        d for d in result.diagnostics if d.code == "source.tag_closing_has_attribute"
+    ]
+
+
+def test_strict_source_raises_markup_defects_to_errors(temple_component, temple_rows):
+    temple_rows[3][2] = BAD_525591
+    result = parse_component(temple_component, temple_rows, strict_source=True)
+    markup = [
+        d for d in result.diagnostics if d.code == "source.tag_closing_has_attribute"
+    ]
+    assert [d.severity.name for d in markup] == ["ERROR"]
+
+
+def test_source_markup_diagnostics_are_capped_per_component(
+    temple_component, temple_rows
+):
+    for row in range(100):
+        temple_rows.append([f"bad_{row}", "", "</color=yellow>текст</color>", "text"])
+    result = parse_component(temple_component, temple_rows)
+    details = [
+        d for d in result.diagnostics if d.code == "source.tag_closing_has_attribute"
+    ]
+    summaries = [
+        d
+        for d in result.diagnostics
+        if d.code == "source.markup_diagnostics_suppressed"
+    ]
+    assert len(details) == 99
+    assert [d.row for d in details] == list(range(5, 104))
+    assert len(summaries) == 1
+    assert summaries[0].severity.name == "WARNING"
+    assert "suppressed 1 further" in summaries[0].message
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

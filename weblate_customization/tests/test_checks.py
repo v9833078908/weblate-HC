@@ -16,6 +16,7 @@ from weblate_customization.checks import (
     GameMarkupCheck,
     GameMaxLengthCheck,
     GameNumberCheck,
+    GameSourceMarkupCheck,
     GameSourceMaxLengthCheck,
     GameTokenCheck,
     _conditional_length_text,  # ruff: ignore[import-private-name]
@@ -988,6 +989,50 @@ class GameSourceMaxLengthCheckTest(TestCase):
         unit = self.get_unit("max-length:100")
         tagged = "<color=#E3BA59>" + "x" * 86 + "</color>"
         self.assertTrue(self.check.check_source([tagged], unit))
+
+
+class GameSourceMarkupCheckTest(TestCase):
+    """check_source_unit on the 525591 defect: boolean and exact highlight."""
+
+    def setUp(self) -> None:
+        self.check = GameSourceMarkupCheck()
+
+    def test_correct_source_passes(self) -> None:
+        unit = make_unit(is_source=True)
+        self.assertFalse(
+            self.check.check_source_unit(["<color=yellow>{0}</color> times"], unit)
+        )
+
+    def test_defect_525591_fails(self) -> None:
+        unit = make_unit(is_source=True)
+        source = "Заказчики приходят в </color=yellow>{0}</color> раза реже."
+        self.assertTrue(self.check.check_source_unit([source], unit))
+
+    def test_plural_source_form_with_the_defect_fails(self) -> None:
+        # A defect in any plural form is a defect the translation copies, so
+        # the plural forms may not be collapsed to sources[0].
+        unit = make_unit(is_source=True)
+        self.assertTrue(
+            self.check.check_source_unit(
+                ["<color>Plain</color>", "Clean {0}", "</color=yellow>{0}"],
+                unit,
+            )
+        )
+
+    def test_highlight_covers_the_exact_span(self) -> None:
+        source = "Заказчики приходят в </color=yellow>{0}</color> раза реже."
+        unit = make_unit(source=source, is_source=True)
+        highlights = self.check.check_highlight(source, unit)
+        self.assertEqual(len(highlights), 1)
+        (highlight,) = highlights
+        self.assertEqual(highlight.start, source.index("</color=yellow>"))
+        self.assertEqual(source[highlight.start : highlight.end], "</color=yellow>")
+        self.assertEqual(highlight.kind, "markup")
+
+    def test_a_bare_closing_tag_is_not_highlighted(self) -> None:
+        source = "<color=yellow>{0}</color>"
+        unit = make_unit(source=source, is_source=True)
+        self.assertEqual(self.check.check_highlight(source, unit), [])
 
 
 class _FakeActiveCheck:

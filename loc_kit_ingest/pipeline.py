@@ -15,7 +15,10 @@ from typing import TYPE_CHECKING
 
 from loc_kit_ingest.infer import DEFAULT_MIN_FILL, InferenceError, infer_profile
 from loc_kit_ingest.model import Severity
-from loc_kit_ingest.parser import parse_component
+from loc_kit_ingest.parser import (
+    SOURCE_MARKUP_SUPPRESSED_CODE,
+    parse_component,
+)
 from loc_kit_ingest.profile import (
     SCHEMA_VERSION,
     ProfileError,
@@ -23,6 +26,7 @@ from loc_kit_ingest.profile import (
     parse_profile,
 )
 from loc_kit_ingest.reader import ReaderError, read_sheets, validate_sheet_headers
+from loc_kit_ingest.source_markup import SOURCE_TAG_CLOSING_HAS_ATTRIBUTE
 from loc_kit_ingest.writer import render_component, validate_rendered_component
 
 if TYPE_CHECKING:
@@ -69,6 +73,14 @@ def _build_report(
     sourceless = sum(1 for d in diagnostics if d.code == "po.missing_source")
     if sourceless:
         lines.append(f"Keys imported without a source string: {sourceless}")
+    markup_defects = sum(
+        1
+        for d in diagnostics
+        if d.code == SOURCE_TAG_CLOSING_HAS_ATTRIBUTE
+        or d.code == SOURCE_MARKUP_SUPPRESSED_CODE
+    )
+    if markup_defects:
+        lines.append(f"Source markup diagnostics: {markup_defects}")
     if inference_notes:
         lines.append("Profile derived from the kit's own header row:")
         lines.extend(f"  * {note}" for note in inference_notes)
@@ -90,11 +102,13 @@ def run(
     component: str | None = None,
     min_fill: float = DEFAULT_MIN_FILL,
     include_languages: frozenset[str] = frozenset(),
+    strict_source: bool = False,
 ) -> int:
     """
     Run the full ingest pipeline.
 
-    Returns 0 on success, 2 on any error.
+    Returns 0 on success, 2 on any error. With ``strict_source``, source
+    markup defects fail the run before staging instead of warning.
     """
     all_diagnostics: list[Diagnostic] = []
 
@@ -195,7 +209,7 @@ def run(
         all_diagnostics.extend(header_diagnostics)
 
         # Parse component.
-        result = parse_component(comp, rows)
+        result = parse_component(comp, rows, strict_source=strict_source)
         parse_results[comp.component] = result
         all_diagnostics.extend(result.diagnostics)
 

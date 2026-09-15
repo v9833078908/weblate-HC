@@ -645,6 +645,47 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         self.assertEqual(ja_unit.source, "")
         self.assertEqual(ja_unit.target, "ベータ限定")
 
+    def test_source_markup_defect_warns_but_keeps_create_available(self) -> None:
+        """
+        A bad closing tag in the kit source is a warning, not a blocker.
+
+        Defect 525591: the ru source carries `</color=yellow>`. The wizard
+        must surface the diagnostic (code and key) and still let the create
+        form through, because the import itself is not refused.
+        """
+        self.user.is_superuser = True
+        self.user.save()
+        kit = (
+            "id,ru,en\n"
+            "spawn_rate,Заказчики приходят в </color=yellow>{0}</color> раза реже.,Fewer customers\n"
+            "line_1,Привет,Hello\n"
+        )
+
+        with modify_settings(INSTALLED_APPS={"remove": "weblate.billing"}):
+            response = self.client.post(
+                reverse("create-component-zip"),
+                {
+                    "zipfile": self._upload("Space Kit - Markup.csv", kit),
+                    "name": "Markup",
+                    "slug": "markup",
+                    "project": self.project.pk,
+                    "source_language": self.component.source_language.pk,
+                },
+            )
+            self.assertContains(response, "source.tag_closing_has_attribute")
+            self.assertContains(response, "spawn_rate")
+
+            # The create form arrives prefilled and remains submittable.
+            form = response.context["form"]
+            params = {field: form[field].value() or "" for field in form.fields}
+            params.pop("inherit_new_lang", None)
+            params["new_lang"] = "none"
+            self.client.post(reverse("create-component-zip"), params, follow=True)
+
+        component = Component.objects.get(slug="markup")
+        source_unit = component.source_translation.unit_set.get(context="spawn_rate")
+        self.assertIn("</color=yellow>", source_unit.source)
+
     def test_create_view_applies_kit_explanations_to_source_units(self) -> None:
         self.user.is_superuser = True
         self.user.save()
