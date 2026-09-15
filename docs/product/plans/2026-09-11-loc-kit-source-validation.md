@@ -8,240 +8,234 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Цель, решения и статус
 
-**Дата:** 2026-09-11. **Статус:** предложен, не реализован.
+**Дата:** 2026-09-11. **Последняя доработка:** 2026-09-15.
+**Статус:** доработан после ревью, ожидает согласования; не реализован.
+**Ревью:** `docs/product/reviews/2026-09-15-loc-kit-source-validation-plan-review.md`.
 
 Повод — дефект 525591 из полного LQA-аудита французского Anvil Saga
-(`docs/operations/audits/2026-09-11-anvil-saga-fr-lqa.md`): в **русском
-исходнике** стоит `Заказчики приходят в </color=yellow>{0}</color> раза реже.`
-Открывающий тег написан как закрывающий. Перевод честно повторил источник,
-поэтому ни одна target-проверка его не видит: `GameMarkupCheck` сравнивает
-мультимножество токенов target с source
-(`weblate_customization/src/weblate_customization/checks.py`,
-`weblate/trans/protected_tokens.py:markup_tokens`), а здесь они совпадают.
-Строка уезжает в игру, в промпт переводчика и в промпт судьи как эталон.
+(`docs/operations/audits/2026-09-11-anvil-saga-fr-lqa.md`): в русском
+источнике стоит `Заказчики приходят в </color=yellow>{0}</color> раза реже.`
+Открывающий тег написан как закрывающий. Перевод повторил источник, поэтому
+`GameMarkupCheck` его не видит: `TAG_PATTERN` в
+`weblate/trans/protected_tokens.py` принимает этот тег, а `GameMarkupCheck`
+сравнивает source и target. Строка попадает в игру, промпт переводчика и
+промпт судьи как эталон.
 
-Важная деталь, которая определяет правило: `TAG_PATTERN`
-(`weblate/trans/protected_tokens.py:13`) — это `</?(color|link|size|b|i|u|s|sprite)(?:[=\s][^>]*)?/?>`.
-Он **матчит** `</color=yellow>`, то есть токенизация считает такое валидным
-тегом. Никто нигде не проверяет ни парность тегов, ни то, что у закрывающего
-тега не бывает атрибута. Это и есть дыра.
+Быстрый smoke подтвердил путь: `TAG_PATTERN.fullmatch("</color=yellow>")`
+истинен, а у source и идентичного target совпадают `markup_tokens` и
+плейсхолдеры. Полный LQA export Anvil Saga содержит эту пару в `SpawnRate`
+(`analysis/data/anvil-saga-fr-lqa-golden-2026-09-11.json`).
 
-**Решение о месте валидации: оба слоя, но разной силы.**
+### Выбранный объём первой поставки
 
-Рассмотрены три варианта:
+Первая поставка ловит только подтверждённый, однозначный дефект
+`source.tag_closing_has_attribute`: закрывающий Unity-тег с `=` или
+пробельным атрибутом. Это один теговый токен — ему не нужна эвристика,
+сравнение с target или восстановление стека.
 
-| Вариант | Ловит | Цена | Чего не ловит |
-|---|---|---|---|
-| (а) только офлайн в `loc_kit_ingest` | дефект до импорта, в отчёте CLI и в предпросмотре мастера | дешёвый, без Django, без миграций | строки, которые пришли не из кита (правка в UI, API, git-пуш) |
-| (б) только source-проверка Weblate | всё, что попало в базу, любым путём | нужна регистрация проверки в `WEBLATE_ADD_CHECK`, пересчёт проверок на проде | не мешает импорту: дефект уже внутри, продюсер узнаёт постфактум |
-| (в) оба слоя | и то и другое | два места с общими правилами | — |
+    </(?:color|link|size|b|i|u|s|sprite)[=\s][^>]*>
 
-Выбран **(в)**, с явным разделением ролей и **одним источником правил**:
+Паттерн регистронезависим, как существующий `TAG_PATTERN`. Его закрытый
+список имён не принимает обычную пунктуацию: `HP > 50`, `<3`, `a -> b`,
+`Урон < 10`, `2 < 3 > 1` и `<basic>` не являются кандидатами.
 
-- модуль правил живёт в `loc_kit_ingest` (чистый Python, без Django), потому
-  что офлайновый CLI не может импортировать Weblate;
-- source-проверка Weblate импортирует тот же модуль, как
-  `weblate_customization/src/weblate_customization/autofixes.py` уже импортирует
-  регулярки из `checks.py`. Два независимых набора правил разъедутся — это уже
-  случалось с фильтром `repeat-drift` между MT-промптом и промптом судьи
-  (`docs/changes.rst`, запись про `repeat-drift` в «Bug fixes»).
+**Не входят в эту поставку:** парность/вложенность тегов, общий malformed-tag
+parser, незакрытые `{`, conditional DSL, идентификаторы перед `[` и эвристика
+внутритегового пробела. Для них нужны отдельные грамматики или межстрочный
+контекст; они не могут надёжно жить в `source_markup_defects(text)`. Решение
+расширить правило допускается только новым планом после измерения precision
+на source corpus.
 
-Дублирования кода при этом нет: правила определены один раз, слоя два.
+### Два слоя, один обязательный источник правила
 
-## Что именно считаем дефектом исходника
+Модуль `loc_kit_ingest/source_markup.py` — чистый Python, без Django. Его
+используют:
 
-Правила работают на **одной** строке, без пары source/target — этим они
-отличаются от всех существующих game-проверок.
+1. офлайновый CLI и обычный PO intake: до записи в отчёте появляется warning,
+   а `--strict-source` делает его error;
+2. `GameSourceMarkupCheck` в Weblate: он проверяет source Unit, поэтому ловит
+   UI/API/VCS пути, которые не проходят через kit.
 
-| Код | Правило | Пример |
-|---|---|---|
-| `source.tag_closing_has_attribute` | у закрывающего тега есть атрибут: `</color=yellow>`, `</size=14>` | 525591, реальный |
-| `source.tag_unbalanced` | открытых и закрытых тегов одного имени разное число, либо закрывающий идёт раньше открывающего | `<color=#25E94F>+{0}` без `</color>`, реальный класс (см. §«Замер») |
-| `source.tag_malformed` | `<` имени тега без `>` до конца строки, пробел внутри имени (`< color=#fff>`), пустой атрибут (`<color=>`) | синтетический |
-| `source.placeholder_unclosed` | `{` без парной `}` (учитывая, что вложенность плейсхолдеров бывает в условных: `{hours:cond:>0?{hours}h. \|}`) | синтетический |
-| `source.conditional_malformed` | условный плейсхолдер Hero Craft не разбирается `_CONDITIONAL_HEADER` (`checks.py:191`): пробел в заголовке, потерянный `\|`, битое сравнение | реальный класс, уже описан в `docs/changes.rst` для target |
-| `source.token_suspicious` | идентификатор подстановки (`TOKEN_PATTERN`, `checks.py:183`) записан кириллицей или с пробелом перед `[` | синтетический |
-| `source.tag_inner_whitespace` | пробел или таб сразу после открывающего тега, которого нет у соседних строк того же ключа-префикса | 7 строк `plus*` в Anvil Saga (аудит, §2), но там это дефект **перевода**; в источнике класс тот же |
+`GameSourceMarkupCheck` импортирует модуль **обязательно**. Silent fallback
+запрещён: зарегистрированная проверка без модуля должна оборвать загрузку
+конфигурации, а не выдать ложное отсутствие дефектов.
 
-**Гейт против ложных срабатываний.** `<` и `>` в игровом тексте сплошь и
-рядом обычная пунктуация: `HP > 50`, `<3`, стрелки `->`. Одного `TAG_PATTERN`
-для гейта недостаточно: сломанный тег по определению ему не соответствует
-(`< color=#fff>` и незакрытый `<color` не матчатся), поэтому нужен второй,
-узкий детектор «начало тега»:
+У production image уже есть правильная граница поставки: `deploy/Dockerfile`
+копирует весь `loc_kit_ingest` в `/app/pylib`, а `deploy/vps.sh` включает этот
+каталог в `IMAGE_PATHS`, поэтому изменение модуля пересобирает образ. Для
+запущенного dev container модуль нужно отдельно скопировать в
+`dev-docker/data/python/loc_kit_ingest/`, откуда его импортирует Python.
 
-```text
-TAG_START = r"</?\s*(?:color|link|size|b|i|u|s|sprite)\b"
-```
+## Контракт v1
 
-Имена — тот же закрытый список, что в `TAG_PATTERN`
-(`weblate/trans/protected_tokens.py:13`), с `\b` на конце, чтобы `<basic>`
-или `<3` не считались началом тега. Правила:
+    @dataclass(frozen=True)
+    class SourceDefect:
+        code: str
+        message: str
+        span: tuple[int, int]
 
-1. строка рассматривается как размеченная, если в ней есть хотя бы один матч
-   `TAG_PATTERN` **или** `TAG_START`; иначе ни одно правило про теги не
-   срабатывает, и одинокие `>`, `<`, `->` дефектом не становятся;
-2. валидность тега определяется **собственной строгой грамматикой** модуля,
-   а не членством в `TAG_PATTERN`: тот написан для токенизации и намеренно
-   мягок — `(?:[=\s][^>]*)?` допускает пустой атрибут, поэтому `<color=>`
-   ему соответствует и по членству дефектом бы не стал. Грамматика:
 
-   ```text
-   TAG_WELL_FORMED = r"""
-     <
-     (?: /  (?P<close>color|link|size|b|i|u|s)  >          # закрывающий: имя и всё
-       | (?P<open>color|link|size|b|i|u|s)
-         (?: = (?P<value>[^\s<>=]+) )?                      # <color=#25E94F>, <size=14>
-         >
-       | (?P<void>sprite) \s+ name="(?P<attr>[^"<>]+)" /? > # <sprite name="fire">
-     )
-   """
-   ```
+    def source_markup_defects(text: str) -> tuple[SourceDefect, ...]:
+        """Return one source.tag_closing_has_attribute defect per matching tag."""
 
-   Грамматика разделяет три формы намеренно: у закрывающей ветки после
-   имени сразу `>`, поэтому `</color=yellow>` ей **не** соответствует и не
-   может проскочить как корректный тег;
+- Единственный `code` v1 — `source.tag_closing_has_attribute`.
+- Один match даёт ровно один `SourceDefect`; строка с двумя независимыми
+  ошибочными закрывающими тегами даёт два дефекта с точными неперекрывающимися
+  `span`.
+- Никакая другая часть строки не анализируется. В частности,
+  `<color=>`, `</sprite>` и несбалансированная пара не получают v1 verdict,
+  пока не появится отдельная проверенная грамматика.
+- В parser v1 проверяется только source value PO-единицы `_parse_keyed`.
+  TBX term, explanation, notes и section captions вне scope: glossary не
+  доставляет игровой rich text, а их выбор нельзя вывести из одного
+  «source language column».
+- `Diagnostic.message` включает ключ строки (`key <…>`) и безопасный
+  диагностический текст; текущая модель `Diagnostic` не имеет отдельного
+  поля key.
 
-   Пустое значение (`<color=>`), пробел перед именем (`< color=#fff>`),
-   незакрытый `<color`, лишние символы внутри — всё это даёт матч
-   `TAG_START` без матча `TAG_WELL_FORMED` в той же позиции и становится
-   `source.tag_malformed`;
-3. `source.tag_closing_has_attribute` разбирается **до** общего вердикта
-   `tag_malformed` и имеет приоритет над ним: отдельное правило
-   `</(?:color|link|size|b|i|u|s|sprite)[=\s][^>]*>` ловит закрывающий тег с
-   атрибутом — ровно случай 525591. Своя диагностика нужна потому, что
-   продюсеру надо сказать «убери `/`», а не «тег не разбирается»;
-4. **Void-теги.** Единственный тег без парного закрывающего —
-   `sprite`: он вставляет иконку и содержимого не имеет
-   (`weblate_customization`-проверки трактуют его так же, сравнивая как
-   отдельный токен). Он не кладётся в стек и его закрывающая форма
-   (`</sprite>`) сама по себе является дефектом `source.tag_unbalanced`.
-   Все остальные имена из словаря (`color`, `link`, `size`, `b`, `i`, `u`,
-   `s`) — парные; синтаксис `<color/>` в словаре игры не используется и
-   попадает в `tag_malformed`. Никаких HTML-void-тегов вроде `<br/>` в
-   словаре нет, и добавлять их этот план не предлагает;
-5. `source.tag_unbalanced` работает на последовательности well-formed
-   парных тегов: стек по имени, ошибка на закрывающем без открытого, на
-   закрытии не того имени и на непустом стеке в конце строки;
-6. `source.placeholder_unclosed` игнорирует строку, где нет ни одного
-   валидного плейсхолдера по `PLACEHOLDER_PATTERN`: `{` в прозе бывает.
+## Политика найденного
 
-Негативные кейсы, обязательные в тестах: `HP > 50`, `<3`, `a -> b`,
-`Урон < 10`, `2 < 3 > 1`, `Стоимость: {0} (около 5 <)`, `<basic>` как
-обычное слово в угловых скобках.
-
-## Что делать с найденным
-
-Кит присылает игровая команда, и переделать его быстро нельзя. Поэтому:
-
-- по умолчанию дефект источника — **WARNING**, импорт проходит, дефектные
-  строки перечислены в отчёте с ключом, листом и номером строки;
-- CLI получает `--strict-source`, который поднимает эти диагностики до
-  ERROR (`Severity.ERROR` в `loc_kit_ingest/model.py:12`), и тогда
-  `pipeline.run()` возвращает 2 до стадии записи (шаг 5,
-  `loc_kit_ingest/pipeline.py:202`);
-- в мастере создания компонента предупреждения показываются на экране
-  предпросмотра рядом с уже существующими предупреждениями импорта
-  (`weblate/utils/views.py:create_component_from_kit`), не блокируя кнопку;
-- source-проверка Weblate при этом помечает сами строки, так что дефект
-  виден в фильтре `has:check` на исходном языке и после импорта.
+- По умолчанию source defect — **WARNING**. Импорт сохраняется, а существующий
+  wizard уже переносит non-ERROR diagnostics в `kit_info["warnings"]` и
+  выводит первые пять предупреждений; новый шаблон не нужен.
+- `--strict-source` повышает только diagnostics этого правила, включая summary
+  о подавленных результатах, до **ERROR**. `pipeline.run()` возвращает 2 до
+  staging и не создаёт output directory.
+- Лимит — 100 source-markup diagnostics на component: первые 99 в
+  детерминированном порядке строки/позиции и один
+  `source.markup_diagnostics_suppressed` с числом остальных. Это не даёт
+  битому листу разрастить report или `kit_info["warnings"]` без границы.
+- SourceCheck возвращает `True`, если хотя бы одна source plural form имеет
+  дефект, и подсвечивает каждый `SourceDefect.span`. Его статичное описание
+  называет конкретную ошибку закрывающего тега — v1 не сворачивает разные
+  типы ошибок в один непрозрачный check.
 
 ## Задачи
 
-### Задача 1. Модуль правил в `loc_kit_ingest`
+### Задача 0. Подтвердить rule и измерить source corpus
 
-**Файлы:** новый `loc_kit_ingest/source_markup.py`, тесты
-`loc_kit_ingest/tests/test_source_markup.py`.
+**Outcome.** Чистый модуль определяет один проверенный rule; read-only probe
+доказывает его частоту и precision до включения source check на production.
+Никакие данные Weblate не изменяются.
 
-Функция `source_markup_defects(text: str) -> tuple[SourceDefect, ...]`, где
-`SourceDefect` — фроузен-датакласс с `code`, `message`, `span`. Никаких
-зависимостей от Django и от Weblate: пакет остаётся автономным (AGENTS.md,
-раздел про `loc_kit_ingest`). Регулярки тегов и плейсхолдеров копируются в
-модуль **один раз** и снабжаются комментарием, что вторая копия —
-`weblate/trans/protected_tokens.py`, с тестом эквивалентности из задачи 3.
-
-**Приёмка:** `cd loc_kit_ingest && uv run pytest` зелёный; в тестах есть
-строка 525591 целиком и по одному кейсу на каждый код из таблицы выше, плюс
-негативные кейсы `HP > 50`, `<3`, `->`, `{` в прозе.
-
-### Задача 2. Диагностики в парсере и отчёте
-
-**Файлы:** `loc_kit_ingest/parser.py` (`_parse_keyed`, `_parse_pairs`,
-`_parse_record_map`), `loc_kit_ingest/pipeline.py` (`_build_report`, `run`),
-`loc_kit_ingest/cli.py` (флаг `--strict-source`).
-
-Проверяется **только колонка исходного языка**: `comp.source_lang` профиля
-(`loc_kit_ingest/profile.py`). Каждый дефект становится `Diagnostic` с
-`severity=WARNING` (или ERROR при `--strict-source`), `code` из задачи 1,
-реальным номером строки листа. Число диагностик на компонент ограничено
-сверху так же, как уже ограничены предупреждения импорта, чтобы битый лист не
-породил отчёт на десятки тысяч строк.
-
-**Приёмка:** `cd loc_kit_ingest && uv run pytest`; в тестах — кит с одной
-битой строкой даёт ровно одну диагностику и `run()` возвращает 0; тот же кит
-с `--strict-source` возвращает 2 и **не создаёт** выходной каталог.
-
-### Задача 3. Source-проверка `game-source-markup`
-
-**Файлы:** `weblate_customization/src/weblate_customization/checks.py`
-(новый класс на базе `SourceCheck`), тесты
-`weblate_customization/tests/test_checks.py`, регистрация в
-`dev-docker/docker-compose.yml` и `deploy/environment.example`
-(`WEBLATE_ADD_CHECK`), документация в
-`docs/product/guides/producer-guide-weblate.md`.
-
-Класс импортирует правила из `loc_kit_ingest.source_markup`, если пакет
-доступен на `sys.path` (в контейнере он лежит в `/app/data/python`), иначе
-проверка молчит — так же, как `mechanical_group_available` в
-`weblate/trans/fix_check.py` молчит без кастомизации. `default_disabled = False`:
-битый тег в источнике — дефект везде, а не настройка компонента.
-
-Отдельный тест-эквивалентности: набор строк из задачи 1 даёт один и тот же
-вердикт у `source_markup_defects` и у проверки, чтобы копии регулярок не
-разъехались.
-
-**Приёмка:** `./rundev.sh test weblate_customization/tests/test_checks.py`
-зелёный; на dev-инстансе строка с `</color=yellow>` попадает в фильтр
-`check:game-source-markup` на исходном языке.
-
-### Задача 4. Предпросмотр мастера
-
-**Файлы:** `weblate/utils/views.py:create_component_from_kit` и шаблон
-предпросмотра импорта лок-кита.
-
-Предупреждения источника показываются рядом с существующими
-предупреждениями импорта, с ключом и номером строки, и не блокируют создание
-компонента.
-
-**Приёмка:** `./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py`
-зелёный; ручная загрузка кита с битой строкой на dev показывает
-предупреждение на экране предпросмотра.
-
-### Задача 5. Замер на реальных данных (read-only)
-
-**Файл:** `analysis/probes/source-markup-defects.py`.
-
-Скрипт проходит **исходные** переводы всех прод-проектов через
-`GET /api/translations/{project}/{component}/{source_lang}/units/`, прогоняет
-`source_markup_defects` локально и печатает `Counter` по кодам с одним
-примером на код. Ничего не пишет. Результат — в
+**Файлы и интерфейсы:** новый `loc_kit_ingest/source_markup.py`; новый
+`loc_kit_ingest/tests/test_source_markup.py`; новый
+`analysis/probes/source-markup-defects.py`; новый dated report в
 `docs/operations/measurements/`.
 
-**Приёмка:** отчёт с числом строк на каждый код и явной оценкой, сколько из
-них ложные; без этого числа задачи 3 и 4 на прод не выкатываются.
+**Действия:**
+
+- [ ] Реализовать `SourceDefect` и `source_markup_defects()` строго по
+      контракту v1; не копировать более широкий `TAG_PATTERN` и не добавлять
+      стек, brace или DSL parsing.
+- [ ] Добавить unit tests: полный текст 525591, один match, два независимых
+      closing tags, пустая строка, корректные открывающий/закрывающий теги и
+      все перечисленные punctuation negatives.
+- [ ] Написать read-only probe поверх этого модуля. Он получает список
+      проектов и components, берёт `source_language` у **каждого** component,
+      cursor-paginate source translation через `?page_size=1000`, следует
+      `next` до конца и обрабатывает source один раз на `(component, context)`.
+- [ ] Напечатать components, число просмотренных source units, Counter по
+      code и не более трёх `(project, component, context, source)` примеров
+      на code. Сохранить в dated measurement ручную классификацию каждого
+      кандидата как true/false positive.
+
+**Verification.** `cd loc_kit_ingest && uv run pytest tests/test_source_markup.py`.
+Read-only production run требует отдельной авторизации доступа; report обязан
+зафиксировать cursor coverage и число просмотренных source units. Отсутствие
+найденных кандидатов — корректный результат, не повод расширять rule без
+новой evidence.
+
+### Задача 1. Показывать v1 diagnostics при PO intake
+
+**Outcome.** Обычный PO kit с bad closing tag проходит с ограниченным warning;
+strict CLI отказывает до записи. Existing wizard показывает тот же warning и
+не блокирует переход к созданию component.
+
+**Файлы и интерфейсы:** `loc_kit_ingest/parser.py` (`parse_component`,
+`_parse_keyed`); `loc_kit_ingest/pipeline.py` (`run`, `_build_report`);
+`loc_kit_ingest/cli.py`; существующие tests в `loc_kit_ingest/tests/`;
+`weblate/trans/tests/test_loc_kit_ingest_contract.py`.
+
+**Действия:**
+
+- [ ] Добавить явный `strict_source: bool = False` от CLI до PO parser; UI
+      всегда вызывает default `False`.
+- [ ] Для каждого source value `_parse_keyed` преобразовать defects в
+      `Diagnostic` с component, sheet, точной spreadsheet row и message,
+      содержащим key. Соблюдать per-component cap 99 + summary 1.
+- [ ] Не вызывать v1 rule для target value, TBX grammar или пустого source.
+- [ ] Оставить существующий `kit_info["warnings"]` и message flow без template
+      change. Расширить только contract test, чтобы response содержит code и
+      ключ, но create form остаётся доступной.
+
+**Verification.** `cd loc_kit_ingest && uv run pytest` доказывает: одна
+ошибка даёт один warning и output; две ошибки дают две diagnostics; 101 ошибки
+дают 99 details и summary; `--strict-source` даёт exit 2 и output directory
+не появляется. `./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py`
+доказывает UI warning без блока создания.
+
+### Задача 2. Включить обязательный source check и поставку модуля
+
+**Outcome.** Любая source Unit с closing tag attribute получает
+`check:game-source-markup`, причина и highlight; отсутствие общей библиотеки
+останавливает конфигурацию вместо silent pass.
+
+**Файлы и интерфейсы:**
+`weblate_customization/src/weblate_customization/checks.py`;
+`weblate_customization/tests/test_checks.py`;
+`dev-docker/docker-compose.yml`; `deploy/environment.example`;
+`deploy/Dockerfile`; `docs/product/guides/producer-guide-weblate.md`;
+`docs/changes.rst`.
+
+**Действия:**
+
+- [ ] Добавить `GameSourceMarkupCheck(SourceCheck)` с `check_id =
+      "game-source-markup"`, `default_disabled = False`, обязательным импортом
+      `source_markup_defects`, `check_source_unit(sources, unit)` и
+      `check_highlight(source, unit)` по `SourceDefect.span`.
+- [ ] Добавить translatable name/description, прямо называющие closing tag с
+      attribute; не использовать `check_single` и не терять plural source
+      forms.
+- [ ] Зарегистрировать class в `WEBLATE_ADD_CHECK` для dev и deployment
+      environment. Не добавлять fallback when import fails.
+- [ ] Обновить build assertion в `deploy/Dockerfile`, чтобы он проверял
+      `loc_kit_ingest.source_markup` наряду с пакетом. Существующий
+      `IMAGE_PATHS` уже пересобирает production image при изменении
+      `loc_kit_ingest`; не создавать вторую deployment path.
+- [ ] Для dev verification до запуска test скопировать оба обязательных
+      модуля: `cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/`
+      и `cp -r weblate_customization/src/weblate_customization
+      dev-docker/data/python/`. Полная пересборка/перезапуск dev stack требует
+      отдельного разрешения.
+- [ ] Описать source warning/check в producer guide и добавить короткую запись
+      в текущую unreleased section `docs/changes.rst`.
+
+**Verification.** Unit tests вызывают `check_source_unit()` на корректном
+source, 525591 и plural source; проверяют boolean и exact highlight span.
+`./rundev.sh test weblate_customization/tests/test_checks.py` проходит после
+копирования пакетов. На уже разрешённой dev instance source Unit с
+`</color=yellow>` появляется в `check:game-source-markup`; production rollout
+только после отчёта Task 0 и отдельного разрешения deployment.
 
 ## Вне области
 
-- Автопочинка исходника. Восстановить `</color=yellow>` до `<color=yellow>`
-  технически тривиально, но правка исходника меняет игровой текст и
-  инвалидирует переводы — это решение игровой команды, не импортёра.
-- Изменение target-проверок (`GameMarkupCheck` и прочие) — они сравнивают
-  пару и остаются как есть.
-- Проверка орфографии, терминологии и прочего смысла исходника.
-- Любая запись на прод: задача 5 строго read-only.
+- Автопочинка source. Правка меняет игровой текст и инвалидирует переводы; её
+  принимает игровая команда, не импортёр.
+- Любая target-проверка (`GameMarkupCheck` и прочие), проверка орфографии,
+  терминологии или смысла source.
+- Unbalanced/malformed tags, placeholders, conditional DSL, token identifiers
+  и `tag_inner_whitespace`: это будущие независимые designs после measured
+  precision и, где нужно, batch context.
+- TBX/glossary parser diagnostics в v1.
+- Любая запись на production; Task 0 только читает, а rollout требует
+  отдельного разрешения.
 
-## Открытые вопросы
+## Условия реализации
 
-1. Нужен ли `--strict-source` по умолчанию для новых китов (первый импорт
-   игры), где ломать нечего и правило можно поставить жёстко сразу.
-2. Стоит ли складывать дефекты источника в `explanation` строки, чтобы
-   переводчик видел причину прямо в редакторе, или хватает самой проверки.
+План готов к реализации только после согласования. Последовательность
+жёсткая: Task 0 → Task 1 → Task 2. Measurement Task 0 — evidence для
+production включения, а не основание незаметно расширить v1. Новое source
+rule не должно повторять судьбу 525591: успешный import/registration обязан
+быть проверяемым, а недоступная библиотека не имеет безопасного режима
+«молчать».
