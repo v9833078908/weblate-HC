@@ -1,0 +1,24 @@
+{
+  "completion": {
+    "subject": "Локализация Pirate Ships готова: 7 из 9 языков",
+    "from": "HCGameLoc <no-reply@hcgameloc.internal>",
+    "to": "Анна Продюсер <a.producer@studio.example>",
+    "preheader": "Прогон #12 завершён. 3 строки блокируют выгрузку.",
+    "heading": "Перевод завершён",
+    "body": "Прогон #12 для проекта Pirate Ships завершён. Переведено 9 языков, готовы к выгрузке 7. Три строки блокируют выгрузку и требуют вашего решения.",
+    "cta": "Открыть «Требуют решения»",
+    "cta_url": "/projects/pirate-ships/decisions?kind=blocking",
+    "cost": "Стоимость прогона: $35.10"
+  },
+  "failure": {
+    "subject": "Ошибка локализации Heart of the Abyss",
+    "from": "HCGameLoc <no-reply@hcgameloc.internal>",
+    "to": "Анна Продюсер <a.producer@studio.example>",
+    "preheader": "Прогон #1 остановлен с ошибкой.",
+    "heading": "Прогон остановлен с ошибкой",
+    "body": "Прогон #1 для проекта Heart of the Abyss остановлен. Модель вернула ошибку аутентификации (401). Незавершённые строки не потеряны — можно перезапустить незавершённое.",
+    "cta": "Перезапустить незавершённое",
+    "cta_url": "/projects/heart-of-the-abyss/runs/1",
+    "cost": "Стоимость до остановки: $3.10"
+  }
+}

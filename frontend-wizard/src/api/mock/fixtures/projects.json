@@ -1,0 +1,37 @@
+[
+  {
+    "slug": "pirate-ships",
+    "name": "Pirate Ships",
+    "localized": true,
+    "ready_count": 7,
+    "language_count": 9,
+    "decisions_count": 14,
+    "blocking_count": 3,
+    "spend_month": "41.20",
+    "month_label": "сентябре",
+    "last_run": { "id": 13, "kind": "judge", "status": "running", "when": "2025-09-18T11:42:00" }
+  },
+  {
+    "slug": "heart-of-the-abyss",
+    "name": "Heart of the Abyss",
+    "localized": true,
+    "ready_count": 0,
+    "language_count": 6,
+    "decisions_count": 0,
+    "blocking_count": 0,
+    "spend_month": "3.10",
+    "month_label": "сентябре",
+    "last_run": { "id": 1, "kind": "translate", "status": "error", "when": "2025-09-17T09:05:00" }
+  },
+  {
+    "slug": "novyy-proekt",
+    "name": "Новый проект",
+    "localized": false,
+    "ready_count": 0,
+    "language_count": 0,
+    "decisions_count": 0,
+    "blocking_count": 0,
+    "spend_month": "0.00",
+    "month_label": "сентябре"
+  }
+]

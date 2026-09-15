@@ -1,0 +1,10 @@
+{
+  "pirate-ships": [
+    { "source": "Клинок", "note": "оружие, редкая категория", "rule": "обязательный", "targets": { "en": "blade", "fr": "lame", "ja": "刃", "de": "Klinge" } },
+    { "source": "Bloody Mary", "note": "имя корабля", "rule": "не переводить", "targets": { "en": "Bloody Mary", "fr": "Bloody Mary", "ja": "Bloody Mary", "de": "Bloody Mary" } },
+    { "source": "Золото", "note": "валюта", "rule": "обязательный", "targets": { "en": "gold", "fr": "or", "ja": "ゴールド", "de": "Gold" } },
+    { "source": "Кракен", "note": "босс", "rule": "обязательный", "targets": { "en": "Kraken", "fr": "Kraken", "ja": "クラーケン", "de": "Kraken" } },
+    { "source": "штурвал", "note": "часть корабля", "rule": "обычный", "targets": { "en": "helm", "fr": "barre", "ja": "舵", "de": "Steuerrad" } },
+    { "source": "чёрт", "note": "цензура", "rule": "запрещён", "targets": {} }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "pirate-ships": [
+    {
+      "id": 13, "kind": "judge", "status": "running", "title": "Прогон #13 · Лок-кит v3 · Оценка качества",
+      "started": "2025-09-18T11:42:00", "elapsed": "1 ч 12 мин",
+      "stages": [
+        { "name": "Оценка", "status": "done" },
+        { "name": "Проверка", "status": "running", "detail": "620 / 1 240 строк" },
+        { "name": "Итог", "status": "pending" }
+      ],
+      "languages": [],
+      "cost": [
+        { "language": "—", "model": "gpt-5.2-judge", "usd": "9.10" }
+      ],
+      "outcome": { "passed": 512, "notes": 74, "decisions": 34 }
+    },
+    {
+      "id": 12, "kind": "translate", "status": "completed", "title": "Прогон #12 · Лок-кит v3 · Перевод",
+      "started": "2025-09-16T14:03:00", "finished": "2025-09-16T16:31:00", "elapsed": "2 ч 28 мин",
+      "stages": [
+        { "name": "Импорт", "status": "done" },
+        { "name": "Языки", "status": "done" },
+        { "name": "Перевод", "status": "done", "detail": "9 / 9 языков",
+          "sub": [
+            { "name": "Английский", "status": "done" },
+            { "name": "Немецкий", "status": "done" },
+            { "name": "Французский", "status": "done" },
+            { "name": "Испанский", "status": "done" },
+            { "name": "Португальский (Бразилия)", "status": "done" },
+            { "name": "Турецкий", "status": "done" },
+            { "name": "Японский", "status": "done" },
+            { "name": "Корейский", "status": "done" },
+            { "name": "Китайский (упр.)", "status": "done" }
+          ]
+        },
+        { "name": "Проверки", "status": "done", "detail": "3 блокирующих" }
+      ],
+      "languages": [],
+      "cost": [
+        { "language": "Английский", "model": "gpt-5.2", "usd": "3.42" },
+        { "language": "Немецкий", "model": "gpt-5.2", "usd": "3.88" },
+        { "language": "Французский", "model": "gpt-5.2", "usd": "3.71" },
+        { "language": "Испанский", "model": "gpt-5.2", "usd": "3.55" },
+        { "language": "Португальский (Бразилия)", "model": "gpt-5.2", "usd": "3.60" },
+        { "language": "Турецкий", "model": "gpt-5.2", "usd": "3.98" },
+        { "language": "Японский", "model": "claude-sonnet-4.5", "usd": "4.42" },
+        { "language": "Корейский", "model": "claude-sonnet-4.5", "usd": "4.30" },
+        { "language": "Китайский (упр.)", "model": "claude-sonnet-4.5", "usd": "4.24" }
+      ]
+    },
+    {
+      "id": 11, "kind": "translate", "status": "completed", "title": "Прогон #11 · Лок-кит v2 · Перевод",
+      "started": "2025-09-10T10:00:00", "finished": "2025-09-10T12:10:00", "elapsed": "2 ч 10 мин",
+      "stages": [], "languages": [], "cost": []
+    }
+  ],
+  "heart-of-the-abyss": [
+    {
+      "id": 1, "kind": "translate", "status": "error", "title": "Прогон #1 · Лок-кит v1 · Перевод",
+      "started": "2025-09-17T09:05:00", "elapsed": "14 мин",
+      "stages": [
+        { "name": "Импорт", "status": "done" },
+        { "name": "Языки", "status": "done" },
+        { "name": "Перевод", "status": "error", "detail": "2 / 6 языков" },
+        { "name": "Проверки", "status": "pending" }
+      ],
+      "languages": [], "cost": [ { "language": "Английский", "model": "gpt-5.2", "usd": "1.55" }, { "language": "Немецкий", "model": "gpt-5.2", "usd": "1.55" } ],
+      "error": "Модель вернула ошибку аутентификации (401) на языке «Французский». Ключ API мог истечь. Незавершённые строки не потеряны."
+    }
+  ]
+}

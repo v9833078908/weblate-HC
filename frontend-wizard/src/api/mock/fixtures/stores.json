@@ -1,0 +1,34 @@
+{
+  "steam": {
+    "limits_source": "из справочника Steamworks v2026-09",
+    "fields": [
+      { "id": "short", "label": "Краткое описание", "limit": 300, "markup": true },
+      { "id": "about", "label": "Об игре (About)", "limit": 8000, "markup": true },
+      { "id": "legal", "label": "Правовая информация", "limit": 500, "markup": true }
+    ]
+  },
+  "google_play": {
+    "limits_source": "из справочника Google Play",
+    "fields": [
+      { "id": "title", "label": "Название", "limit": 30, "markup": false },
+      { "id": "short", "label": "Краткое описание", "limit": 80, "markup": false },
+      { "id": "full", "label": "Полное описание", "limit": 4000, "markup": false }
+    ]
+  },
+  "app_store": {
+    "limits_source": "из справочника App Store Connect",
+    "fields": [
+      { "id": "name", "label": "Название", "limit": 30, "markup": false },
+      { "id": "subtitle", "label": "Подзаголовок", "limit": 30, "markup": false },
+      { "id": "description", "label": "Описание", "limit": 4000, "markup": false },
+      { "id": "keywords", "label": "Ключевые слова", "limit": 100, "markup": false },
+      { "id": "promotional", "label": "Промо-текст", "limit": 170, "markup": false }
+    ]
+  },
+  "custom": {
+    "limits_source": "без ограничений",
+    "fields": [
+      { "id": "field1", "label": "Поле 1", "limit": 0, "markup": false }
+    ]
+  }
+}

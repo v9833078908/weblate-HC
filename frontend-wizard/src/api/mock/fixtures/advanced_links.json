@@ -1,0 +1,9 @@
+{
+  "pirate-ships": {
+    "project": "https://weblate.hcgameloc.internal/projects/pirate-ships/",
+    "addons": "https://weblate.hcgameloc.internal/addons/pirate-ships/",
+    "vcs": "https://weblate.hcgameloc.internal/projects/pirate-ships/#repository",
+    "checks": "https://weblate.hcgameloc.internal/checks/?project=pirate-ships",
+    "machinery": "https://weblate.hcgameloc.internal/manage/machinery/"
+  }
+}

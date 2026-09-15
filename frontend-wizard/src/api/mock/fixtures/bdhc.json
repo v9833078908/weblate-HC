@@ -1,0 +1,16 @@
+{
+  "titles": [
+    { "id": "bdhc-pirate", "title": "Pirate Ships — карточка игры в БДХК", "has_brief": true, "has_voice": true },
+    { "id": "bdhc-abyss", "title": "Heart of the Abyss — карточка игры в БДХК", "has_brief": true, "has_voice": false },
+    { "id": "bdhc-sky", "title": "Sky Raiders — карточка игры в БДХК", "has_brief": false, "has_voice": false }
+  ],
+  "profiles": {
+    "bdhc-pirate": {
+      "brief": "Пиратский экшн в открытом море. Сеттинг — альтернативный XVII век, лёгкий юмор, зрелищные битвы.",
+      "voice": "Тон: бодрый, приключенческий. Обращение к игроку на «ты». Аудитория 12+. Избегать грубой лексики."
+    },
+    "bdhc-abyss": {
+      "brief": "Мрачный подводный хоррор. Атмосфера тревоги и тайны."
+    }
+  }
+}

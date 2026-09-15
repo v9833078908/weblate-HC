@@ -1,0 +1,143 @@
+[
+  {
+    "unit_id": "u-001", "key": "hero.sword.give", "language": "fr", "language_name": "Французский",
+    "source": "Герой отдаёт <color=#d4af37>меч</color> стражнику.",
+    "target": "Le héros donne l’épée au garde.",
+    "back_translation": null,
+    "reason": "Потерян тег <color>",
+    "kind": "blocking", "content": "loc-kit",
+    "glossary": [{ "lang": "source", "from": 6, "to": 9 }],
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/fr/?checksum=hero.sword.give&type=xml_tags"
+  },
+  {
+    "unit_id": "u-002", "key": "quest.gold.count", "language": "fr", "language_name": "Французский",
+    "source": "У вас 24 золотых.",
+    "target": "Vous avez 42 pièces d’or.",
+    "back_translation": null,
+    "reason": "Число изменилось: 24 → 42",
+    "kind": "blocking", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/fr/?checksum=quest.gold.count&type=number"
+  },
+  {
+    "unit_id": "u-003", "key": "ui.continue.hint", "language": "ja", "language_name": "Японский",
+    "source": "Нажмите A$B чтобы продолжить.",
+    "target": "続行するには A B を押してください。",
+    "back_translation": null,
+    "reason": "Разделитель строк $ повреждён",
+    "kind": "blocking", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/ja/?checksum=ui.continue.hint&type=formatc"
+  },
+  {
+    "unit_id": "u-004", "key": "cutscene.betrayal.01", "language": "fr", "language_name": "Французский",
+    "source": "Герой отдаёт меч предателю без боя.",
+    "target": "Le héros reçoit l’épée du traître sans combat.",
+    "back_translation": "Герой получает меч от предателя без боя.",
+    "reason": "Судья: искажён смысл — герой отдаёт меч, в переводе получает",
+    "kind": "judge_critical", "severity": "critical", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" }, { "attempt": 2, "kind": "judge", "note": "Оценка судьёй (прогон #13)" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/fr/?checksum=cutscene.betrayal.01"
+  },
+  {
+    "unit_id": "u-005", "key": "dialog.king.request", "language": "fr", "language_name": "Французский",
+    "source": "Король вежливо просит вас о помощи.",
+    "target": "Le roi exige votre aide.",
+    "back_translation": "Король требует вашей помощи.",
+    "reason": "Судья: изменён тон — вежливая просьба стала требованием",
+    "kind": "judge_critical", "severity": "critical", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" }, { "attempt": 2, "kind": "judge", "note": "Оценка судьёй (прогон #13)" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/fr/?checksum=dialog.king.request"
+  },
+  {
+    "unit_id": "u-006", "key": "item.potion.desc", "language": "ja", "language_name": "Японский",
+    "source": "Зелье восстанавливает 50 очков здоровья.",
+    "target": "ポーションは体力を 50 失う。",
+    "back_translation": "Зелье отнимает 50 очков здоровья.",
+    "reason": "Судья: перепутан эффект — лечение названо уроном",
+    "kind": "judge_critical", "severity": "critical", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" }, { "attempt": 2, "kind": "judge", "note": "Оценка судьёй (прогон #13)" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/ja/?checksum=item.potion.desc"
+  },
+  {
+    "unit_id": "u-007", "key": "tutorial.jump.hint", "language": "ja", "language_name": "Японский",
+    "source": "Чтобы прыгнуть, нажмите пробел.",
+    "target": "ジャンプするにはしゃがむ。",
+    "back_translation": "Чтобы прыгнуть, присядьте.",
+    "reason": "Судья: инструкция противоречит действию",
+    "kind": "judge_critical", "severity": "critical", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" }, { "attempt": 2, "kind": "judge", "note": "Оценка судьёй (прогон #13)" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/ja/?checksum=tutorial.jump.hint"
+  },
+  {
+    "unit_id": "u-008", "key": "menu.settings.title", "language": "fr", "language_name": "Французский",
+    "source": "Настройки",
+    "target": "Paramètres…",
+    "back_translation": "Настройки…",
+    "reason": "Судья: пунктуация отличается от оригинала",
+    "kind": "judge_note", "severity": "minor", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/fr/?checksum=menu.settings.title"
+  },
+  {
+    "unit_id": "u-009", "key": "shop.buy.confirm", "language": "fr", "language_name": "Французский",
+    "source": "Купить этот предмет?",
+    "target": "Acheter cet objet-là ?",
+    "back_translation": "Купить вон тот предмет?",
+    "reason": "Судья: возможно неестественная формулировка",
+    "kind": "judge_note", "severity": "minor", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/fr/?checksum=shop.buy.confirm"
+  },
+  {
+    "unit_id": "u-010", "key": "quest.reward.desc", "language": "fr", "language_name": "Французский",
+    "source": "Награда: редкий клинок.",
+    "target": "Récompense : une lame rare.",
+    "back_translation": "Награда: редкое лезвие.",
+    "reason": "Судья: глоссарный термин «клинок» переведён вариативно",
+    "kind": "judge_note", "severity": "major", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/fr/?checksum=quest.reward.desc"
+  },
+  {
+    "unit_id": "u-011", "key": "ship.name.default", "language": "fr", "language_name": "Французский",
+    "source": "«Кровавая Мери»",
+    "target": "« Bloody Mary »",
+    "back_translation": "« Bloody Mary » (не переведено)",
+    "reason": "Судья: имя корабля оставлено на английском",
+    "kind": "judge_note", "severity": "minor", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/fr/?checksum=ship.name.default"
+  },
+  {
+    "unit_id": "u-012", "key": "achievement.first.blood", "language": "ja", "language_name": "Японский",
+    "source": "Первая кровь",
+    "target": "ファーストブラッド",
+    "back_translation": "Фёрст Блад (транслитерация)",
+    "reason": "Судья: вместо перевода использована транслитерация",
+    "kind": "judge_note", "severity": "minor", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/ja/?checksum=achievement.first.blood"
+  },
+  {
+    "unit_id": "u-013", "key": "store.short.desc", "language": "ja", "language_name": "Японский",
+    "source": "Захватывайте моря в эпичных битвах!",
+    "target": "壮大な海戦で海を支配せよ！",
+    "back_translation": "Покоряйте моря в великих морских сражениях!",
+    "reason": "Судья: тон более торжественный, чем в оригинале",
+    "kind": "judge_note", "severity": "minor", "content": "store-gp",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/store-gp/ja/?checksum=store.short.desc"
+  },
+  {
+    "unit_id": "u-014", "key": "dialog.captain.warn", "language": "ja", "language_name": "Японский",
+    "source": "Капитан предупреждает о шторме.",
+    "target": "船長は嵐について話す。",
+    "back_translation": "Капитан говорит о шторме.",
+    "reason": "Судья: ослаблена семантика — «предупреждает» → «говорит»",
+    "kind": "judge_note", "severity": "major", "content": "loc-kit",
+    "history": [ { "attempt": 1, "kind": "MT", "note": "Машинный перевод" } ],
+    "advanced_url": "https://weblate.hcgameloc.internal/translate/pirate-ships/loc-kit/ja/?checksum=dialog.captain.warn"
+  }
+]

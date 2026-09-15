@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600&family=Source+Sans+3:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 210 24% 22%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 24% 22%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 24% 22%;
+    --primary: 166 77% 27%;
+    --primary-foreground: 0 0% 100%;
+    --primary-strong: 165 59% 19%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 210 24% 22%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 13% 92%;
+    --accent-foreground: 210 24% 22%;
+    --destructive: 10 73% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 167 72% 29%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 40% 39%;
+    --warning-surface: 50 80% 94%;
+    --info: 208 83% 45%;
+    --info-strong: 208 83% 35%;
+    --info-surface: 205 38% 91%;
+    --border: 220 13% 92%;
+    --input: 0 0% 80%;
+    --ring: 166 77% 27%;
+    --topbar: 210 24% 22%;
+    --topbar-foreground: 210 7% 76%;
+    --topbar-foreground-hover: 167 63% 49%;
+    --highlight-glossary: 60 100% 90%;
+    --radius: 10px;
+  }
+  .dark {
+    --background: 200 6% 11%;
+    --foreground: 33 17% 83%;
+    --card: 195 5% 13%;
+    --card-foreground: 33 17% 83%;
+    --muted: 200 4% 14%;
+    --muted-foreground: 36 15% 80%;
+    --border: 200 4% 40%;
+    --primary: 166 63% 43%;
+    --primary-foreground: 168 32% 6%;
+    --ring: 168 78% 61%;
+    --topbar: 205 20% 19%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 16px;
+  }
+  /* Visible focus ring on every interactive element (contract: 2px ring, 2px offset) */
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring));
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .code-cell {
+    @apply font-mono text-code-md;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
