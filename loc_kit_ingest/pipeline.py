@@ -76,8 +76,7 @@ def _build_report(
     markup_defects = sum(
         1
         for d in diagnostics
-        if d.code == SOURCE_TAG_CLOSING_HAS_ATTRIBUTE
-        or d.code == SOURCE_MARKUP_SUPPRESSED_CODE
+        if d.code in (SOURCE_TAG_CLOSING_HAS_ATTRIBUTE, SOURCE_MARKUP_SUPPRESSED_CODE)
     )
     if markup_defects:
         lines.append(f"Source markup diagnostics: {markup_defects}")
