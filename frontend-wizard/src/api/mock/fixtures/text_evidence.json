@@ -1,0 +1,32 @@
+{
+  "rows": 3864,
+  "short_label_share": 0.61,
+  "dialogue_rows": 744,
+  "markup": { "<color>": 212, "<b>": 40, "<sprite>": 8 },
+  "placeholders": { "{0}": 590, "%KEY%": 33 },
+  "separators": { "dollar": 1102, "newline": 0 },
+  "terminal_punct_share": 0.38,
+  "explanation_coverage": 0.11,
+  "profanity_rows": 23,
+  "samples": {
+    "ui": [
+      { "key": "btn.continue", "text": "Продолжить" },
+      { "key": "menu.settings", "text": "Настройки" },
+      { "key": "hud.gold", "text": "Золото: {0}" }
+    ],
+    "tooltip": [
+      { "key": "tip.potion", "text": "Восстанавливает {0} здоровья" },
+      { "key": "tip.armor", "text": "Защита +%KEY%" },
+      { "key": "tip.crit", "text": "Шанс крит. удара: {0}%" }
+    ],
+    "dialogue": [
+      { "key": "dialog_text_001", "character": "Капитан Сильвер", "text": "Поднять паруса, псы морские!" },
+      { "key": "dialog_text_014", "character": "Мэри", "text": "Ты уверен, что это разумно?" },
+      { "key": "dialog_text_037", "character": "Боцман", "text": "На горизонте Кракен!" }
+    ],
+    "softened": [
+      { "src": "Проклятый предатель!", "tgt": "You traitor!", "note": "в существующем переводе смягчено" }
+    ]
+  },
+  "shipped_register": { "ja": "нейтрально-вежливая (です/ます)", "ko": "нейтрально-вежливая (해요체)" }
+}

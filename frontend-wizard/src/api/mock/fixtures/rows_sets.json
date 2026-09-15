@@ -1,0 +1,29 @@
+{
+  "quarantine": [
+    { "n": 14, "reason": "пусто во всех языках", "cells": { "key": "ui.spacer.01", "ru": "", "en": "" } },
+    { "n": 88, "reason": "пусто во всех языках", "cells": { "key": "debug.marker", "ru": "", "en": "" } },
+    { "n": 141, "reason": "дубликат ключа, разные тексты", "cells": { "key": "quest.title", "ru": "Погоня", "en": "The Chase" } },
+    { "n": 142, "reason": "дубликат ключа, разные тексты", "cells": { "key": "quest.title", "ru": "Охота", "en": "The Hunt" } },
+    { "n": 209, "reason": "пустой ключ", "cells": { "key": "", "ru": "Осталось без ключа", "en": "" } },
+    { "n": 501, "reason": "точный дубликат", "cells": { "key": "btn.ok", "ru": "ОК", "en": "OK" } }
+  ],
+  "duplicates": [
+    { "n": 141, "reason": "один ключ, разные тексты", "cells": { "key": "quest.title", "ru": "Погоня" } },
+    { "n": 142, "reason": "один ключ, разные тексты", "cells": { "key": "quest.title", "ru": "Охота" } },
+    { "n": 501, "reason": "точный дубликат", "cells": { "key": "btn.ok", "ru": "ОК" } }
+  ],
+  "empty_all": [
+    { "n": 14, "reason": "пусто во всех языках", "cells": { "key": "ui.spacer.01" } },
+    { "n": 88, "reason": "пусто во всех языках", "cells": { "key": "debug.marker" } }
+  ],
+  "family": {
+    "mission_descr_complete_tutorial": [
+      { "n": 620, "cells": { "key": "mission_descr_complete_tutorial_01", "ru": "Завершите обучение" } },
+      { "n": 621, "cells": { "key": "mission_descr_complete_tutorial_02", "ru": "Пройдите первый бой" } }
+    ]
+  },
+  "sample": [
+    { "n": 2, "cells": { "key": "btn.continue", "ru": "Продолжить", "en": "Continue" } },
+    { "n": 3, "cells": { "key": "menu.settings", "ru": "Настройки", "en": "Settings" } }
+  ]
+}

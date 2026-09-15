@@ -9,6 +9,7 @@ import { EmptyProjectScreen } from '@/components/console/screens/EmptyProject'
 import { ProjectOverviewScreen } from '@/components/console/screens/ProjectOverview'
 import { DecisionsQueueScreen } from '@/components/console/screens/DecisionsQueue'
 import { WizardScreen } from '@/components/console/screens/Wizard'
+import { UniversalWizardScreen } from '@/components/console/screens/UniversalWizard'
 import { UploadScreen } from '@/components/console/screens/UploadScreen'
 import { RunCardScreen } from '@/components/console/screens/RunCard'
 import { DownloadScreen } from '@/components/console/screens/DownloadScreen'
@@ -105,7 +106,8 @@ function App() {
               ? <ProjectOverviewScreen project={project} navigate={navigate} />
               : <EmptyProjectScreen project={project} navigate={navigate} />
           }
-          if (section === 'localize') return <WizardScreen project={project} navigate={navigate} />
+          if (section === 'localize') return <UniversalWizardScreen project={project} navigate={navigate} />
+          if (section === 'localize-legacy') return <WizardScreen project={project} navigate={navigate} />
           if (section === 'upload') return <UploadScreen project={project} navigate={navigate} />
           if (section === 'decisions') return <DecisionsQueueScreen project={project} initialQuery={query} navigate={navigate} />
           if (section === 'glossary') return <GlossaryScreen project={project} navigate={navigate} />

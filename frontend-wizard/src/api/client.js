@@ -16,6 +16,14 @@ import bdhcFixture from './mock/fixtures/bdhc.json'
 import advancedLinksFixture from './mock/fixtures/advanced_links.json'
 import exportSummaryFixture from './mock/fixtures/export_summary.json'
 import emailsFixture from './mock/fixtures/emails.json'
+import textEvidenceFixture from './mock/fixtures/text_evidence.json'
+import candidatesV2Fixture from './mock/fixtures/glossary_candidates_v2.json'
+import exceptionsFixture from './mock/fixtures/exceptions.json'
+import profileFixture from './mock/fixtures/profile.json'
+import splitSignalsFixture from './mock/fixtures/split_signals.json'
+import rowsSetsFixture from './mock/fixtures/rows_sets.json'
+import * as drafts from './mock/uploads'
+import * as uni from './mock/universal'
 
 const MODE = (process.env.NEXT_PUBLIC_API_MODE || 'mock').toLowerCase()
 const BASE = '/api/producer'
@@ -135,7 +143,8 @@ export async function createLocalization(slug, payload) {
     stages: [
       { name: 'Импорт', status: 'done' },
       { name: 'Языки', status: 'done' },
-      { name: 'Перевод', status: 'pending', detail: '0 / ' + (payload?.languages?.length || 9) + ' языков' },
+      { name: 'Глоссарий', status: 'done' },
+      { name: 'Перевод', status: 'running', detail: '0 / ' + (payload?.languages?.length || 8) + ' языков' },
       { name: 'Проверки', status: 'pending' },
     ],
     languages: [],
@@ -273,4 +282,167 @@ export function getEmails() {
   return clone(emailsFixture)
 }
 
+// ===================== Wizard: uploads & analysis =====================
+
+// POST projects/{slug}/uploads/ → UploadAnalysis
+export async function createUploadAnalysis(slug, { file } = {}) {
+  if (MODE === 'live') return http(`projects/${slug}/uploads/`, { method: 'POST', body: { kind: 'loc-kit', file } })
+  await wait(latency() + 1200)
+  return drafts.createDraft(file || 'pirate-ships.xlsx')
+}
+
+// GET uploads/{id}/
+export async function getUpload(id) {
+  if (MODE === 'live') return http(`uploads/${id}/`)
+  await wait(200)
+  const a = drafts.getDraft(id)
+  if (!a) throw Object.assign(new Error('not_found'), { status: 404 })
+  return clone(a)
+}
+
+// PATCH uploads/{id}/ (re-runs analysis + import gate)
+export async function patchUpload(id, patch) {
+  if (MODE === 'live') return http(`uploads/${id}/`, { method: 'PATCH', body: patch })
+  await wait(latency())
+  return clone(drafts.patchDraft(id, patch))
+}
+
+// GET uploads/{id}/rows/?set=&value=
+export async function getUploadRows(id, set, value) {
+  if (MODE === 'live') return http(`uploads/${id}/rows/?set=${set}&value=${value || ''}`)
+  await wait(250)
+  if (set === 'family') return clone((rowsSetsFixture.family || {})[value] || [])
+  return clone(rowsSetsFixture[set] || [])
+}
+
+// GET uploads/{id}/split-signals/
+export async function getSplitSignals(id) {
+  if (MODE === 'live') return http(`uploads/${id}/split-signals/`)
+  await wait(latency())
+  const a = drafts.getDraft(id)
+  const key = a?.scenario === 'positional' ? 'positional' : 'pirate-ships'
+  return clone(splitSignalsFixture[key])
+}
+
+// GET uploads/{id}/text-evidence/
+export async function getTextEvidence(id) {
+  if (MODE === 'live') return http(`uploads/${id}/text-evidence/`)
+  await wait(latency())
+  return clone(textEvidenceFixture)
+}
+
+// GET projects/{slug}/glossary/candidates/?upload=&scope=&extraction=
+export async function getCandidatesV2(slug, { upload, scope, extraction } = {}) {
+  if (MODE === 'live') {
+    const qs = new URLSearchParams({ upload: upload || '', scope: (scope || []).join(','), extraction: extraction || '' }).toString()
+    return http(`projects/${slug}/glossary/candidates/?${qs}`)
+  }
+  await wait(latency())
+  return clone(candidatesV2Fixture)
+}
+
+// POST projects/{slug}/glossary/extractions/ → {id, status}
+export async function startExtraction(slug, body) {
+  if (MODE === 'live') return http(`projects/${slug}/glossary/extractions/`, { method: 'POST', body })
+  await wait(300)
+  return drafts.startExtraction()
+}
+
+// GET projects/{slug}/glossary/extractions/{id}/
+export async function getExtraction(slug, id) {
+  if (MODE === 'live') return http(`projects/${slug}/glossary/extractions/${id}/`)
+  await wait(250)
+  return drafts.getExtraction(id)
+}
+
+// POST projects/{slug}/glossary/exceptions/preview/ → Exception[]
+export async function previewExceptions(slug, body) {
+  if (MODE === 'live') return http(`projects/${slug}/glossary/exceptions/preview/`, { method: 'POST', body })
+  await wait(latency())
+  return clone(exceptionsFixture)
+}
+
+// GET projects/{slug}/profile/
+export async function getProfile(slug) {
+  if (MODE === 'live') return http(`projects/${slug}/profile/`)
+  await wait(latency())
+  return clone(profileFixture[slug] || profileFixture['pirate-ships'])
+}
+
+// PATCH projects/{slug}/profile/ (invalidates judge cache)
+export async function patchProfile(slug, answers) {
+  if (MODE === 'live') return http(`projects/${slug}/profile/`, { method: 'PATCH', body: { answers } })
+  await wait(latency())
+  return { answers, summary: (profileFixture[slug] || profileFixture['pirate-ships']).summary, judge_cache_invalidated: true }
+}
+
 export const API_MODE = MODE
+
+// ============ Universal 4-stage wizard: uploads, stores registry, launch ============
+
+// GET stores/registry/ → { steam, google_play, app_store, custom }
+export async function getStoresRegistry() {
+  if (MODE === 'live') return http('stores/registry/')
+  await wait(150)
+  return uni.getStoresRegistry()
+}
+
+// POST projects/{slug}/uploads/ → UniversalUploadAnalysis
+// `input` is a dropped file name (real drop) or a scenario key (dev/states tiles).
+export async function createUniversalUpload(slug, input) {
+  if (MODE === 'live') return http(`projects/${slug}/uploads/`, { method: 'POST', body: { input } })
+  await wait(latency() + 900)
+  return uni.createUniversalDraft(input || 'pirate-ships.xlsx')
+}
+
+// GET uploads/{id}/ → UniversalUploadAnalysis
+export async function getUniversalUpload(id) {
+  if (MODE === 'live') return http(`uploads/${id}/`)
+  await wait(180)
+  const a = uni.getUniversalDraft(id)
+  if (!a) throw Object.assign(new Error('not_found'), { status: 404 })
+  return a
+}
+
+// PATCH uploads/{id}/ (resolve clarifications, replace/remove files, set answers)
+export async function patchUniversalUpload(id, patch) {
+  if (MODE === 'live') return http(`uploads/${id}/`, { method: 'PATCH', body: patch })
+  await wait(latency())
+  const a = uni.patchUniversalDraft(id, patch)
+  if (!a) throw Object.assign(new Error('not_found'), { status: 404 })
+  return a
+}
+
+// POST projects/{slug}/localization/ → Run (universal: kit or store)
+export async function createUniversalLocalization(slug, payload) {
+  if (MODE === 'live') return http(`projects/${slug}/localization/`, { method: 'POST', body: payload })
+  await wait(latency())
+  const isStore = payload?.kind === 'store'
+  const langs = payload?.languages || []
+  return mock({
+    id: 1,
+    kind: 'translate',
+    status: 'queued',
+    title: isStore ? `Прогон #1 · Тексты для стора (${payload?.store || ''}) · Перевод` : 'Прогон #1 · Лок-кит v1 · Перевод',
+    started: new Date().toISOString(),
+    elapsed: '0 мин',
+    stages: isStore
+      ? [
+        { name: 'Подготовка файлов', status: 'done' },
+        { name: 'Языки', status: 'done' },
+        { name: 'Глоссарий', status: 'done' },
+        { name: 'Перевод', status: 'running', detail: '0 / ' + langs.length + ' языков' },
+        { name: 'Проверка лимитов и разметки', status: 'pending' },
+        { name: 'Сборка ZIP', status: 'pending' },
+      ]
+      : [
+        { name: 'Импорт', status: 'done' },
+        { name: 'Языки', status: 'done' },
+        { name: 'Глоссарий', status: 'done' },
+        { name: 'Перевод', status: 'running', detail: '0 / ' + langs.length + ' языков' },
+        { name: 'Проверки', status: 'pending' },
+      ],
+    languages: [],
+    cost: [],
+  })
+}

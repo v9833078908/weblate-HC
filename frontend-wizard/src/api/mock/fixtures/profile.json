@@ -1,0 +1,15 @@
+{
+  "pirate-ships": {
+    "answers": {
+      "genre": "Пиратский экшн",
+      "setting": "Альтернативный XVII век, открытое море",
+      "register_ui": "ты",
+      "register_dialogue": "by_speaker",
+      "profanity": "keep",
+      "profanity_level": null,
+      "cjk_politeness": "as_shipped"
+    },
+    "summary": "Пиратский экшн, альтернативный XVII век. Тексты: 61% — короткие подписи интерфейса, 744 реплики диалогов. Интерфейс на «ты», в диалогах — по говорящему. Мат сохраняем в силе источника. Для ja/ko — как в существующих переводах (нейтрально-вежливо).",
+    "judge_cache_invalidates_on_change": true
+  }
+}
