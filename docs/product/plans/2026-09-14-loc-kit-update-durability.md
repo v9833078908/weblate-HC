@@ -7,8 +7,70 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # Закрытие durability-пробелов полного loc-kit обновления
 
 Дата: 2026-09-14.
-Статус: предложено; ожидает отдельного согласования реализации. Этот документ
-не разрешает production deploy или применение миграций.
+Статус: реализовано на ветке рабочего каталога; deploy и применение
+миграций на живом инстансе не выполнялись и требуют отдельного
+согласования. Все четыре задачи (durable dispatch ledger, атомарная
+порция, repository-locked finalizer с no-diff recovery, admission/docs)
+реализованы и покрыты регрессионными тестами; строго failing-first (red
+перед implementation) подтверждён явно только для Task 4 (несоответствие
+лимитов загрузки: тест сначала проверенно упал на текущем коде, затем
+форма исправлена и тест стал зелёным) и для отдельных находок,
+обнаруженных при обзоре (drain `skip_locked` без `.filter().first()`,
+PO-Revision-Date-детерминизм для no-diff replay); остальные тесты Tasks
+1-3 писались вместе с реализацией и подтверждают поведение постфактум, не
+строгим red-green циклом.
+
+Точный результат обязательной команды верификации (`CI_DB_PORT=5434 uv run
+pytest --create-db weblate/trans/tests/test_loc_kit_ingest_contract.py
+weblate/trans/tests/test_loc_kit_drafts.py weblate/trans/tests/test_tasks.py
+weblate/formats/tests/test_formats.py`), четыре независимых
+последовательных прогона на чистой БД: `1 failed, 794 passed, 58 skipped,
+60 subtests passed` в каждом из четырёх прогонов - не 0 сбоев. Сбой каждый
+раз один и тот же по сигнатуре
+(`weblate.vcs.base.RepositoryCommandError: fatal: Invalid revision range
+..<sha>`) и каждый раз в `LocKitGlossaryUploadUITest` (glossary upload UI,
+код не затронут этим документом), но каждый раз на РАЗНОМ конкретном тесте
+класса; тот же тест зелёный при изолированном перезапуске. Это
+воспроизводимо похоже на предсуществующую нестабильность общего VCS test
+fixture между тестовыми классами этого файла, а не на регрессию этой
+работы, но обязательная команда как есть не даёт чистого нулевого results:
+сбой зафиксирован как есть, не подавлен и не объявлен решённым. Каждый тест
+в объёме задач 1-4 (включая новые `LocKitAtomicPortionConcurrencyTest`,
+`LocKitFinalizerRecoveryTest`, `LocKitDispatchDrainConcurrencyTest`)
+проходит стабильно во всех четырёх прогонах.
+
+Новая миграция `trans.0127_loc_kit_dispatch_ledger` отдельно проверена
+`manage.py migrate --noinput` на изолированной чистой БД
+(`weblate_migration_check`, вне test-раннера) - применяется без ошибок.
+
+`uv run prek run --files <изменённые файлы>`: `ruff-check` заканчивается 20
+находками в изменённых файлах (`weblate/trans/loc_kit.py`,
+`weblate/trans/models/translation.py`,
+`weblate/trans/tests/test_loc_kit_ingest_contract.py`,
+`weblate/trans/views/create.py`) - не 0. Каждая из 20 сверена построчно с
+diff hunks этой работы и подтверждена вне изменённого диапазона (пример:
+`too-many-arguments` на `_add_unit_locked`, не тронутый этой работой;
+`literal-membership` на `draft.state in (...)`, четыре идентичных
+вхождения в файле, из которых только одно дословно, без изменения логики,
+оказалось внутри переписанного `_retry` при реструктуризации - оставлено
+как есть, чтобы не расходиться стилем с тремя нетронутыми соседними
+вхождениями того же паттерна в том же файле). Находки, изначально введённые
+этой работой, устранены до финальной проверки: сложность 19>16 на
+`_append_translation_strings_locked` - извлечением
+`_tag_cascade_pending_changes`; `private-member-access` на прямой доступ
+теста к `_apply_kit_explanations_locked` - `# ruff:
+ignore[private-member-access]`; 13 `missing-blank-line-after-summary` на
+docstring новых тестовых методов/классов (`LocKitAtomicPortionConcurrencyTest`,
+`LocKitFinalizerRecoveryTest`, новые методы в существующих классах) и на
+docstring `_tag_cascade_pending_changes` - переписаны в формат
+one-line-summary + blank line + description; после этого повторный
+функциональный прогон (18 тестов, затронутых переформулировкой) зелёный.
+`rumdl`/`ruff-format` зелёные для изменённых файлов. `reuse lint` и
+`typos` сообщают о файлах, не тронутых этой работой (`.omp/lsp.json`,
+`DESIGN.md`, `analysis/data/anvil-saga-fr-lqa-golden-2026-09-11.json`) -
+записано, не подавлено. `mypy` не вносит новых находок ни в один из семи
+изменённых модулей (все существующие находки лежат вне изменённых
+диапазонов diff, подтверждено построчной сверкой).
 
 ## Цель и основания
 

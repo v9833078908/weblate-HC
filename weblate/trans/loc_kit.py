@@ -19,6 +19,7 @@ import hashlib
 import json
 import tempfile
 from dataclasses import dataclass, field
+from datetime import timedelta
 from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn, TypedDict
@@ -26,6 +27,7 @@ from typing import TYPE_CHECKING, NoReturn, TypedDict
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 
@@ -1044,6 +1046,44 @@ def classify_kit_explanations(
     return counters
 
 
+def _apply_kit_explanations_locked(
+    *,
+    user: User,
+    component: Component,
+    units: Sequence[StringUnit],
+    overwrite: bool,
+    baseline: Mapping[str, str] | None = None,
+) -> KitExplanationApplyResult:
+    """
+    Lock-free core of :func:`apply_kit_explanations`.
+
+    The caller owns the ``repository -> component -> draft`` lock order and
+    the enclosing transaction; this primitive never takes a lock itself so
+    the atomic portion coordinator can run it under the same component lock
+    as the string append.
+    """
+    _check_explanation_apply_eligibility(component)
+    if not user.has_perm("source.edit", component.source_translation):
+        raise PermissionDenied
+    keys = {unit.key for unit in units if unit.explanation.strip()}
+    source_units = {
+        unit.context: unit
+        for unit in component.source_translation.unit_set.select_for_update()
+        .filter(context__in=keys)
+        .order_by("pk")
+    }
+    to_apply, result = _classify_kit_explanations(
+        source_units=source_units,
+        units=units,
+        overwrite=overwrite,
+        source_lang=component.source_language.code,
+        baseline=baseline,
+    )
+    for source_unit, explanation in to_apply:
+        source_unit.update_explanation(explanation, user)
+    return result
+
+
 def apply_kit_explanations(
     *,
     user: User,
@@ -1063,28 +1103,14 @@ def apply_kit_explanations(
     _check_explanation_apply_eligibility(component)
     if not user.has_perm("source.edit", component.source_translation):
         raise PermissionDenied
-
-    keys = {unit.key for unit in units if unit.explanation.strip()}
     with transaction.atomic(), component.locked_for_update() as locked_component:
-        _check_explanation_apply_eligibility(locked_component)
-        if not user.has_perm("source.edit", locked_component.source_translation):
-            raise PermissionDenied
-        source_units = {
-            unit.context: unit
-            for unit in locked_component.source_translation.unit_set.select_for_update()
-            .filter(context__in=keys)
-            .order_by("pk")
-        }
-        to_apply, result = _classify_kit_explanations(
-            source_units=source_units,
+        return _apply_kit_explanations_locked(
+            user=user,
+            component=locked_component,
             units=units,
             overwrite=overwrite,
-            source_lang=locked_component.source_language.code,
             baseline=baseline,
         )
-        for source_unit, explanation in to_apply:
-            source_unit.update_explanation(explanation, user)
-    return result
 
 
 def load_prepared_string_units(
@@ -1274,6 +1300,202 @@ def _resolve_append_language(
     return component.add_new_language(language, None)
 
 
+def _tag_cascade_pending_changes(
+    cascade_pending_qs,
+    *,
+    pending_owner: str,
+    new_row_flags: Mapping[str, str],
+    source_translation_id: int,
+) -> list[int]:
+    """
+    Tag draft ownership on every cascade pending change of a fresh key.
+
+    Returns every tagged primary key. For the source unit, also snapshot an
+    ``extra_flags`` value when one is present, so the runtime pending writer
+    can later carry it into the backing file.
+    """
+    if not pending_owner:
+        return list(cascade_pending_qs.values_list("pk", flat=True))
+    pending_ids: list[int] = []
+    for pending_change in cascade_pending_qs:
+        pending_change.metadata["loc_kit_draft_id"] = pending_owner
+        if (
+            new_row_flags
+            and pending_change.unit.translation_id == source_translation_id
+            and pending_change.unit.context in new_row_flags
+        ):
+            pending_change.metadata["extra_flags"] = new_row_flags[
+                pending_change.unit.context
+            ]
+        pending_change.save(update_fields=["metadata"])
+        pending_ids.append(pending_change.pk)
+    return pending_ids
+
+
+def _append_translation_strings_locked(
+    *,
+    user: User,
+    component: Component,
+    units: Sequence[StringUnit],
+    pending_owner: str = "",
+) -> StringsAppendResult:
+    """
+    Lock-free core of :func:`append_translation_strings`.
+
+    The caller owns the ``repository -> component -> draft`` lock order and
+    the enclosing transaction; this primitive never takes a lock itself, so
+    the atomic portion coordinator can run it under the same component lock
+    as the explanation application. The full documented contract lives on
+    :func:`append_translation_strings`.
+
+    When ``pending_owner`` is set and the component's format can persist
+    flags, the input ``extra_flags`` of each brand-new row are snapshotted
+    into ``metadata["extra_flags"]`` of exactly the source pending change
+    that adds that key, so the runtime pending writer can carry them into
+    the backing file before serialization. The snapshot comes from the
+    immutable packet row, never from a possibly later user edit, and an
+    existing key's flags are never touched.
+    """
+    _check_string_update_eligibility(component)
+    existing_keys = existing_string_keys(component)
+    new_units = [unit for unit in units if unit.key not in existing_keys]
+    existing_count = len(units) - len(new_units)
+    if not new_units:
+        return StringsAppendResult(existing=existing_count)
+
+    snapshot_flags = component.file_format_cls.supports_flags
+    new_row_flags = (
+        {unit.key: unit.flags for unit in new_units if unit.flags.strip()}
+        if snapshot_flags
+        else {}
+    )
+
+    source_lang = component.source_language.code
+    requested_codes = {
+        code
+        for unit in new_units
+        for code, value in unit.values.items()
+        if value.strip()
+    } - {source_lang}
+    translations_by_code = {
+        translation.language.code: translation
+        for translation in component.translation_set.select_related("language")
+        if translation.language_id != component.source_language_id
+    }
+
+    created_languages: list[str] = []
+    unavailable_languages: list[str] = []
+    for code in sorted(requested_codes - set(translations_by_code)):
+        translation = _resolve_append_language(
+            user=user, component=component, code=code
+        )
+        if translation is None:
+            unavailable_languages.append(code)
+        else:
+            translations_by_code[code] = translation
+            created_languages.append(code)
+
+    source_translation = component.source_translation
+    language_added: dict[str, int] = {}
+    row_keys: list[str] = []
+    touched_translations: dict[int, Translation] = {}
+    target_pending: list[PendingUnitChange] = []
+    for unit in new_units:
+        note = "; ".join(comment for comment in unit.comments if comment)
+        location = ",".join(ref for ref in unit.references if ref)
+        source_unit = source_translation.add_unit(
+            None,
+            unit.key,
+            unit.values.get(source_lang, ""),
+            [],
+            is_batch_update=True,
+            note=note,
+            location=location,
+            author=user,
+        )
+        if source_unit is None:
+            continue
+        row_keys.append(unit.key)
+        for code, value in unit.values.items():
+            if code == source_lang or not value.strip():
+                continue
+            translation = translations_by_code.get(code)
+            if translation is None:
+                continue
+            target_unit = translation.unit_set.filter(context=unit.key).first()
+            if target_unit is None:
+                continue
+            # For a monolingual format, ``pending = is_source`` in
+            # ``_add_unit_locked``: the component-wide ``add_unit`` cascade
+            # above creates this target unit's DB row but no pending
+            # change at all (only the source unit gets one). This
+            # ``translate`` call is therefore the first-ever pending
+            # change for a unit that has never been written to its own
+            # target file, so ``update_units`` must route it through
+            # ``find_or_add_pending_store_unit`` - flip the ``add_unit``
+            # flag ``Unit.translate`` does not know to set, after it has
+            # done its normal state/check/change-history bookkeeping.
+            target_unit.is_batch_update = True
+            target_unit.translate(
+                user, value, STATE_TRANSLATED, author=user, propagate=False
+            )
+            if target_unit.pending_unit_change is not None:
+                target_unit.pending_unit_change.add_unit = True
+                target_pending.append(target_unit.pending_unit_change)
+            touched_translations[translation.pk] = translation
+            language_added[code] = language_added.get(code, 0) + 1
+        # Flags land on the source unit only after every target is
+        # written: a read-only flag would otherwise block the target
+        # writes above.
+        if unit.flags.strip():
+            flags = Flags(unit.flags)
+            source_unit.update_extra_flags(flags.format(), user)
+
+    if pending_owner:
+        for pending_change in target_pending:
+            pending_change.metadata["loc_kit_draft_id"] = pending_owner
+    source_translation.store_update_changes()
+    for translation in touched_translations.values():
+        translation.store_update_changes()
+
+    pending_ids = [
+        pending_change.pk
+        for pending_change in target_pending
+        if pending_change.pk is not None
+    ]
+    if row_keys:
+        # The source unit's own ``add_unit=True`` pending change, plus
+        # any language the row's values did not populate: every such
+        # unit ``add_unit`` created belongs to this row's atomic
+        # finalizing commit, not only the ones this call also
+        # translated above.
+        cascade_pending_qs = (
+            PendingUnitChange.objects.filter(
+                unit__translation__component=component,
+                unit__context__in=row_keys,
+                add_unit=True,
+            )
+            .exclude(pk__in=[pc.pk for pc in target_pending if pc.pk is not None])
+            .select_related("unit")
+        )
+        pending_ids.extend(
+            _tag_cascade_pending_changes(
+                cascade_pending_qs,
+                pending_owner=pending_owner,
+                new_row_flags=new_row_flags,
+                source_translation_id=source_translation.pk,
+            )
+        )
+    return StringsAppendResult(
+        added=len(new_units),
+        existing=existing_count,
+        language_added=language_added,
+        created_languages=tuple(created_languages),
+        unavailable_languages=tuple(unavailable_languages),
+        pending_change_ids=tuple(pending_ids),
+    )
+
+
 def append_translation_strings(
     *,
     user: User,
@@ -1313,135 +1535,11 @@ def append_translation_strings(
     """
     _check_string_update_eligibility(component)
     with transaction.atomic(), component.locked_for_update() as locked_component:
-        _check_string_update_eligibility(locked_component)
-        existing_keys = existing_string_keys(locked_component)
-        new_units = [unit for unit in units if unit.key not in existing_keys]
-        existing_count = len(units) - len(new_units)
-        if not new_units:
-            return StringsAppendResult(existing=existing_count)
-
-        source_lang = locked_component.source_language.code
-        requested_codes = {
-            code
-            for unit in new_units
-            for code, value in unit.values.items()
-            if value.strip()
-        } - {source_lang}
-        translations_by_code = {
-            translation.language.code: translation
-            for translation in locked_component.translation_set.select_related(
-                "language"
-            )
-            if translation.language_id != locked_component.source_language_id
-        }
-
-        created_languages: list[str] = []
-        unavailable_languages: list[str] = []
-        for code in sorted(requested_codes - set(translations_by_code)):
-            translation = _resolve_append_language(
-                user=user, component=locked_component, code=code
-            )
-            if translation is None:
-                unavailable_languages.append(code)
-            else:
-                translations_by_code[code] = translation
-                created_languages.append(code)
-
-        source_translation = locked_component.source_translation
-        language_added: dict[str, int] = {}
-        row_keys: list[str] = []
-        touched_translations: dict[int, Translation] = {}
-        target_pending: list[PendingUnitChange] = []
-        for unit in new_units:
-            note = "; ".join(comment for comment in unit.comments if comment)
-            location = ",".join(ref for ref in unit.references if ref)
-            source_unit = source_translation.add_unit(
-                None,
-                unit.key,
-                unit.values.get(source_lang, ""),
-                [],
-                is_batch_update=True,
-                note=note,
-                location=location,
-                author=user,
-            )
-            if source_unit is None:
-                continue
-            row_keys.append(unit.key)
-            for code, value in unit.values.items():
-                if code == source_lang or not value.strip():
-                    continue
-                translation = translations_by_code.get(code)
-                if translation is None:
-                    continue
-                target_unit = translation.unit_set.filter(context=unit.key).first()
-                if target_unit is None:
-                    continue
-                # For a monolingual format, ``pending = is_source`` in
-                # ``_add_unit_locked``: the component-wide ``add_unit`` cascade
-                # above creates this target unit's DB row but no pending
-                # change at all (only the source unit gets one). This
-                # ``translate`` call is therefore the first-ever pending
-                # change for a unit that has never been written to its own
-                # target file, so ``update_units`` must route it through
-                # ``find_or_add_pending_store_unit`` - flip the ``add_unit``
-                # flag ``Unit.translate`` does not know to set, after it has
-                # done its normal state/check/change-history bookkeeping.
-                target_unit.is_batch_update = True
-                target_unit.translate(
-                    user, value, STATE_TRANSLATED, author=user, propagate=False
-                )
-                if target_unit.pending_unit_change is not None:
-                    target_unit.pending_unit_change.add_unit = True
-                    target_pending.append(target_unit.pending_unit_change)
-                touched_translations[translation.pk] = translation
-                language_added[code] = language_added.get(code, 0) + 1
-            # Flags land on the source unit only after every target is
-            # written: a read-only flag would otherwise block the target
-            # writes above.
-            if unit.flags.strip():
-                flags = Flags(unit.flags)
-                source_unit.update_extra_flags(flags.format(), user)
-
-        if pending_owner:
-            for pending_change in target_pending:
-                pending_change.metadata["loc_kit_draft_id"] = pending_owner
-        source_translation.store_update_changes()
-        for translation in touched_translations.values():
-            translation.store_update_changes()
-
-        pending_ids = [
-            pending_change.pk
-            for pending_change in target_pending
-            if pending_change.pk is not None
-        ]
-        if row_keys:
-            # The source unit's own ``add_unit=True`` pending change, plus
-            # any language the row's values did not populate: every such
-            # unit ``add_unit`` created belongs to this row's atomic
-            # finalizing commit, not only the ones this call also
-            # translated above.
-            cascade_pending_qs = PendingUnitChange.objects.filter(
-                unit__translation__component=locked_component,
-                unit__context__in=row_keys,
-                add_unit=True,
-            ).exclude(pk__in=[pc.pk for pc in target_pending if pc.pk is not None])
-            if pending_owner:
-                for pending_change in cascade_pending_qs:
-                    pending_change.metadata["loc_kit_draft_id"] = pending_owner
-                    pending_change.save(update_fields=["metadata"])
-                pending_ids.extend(
-                    pending_change.pk for pending_change in cascade_pending_qs
-                )
-            else:
-                pending_ids.extend(cascade_pending_qs.values_list("pk", flat=True))
-        return StringsAppendResult(
-            added=len(new_units),
-            existing=existing_count,
-            language_added=language_added,
-            created_languages=tuple(created_languages),
-            unavailable_languages=tuple(unavailable_languages),
-            pending_change_ids=tuple(pending_ids),
+        return _append_translation_strings_locked(
+            user=user,
+            component=locked_component,
+            units=units,
+            pending_owner=pending_owner,
         )
 
 
@@ -1455,6 +1553,56 @@ class StringsUpdateResult:
     @property
     def pending_change_ids(self) -> tuple[int, ...]:
         return self.strings.pending_change_ids
+
+
+def _apply_loc_kit_string_update_locked(
+    *,
+    user: User,
+    component: Component,
+    units: Sequence[StringUnit],
+    overwrite_explanations: bool,
+    pending_owner: str = "",
+    explanation_baseline: Mapping[str, str] | None = None,
+) -> StringsUpdateResult:
+    """
+    Lock-free core of :func:`apply_loc_kit_string_update`.
+
+    The caller owns the ``repository -> component -> draft`` lock order and
+    the enclosing transaction. Permission-axis independence is decided up
+    front inside this single transaction: a user with only upload/add
+    rights still gets new strings added with Explanations unavailable, and
+    a user with only ``source.edit`` still gets Explanations set with new
+    strings unavailable. An operational exception on either axis rolls the
+    whole portion back - no new unit, owned pending row or cursor advance
+    survives without its paired outcome.
+    """
+    _check_string_update_eligibility(component)
+    can_add_strings = user.has_perm("upload.perform", component) and user.has_perm(
+        "unit.add", component.source_translation
+    )
+    if can_add_strings:
+        strings_result = _append_translation_strings_locked(
+            user=user, component=component, units=units, pending_owner=pending_owner
+        )
+    else:
+        existing_keys = existing_string_keys(component)
+        strings_result = StringsAppendResult(
+            existing=sum(1 for unit in units if unit.key in existing_keys)
+        )
+
+    if user.has_perm("source.edit", component.source_translation):
+        explanation_result = _apply_kit_explanations_locked(
+            user=user,
+            component=component,
+            units=units,
+            overwrite=overwrite_explanations,
+            baseline=explanation_baseline,
+        )
+    else:
+        explanation_result = KitExplanationApplyResult(
+            unavailable_count=sum(1 for unit in units if unit.explanation.strip())
+        )
+    return StringsUpdateResult(strings=strings_result, explanations=explanation_result)
 
 
 def apply_loc_kit_string_update(
@@ -1474,37 +1622,145 @@ def apply_loc_kit_string_update(
     added even though Explanation stays unavailable, and a user with only
     ``source.edit`` still gets Explanations set even though new strings stay
     unavailable. ``upload.perform`` alone never authorizes an Explanation
-    change. Each mutation keeps its own atomic transaction and locking, so
-    neither needs to nest inside the other's.
+    change. Both axes run inside ONE transaction under the component lock,
+    so an operational exception on either axis rolls back the whole call -
+    the previous split into two transactions could commit an append whose
+    Explanation later failed, forcing a lossy replay.
     """
     _check_string_update_eligibility(component)
     validate_loc_kit_string_update_size(units)
-    can_add_strings = user.has_perm("upload.perform", component) and user.has_perm(
-        "unit.add", component.source_translation
-    )
-    if can_add_strings:
-        strings_result = append_translation_strings(
-            user=user, component=component, units=units, pending_owner=pending_owner
-        )
-    else:
-        existing_keys = existing_string_keys(component)
-        strings_result = StringsAppendResult(
-            existing=sum(1 for unit in units if unit.key in existing_keys)
+    with transaction.atomic(), component.locked_for_update() as locked_component:
+        return _apply_loc_kit_string_update_locked(
+            user=user,
+            component=locked_component,
+            units=units,
+            overwrite_explanations=overwrite_explanations,
+            pending_owner=pending_owner,
+            explanation_baseline=explanation_baseline,
         )
 
-    if user.has_perm("source.edit", component.source_translation):
-        explanation_result = apply_kit_explanations(
+
+def apply_loc_kit_portion(
+    *,
+    user: User,
+    component: Component,
+    units: Sequence[StringUnit],
+    overwrite_explanations: bool,
+    pending_owner: str,
+    explanation_baseline: Mapping[str, str] | None,
+    draft_id: int,
+    task_id,
+    expected_cursor: int,
+    total_rows: int,
+) -> StringsUpdateResult | None:
+    """
+    Apply one atomic row portion under ``repository -> component -> draft`` locks.
+
+    This is the durable write boundary a single Celery delivery may cross
+    exactly once: the component repository lock, the component row and the
+    draft row are locked in that order inside one transaction, the fencing
+    token (``state == APPLYING``, ``apply_task_id == task_id``) and the
+    cursor are re-checked before ANY unit mutation, and the adds,
+    Explanations, owned pending tagging, cursor, counters and heartbeat are
+    all committed together. A stale or replaced task observes a mismatched
+    token or cursor and returns ``None`` without an externally visible
+    mutation; two duplicate deliveries of the same UUID therefore commit at
+    most one portion. An operational exception on any axis rolls the whole
+    portion back and propagates, leaving the draft retryable.
+
+    The immutable packet data (``units``, ``explanation_baseline``) is
+    loaded by the caller once per delivery, never re-read from the draft
+    inside the lock.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    _check_string_update_eligibility(component)
+    validate_loc_kit_string_update_size(units)
+    with component.locked_for_update() as locked_component:
+        _check_string_update_eligibility(locked_component)
+        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+            pk=draft_id
+        )
+        if (
+            draft.kind != LocKitImportDraft.Kind.STRING
+            or draft.state != LocKitImportDraft.State.APPLYING
+            or draft.apply_task_id != task_id
+            or draft.next_row != expected_cursor
+        ):
+            # Fence check inside the lock: a replaced UUID or an advanced
+            # cursor means another generation owns this portion. Return
+            # without touching anything.
+            return None
+
+        result = _apply_loc_kit_string_update_locked(
             user=user,
-            component=component,
+            component=locked_component,
             units=units,
-            overwrite=overwrite_explanations,
-            baseline=explanation_baseline,
+            overwrite_explanations=overwrite_explanations,
+            pending_owner=pending_owner,
+            explanation_baseline=explanation_baseline,
         )
-    else:
-        explanation_result = KitExplanationApplyResult(
-            unavailable_count=sum(1 for unit in units if unit.explanation.strip())
+
+        saved_progress = draft.progress if isinstance(draft.progress, dict) else {}
+        totals = {
+            key: int(saved_progress.get(key, 0))
+            for key in (
+                "added",
+                "existing",
+                "explanations_set",
+                "explanations_unchanged",
+                "explanations_would_overwrite",
+                "explanations_unavailable",
+                "explanations_source_changed",
+                "explanations_baseline_changed",
+            )
+        }
+        totals["added"] += result.strings.added
+        totals["existing"] += result.strings.existing
+        totals["explanations_set"] += result.explanations.set_count
+        totals["explanations_unchanged"] += result.explanations.unchanged_count
+        totals["explanations_would_overwrite"] += (
+            result.explanations.would_overwrite_count
         )
-    return StringsUpdateResult(strings=strings_result, explanations=explanation_result)
+        totals["explanations_unavailable"] += result.explanations.unavailable_count
+        totals["explanations_source_changed"] += (
+            result.explanations.source_changed_count
+        )
+        totals["explanations_baseline_changed"] += (
+            result.explanations.baseline_changed_count
+        )
+        created_languages: set[str] = set(saved_progress.get("created_languages", ()))
+        created_languages.update(result.strings.created_languages)
+        unavailable_languages: set[str] = set(
+            saved_progress.get("unavailable_languages", ())
+        )
+        unavailable_languages.update(result.strings.unavailable_languages)
+
+        draft.next_row = expected_cursor + len(units)
+        draft.pending_change_ids = sorted(
+            set(draft.pending_change_ids) | set(result.pending_change_ids)
+        )
+        draft.progress = {
+            "phase": "applying",
+            "processed_rows": draft.next_row,
+            "total_rows": total_rows,
+            **totals,
+            "created_languages": sorted(created_languages),
+            "unavailable_languages": sorted(unavailable_languages),
+        }
+        draft.last_activity_at = timezone.now()
+        draft.expires_at = draft.last_activity_at + timedelta(hours=1)
+        draft.save(
+            update_fields=[
+                "next_row",
+                "pending_change_ids",
+                "progress",
+                "last_activity_at",
+                "expires_at",
+            ]
+        )
+        return result
 
 
 # --------------------------------------------------------------------------- #

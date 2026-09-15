@@ -68,6 +68,10 @@ class LocKitImportDraft(models.Model):
         FAILED = "failed", gettext_lazy("Failed")
         CONSUMED = "consumed", gettext_lazy("Consumed")
 
+    class DispatchPhase(models.TextChoices):
+        PREPARE = "prepare", gettext_lazy("Prepare")
+        APPLY = "apply", gettext_lazy("Apply")
+
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.GLOSSARY)
     owner = models.ForeignKey(
@@ -109,6 +113,27 @@ class LocKitImportDraft(models.Model):
     )
     apply_task_id = models.UUIDField(null=True, blank=True)
     prepare_task_id = models.UUIDField(null=True, blank=True)
+    # Durable dispatch ledger for the current prepare/apply generation. The
+    # same DB transaction that reserves ``prepare_task_id``/``apply_task_id``
+    # stores ``dispatch_task_id`` + ``dispatch_phase`` here; the common
+    # dispatcher (``weblate.trans.tasks._publish_loc_kit_dispatch``) claims
+    # this intent on commit and a periodic drain reclaims any intent that
+    # never made it to the broker. ``dispatch_published_at`` is set only
+    # after ``apply_async`` returned, so a crash between broker publish and
+    # the DB mark yields a duplicate delivery of the same UUID - safe only
+    # because each row portion commits under its fencing token exactly once
+    # (``weblate.trans.loc_kit.apply_loc_kit_portion``). A user retry
+    # reserves a fresh UUID and overwrites the intent; it never re-publishes
+    # the old generation. ``dispatch_attempts``/``dispatch_error`` bound the
+    # broker-failure record without tracebacks.
+    dispatch_task_id = models.UUIDField(null=True, blank=True)
+    dispatch_phase = models.CharField(
+        max_length=20, choices=DispatchPhase.choices, blank=True
+    )
+    dispatch_requested_at = models.DateTimeField(null=True, blank=True)
+    dispatch_published_at = models.DateTimeField(null=True, blank=True)
+    dispatch_attempts = models.PositiveIntegerField(default=0)
+    dispatch_error = models.TextField(blank=True)
     confirmed_options = models.JSONField(default=dict, blank=True)
     progress = models.JSONField(default=dict, blank=True)
     next_row = models.PositiveIntegerField(default=0)

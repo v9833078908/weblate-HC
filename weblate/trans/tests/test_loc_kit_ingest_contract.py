@@ -22,6 +22,7 @@ import re
 import shutil
 import sys
 import tempfile
+import threading
 import uuid
 import zipfile
 from dataclasses import replace
@@ -33,8 +34,12 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import DatabaseError
-from django.test import RequestFactory, SimpleTestCase
+from django.db import DatabaseError, connection, transaction
+from django.test import (
+    RequestFactory,
+    SimpleTestCase,
+    TransactionTestCase,
+)
 from django.test.utils import modify_settings, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -65,12 +70,20 @@ from weblate.trans.models.loc_kit import (
     LocKitImportDraft,
 )
 from weblate.trans.tasks import (
+    LOC_KIT_DISPATCH_MAX_ATTEMPTS,
+    _flush_loc_kit_pending_changes,
+    _publish_loc_kit_dispatch,
     apply_loc_kit_string_update_draft,
+    drain_loc_kit_dispatches,
     perform_load,
     prepare_loc_kit_string_update,
 )
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.trans.tests.utils import create_another_user
+from weblate.trans.tests.utils import (
+    RepoTestMixin,
+    create_another_user,
+    create_test_user,
+)
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.state import (
     STATE_APPROVED,
@@ -3654,6 +3667,80 @@ class LocKitStringsUpdatePendingCommitTest(ViewTestCase):
         source_unit = en_translation.unit_set.get(context="frozen_key")
         self.assertEqual(source_unit.explanation, "LLM-only context.")
 
+    def test_new_unit_extra_flags_reach_the_backing_po_file_on_reparse(self) -> None:
+        """
+        New loc-kit row flags reach the backing PO file, not the DB alone.
+
+        The runtime pending writer snapshots them into the source pending
+        change's metadata and carries them into the file, so a fresh parse
+        of the committed file reports the same flag.
+        """
+        row = self._row(key="frozen_flag_key", flags="read-only")
+
+        result = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(row,),
+            overwrite_explanations=False,
+            pending_owner="draft-token-flags",
+        )
+        self.assertEqual(result.strings.added, 1)
+        source_pending = PendingUnitChange.objects.get(
+            pk__in=result.pending_change_ids,
+            unit__translation=self.component.source_translation,
+        )
+        self.assertEqual(source_pending.metadata.get("extra_flags"), "read-only")
+
+        committed = self.component.commit_pending_subset(
+            "loc-kit flags test", self.user, set(result.pending_change_ids)
+        )
+        self.assertTrue(committed)
+
+        source_translation = self.component.source_translation
+        source_translation.drop_store_cache()
+        content = Path(source_translation.get_filename()).read_text(encoding="utf-8")
+        self.assertIn('#, read-only\nmsgid "frozen_flag_key"', content)
+
+        source_unit = source_translation.unit_set.get(context="frozen_flag_key")
+        self.assertEqual(source_unit.extra_flags, "read-only")
+
+    def test_existing_key_extra_flags_are_never_snapshotted_or_changed(self) -> None:
+        """
+        An existing key's flags stay exactly as they are.
+
+        The snapshot only ever applies to a brand-new key's own pending
+        change.
+        """
+        existing = self.component.source_translation.add_unit(
+            None, "existing_flag_key", "Existing", author=self.user
+        )
+        existing.extra_flags = "max-length:10"
+        existing.save(update_fields=["extra_flags"], same_content=True)
+
+        row = self._row(
+            key="existing_flag_key",
+            values={"en": "Existing", "cs": "Existujici"},
+            flags="read-only",
+        )
+        result = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(row,),
+            overwrite_explanations=False,
+            pending_owner="draft-token-existing",
+        )
+        self.assertEqual(result.strings.existing, 1)
+        self.assertFalse(
+            any(
+                pending.metadata.get("extra_flags")
+                for pending in PendingUnitChange.objects.filter(
+                    unit__context="existing_flag_key"
+                )
+            )
+        )
+        existing.refresh_from_db()
+        self.assertEqual(existing.extra_flags, "max-length:10")
+
     def test_retried_flush_does_not_duplicate_note_or_location(self) -> None:
         result = loc_kit.append_translation_strings(
             user=self.user,
@@ -3730,6 +3817,78 @@ class LocKitStringsUpdatePendingCommitTest(ViewTestCase):
         cs_translation.drop_store_cache()
         cs_content = Path(cs_translation.get_filename()).read_text(encoding="utf-8")
         self.assertIn("Ahoj", cs_content)
+
+    def test_no_diff_replay_clears_pending_rows_without_a_second_commit(
+        self,
+    ) -> None:
+        """
+        A no-diff replay clears pending rows without a second commit.
+
+        A pending change describing content already on disk - exactly the
+        shape left behind by a crash between a successful VCS commit and
+        the DB deleting its pending rows - is recognized as an idempotent
+        already-applied replay: the row is cleared and ``True`` is
+        returned, but no second repository commit is issued. This must
+        hold even when the retry happens minutes later: the replay reuses
+        the original pending change's own stable ``timestamp`` for the PO
+        header, so a moved wall clock never manufactures a phantom
+        revision-date diff.
+        """
+        row = self._row()
+        result = loc_kit.append_translation_strings(
+            user=self.user,
+            component=self.component,
+            units=(row,),
+            pending_owner="draft-first",
+        )
+        # ``commit_pending_subset`` applies ONE header timestamp - the max
+        # across every pending change in the batch, source and target
+        # alike - to every translation it writes. The replay below must
+        # reproduce that exact max, not just the source row's own value.
+        original_timestamp = max(
+            PendingUnitChange.objects.filter(
+                pk__in=result.pending_change_ids
+            ).values_list("timestamp", flat=True)
+        )
+        committed = self.component.commit_pending_subset(
+            "first commit", self.user, set(result.pending_change_ids)
+        )
+        self.assertTrue(committed)
+        commits_after_first = self.component.repository.count_outgoing()
+
+        source_unit = self.component.source_translation.unit_set.get(context=row.key)
+        # The row a real crash leaves behind is the SAME row, never
+        # touched: its ``timestamp`` is whatever the first attempt already
+        # used, not a freshly minted one.
+        replay_change = PendingUnitChange.objects.create(
+            unit=source_unit,
+            author=self.user,
+            target=source_unit.target,
+            explanation=source_unit.explanation,
+            source_unit_explanation=source_unit.explanation,
+            state=source_unit.state,
+            add_unit=False,
+            metadata={"loc_kit_draft_id": "draft-first"},
+            timestamp=original_timestamp,
+        )
+
+        # Advance the wall clock well past the first commit: the replay's
+        # no-diff outcome must not depend on when the retry actually runs.
+        moved_clock = timezone.now() + timedelta(minutes=10)
+        with patch(
+            "weblate.trans.models.translation.timezone.now", return_value=moved_clock
+        ):
+            recovered = self.component.commit_pending_subset(
+                "replay commit", self.user, {replay_change.pk}
+            )
+
+        self.assertTrue(recovered)
+        self.assertEqual(
+            self.component.repository.count_outgoing(),
+            commits_after_first,
+            "a no-diff replay must not create a second commit",
+        )
+        self.assertFalse(PendingUnitChange.objects.filter(pk=replay_change.pk).exists())
 
 
 class LocKitStringsUpdateViewTest(ViewTestCase):
@@ -3873,7 +4032,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         with (
             patch(
-                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
             ) as dispatch,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -3889,6 +4048,184 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             priority=0,
         )
         self.assertEqual(self.component.source_translation.unit_set.count(), before)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_unpublished_intent_is_reclaimed_by_the_drain(self) -> None:
+        """
+        An unpublished intent is reclaimed by the periodic drain.
+
+        A confirm whose ``on_commit`` callback never ran (process loss
+        before the broker publication) still leaves a durable dispatch
+        intent; the drain publishes exactly the reserved UUID, and no unit
+        is written before a worker executes.
+        """
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload("key,en\nnew_key,Hello\n")},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        before = self.component.source_translation.unit_set.count()
+
+        with (
+            patch(
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            # The callback is captured and dropped: the process died between
+            # the reserving commit and the fast-path publication.
+            self.captureOnCommitCallbacks(execute=False),
+        ):
+            response = self.client.post(preview_url, {"action": "confirm"})
+
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        reserved_task_id = draft.apply_task_id
+        self.assertEqual(draft.dispatch_task_id, reserved_task_id)
+        self.assertEqual(draft.dispatch_phase, LocKitImportDraft.DispatchPhase.APPLY)
+        self.assertIsNone(draft.dispatch_published_at)
+        dispatch.assert_not_called()
+        self.assertEqual(self.component.source_translation.unit_set.count(), before)
+
+        with patch(
+            "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
+        ) as reclaimed:
+            drain_loc_kit_dispatches()
+
+        reclaimed.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(reserved_task_id),
+            priority=0,
+        )
+        draft.refresh_from_db()
+        self.assertIsNotNone(draft.dispatch_published_at)
+        self.assertEqual(self.component.source_translation.unit_set.count(), before)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_drain_republishes_same_uuid_after_broker_success_before_record(
+        self,
+    ) -> None:
+        """
+        The drain republishes the same UUID after a lost publish record.
+
+        Broker accepted the message but the process died before
+        ``dispatch_published_at`` was recorded: the drain republishes the
+        SAME UUID (a duplicate delivery the portion contract makes safe),
+        never a fresh generation.
+        """
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload("key,en\nnew_key,Hello\n")},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        with self.captureOnCommitCallbacks(execute=False):
+            self.client.post(preview_url, {"action": "confirm"})
+        draft.refresh_from_db()
+        reserved_task_id = draft.apply_task_id
+        self.assertIsNone(draft.dispatch_published_at)
+
+        with (
+            patch(
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch,
+            # The DB mark dies after the broker call returned.
+            patch(
+                "weblate.trans.tasks._record_loc_kit_dispatch_published",
+                side_effect=KeyboardInterrupt,
+            ),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            _publish_loc_kit_dispatch(draft_id=draft.pk)
+
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(reserved_task_id),
+            priority=0,
+        )
+        draft.refresh_from_db()
+        self.assertIsNone(draft.dispatch_published_at)
+
+        with patch(
+            "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
+        ) as republished:
+            drain_loc_kit_dispatches()
+
+        republished.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(reserved_task_id),
+            priority=0,
+        )
+        draft.refresh_from_db()
+        self.assertIsNotNone(draft.dispatch_published_at)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_dispatch_broker_failure_exhausts_to_retryable_failed(self) -> None:
+        """
+        Persistent broker failures are bounded.
+
+        The cap flips the draft to a retryable FAILED with a sanitized
+        message, never touching the payload or the cursor.
+        """
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {"table": self._upload("key,en\nnew_key,Hello\n")},
+        )
+        preview_url = start["Location"]
+        draft = LocKitImportDraft.objects.get()
+        prepare_loc_kit_string_update.apply(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.prepare_task_id),
+        )
+        with (
+            patch(
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async",
+                side_effect=RuntimeError("broker credentials leaked here"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(preview_url, {"action": "confirm"})
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        self.assertEqual(draft.dispatch_attempts, 1)
+        self.assertIsNone(draft.dispatch_published_at)
+
+        with patch(
+            "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async",
+            side_effect=RuntimeError("broker credentials leaked here"),
+        ):
+            for _ in range(LOC_KIT_DISPATCH_MAX_ATTEMPTS - 1):
+                _publish_loc_kit_dispatch(draft_id=draft.pk)
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
+        self.assertEqual(draft.error_code, "dispatch-failed")
+        self.assertEqual(draft.retry_phase, "apply")
+        self.assertEqual(draft.dispatch_attempts, LOC_KIT_DISPATCH_MAX_ATTEMPTS)
+        # Broker exception text must never reach the owner-visible fields.
+        self.assertNotIn("credentials", draft.error_details)
+        self.assertNotIn("credentials", draft.dispatch_error)
+        # Cursor and private payload are untouched by dispatch bookkeeping.
+        self.assertEqual(draft.next_row, 0)
+        self.assertTrue(draft.prepared_payload.name)
 
     def test_cancel_deletes_the_draft_without_changing_anything(self) -> None:
         kit = "key,en\nnew_key,Hello\n"
@@ -3951,6 +4288,42 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             {"table": self._upload("key,en\na,A\n")},
         )
         self.assertEqual(response.status_code, 404)
+
+    @override_settings(
+        TRANSLATION_UPLOAD_MAX_SIZE=200, COMPONENT_ZIP_UPLOAD_MAX_SIZE=1_000_000
+    )
+    def test_oversized_table_under_conflicting_limits_is_rejected_synchronously(
+        self,
+    ) -> None:
+        """
+        A table over ``TRANSLATION_UPLOAD_MAX_SIZE`` must fail synchronously.
+
+        This must hold even when the much larger
+        ``COMPONENT_ZIP_UPLOAD_MAX_SIZE`` would have let it through: no
+        draft row, no storage object and no background dispatch for a table
+        that can only ever fail asynchronously.
+        """
+        kit = "key,en\n" + "".join(
+            f"padding_key_{number},{'x' * 20}\n" for number in range(20)
+        )
+        self.assertGreater(len(kit.encode()), 200)
+        self.assertLess(len(kit.encode()), 1_000_000)
+
+        with patch(
+            "weblate.trans.tasks.prepare_loc_kit_string_update.apply_async"
+        ) as dispatch:
+            response = self.client.post(
+                reverse(
+                    "loc-kit-strings-update",
+                    kwargs={"path": self.component.get_url_path()},
+                ),
+                {"table": self._upload(kit)},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "too big")
+        self.assertFalse(LocKitImportDraft.objects.exists())
+        dispatch.assert_not_called()
 
     def test_apply_lock_timeout_fails_retryably_and_shows_retry(self) -> None:
         kit = "key,en\nnew_key,Hello\n"
@@ -4025,7 +4398,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         with (
             patch(
-                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
             ) as dispatch,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -4128,7 +4501,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self.client.post(start["Location"], {"action": "confirm"})
         draft.refresh_from_db()
 
-        real_apply = loc_kit.apply_loc_kit_string_update
+        real_apply = loc_kit.apply_loc_kit_portion
         calls = {"count": 0}
 
         def interrupt_before_second_portion(*args, **kwargs):
@@ -4143,7 +4516,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             ),
             patch.object(
                 loc_kit,
-                "apply_loc_kit_string_update",
+                "apply_loc_kit_portion",
                 side_effect=interrupt_before_second_portion,
             ),
             self.assertRaises(KeyboardInterrupt),
@@ -4197,7 +4570,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self.client.post(start["Location"], {"action": "confirm"})
         draft.refresh_from_db()
 
-        real_apply = loc_kit.apply_loc_kit_string_update
+        real_apply = loc_kit.apply_loc_kit_portion
         calls = {"count": 0}
 
         def fail_once(*args, **kwargs):
@@ -4207,9 +4580,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
                 raise WeblateLockTimeoutError(msg, lock=None)
             return real_apply(*args, **kwargs)
 
-        with patch.object(
-            loc_kit, "apply_loc_kit_string_update", side_effect=fail_once
-        ):
+        with patch.object(loc_kit, "apply_loc_kit_portion", side_effect=fail_once):
             apply_loc_kit_string_update_draft.apply(
                 kwargs={"draft_id": draft.pk},
                 task_id=str(draft.apply_task_id),
@@ -4256,7 +4627,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         with (
             patch(
-                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
             ) as dispatch,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -4366,7 +4737,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self.client.post(start["Location"], {"action": "confirm"})
         draft.refresh_from_db()
 
-        real_apply = loc_kit.apply_loc_kit_string_update
+        real_apply = loc_kit.apply_loc_kit_portion
         calls = {"n": 0}
 
         def crash_after_first_portion(*args, **kwargs):
@@ -4385,7 +4756,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             ),
             patch.object(
                 loc_kit,
-                "apply_loc_kit_string_update",
+                "apply_loc_kit_portion",
                 side_effect=crash_after_first_portion,
             ),
             self.assertRaises(KeyboardInterrupt),
@@ -4440,7 +4811,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self.client.post(preview_url, {"action": "confirm"})
         draft.refresh_from_db()
 
-        real_apply = loc_kit.apply_loc_kit_string_update
+        real_apply = loc_kit.apply_loc_kit_portion
         calls = {"n": 0}
 
         def fail_after_first_portion(*args, **kwargs):
@@ -4456,7 +4827,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             ),
             patch.object(
                 loc_kit,
-                "apply_loc_kit_string_update",
+                "apply_loc_kit_portion",
                 side_effect=fail_after_first_portion,
             ),
         ):
@@ -4472,7 +4843,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         with (
             patch(
-                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
             ) as dispatch,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -4535,7 +4906,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self.client.post(preview_url, {"action": "confirm"})
         draft.refresh_from_db()
 
-        real_apply = loc_kit.apply_loc_kit_string_update
+        real_apply = loc_kit.apply_loc_kit_portion
         calls = {"n": 0}
 
         def fail_on_third_portion(*args, **kwargs):
@@ -4547,7 +4918,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         with patch.object(
             loc_kit,
-            "apply_loc_kit_string_update",
+            "apply_loc_kit_portion",
             side_effect=fail_on_third_portion,
         ):
             apply_loc_kit_string_update_draft.apply(
@@ -4561,7 +4932,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         with (
             patch(
-                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
             ) as dispatch,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -4592,17 +4963,18 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         )
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
-    def test_retry_replays_a_portion_whose_append_already_committed(self) -> None:
+    def test_explanation_failure_rolls_back_the_whole_portion(self) -> None:
         """
-        ``append_translation_strings`` and ``apply_kit_explanations`` are two
-        independent transactions inside one portion (``apply_loc_kit_string_
-        update``'s own docstring). A failure between them - the append
-        already committed, the explanation call raises - never advances
-        ``next_row`` for that portion, so a retry re-attempts it. That
-        re-attempt is a correct idempotent replay: the keys already exist
-        from the first attempt, so this portion reports as ``existing`` the
-        second time, not a duplicate ``added``. The completed totals add up
-        to every row exactly once; no unit is created twice.
+        An Explanation failure must roll back the whole atomic portion.
+
+        Both mutations run inside one atomic portion (``apply_loc_kit_portion``).
+        A failure in the Explanation step - after the append would previously
+        have already committed - must roll back the append too: no new key,
+        no owned pending row and no cursor advance survive without their
+        paired outcome. A retry then applies the whole portion fresh,
+        reported as ``added``, never as a duplicate-avoiding ``existing``.
+        The completed totals add up to every row exactly once; no unit is
+        created twice.
         """
         row_count = 75
         rows = "key,en\n" + "".join(f"m{i},V{i}\n" for i in range(row_count))
@@ -4621,7 +4993,8 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self.client.post(preview_url, {"action": "confirm"})
         draft.refresh_from_db()
 
-        real_explanations = loc_kit.apply_kit_explanations
+        # ruff: ignore[private-member-access]
+        real_explanations = loc_kit._apply_kit_explanations_locked
         calls = {"n": 0}
 
         def fail_explanations_on_third_portion(*args, **kwargs):
@@ -4633,7 +5006,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         with patch.object(
             loc_kit,
-            "apply_kit_explanations",
+            "_apply_kit_explanations_locked",
             side_effect=fail_explanations_on_third_portion,
         ):
             apply_loc_kit_string_update_draft.apply(
@@ -4642,20 +5015,31 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         draft.refresh_from_db()
         self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
-        # The third portion's append already committed even though the
-        # cursor never advanced past the second portion's boundary.
+        # The third portion's append rolled back together with the failed
+        # Explanation call: the cursor and counters never advanced past the
+        # second portion's boundary, and no "m50".."m74" unit exists.
         self.assertEqual(draft.next_row, 50)
         self.assertEqual(draft.progress.get("added"), 50)
         self.assertEqual(
             self.component.source_translation.unit_set.filter(
                 context__startswith="m"
             ).count(),
-            75,
+            50,
         )
+        # The first two portions' owned pending rows are still legitimately
+        # awaiting finalization (the flush only runs once the whole table
+        # is applied); only the rolled-back third portion left none.
+        owned_contexts = set(
+            PendingUnitChange.objects.filter(
+                metadata__loc_kit_draft_id=str(draft.pk)
+            ).values_list("unit__context", flat=True)
+        )
+        self.assertTrue(owned_contexts)
+        self.assertFalse({f"m{i}" for i in range(50, 75)} & owned_contexts)
 
         with (
             patch(
-                "weblate.trans.views.create.apply_loc_kit_string_update_draft.apply_async"
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
             ) as dispatch,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -4673,13 +5057,11 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         draft.refresh_from_db()
         self.assertEqual(draft.state, LocKitImportDraft.State.COMPLETED)
-        # Every row landed exactly once: the replayed third portion is
-        # correctly counted as existing, not duplicated as added.
-        self.assertEqual(
-            draft.progress["added"] + draft.progress["existing"], row_count
-        )
-        self.assertEqual(draft.progress["existing"], 25)
-        self.assertEqual(draft.progress["added"], row_count - 25)
+        # Every row landed exactly once, all reported as added: the rolled
+        # back third portion was never partially applied, so the retry adds
+        # it fresh instead of replaying it as already-existing.
+        self.assertEqual(draft.progress["added"], row_count)
+        self.assertEqual(draft.progress["existing"], 0)
         units = self.component.source_translation.unit_set.filter(
             context__startswith="m"
         )
@@ -4701,7 +5083,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         with (
             patch(
-                "weblate.trans.views.create.prepare_loc_kit_string_update.apply_async"
+                "weblate.trans.tasks.prepare_loc_kit_string_update.apply_async"
             ) as dispatch,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -4748,3 +5130,551 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self.assertTrue(draft.prepared_payload.name)
         self.assertFalse(draft.uploaded.name)
         self.assertEqual(self.component.source_translation.unit_set.count(), before)
+
+
+class LocKitDispatchDrainConcurrencyTest(TransactionTestCase):
+    """
+    The periodic drain skips a dispatch intent whose row is locked.
+
+    The drain claims with ``SELECT ... FOR UPDATE SKIP LOCKED`` so a
+    concurrent claim (the on-commit fast path or a worker-side reservation)
+    never aborts the sweep; the lock owner publishes. A plain TestCase's
+    outer transaction would hide the second connection, so this needs real
+    commits.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.project = Project.objects.create(
+            name="Probe", slug="probe", web="https://example.com/"
+        )
+        self.user = create_another_user(suffix="-dispatch")
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+
+    def _draft(self) -> LocKitImportDraft:
+        task_id = uuid.uuid4()
+        return LocKitImportDraft.objects.create(
+            owner=self.user,
+            session_key="dispatch-test",
+            project=self.project,
+            slug="component",
+            name="Component",
+            source_filename="update.csv",
+            state=LocKitImportDraft.State.APPLYING,
+            apply_task_id=task_id,
+            dispatch_task_id=task_id,
+            dispatch_phase=LocKitImportDraft.DispatchPhase.APPLY,
+            dispatch_requested_at=timezone.now(),
+        )
+
+    def test_drain_skips_a_locked_intent_and_publishes_after_release(self) -> None:
+        draft = self._draft()
+        connection.close()  # this connection must not straddle the threads
+
+        barrier = threading.Barrier(2)
+        release = threading.Event()
+
+        def holder() -> None:
+            try:
+                with transaction.atomic():
+                    LocKitImportDraft.objects.select_for_update().get(pk=draft.pk)
+                    barrier.wait(timeout=10)
+                    release.wait(timeout=10)
+            finally:
+                connection.close()
+
+        thread = threading.Thread(target=holder)
+        thread.start()
+        try:
+            barrier.wait(timeout=10)
+            with patch(
+                "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
+            ) as dispatch:
+                drain_loc_kit_dispatches()
+            dispatch.assert_not_called()
+        finally:
+            release.set()
+            thread.join(timeout=15)
+            connection.close()
+
+        draft.refresh_from_db()
+        self.assertIsNone(draft.dispatch_published_at)
+
+        with patch(
+            "weblate.trans.tasks.apply_loc_kit_string_update_draft.apply_async"
+        ) as dispatch:
+            drain_loc_kit_dispatches()
+        dispatch.assert_called_once_with(
+            kwargs={"draft_id": draft.pk},
+            task_id=str(draft.apply_task_id),
+            priority=0,
+        )
+        draft.refresh_from_db()
+        self.assertIsNotNone(draft.dispatch_published_at)
+
+
+class LocKitAtomicPortionConcurrencyTest(RepoTestMixin, TransactionTestCase):
+    """
+    Real concurrent deliveries racing ``apply_loc_kit_portion``'s fencing.
+
+    A plain TestCase runs inside one outer transaction (savepoints, not
+    separate commits), so a second thread's connection could never see a
+    committed change from another - this needs real commits, hence
+    TransactionTestCase, mirroring ``JudgeResolutionRealConcurrencyTest``.
+    Each worker fetches its own fresh ``Component`` instance, exactly like
+    two independent Celery deliveries would.
+    """
+
+    def setUp(self) -> None:
+        self.clone_test_repos()
+        super().setUp()
+        self.component = self.create_po_mono(name="ConcurrentStrings")
+        self.component.new_lang = "add"
+        self.component.edit_template = True
+        self.component.save(update_fields=["new_lang", "edit_template"])
+        self.user = create_test_user()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+
+    @staticmethod
+    def _row(key: str) -> StringUnit:
+        return StringUnit(
+            key=key,
+            values={"en": f"Value {key}"},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="",
+            flags="",
+        )
+
+    def _draft(self, task_id) -> LocKitImportDraft:
+        return LocKitImportDraft.objects.create(
+            owner=self.user,
+            session_key="concurrency-test",
+            kind=LocKitImportDraft.Kind.STRING,
+            project=self.component.project,
+            slug=self.component.slug,
+            name=self.component.name,
+            source_filename="update.csv",
+            target_component=self.component,
+            state=LocKitImportDraft.State.APPLYING,
+            apply_task_id=task_id,
+            apply_started_at=timezone.now(),
+        )
+
+    def test_stale_uuid_creates_zero_units_after_retry_installs_new_uuid(
+        self,
+    ) -> None:
+        """
+        A stale, paused task must create nothing once retry replaces its UUID.
+
+        The retry replaces the fencing UUID before the stale task ever
+        reaches the draft lock.
+        """
+        old_task_id = uuid.uuid4()
+        new_task_id = uuid.uuid4()
+        draft = self._draft(old_task_id)
+        connection.close()  # this connection must not straddle the threads
+
+        retried = threading.Event()
+        outcome: dict[str, object] = {}
+
+        def stale_worker() -> None:
+            try:
+                retried.wait(timeout=10)
+                component = Component.objects.get(pk=self.component.pk)
+                outcome["result"] = loc_kit.apply_loc_kit_portion(
+                    user=self.user,
+                    component=component,
+                    units=(self._row("stale_key"),),
+                    overwrite_explanations=False,
+                    pending_owner=str(draft.pk),
+                    explanation_baseline={},
+                    draft_id=draft.pk,
+                    task_id=old_task_id,
+                    expected_cursor=0,
+                    total_rows=1,
+                )
+            finally:
+                connection.close()
+
+        thread = threading.Thread(target=stale_worker)
+        thread.start()
+        # A real committed retry installs a fresh UUID while the stale
+        # worker's delivery is paused before it ever reaches the draft lock.
+        LocKitImportDraft.objects.filter(pk=draft.pk).update(apply_task_id=new_task_id)
+        retried.set()
+        thread.join(timeout=15)
+
+        self.assertIsNone(outcome.get("result"))
+        self.assertFalse(
+            self.component.source_translation.unit_set.filter(
+                context="stale_key"
+            ).exists()
+        )
+
+    def test_duplicate_same_uuid_delivery_commits_at_most_one_portion(
+        self,
+    ) -> None:
+        """
+        Two workers delivering the same UUID commit at most one portion.
+
+        The second worker observes the advanced cursor inside the lock and
+        returns without mutating anything.
+        """
+        task_id = uuid.uuid4()
+        draft = self._draft(task_id)
+        connection.close()
+
+        barrier = threading.Barrier(2, timeout=10)
+        outcomes: list[object] = []
+        lock = threading.Lock()
+
+        def worker() -> None:
+            try:
+                barrier.wait(timeout=10)
+                component = Component.objects.get(pk=self.component.pk)
+                result = loc_kit.apply_loc_kit_portion(
+                    user=self.user,
+                    component=component,
+                    units=(self._row("dup_key"),),
+                    overwrite_explanations=False,
+                    pending_owner=str(draft.pk),
+                    explanation_baseline={},
+                    draft_id=draft.pk,
+                    task_id=task_id,
+                    expected_cursor=0,
+                    total_rows=1,
+                )
+            finally:
+                connection.close()
+            with lock:
+                outcomes.append(result)
+
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=15)
+
+        self.assertEqual(len(outcomes), 2, "both workers must finish and report")
+        successes = [outcome for outcome in outcomes if outcome is not None]
+        self.assertEqual(
+            len(successes), 1, f"exactly one portion must commit, got: {outcomes}"
+        )
+        self.assertEqual(
+            self.component.source_translation.unit_set.filter(
+                context="dup_key"
+            ).count(),
+            1,
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.next_row, 1)
+        self.assertEqual(draft.progress.get("added"), 1)
+
+    def test_explanation_error_rolls_back_an_already_added_key(self) -> None:
+        """
+        An Explanation failure must roll back an already-added key too.
+
+        An exception raised while applying the Explanation, after the
+        append would previously have already committed as its own separate
+        transaction, must roll back the append too under real commit
+        semantics: no key, no owned pending row and no cursor advance
+        survives without its paired outcome. A second, unpatched call then
+        applies the whole portion cleanly, reported as added.
+        """
+        task_id = uuid.uuid4()
+        draft = self._draft(task_id)
+        row = self._row("rollback_key")
+        row = replace(row, explanation="Some context.")
+
+        with (
+            patch.object(
+                loc_kit,
+                "_apply_kit_explanations_locked",
+                side_effect=ValidationError("boom"),
+            ),
+            self.assertRaises(ValidationError),
+        ):
+            loc_kit.apply_loc_kit_portion(
+                user=self.user,
+                component=self.component,
+                units=(row,),
+                overwrite_explanations=False,
+                pending_owner=str(draft.pk),
+                explanation_baseline={},
+                draft_id=draft.pk,
+                task_id=task_id,
+                expected_cursor=0,
+                total_rows=1,
+            )
+
+        self.assertFalse(
+            self.component.source_translation.unit_set.filter(
+                context="rollback_key"
+            ).exists()
+        )
+        self.assertFalse(
+            PendingUnitChange.objects.filter(
+                metadata__loc_kit_draft_id=str(draft.pk)
+            ).exists()
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.next_row, 0)
+        self.assertEqual(draft.progress, {})
+
+        result = loc_kit.apply_loc_kit_portion(
+            user=self.user,
+            component=self.component,
+            units=(row,),
+            overwrite_explanations=False,
+            pending_owner=str(draft.pk),
+            explanation_baseline={},
+            draft_id=draft.pk,
+            task_id=task_id,
+            expected_cursor=0,
+            total_rows=1,
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(result.strings.added, 1)
+        self.assertEqual(result.explanations.set_count, 1)
+        self.assertTrue(
+            self.component.source_translation.unit_set.filter(
+                context="rollback_key"
+            ).exists()
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.next_row, 1)
+        self.assertEqual(draft.progress.get("added"), 1)
+
+
+class LocKitFinalizerRecoveryTest(ViewTestCase):
+    """
+    ``_flush_loc_kit_pending_changes`` locking, ownership and recovery.
+
+    Exercises the finalizer directly against a real po-mono repository so
+    the repository lock, metadata-derived ownership and the VCS-commit
+    recovery path are proven against real commits, not only through the
+    full task/view machinery.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.component = self.create_po_mono(project=self.project, name="Strings")
+
+    def _row(self, key: str, **overrides) -> StringUnit:
+        base = {
+            "key": key,
+            "values": {"en": f"Value {key}"},
+            "comments": (),
+            "references": (),
+            "row": 2,
+            "explanation": "",
+            "flags": "",
+        }
+        base.update(overrides)
+        return StringUnit(**base)
+
+    def _draft(self, task_id) -> LocKitImportDraft:
+        return LocKitImportDraft.objects.create(
+            owner=self.user,
+            session_key="finalizer-test",
+            kind=LocKitImportDraft.Kind.STRING,
+            project=self.component.project,
+            slug=self.component.slug,
+            name=self.component.name,
+            source_filename="update.csv",
+            target_component=self.component,
+            state=LocKitImportDraft.State.APPLYING,
+            apply_task_id=task_id,
+            apply_started_at=timezone.now(),
+        )
+
+    def test_finalizer_holds_repository_lock_before_committing(self) -> None:
+        """A lock timeout must leave every pending row and the draft untouched."""
+        task_id = uuid.uuid4()
+        draft = self._draft(task_id)
+        result = loc_kit.append_translation_strings(
+            user=self.user,
+            component=self.component,
+            units=(self._row("locked_key"),),
+            pending_owner=str(draft.pk),
+        )
+
+        with (
+            patch.object(
+                Component,
+                "locked_for_update",
+                side_effect=WeblateLockTimeoutError("locked", lock=None),
+            ),
+            self.assertRaises(WeblateLockTimeoutError),
+        ):
+            _flush_loc_kit_pending_changes(
+                draft_id=draft.pk,
+                task_id=task_id,
+                component=self.component,
+                owner=self.user,
+                retry_phase="finalize",
+            )
+
+        self.assertTrue(
+            PendingUnitChange.objects.filter(pk__in=result.pending_change_ids).exists()
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+
+    def test_finalizer_excludes_a_foreign_pending_row(self) -> None:
+        """
+        A foreign pending change must survive finalization untouched.
+
+        A pending change never tagged with this draft's metadata - a manual
+        translator edit, or another import entirely - must survive
+        untouched: only this draft's owned, metadata-tagged rows are
+        committed.
+        """
+        task_id = uuid.uuid4()
+        draft = self._draft(task_id)
+        owned = loc_kit.append_translation_strings(
+            user=self.user,
+            component=self.component,
+            units=(self._row("owned_key"),),
+            pending_owner=str(draft.pk),
+        )
+        foreign_unit = self.component.source_translation.add_unit(
+            None, "foreign_key", "Foreign", author=self.user
+        )
+        foreign_change = PendingUnitChange.objects.get(unit=foreign_unit, add_unit=True)
+        self.assertEqual(foreign_change.metadata, {})
+
+        outcome = _flush_loc_kit_pending_changes(
+            draft_id=draft.pk,
+            task_id=task_id,
+            component=self.component,
+            owner=self.user,
+            retry_phase="finalize",
+        )
+
+        self.assertTrue(outcome)
+        self.assertFalse(
+            PendingUnitChange.objects.filter(pk__in=owned.pending_change_ids).exists()
+        )
+        self.assertTrue(PendingUnitChange.objects.filter(pk=foreign_change.pk).exists())
+        self.component.source_translation.drop_store_cache()
+        content = Path(self.component.source_translation.get_filename()).read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("owned_key", content)
+        self.assertNotIn("foreign_key", content)
+
+    def test_finalizer_stops_before_commit_when_permission_is_revoked(self) -> None:
+        """Permission loss must prevent any commit, not only fail afterward."""
+        task_id = uuid.uuid4()
+        draft = self._draft(task_id)
+        result = loc_kit.append_translation_strings(
+            user=self.user,
+            component=self.component,
+            units=(self._row("perm_key"),),
+            pending_owner=str(draft.pk),
+        )
+        limited = create_another_user(suffix="-finalize")
+
+        with patch.object(Component, "commit_pending_subset") as commit_mock:
+            outcome = _flush_loc_kit_pending_changes(
+                draft_id=draft.pk,
+                task_id=task_id,
+                component=self.component,
+                owner=limited,
+                retry_phase="finalize",
+            )
+
+        self.assertFalse(outcome)
+        commit_mock.assert_not_called()
+        self.assertTrue(
+            PendingUnitChange.objects.filter(pk__in=result.pending_change_ids).exists()
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.FAILED)
+        self.assertEqual(draft.error_code, "finalize-forbidden")
+        self.assertEqual(draft.retry_phase, "finalize")
+
+    def test_finalizer_recovers_from_a_crash_after_vcs_commit(self) -> None:
+        """
+        Crash recovery after a VCS commit must never create a second commit.
+
+        A pending row describing content already on disk - exactly what such
+        a crash leaves behind - is cleared without a second commit, and the
+        finalizer reports success so the draft can still complete. This
+        must hold even when the retry happens minutes later: the replay
+        reuses the original batch's own max ``timestamp`` for the PO
+        header, so a moved wall clock never manufactures a phantom
+        revision-date diff.
+        """
+        task_id = uuid.uuid4()
+        draft = self._draft(task_id)
+        result = loc_kit.append_translation_strings(
+            user=self.user,
+            component=self.component,
+            units=(self._row("crash_key"),),
+            pending_owner=str(draft.pk),
+        )
+        # ``commit_pending_subset`` applies ONE header timestamp - the max
+        # across every pending change in the batch - to every translation
+        # it writes. The replay below must reproduce that exact max.
+        original_timestamp = max(
+            PendingUnitChange.objects.filter(
+                pk__in=result.pending_change_ids
+            ).values_list("timestamp", flat=True)
+        )
+        first_outcome = _flush_loc_kit_pending_changes(
+            draft_id=draft.pk,
+            task_id=task_id,
+            component=self.component,
+            owner=self.user,
+            retry_phase="finalize",
+        )
+        self.assertTrue(first_outcome)
+        commits_after_first = self.component.repository.count_outgoing()
+
+        source_unit = self.component.source_translation.unit_set.get(
+            context="crash_key"
+        )
+        # The row a real crash leaves behind is the SAME row, never
+        # touched: its ``timestamp`` is whatever the first attempt already
+        # used, not a freshly minted one.
+        replay_change = PendingUnitChange.objects.create(
+            unit=source_unit,
+            author=self.user,
+            target=source_unit.target,
+            explanation=source_unit.explanation,
+            source_unit_explanation=source_unit.explanation,
+            state=source_unit.state,
+            add_unit=False,
+            metadata={"loc_kit_draft_id": str(draft.pk)},
+            timestamp=original_timestamp,
+        )
+
+        moved_clock = timezone.now() + timedelta(minutes=10)
+        with patch(
+            "weblate.trans.models.translation.timezone.now", return_value=moved_clock
+        ):
+            recovered = _flush_loc_kit_pending_changes(
+                draft_id=draft.pk,
+                task_id=task_id,
+                component=self.component,
+                owner=self.user,
+                retry_phase="finalize",
+            )
+
+        self.assertTrue(recovered)
+        self.assertEqual(
+            self.component.repository.count_outgoing(),
+            commits_after_first,
+            "recovery must not create a second commit",
+        )
+        self.assertFalse(PendingUnitChange.objects.filter(pk=replay_change.pk).exists())
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)

@@ -1674,8 +1674,184 @@ def generate_judge_candidate(
     )
 
 
+# How many persistent broker failures one dispatch intent may record before
+# the generation enters the existing retryable FAILED path. A user retry then
+# reserves a fresh UUID and intent; payload, cursor and counters are never
+# touched by dispatch bookkeeping.
+LOC_KIT_DISPATCH_MAX_ATTEMPTS = 5
+
+
+def _loc_kit_dispatch_task(phase: str):
+    """Return the task class for a dispatch phase."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    if phase == LocKitImportDraft.DispatchPhase.PREPARE:
+        return prepare_loc_kit_string_update
+    if phase == LocKitImportDraft.DispatchPhase.APPLY:
+        return apply_loc_kit_string_update_draft
+    return None
+
+
+def _publish_loc_kit_dispatch(*, draft_id: int, skip_locked: bool = False) -> bool:
+    """
+    Publish the draft's current unpublished dispatch intent exactly once.
+
+    The intent (``dispatch_task_id`` + ``dispatch_phase``) was reserved in
+    the same DB transaction that assigned ``prepare_task_id`` or
+    ``apply_task_id``. This dispatcher claims it under the draft's row lock,
+    verifies it still matches the current phase UUID and state, publishes
+    the broker message with the reserved UUID and interactive priority, and
+    only then records ``dispatch_published_at``. A crash between the broker
+    publish and that record leaves the intent unpublished; the periodic
+    drain re-claims it and republishes the *same* UUID - a duplicate
+    delivery that is safe only because every row portion commits under its
+    fencing token (``weblate.trans.loc_kit.apply_loc_kit_portion``). No
+    caller may publish a prepare/apply message past this dispatcher.
+
+    ``skip_locked`` is used by the periodic drain: another claim (the
+    on-commit fast path or a concurrent drain sweep) is already handling
+    the intent, so the sweep must not block on its row.
+
+    Returns ``True`` when the reserved task is (or already was) published,
+    ``False`` when the intent was superseded or invalid and nothing was
+    queued.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    task_id = None
+    task = None
+    with transaction.atomic():
+        queryset = LocKitImportDraft.objects.select_for_update(
+            of=("self",), skip_locked=skip_locked
+        )
+        if skip_locked:
+            # A genuinely locked row yields no result under SKIP LOCKED;
+            # the lock owner is already handling the intent.
+            draft = queryset.filter(pk=draft_id).first()
+            if draft is None:
+                return False
+        else:
+            draft = queryset.get(pk=draft_id)
+        if draft.dispatch_task_id is None:
+            return False
+        if draft.dispatch_published_at is not None:
+            return True
+        phase = draft.dispatch_phase
+        task = _loc_kit_dispatch_task(phase)
+        if task is None:
+            draft.dispatch_task_id = None
+            draft.dispatch_phase = ""
+            draft.dispatch_published_at = None
+            draft.dispatch_error = ""
+            draft.save(
+                update_fields=[
+                    "dispatch_task_id",
+                    "dispatch_phase",
+                    "dispatch_published_at",
+                    "dispatch_error",
+                ]
+            )
+            return False
+        phase_field = (
+            "prepare_task_id"
+            if phase == LocKitImportDraft.DispatchPhase.PREPARE
+            else "apply_task_id"
+        )
+        expected_state = (
+            LocKitImportDraft.State.PREPARING
+            if phase == LocKitImportDraft.DispatchPhase.PREPARE
+            else LocKitImportDraft.State.APPLYING
+        )
+        task_id = draft.dispatch_task_id
+        if getattr(draft, phase_field) != task_id or draft.state != expected_state:
+            # A retry or state change superseded this intent; never publish a
+            # generation that no longer owns the phase UUID.
+            return False
+    # Publish outside the row lock: a slow broker must not hold the draft row.
+    try:
+        task.apply_async(
+            kwargs={"draft_id": draft_id},
+            task_id=str(task_id),
+            priority=INTERACTIVE_TASK_PRIORITY,
+        )
+    except Exception as error:
+        _record_loc_kit_dispatch_failure(
+            draft_id=draft_id, task_id=task_id, error=error
+        )
+        return False
+    _record_loc_kit_dispatch_published(draft_id=draft_id, task_id=task_id)
+    return True
+
+
+def _record_loc_kit_dispatch_published(*, draft_id: int, task_id) -> None:
+    """Mark the intent published unless a newer generation superseded it."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    with transaction.atomic():
+        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+            pk=draft_id
+        )
+        if draft.dispatch_task_id != task_id or draft.dispatch_published_at is not None:
+            return
+        draft.dispatch_published_at = timezone.now()
+        draft.dispatch_error = ""
+        draft.save(update_fields=["dispatch_published_at", "dispatch_error"])
+
+
+def _record_loc_kit_dispatch_failure(
+    *, draft_id: int, task_id, error: Exception
+) -> None:
+    """
+    Record a persistent broker failure on the current dispatch intent.
+
+    Bounded by ``LOC_KIT_DISPATCH_MAX_ATTEMPTS``: exhaustion flips the draft
+    into the existing retryable FAILED path (``retry_phase`` set, cursor,
+    payload and counters untouched). Only a fixed, user-safe message is ever
+    stored on the draft - a broker exception may embed endpoint or
+    credential text, so the real error goes to the error report alone - and
+    only while the intent still owns the phase UUID, so a superseding retry
+    cannot be failed by an old dispatch.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    with transaction.atomic():
+        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+            pk=draft_id
+        )
+        if draft.dispatch_task_id != task_id or draft.dispatch_published_at is not None:
+            return
+        draft.dispatch_attempts += 1
+        draft.dispatch_error = "The background task could not be queued."
+        draft.last_activity_at = timezone.now()
+        draft.expires_at = draft.last_activity_at + timedelta(hours=1)
+        fields = [
+            "dispatch_attempts",
+            "dispatch_error",
+            "last_activity_at",
+            "expires_at",
+        ]
+        if draft.dispatch_attempts >= LOC_KIT_DISPATCH_MAX_ATTEMPTS:
+            draft.state = LocKitImportDraft.State.FAILED
+            draft.error_code = "dispatch-failed"
+            draft.error_details = draft.dispatch_error
+            draft.retry_phase = draft.dispatch_phase
+            fields.extend(["state", "error_code", "error_details", "retry_phase"])
+        draft.save(update_fields=fields)
+        project = draft.project
+    report_error(
+        "loc-kit task dispatch failed",
+        project=project,
+        exception=error,
+        skip_error_reporting=draft.dispatch_attempts < LOC_KIT_DISPATCH_MAX_ATTEMPTS,
+    )
+
+
 def _chain_loc_kit_apply_continuation(*, draft_id: int, task_id) -> bool:
-    """Fence the current delivery and enqueue exactly one fresh continuation."""
+    """Fence the current delivery and reserve exactly one fresh continuation."""
     # ruff: ignore[import-outside-top-level]
     from uuid import uuid4
 
@@ -1697,31 +1873,26 @@ def _chain_loc_kit_apply_continuation(*, draft_id: int, task_id) -> bool:
         draft.apply_task_id = continuation_id
         draft.last_activity_at = timezone.now()
         draft.expires_at = draft.last_activity_at + timedelta(hours=1)
-        draft.save(update_fields=["apply_task_id", "last_activity_at", "expires_at"])
-
-        def publish() -> None:
-            try:
-                apply_loc_kit_string_update_draft.apply_async(
-                    kwargs={"draft_id": draft_id},
-                    task_id=str(continuation_id),
-                    priority=INTERACTIVE_TASK_PRIORITY,
-                )
-            except Exception as error:
-                report_error(
-                    "loc-kit apply continuation dispatch failed",
-                    project=component.project,
-                )
-                mark_loc_kit_draft_failed(
-                    draft_id,
-                    task_id_field="apply_task_id",
-                    expected_state=LocKitImportDraft.State.APPLYING,
-                    task_id=continuation_id,
-                    error_code="apply-dispatch-failed",
-                    message=str(error),
-                    retry_phase="apply",
-                )
-
-        transaction.on_commit(publish)
+        draft.dispatch_task_id = continuation_id
+        draft.dispatch_phase = LocKitImportDraft.DispatchPhase.APPLY
+        draft.dispatch_requested_at = draft.last_activity_at
+        draft.dispatch_published_at = None
+        draft.dispatch_attempts = 0
+        draft.dispatch_error = ""
+        draft.save(
+            update_fields=[
+                "apply_task_id",
+                "last_activity_at",
+                "expires_at",
+                "dispatch_task_id",
+                "dispatch_phase",
+                "dispatch_requested_at",
+                "dispatch_published_at",
+                "dispatch_attempts",
+                "dispatch_error",
+            ]
+        )
+        transaction.on_commit(lambda: _publish_loc_kit_dispatch(draft_id=draft_id))
     return True
 
 
@@ -1772,114 +1943,116 @@ def _flush_loc_kit_pending_changes(
     owner: User,
     retry_phase: str,
 ) -> bool:
-    """Commit only this draft's pending changes, never ambient component work."""
-    # ruff: ignore[import-outside-top-level]
-    from weblate.trans.models import LocKitImportDraft
+    """
+    Commit only this draft's owned pending changes, under repository lock.
 
-    with transaction.atomic():
-        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
-            pk=draft_id
-        )
-        if (
-            draft.state != LocKitImportDraft.State.APPLYING
-            or draft.apply_task_id != task_id
-        ):
-            return False
-        candidate_ids = set(draft.pending_change_ids)
-        owned_ids = set(
-            PendingUnitChange.objects.filter(
-                metadata__loc_kit_draft_id=str(draft.pk)
-            ).values_list("pk", flat=True)
-        )
-        unowned_ids = (
-            set(
-                PendingUnitChange.objects.filter(pk__in=candidate_ids).values_list(
-                    "pk", flat=True
-                )
-            )
-            - owned_ids
-        )
-        draft.progress = {**draft.progress, "phase": "finalizing"}
-        draft.last_activity_at = timezone.now()
-        draft.expires_at = draft.last_activity_at + timedelta(hours=1)
-        draft.save(update_fields=["progress", "last_activity_at", "expires_at"])
-
-    if unowned_ids:
-        report_error(
-            "loc-kit finalizing found unowned pending changes",
-            project=component.project,
-        )
-        mark_loc_kit_draft_failed(
-            draft_id,
-            task_id_field="apply_task_id",
-            expected_state=LocKitImportDraft.State.APPLYING,
-            task_id=task_id,
-            error_code="finalize-failed",
-            message=(
-                "Refusing to commit pending changes without this draft's "
-                "ownership metadata."
-            ),
-            retry_phase=retry_phase,
-        )
-        return False
-
-    still_authorized = owner.has_perm("source.edit", component.source_translation) or (
-        owner.has_perm("upload.perform", component)
-        and owner.has_perm("unit.add", component.source_translation)
-    )
-    if owned_ids and not still_authorized:
-        # Authorization is rechecked here because a portion may have been
-        # staged minutes or hours before the repository commit happens.
-        mark_loc_kit_draft_failed(
-            draft_id,
-            task_id_field="apply_task_id",
-            expected_state=LocKitImportDraft.State.APPLYING,
-            task_id=task_id,
-            error_code="finalize-forbidden",
-            message="The owner no longer holds permission to apply this table.",
-            retry_phase=retry_phase,
-        )
-        return False
-
-    if owned_ids and not component.commit_pending_subset(
-        f"loc-kit table update ({component.slug})", owner, owned_ids
-    ):
-        mark_loc_kit_draft_failed(
-            draft_id,
-            task_id_field="apply_task_id",
-            expected_state=LocKitImportDraft.State.APPLYING,
-            task_id=task_id,
-            error_code="finalize-failed",
-            message="Could not commit the applied strings to the repository.",
-            retry_phase=retry_phase,
-        )
-        return False
-
-    with transaction.atomic():
-        draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
-            pk=draft_id
-        )
-        if (
-            draft.state != LocKitImportDraft.State.APPLYING
-            or draft.apply_task_id != task_id
-        ):
-            return False
-        remaining_ids = set(
-            PendingUnitChange.objects.filter(
-                metadata__loc_kit_draft_id=str(draft.pk)
-            ).values_list("pk", flat=True)
-        )
-        draft.pending_change_ids = sorted(remaining_ids)
-        draft.save(update_fields=["pending_change_ids"])
-    if remaining_ids:
-        return _flush_loc_kit_pending_changes(
+    Enters ``Component.locked_for_update()`` before the draft row lock -
+    the same ``repository -> component -> draft`` order the atomic portion
+    coordinator uses - so finalization serializes against every other
+    component writer: a concurrent manual edit, another import, or a
+    duplicate same-UUID delivery of this draft. ``commit_pending_subset``
+    is never called without holding this lock.
+    """
+    with component.locked_for_update() as locked_component:
+        return _flush_loc_kit_pending_changes_locked(
             draft_id=draft_id,
             task_id=task_id,
-            component=component,
+            component=locked_component,
             owner=owner,
             retry_phase=retry_phase,
         )
-    return True
+
+
+def _flush_loc_kit_pending_changes_locked(
+    *,
+    draft_id: int,
+    task_id,
+    component: Component,
+    owner: User,
+    retry_phase: str,
+) -> bool:
+    """
+    Loop body of the finalizer; the caller holds the repository/component lock.
+
+    The owned set is re-derived from
+    ``PendingUnitChange.metadata["loc_kit_draft_id"]`` on every attempt -
+    ``pending_change_ids`` is written here purely as audit/recovery data,
+    never read back as ownership authority. Looping (not recursing) lets a
+    duplicate same-UUID delivery's freshly owned rows, added while an
+    earlier attempt's commit ran, be swept in without re-entering the lock.
+    Only an empty owned set may report success.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    while True:
+        with transaction.atomic():
+            draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
+                pk=draft_id
+            )
+            if (
+                draft.state != LocKitImportDraft.State.APPLYING
+                or draft.apply_task_id != task_id
+            ):
+                return False
+            owned_ids = set(
+                PendingUnitChange.objects.filter(
+                    metadata__loc_kit_draft_id=str(draft.pk)
+                ).values_list("pk", flat=True)
+            )
+            draft.progress = {**draft.progress, "phase": "finalizing"}
+            draft.pending_change_ids = sorted(owned_ids)
+            draft.last_activity_at = timezone.now()
+            draft.expires_at = draft.last_activity_at + timedelta(hours=1)
+            draft.save(
+                update_fields=[
+                    "progress",
+                    "pending_change_ids",
+                    "last_activity_at",
+                    "expires_at",
+                ]
+            )
+        if not owned_ids:
+            return True
+
+        still_authorized = owner.has_perm(
+            "source.edit", component.source_translation
+        ) or (
+            owner.has_perm("upload.perform", component)
+            and owner.has_perm("unit.add", component.source_translation)
+        )
+        if not still_authorized:
+            # Authorization is rechecked here because a portion may have
+            # been staged minutes or hours before the repository commit
+            # happens; permission loss stops finalization before any
+            # commit is attempted.
+            mark_loc_kit_draft_failed(
+                draft_id,
+                task_id_field="apply_task_id",
+                expected_state=LocKitImportDraft.State.APPLYING,
+                task_id=task_id,
+                error_code="finalize-forbidden",
+                message="The owner no longer holds permission to apply this table.",
+                retry_phase=retry_phase,
+            )
+            return False
+
+        if not component.commit_pending_subset(
+            f"loc-kit table update ({component.slug})", owner, owned_ids
+        ):
+            mark_loc_kit_draft_failed(
+                draft_id,
+                task_id_field="apply_task_id",
+                expected_state=LocKitImportDraft.State.APPLYING,
+                task_id=task_id,
+                error_code="finalize-failed",
+                message="Could not commit the applied strings to the repository.",
+                retry_phase=retry_phase,
+            )
+            return False
+        # Loop again under the same lock: re-query the owned set to confirm
+        # the empty-set transition, or to sweep in rows a duplicate
+        # same-UUID delivery added while this commit ran.
 
 
 @app.task(bind=True, acks_late=True, reject_on_worker_lost=True)
@@ -2093,15 +2266,18 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
     """
     Apply a prepared string-update packet in bounded, resumable portions.
 
-    Each portion is one call to ``apply_loc_kit_string_update``, which holds
-    the component lock only for that portion's rows; the durable cursor
-    (``next_row``) and this draft's collected ``pending_change_ids`` advance
-    together after each portion commits, so a redelivery resumes from the
-    next unprocessed row rather than the whole table, and never double-adds
-    a key already written by an earlier portion. Finalizing commits exactly
-    this draft's owned pending changes with ``commit_pending_subset``, never
-    the component's ambient ``commit_pending()`` - a concurrent manual edit
-    or another import's pending changes are never swept in.
+    Each portion is one call to ``apply_loc_kit_portion``, which locks
+    ``repository -> component -> draft`` in one transaction, re-checks the
+    fencing token (``state``, ``apply_task_id``) and the durable cursor
+    before any mutation, and commits the adds, Explanations, owned pending
+    tagging, cursor, counters and heartbeat together. A redelivery resumes
+    from the next unprocessed row; two duplicate deliveries of the same
+    UUID commit at most one portion, because the second observes the
+    advanced cursor inside the lock and returns ``None`` without mutating
+    anything. Finalizing commits exactly this draft's owned pending changes
+    with ``commit_pending_subset``, never the component's ambient
+    ``commit_pending()`` - a concurrent manual edit or another import's
+    pending changes are never swept in.
     """
     # ruff: ignore[import-outside-top-level]
     from uuid import UUID
@@ -2115,8 +2291,9 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.loc_kit import (
         LOC_KIT_STRING_UPDATE_PORTION_SIZE,
-        apply_loc_kit_string_update,
+        apply_loc_kit_portion,
         load_prepared_string_units,
+        validate_loc_kit_string_update_size,
     )
 
     # ruff: ignore[import-outside-top-level]
@@ -2164,28 +2341,19 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
         return
 
     total_rows = len(units)
-    # Rehydrate accumulated counters from the durable draft: a redelivery
-    # runs this task fresh from row zero locally, but ``next_row`` may
-    # already be mid-table, and the completed summary must reflect every
-    # portion applied across every delivery, not only this one.
-    saved_progress = draft.progress if isinstance(draft.progress, dict) else {}
-    totals = {
-        key: int(saved_progress.get(key, 0))
-        for key in (
-            "added",
-            "existing",
-            "explanations_set",
-            "explanations_unchanged",
-            "explanations_would_overwrite",
-            "explanations_unavailable",
-            "explanations_source_changed",
-            "explanations_baseline_changed",
+    try:
+        validate_loc_kit_string_update_size(units)
+    except ValidationError as error:
+        mark_loc_kit_draft_failed(
+            draft_id,
+            task_id_field="apply_task_id",
+            expected_state=LocKitImportDraft.State.APPLYING,
+            task_id=task_id,
+            error_code="apply-failed",
+            message="; ".join(error.messages),
+            retry_phase="apply",
         )
-    }
-    created_languages: set[str] = set(saved_progress.get("created_languages", ()))
-    unavailable_languages: set[str] = set(
-        saved_progress.get("unavailable_languages", ())
-    )
+        return
 
     while True:
         with transaction.atomic():
@@ -2225,13 +2393,17 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
             return
         portion = units[cursor : cursor + LOC_KIT_STRING_UPDATE_PORTION_SIZE]
         try:
-            result = apply_loc_kit_string_update(
+            result = apply_loc_kit_portion(
                 user=owner,
                 component=component,
                 units=portion,
                 overwrite_explanations=overwrite_explanations,
-                pending_owner=str(draft.pk),
+                pending_owner=str(draft_id),
                 explanation_baseline=explanation_baseline,
+                draft_id=draft_id,
+                task_id=task_id,
+                expected_cursor=cursor,
+                total_rows=total_rows,
             )
         except WeblateLockTimeoutError as error:
             retry_delays = (1, 2, 4, 8, 16, 32, 64, 128)
@@ -2306,59 +2478,11 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
             )
             raise
 
-        totals["added"] += result.strings.added
-        totals["existing"] += result.strings.existing
-        totals["explanations_set"] += result.explanations.set_count
-        totals["explanations_unchanged"] += result.explanations.unchanged_count
-        totals["explanations_would_overwrite"] += (
-            result.explanations.would_overwrite_count
-        )
-        totals["explanations_unavailable"] += result.explanations.unavailable_count
-        totals["explanations_source_changed"] += (
-            result.explanations.source_changed_count
-        )
-        totals["explanations_baseline_changed"] += (
-            result.explanations.baseline_changed_count
-        )
-        created_languages.update(result.strings.created_languages)
-        unavailable_languages.update(result.strings.unavailable_languages)
-
-        with transaction.atomic():
-            draft = LocKitImportDraft.objects.select_for_update(of=("self",)).get(
-                pk=draft_id
-            )
-            if (
-                draft.state != LocKitImportDraft.State.APPLYING
-                or draft.apply_task_id != task_id
-                or draft.next_row != cursor
-            ):
-                # A newer delivery already advanced past this portion; its
-                # cursor and counters must never be rolled back by a stale
-                # one holding the same token.
-                return
-            draft.next_row = cursor + len(portion)
-            draft.pending_change_ids = sorted(
-                set(draft.pending_change_ids) | set(result.pending_change_ids)
-            )
-            draft.progress = {
-                "phase": "applying",
-                "processed_rows": draft.next_row,
-                "total_rows": total_rows,
-                **totals,
-                "created_languages": sorted(created_languages),
-                "unavailable_languages": sorted(unavailable_languages),
-            }
-            draft.last_activity_at = timezone.now()
-            draft.expires_at = draft.last_activity_at + timedelta(hours=1)
-            draft.save(
-                update_fields=[
-                    "next_row",
-                    "pending_change_ids",
-                    "progress",
-                    "last_activity_at",
-                    "expires_at",
-                ]
-            )
+        if result is None:
+            # The fence check inside the coordinator's lock found a
+            # replaced UUID or an already-advanced cursor: another
+            # generation owns this portion. Stop this delivery quietly.
+            return
         touch_task_liveness(str(task_id))
         if time.monotonic() - delivery_started_at >= delivery_budget:
             _chain_loc_kit_apply_continuation(draft_id=draft_id, task_id=task_id)
@@ -2382,19 +2506,36 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
             or draft.apply_task_id != task_id
         ):
             return
+        # The coordinator merges each portion's counters into the durable
+        # ``progress`` as it commits, so the completed summary is read from
+        # there rather than re-accumulated locally - it must reflect every
+        # portion applied across every delivery, not only this one.
+        final_progress = draft.progress if isinstance(draft.progress, dict) else {}
         draft.state = LocKitImportDraft.State.COMPLETED
         draft.progress = {
             "phase": "completed",
-            "added": totals["added"],
-            "existing": totals["existing"],
-            "explanations_set": totals["explanations_set"],
-            "explanations_unchanged": totals["explanations_unchanged"],
-            "explanations_would_overwrite": totals["explanations_would_overwrite"],
-            "explanations_unavailable": totals["explanations_unavailable"],
-            "explanations_source_changed": totals["explanations_source_changed"],
-            "explanations_baseline_changed": totals["explanations_baseline_changed"],
-            "created_languages": sorted(created_languages),
-            "unavailable_languages": sorted(unavailable_languages),
+            "added": int(final_progress.get("added", 0)),
+            "existing": int(final_progress.get("existing", 0)),
+            "explanations_set": int(final_progress.get("explanations_set", 0)),
+            "explanations_unchanged": int(
+                final_progress.get("explanations_unchanged", 0)
+            ),
+            "explanations_would_overwrite": int(
+                final_progress.get("explanations_would_overwrite", 0)
+            ),
+            "explanations_unavailable": int(
+                final_progress.get("explanations_unavailable", 0)
+            ),
+            "explanations_source_changed": int(
+                final_progress.get("explanations_source_changed", 0)
+            ),
+            "explanations_baseline_changed": int(
+                final_progress.get("explanations_baseline_changed", 0)
+            ),
+            "created_languages": sorted(final_progress.get("created_languages", ())),
+            "unavailable_languages": sorted(
+                final_progress.get("unavailable_languages", ())
+            ),
         }
         draft.finished_at = timezone.now()
         draft.last_activity_at = draft.finished_at
@@ -2442,6 +2583,31 @@ def cleanup_loc_kit_drafts() -> None:
                 continue
             draft.delete_storage()
             draft.delete()
+
+
+@app.task(trail=False)
+def drain_loc_kit_dispatches() -> None:
+    """
+    Reclaim every unpublished loc-kit dispatch intent.
+
+    ``transaction.on_commit`` normally publishes a reserved intent
+    immediately; this drain covers the crash between the reserving DB commit
+    and that callback, or a lost broker publication. Each intent is claimed
+    under the draft's row lock and verified against the current phase UUID
+    before ``apply_async`` runs, so a superseded generation is never
+    published. Duplicate same-UUID deliveries are safe: every row portion
+    commits under its fencing token exactly once.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    candidate_ids = list(
+        LocKitImportDraft.objects.filter(
+            dispatch_task_id__isnull=False, dispatch_published_at__isnull=True
+        ).values_list("pk", flat=True)
+    )
+    for draft_id in candidate_ids:
+        _publish_loc_kit_dispatch(draft_id=draft_id, skip_locked=True)
 
 
 @app.task(trail=False)
@@ -2619,6 +2785,9 @@ def setup_periodic_tasks(sender, **kwargs) -> None:
         )
     sender.add_periodic_task(
         900, cleanup_loc_kit_drafts.s(), name="cleanup-loc-kit-drafts"
+    )
+    sender.add_periodic_task(
+        60, drain_loc_kit_dispatches.s(), name="drain-loc-kit-dispatches"
     )
     sender.add_periodic_task(
         900,

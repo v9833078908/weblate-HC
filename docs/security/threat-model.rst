@@ -700,10 +700,21 @@ Size and rate assumptions:
 * Loc-kit updates for an existing monolingual component are owner- and
   session-bound, require component-scoped ``upload.perform`` or
   ``source.edit`` as appropriate, and parse CSV/TSV/XLSX locally into a
-  private bounded payload before confirmation. The task fences every delivery
-  with a durable UUID and commits only its metadata-tagged pending changes, so
-  a stale worker cannot write after retry and ambient pending edits are not
-  committed. No uploaded table content is sent to an outbound service.
+  private bounded payload before confirmation. Every delivery is fenced by
+  a durable UUID: reservation and publication (claim, publish, periodic
+  drain) are ordered by the draft row lock alone, while each row portion
+  and finalization additionally take ``repository -> Component -> draft``
+  locks in one transaction, so a stale or replaced worker cannot write
+  after retry and a duplicate delivery of the same UUID commits at most
+  once. Finalizing holds the same repository lock and commits only its
+  metadata-tagged pending changes, never ambient pending edits from a
+  concurrent manual translator edit or another import. The importer makes
+  no direct request to any LLM or translation-suggestion provider. Its
+  finalization step reuses the component's own pre-existing configured VCS
+  commit/push path - the same path every other translation write already
+  takes - so table-derived translation content does leave Weblate outbound
+  to that configured repository once a portion is committed; this is not a
+  new outbound integration class.
   *(maintainer)*
 
 

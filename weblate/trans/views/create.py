@@ -72,11 +72,9 @@ from weblate.trans.loc_kit import (
 from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LocKitImportDraft
 from weblate.trans.tasks import (
-    apply_loc_kit_string_update_draft,
+    _publish_loc_kit_dispatch,
     import_project_backup,
-    mark_loc_kit_draft_failed,
     perform_update,
-    prepare_loc_kit_string_update,
 )
 from weblate.utils import messages
 from weblate.utils.celery import (
@@ -84,7 +82,6 @@ from weblate.utils.celery import (
     add_user_task,
     store_task_metadata,
 )
-from weblate.utils.errors import report_error
 from weblate.utils.licenses import LICENSE_URLS, detect_license
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.ratelimit import check_rate_limit, session_ratelimit_post
@@ -1871,53 +1868,54 @@ def _loc_kit_error_message(draft: LocKitImportDraft) -> str:
     return str(template) % (draft.error_details or "")
 
 
+def _reserve_loc_kit_dispatch(
+    draft: LocKitImportDraft, *, task_id: uuid.UUID, phase: str
+) -> None:
+    """
+    Stamp the durable dispatch intent for a freshly reserved generation.
+
+    Must run in the same DB transaction that assigns the phase UUID
+    (``prepare_task_id``/``apply_task_id``); the common dispatcher
+    (``weblate.trans.tasks._publish_loc_kit_dispatch``) publishes this
+    intent on commit and the periodic drain reclaims it if the commit
+    callback never ran.
+    """
+    draft.dispatch_task_id = task_id
+    draft.dispatch_phase = phase
+    draft.dispatch_requested_at = timezone.now()
+    draft.dispatch_published_at = None
+    draft.dispatch_attempts = 0
+    draft.dispatch_error = ""
+
+
 def _dispatch_loc_kit_task(
     request: AuthenticatedHttpRequest,
     draft: LocKitImportDraft,
-    task,
     task_id: uuid.UUID,
     *,
     text: str,
+    phase: str,
 ) -> None:
     """
-    Publish a loc-kit background task after commit, and register it for
-    user discovery. ``add_user_task`` only surfaces a *running* task
-    (weblate.utils.celery.get_user_tasks drops settled ones); a completed
-    or failed draft stays discoverable afterwards through the durable
-    ``active_loc_kit_string_draft`` link on the component page instead.
+    Register the on-commit publication of a reserved loc-kit dispatch intent.
+
+    The intent itself (``dispatch_task_id`` + ``dispatch_phase``) is stamped
+    on the draft by the caller in the same transaction that assigns the
+    phase UUID; this helper only wires the fast-path broker publication and
+    user discovery. If the commit callback is lost, the periodic drain
+    publishes the same reserved UUID.
     """
     status_url = reverse("loc-kit-strings-preview", kwargs={"token": draft.token})
 
     def _publish() -> None:
-        try:
-            task.apply_async(
-                kwargs={"draft_id": draft.pk},
-                task_id=str(task_id),
-                priority=INTERACTIVE_TASK_PRIORITY,
+        if _publish_loc_kit_dispatch(draft_id=draft.pk):
+            add_user_task(
+                request.user.pk,
+                str(task_id),
+                text=text,
+                label=draft.name,
+                url=status_url,
             )
-        except Exception as error:
-            # The draft row is already durable here, so a broker failure must
-            # leave a retryable state rather than a draft nobody works on.
-            report_error("loc-kit task dispatch failed", project=draft.project)
-            mark_loc_kit_draft_failed(
-                draft.pk,
-                task_id_field=(
-                    "prepare_task_id"
-                    if task is prepare_loc_kit_string_update
-                    else "apply_task_id"
-                ),
-                expected_state=draft.state,
-                task_id=task_id,
-                error_code="dispatch-failed",
-                message=str(error),
-                retry_phase=(
-                    "prepare" if task is prepare_loc_kit_string_update else "apply"
-                ),
-            )
-            return
-        add_user_task(
-            request.user.pk, str(task_id), text=text, label=draft.name, url=status_url
-        )
 
     transaction.on_commit(_publish)
 
@@ -1976,6 +1974,9 @@ class LocKitStringsUpdateStartView(TemplateView):
             prepare_task_id=task_id,
             progress={"phase": "preparing", "processed_rows": 0},
         )
+        _reserve_loc_kit_dispatch(
+            draft, task_id=task_id, phase=LocKitImportDraft.DispatchPhase.PREPARE
+        )
         draft.uploaded.save(filename, uploaded, save=False)
         try:
             draft.save()
@@ -1985,9 +1986,9 @@ class LocKitStringsUpdateStartView(TemplateView):
         _dispatch_loc_kit_task(
             request,
             draft,
-            prepare_loc_kit_string_update,
             task_id,
             text=gettext("Preparing loc-kit table “%s”") % filename,
+            phase=LocKitImportDraft.DispatchPhase.PREPARE,
         )
         return redirect("loc-kit-strings-preview", token=draft.token)
 
@@ -2115,6 +2116,9 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
             locked.progress = {"phase": "applying", "processed_rows": 0}
             locked.last_activity_at = timezone.now()
             locked.apply_started_at = locked.last_activity_at
+            _reserve_loc_kit_dispatch(
+                locked, task_id=task_id, phase=LocKitImportDraft.DispatchPhase.APPLY
+            )
             locked.save(
                 update_fields=[
                     "state",
@@ -2123,14 +2127,20 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
                     "progress",
                     "last_activity_at",
                     "apply_started_at",
+                    "dispatch_task_id",
+                    "dispatch_phase",
+                    "dispatch_requested_at",
+                    "dispatch_published_at",
+                    "dispatch_attempts",
+                    "dispatch_error",
                 ]
             )
             _dispatch_loc_kit_task(
                 request,
                 locked,
-                apply_loc_kit_string_update_draft,
                 task_id,
                 text=gettext("Applying loc-kit table “%s”") % locked.name,
+                phase=LocKitImportDraft.DispatchPhase.APPLY,
             )
         return redirect("loc-kit-strings-preview", token=draft.token)
 
@@ -2144,12 +2154,11 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
             ):
                 raise Http404
             task_id = uuid.uuid4()
-            task = apply_loc_kit_string_update_draft
+            phase = LocKitImportDraft.DispatchPhase.APPLY
             reset_fields = {
                 "state": LocKitImportDraft.State.APPLYING,
                 "apply_task_id": task_id,
             }
-            task_id_field = "apply_task_id"
             text = gettext("Retrying stalled loc-kit table “%s”") % draft.name
             expected_state = LocKitImportDraft.State.APPLYING
             expected_retry_phase = None
@@ -2157,24 +2166,22 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
             raise Http404
         elif draft.retry_phase == "prepare":
             task_id = uuid.uuid4()
-            task = prepare_loc_kit_string_update
+            phase = LocKitImportDraft.DispatchPhase.PREPARE
             reset_fields = {
                 "state": LocKitImportDraft.State.PREPARING,
                 "prepare_task_id": task_id,
                 "progress": {"phase": "preparing", "processed_rows": 0},
             }
-            task_id_field = "prepare_task_id"
             text = gettext("Preparing loc-kit table “%s”") % draft.source_filename
             expected_state = LocKitImportDraft.State.FAILED
             expected_retry_phase = draft.retry_phase
         elif draft.retry_phase in ("apply", "finalize"):
             task_id = uuid.uuid4()
-            task = apply_loc_kit_string_update_draft
+            phase = LocKitImportDraft.DispatchPhase.APPLY
             reset_fields = {
                 "state": LocKitImportDraft.State.APPLYING,
                 "apply_task_id": task_id,
             }
-            task_id_field = "apply_task_id"
             text = gettext("Applying loc-kit table “%s”") % draft.name
             expected_state = LocKitImportDraft.State.FAILED
             expected_retry_phase = draft.retry_phase
@@ -2201,6 +2208,7 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
             locked.error_details = ""
             locked.retry_phase = ""
             locked.last_activity_at = timezone.now()
+            _reserve_loc_kit_dispatch(locked, task_id=task_id, phase=phase)
             locked.save(
                 update_fields=[
                     *reset_fields.keys(),
@@ -2208,9 +2216,13 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
                     "error_details",
                     "retry_phase",
                     "last_activity_at",
+                    "dispatch_task_id",
+                    "dispatch_phase",
+                    "dispatch_requested_at",
+                    "dispatch_published_at",
+                    "dispatch_attempts",
+                    "dispatch_error",
                 ]
             )
-            _dispatch_loc_kit_task(
-                request, locked, task, getattr(locked, task_id_field), text=text
-            )
+            _dispatch_loc_kit_task(request, locked, task_id, text=text, phase=phase)
         return redirect("loc-kit-strings-preview", token=draft.token)

@@ -3203,7 +3203,7 @@ class LocKitStringsUpdateForm(forms.Form):
             "or update Unit.explanation on new and existing keys."
         ),
         validators=[
-            validate_component_zip_upload_size,
+            validate_translation_upload_size,
             FileExtensionValidator(allowed_extensions=["csv", "tsv", "xlsx"]),
         ],
         widget=forms.FileInput(attrs={"accept": ".csv,.tsv,.xlsx"}),

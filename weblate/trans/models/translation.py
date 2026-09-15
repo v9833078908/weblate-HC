@@ -8,7 +8,7 @@ import codecs
 import os
 import tempfile
 from contextlib import contextmanager, suppress
-from datetime import UTC
+from datetime import UTC, datetime
 from itertools import batched, chain
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, Literal, NotRequired, TypedDict, overload
@@ -82,7 +82,6 @@ SINGLE_FILE_IMPORT_ALERTS = {"DuplicateString", "ParseError"}
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
-    from datetime import datetime
 
     from weblate.auth.models import AuthenticatedHttpRequest, User
     from weblate.formats.base import TranslationUnit
@@ -1386,7 +1385,8 @@ class Translation(
             return
         note = pending_change.metadata.get("note", "")
         location = pending_change.metadata.get("location", "")
-        if not note and not location:
+        extra_flags = pending_change.metadata.get("extra_flags", "")
+        if not note and not location and not extra_flags:
             return
         # ``pounit`` is Weblate's wrapper (``TranslationUnit``); the
         # translate-toolkit note/location API lives on the raw unit it
@@ -1406,6 +1406,17 @@ class Translation(
                 item = item.strip()
                 if item and item not in existing_locations:
                     raw_unit.addlocation(item)
+        if extra_flags and store.supports_flags:
+            # A loc-kit snapshot: carry the new key's input flags into the
+            # backing file exactly as the PO exporter does (``settypecomment``
+            # for the gettext family). Formats without a typecomment-style
+            # setter simply keep the flags in the database, which remains
+            # authoritative for checks.
+            setter = getattr(raw_unit, "settypecomment", None)
+            if setter is not None:
+                parsed = Flags(extra_flags)
+                for flag in parsed.items():
+                    setter(Flags.format_flag(flag))
 
     @property
     def count_pending_units(self):
@@ -1485,8 +1496,20 @@ class Translation(
         pending_changes: list[PendingUnitChange],
         store: TranslationFormat,
         author_name: str,
+        header_timestamp: datetime | None = None,
     ) -> dict[int, bool]:
-        """Update backend file and unit."""
+        """
+        Update backend file and unit.
+
+        ``header_timestamp`` defaults to ``timezone.now()``, matching the
+        interactive/ambient commit semantics of a genuinely new write. A
+        caller that may retry the exact same ``pending_changes`` after an
+        already-successful write - ``Component.commit_pending_subset``'s
+        crash-recovery replay - passes a value derived from the pending
+        changes' own stable ``timestamp`` field instead, so a retry writes
+        an identical header and the resulting no-diff is detected instead
+        of masked by a fresh revision date on every attempt.
+        """
         changes_status = {}
         updated = False
         for index, pending_change in enumerate(pending_changes, start=1):
@@ -1593,7 +1616,7 @@ class Translation(
             return changes_status
 
         # Update po file header
-        now = timezone.now()
+        now = header_timestamp if header_timestamp is not None else timezone.now()
         if not timezone.is_aware(now):
             now = timezone.make_aware(now, UTC)
 

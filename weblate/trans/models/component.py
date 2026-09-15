@@ -3845,7 +3845,16 @@ class Component(  # ruff: ignore[too-many-public-methods]
         *,
         skip_push: bool = False,
     ) -> bool:
-        """Commit exactly the supplied pending changes in one repository commit."""
+        """
+        Commit exactly the supplied pending changes in one repository commit.
+
+        A retry whose ``update_units`` reproduces byte-identical content -
+        because a previous attempt's repository commit already succeeded
+        before its own transaction rolled back the pending-row deletion -
+        is treated as an idempotent already-applied replay: the proven
+        pending rows are still cleared and ``True`` is returned, but no
+        second commit or push is issued.
+        """
         # ruff: ignore[import-outside-top-level]
         from weblate.auth.models import User
 
@@ -3866,6 +3875,11 @@ class Component(  # ruff: ignore[too-many-public-methods]
         if len(pending_changes) != len(pending_change_ids):
             self.log_error("refusing to commit pending changes outside this repository")
             return False
+
+        # Shared by the header write and the commit's own author date, so a
+        # retry of this exact, still-pending set reproduces byte-identical
+        # file content instead of a fresh timestamp masking a real no-diff.
+        subset_timestamp = max(change.timestamp for change in pending_changes)
 
         changes_by_translation: dict[int, list[PendingUnitChange]] = defaultdict(list)
         translations: dict[int, Translation] = {}
@@ -3903,7 +3917,10 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 store = translation.store
                 store.ensure_index()
                 changes_status = translation.update_units(
-                    changes, store, user.get_author_name()
+                    changes,
+                    store,
+                    user.get_author_name(),
+                    header_timestamp=subset_timestamp,
                 )
             except (FailedCommitError, FileParseError, ValueError) as error:
                 translation.log_error("skipping commit due to error: %s", error)
@@ -3922,17 +3939,26 @@ class Component(  # ruff: ignore[too-many-public-methods]
 
         if not filenames:
             return False
-        if not self.commit_files(
+        committed = self.commit_files(
             message=reason,
             author=user.get_author_name(),
-            timestamp=max(change.timestamp for change in pending_changes),
+            timestamp=subset_timestamp,
             files=list(dict.fromkeys(filenames)),
             signals=False,
             skip_push=skip_push,
             store_hash=False,
-        ):
-            return False
-
+        )
+        # ``commit_files`` returns ``False`` only when the repository has no
+        # diff for these files (``Repository.commit`` bails out via
+        # ``needs_commit``; a genuine write/parse/commit error raises
+        # instead of returning). ``update_units`` above already reproduced
+        # this exact content on disk, so a no-diff result here means a
+        # previous attempt's VCS commit already succeeded before a DB
+        # rollback undid the pending-row deletion below (the crash window
+        # between a successful repository commit and this transaction's
+        # commit). That is an idempotent replay, not a failure: the proven
+        # pending rows and caches are cleared without a second commit/push,
+        # and no duplicate commit Change is recorded.
         PendingUnitChange.objects.filter(pk__in=pending_change_ids).delete()
         for translation_id, changes in changes_by_translation.items():
             translation = translations[translation_id]
@@ -3943,14 +3969,21 @@ class Component(  # ruff: ignore[too-many-public-methods]
             translation.drop_store_cache()
             translation.store_hash()
             translation.addon_commit_files = []
-            translation.log_info(
-                "committed %s as %s", translation.filenames, user.get_author_name()
-            )
-            translation.change_set.create(
-                action=ActionEvents.COMMIT, user=user, author=user
-            )
+            if committed:
+                translation.log_info(
+                    "committed %s as %s", translation.filenames, user.get_author_name()
+                )
+                translation.change_set.create(
+                    action=ActionEvents.COMMIT, user=user, author=user
+                )
+            else:
+                translation.log_info(
+                    "pending changes for %s already applied on disk",
+                    translation.filenames,
+                )
         for component in components.values():
-            component.send_post_commit_signal()
+            if committed:
+                component.send_post_commit_signal()
             component.update_import_alerts(delete=False)
         return True
 
