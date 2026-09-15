@@ -1,0 +1,1153 @@
+<!--
+Copyright © HCGameLoc
+
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
+# Продюсерская консоль HCGameLoc: дизайн и роадмап
+
+**Статус:** на согласовании у владельца продукта; после одобрения — рабочий
+документ разработчика, обновляется на месте (статусы задач в §9).
+**Обновлён:** 2026-09-15.
+
+Это единый документ: дизайн (§1–§7), зависимости и задачи (§8–§10),
+оставшиеся согласования (§11). Дополнительные документы сейчас не создаются.
+При реализации датированные планы волн следуют `AGENTS.md`, но не заменяют
+этот источник решений. Приоритет: последние решения владельца → этот
+документ → промпты 2/3 → ранний бриф → визуальный прототип. Код определяет
+текущее поведение, а не отменяет согласованное целевое.
+Ссылки на строки в §3 — ориентиры аудита от 2026-09-15; устойчивый якорь —
+имя модуля и символа. Все новые модули, API и проверки ниже **предлагаются**,
+а не объявляются уже существующими или прошедшими проверку.
+
+Источники: бриф `docs/product/designs/2026-09-14-01-producer-frontend-brief.md`
+(15 решений), промпт-2 `docs/product/designs/2026-09-14-03-producer-wizard-emergent-prompt.md`
+(инварианты подробного wizard-а), промпт-3
+`docs/product/designs/2026-09-15-producer-universal-wizard-emergent-prompt.md`
+(быстрый wizard и стор-тексты), прототип `frontend-wizard/`: первоначально
+`18b3fd1`, актуальный снимок на момент передачи — `dd7e71c` (§3.1),
+интервью с владельцем 2026-09-15 (§2), инвентаризация кода
+read-only субагентами (§3), инструкция по сторам
+`/Users/eli/Downloads/lokalizaciya-tekstov-dlya-storovstim.md`.
+
+## 1. Цель, успех, не-цели
+
+**Цель.** Продюсер загружает лок-кит или тексты для стора и без знания
+Weblate получает переведённый, проверенный результат в нужном формате.
+Консоль — второй view над теми же данными: Weblate (Advanced) остаётся
+полностью, обе стороны видят одно состояние, потому что консоль работает
+через те же модели, права и Celery-задачи, а не через свою копию.
+
+**Видимый успех.** Критический путь из инструкции (проект → импорт кита и
+глоссария → языки → промпты → пакетный MT с фильтром → судья → скачать)
+сжимается до: пустой проект → «Сделать локализацию» → загрузить файл →
+(опционально) «Проверить качество» → решить N строк → скачать. Ни одного
+ручного шага «языки», «промпты», «базовый файл `metadata/ru`», «флаг
+`bbcode-text`», «`max-length` на строку», «фильтр `state:empty`».
+
+**Не-целей** (из брифа, без изменений): новый переводческий редактор;
+удаление функций Weblate; Git PR из фронта; числовой скор качества;
+auto-approve без калибровки; интеграция БДХК за пределами чтения карточки;
+массовое заполнение БДХК. Добавлено 2026-09-15: JSON-киты остаются в
+Advanced; денежные лимиты (только отчётность); отдельный экран входа.
+
+## 2. Решения интервью 2026-09-15
+
+Решения брифа 1–15 действуют с уточнениями ниже и приоритетом из введения.
+
+| # | Вопрос | Решение |
+|---|---|---|
+| 16 | Версия wizard-а | Два режима одного wizard-а: **быстрый** (4 этапа: Файлы → Языки → Контекст и термины → Проверка и запуск) — для стор-текстов; **подробный** (8 шагов промпта-2) — для лок-китов. Переключение в любой момент без потери черновика. На момент ответа прототип имел 5 шагов; появившаяся позднее сборка `dd7e71c` учтена в §3.1 |
+| 17 | LLM-движок подготовки | Две задачи с отдельными промптами: извлечение кандидатов в глоссарий и генерация `persona`/`style`/`language_instructions`. Модель выбирается отдельно на каждую задачу (уточнение 18); можно задать одну и ту же. Структура кита, языки, карантин и split — детерминированно плюс ответы продюсера, не решения LLM |
+| 18 | Конфиг моделей | Env по образцу судьи: `WEBLATE_PREP_*` — модель на задачу (термины / профиль / обратный перевод), primary LiteLLM (например `kimi-k3`) + фолбэк OpenRouter со своими моделями; общий резолвер с судьёй (рефакторинг без изменения поведения судьи) |
+| 19 | Порядок волн | Волна 1: новый проект — оба режима wizard-а (лок-кит XLSX/CSV/TSV/табличный TXT, ZIP с ними; стор-тексты TXT/папка/ZIP `metadata` + форма полей), хостинг, единый прогон, скачивание с пустыми блокируемыми строками. Волна 2: «Требуют решения», судья с оценкой, повторная загрузка, письма, деньги. Волна 3: БДХК, split на компоненты, «как загружено» для прочих форматов |
+| 20 | Хостинг | Тот же origin: Django отдаёт `/console/` как статическую SPA; порт прототипа на Vite + TypeScript; сессия Weblate, без CORS и токенов |
+| 21 | Роли | Без новой роли: Продюсер = администратор проекта Weblate; админ AI Tools = superuser. Консоль вызывает те же проверки прав, что и Advanced |
+| 22 | Удалённые из кита ключи | Хранить, не выгружать, показывать счётчик; удаление — в Advanced |
+| 23 | Обратный перевод для чек-only строк | По запросу: кнопка «Показать обратный перевод», дешёвая модель, кэш по хешу target, стоимость в `LLMUsageLog` |
+| 24 | Модель прогона | Не новая сущность: `ProducerRun` + поле `stages` + режим `localize` + обобщённый adoption предсозданного прогона |
+| 25 | Платные вызовы подготовки | Оценка и подтверждение только для извлечения терминов; генерация профиля без подтверждения, стоимость учитывается |
+| 26 | Существующие проекты | Любой проект виден полностью (обзор, прогоны, очередь, скачивание, судья); «Загрузить кит» — только в компонент табличного происхождения (po-mono из таблицы), прочие — «Открыть в Weblate» |
+| 27 | Бюджеты | Только отчётность: деньги по прогону/языку/модели/месяцу; оценка перед судьёй и извлечением |
+| 28 | Команда | Один full-stack разработчик через AI-агентов; последовательные вертикальные срезы; каждая задача самодостаточна и несёт команду проверки |
+| 29 | Прототип | Заморожен как эталон в `frontend-wizard/`; продакшн — новая директория, экраны/токены/фикстуры/`/dev/states` переносятся 1:1; расхождения только через запись в `DESIGN-NOTES.md`. Кнопка «Открыть в Weblate» (Advanced) сохраняется на каждой сущности |
+| 30 | Приёмка | pytest на API + Playwright E2E на dev-docker + контракт: TS-типы генерируются из OpenAPI, мок-фикстуры валидируются по схеме |
+| 31 | JSON-киты | Пропускаем: остаются в Advanced (прецедент `docs/operations/plans/2026-08-15-pirate-ships-local-json-component.md`) |
+| 32 | Стор-тексты, вход | TXT-файлы / папка / ZIP `metadata` (промпт-3) **и** форма полей стора (прототип); оба сходятся в один «пакет стора» на бэкенде |
+
+Технические предложения, представленные перед поручением «пиши»:
+ответы анкеты — `Project.machinery_settings["_producer"]`; удалённые ключи —
+проектный `Label`; письма — `send_notification_email`; черновик —
+расширение `LocKitImportDraft`; `GET me/` — capabilities; реестр полей стора —
+версионируемые данные с источниками. Это выбранный вариант реализации,
+а не отдельные пользовательские требования к названиям полей или файлов.
+Новых произвольных лимитов загрузки не вводим. Развёртывание любого
+изменения на работающей инстанции требует отдельного разрешения.
+
+## 3. Текущее состояние бэкенда (аудит 2026-09-15)
+
+Что есть и переиспользуется как есть, что есть только как HTML/session, чего
+нет. OBSERVED, если не указано иное.
+
+| Область | Есть | Ограничение / чего нет |
+|---|---|---|
+| REST-каркас | Роутер `weblate/api/urls.py:28-51`, смонтирован `weblate/urls.py:1092-1098`; схема `SpectacularAPIView`, генератор берёт все пути `/api/` (`weblate/api/generators.py:11-25`); auth Session/Token/Bearer (`weblate/api/spectacular.py:264-303`); throttling `settings_docker.py:1369-1384` | Нет namespace `/api/producer/`; нет `users/me` (`weblate/api/views.py:920-1008`) |
+| Сессия/CSRF | `CSRF_USE_SESSIONS=True`, cookie HttpOnly (`settings_docker.py:865-870,1133-1142`); CORS только для `/api/` по env (`:1484-1487`) | CSRF-токен нельзя прочитать из cookie — прототип это делает (`frontend-wizard/src/api/client.js:getCookie`, `http`), нужен `<meta>` в шаблоне `/console/` |
+| Проекты/компоненты/языки | `ProjectViewSet` create `views.py:2219-2268`, components multipart `:1970-2021`, languages `:2110-2127`; add language `ComponentViewSet.translations` `:2804-2896`; `machinery_settings` `:2409-2507` | Нативные payload-ы, не «статус по языкам / contents / очередь» |
+| Intake лок-кита | `create_component_from_kit` `weblate/utils/views.py:704-833` (ZIP или CSV/TSV/XLSX → po-mono, `LocalRepository`); `loc_kit_ingest/infer.py:258-513` (min_fill 5 %, исходный = крайняя левая заполненная колонка, `notes :447-459`); `parser.py:89-307` (дубликат ключа = ERROR, пусто во всех языках = ERROR); `LocKitImportDraft` `weblate/trans/models/loc_kit.py:47-218` (owner+session, TTL 3600 с, состояния UPLOADED…CONSUMED, private storage) | Всё HTML/session (`weblate/trans/views/create.py:638-763,1119-1668`, URL `weblate/urls.py:379-410`); `.txt` отвергается тестом; нет явного выбора исходного языка с записью его первой колонкой; нет ролей колонок, ambiguous-заголовков, split по семействам ключей; нет diff removed |
+| Повторная загрузка | Durable prepare/apply/finalize `weblate/trans/tasks.py:1849-2293`; preview с new/existing/changed_sources (`weblate/trans/loc_kit.py:1239-1273`); append-only для существующих (`:1530-1555`) | Изменённый источник только предупреждение — переперевода нет; удалённые ключи не отслеживаются; HTML `create.py:1829-2228` |
+| Глоссарий | `append_glossary_terms` `loc_kit.py:1788-2129` (identity `(context, source)`, существующее не трогается, partial success); флаги `read-only/forbidden/exact/not-applicable/terminology` (`weblate/checks/flags.py:127-134`, `weblate/glossary/models.py:392-455`); в MT-промпт `weblate/machinery/llm.py:704-718`, в судью `glossary/models.py:446-475` | Извлечения терминов LLM нет нигде; HTML-only preview/confirm |
+| Промпты проекта | Форма `weblate/machinery/forms.py:486-563` (persona, style, language_instructions ≤ `LLM_LANGUAGE_INSTRUCTION_LENGTH`); routed-движки `weblate_customization/.../machinery.py:43-142`; merge проект→глобал по полю `weblate/trans/models/project.py:1331-1350`; Advanced-форма пишет только diff `weblate/machinery/views.py:357-361`; выбор движка `weblate/trans/forms.py:1215-1221` | Генерации persona/style/LI из анкеты/БДХК нет; кэш судьи инвалидирует только persona+style (`project_context_hash`, `weblate/trans/models/judge.py:245-273`), не LI |
+| Прогоны | `ProducerRun` `weblate/trans/models/judge.py:290-372` (UUID, actor, task_id, scope до `project`, status, summary, configuration_snapshot); создаётся в `BatchAutoTranslate` `weblate/trans/autotranslate.py:1303-1372`, adoption только `recheck` (`:1316-1321`); fan-out по языкам `:1110-1179`; liveness `weblate/utils/celery.py:87-206` (`queued/running/no-update`); запуск `weblate/trans/views/edit.py:1809-1918`; `GET /api/tasks/{id}/` `views.py:4945-5055` | Нет стадий до перевода, per-language прогресса в БД, resume-эндпоинта; `autotranslate` REST синхронный без task id (`views.py:3669-3727`) |
+| Судья | Оценка `weblate/trans/judge.py:812-827` + `recent_cost_range` (`edit.py:1650-1680`); `JudgeRunUnit`/`JudgeVerdict` `judge.py:575-820` (outcome, back_translation, errors, resolution); отчёт `weblate/trans/views/judge.py:542-694`; resolve `models/judge.py:1310+`/`edit.py:1990+`; candidate generation `judge_loop.py:2222-2310`; recheck `:2041-2110`; env-конфиг `settings_docker.py:1732-1775`, резолвер и фолбэк `trans/judge.py:418-722` | Всё HTML; нет REST-очереди решений; описания чеков — gettext EN, RU-причин для продюсера нет |
+| Mass-fix / repair | `fix_failing_checks` `tasks.py:1274+`, политики `fix_check.py:1315-1508`; single-unit candidate HTML `weblate/urls.py:497-500` | Нет REST-эндпоинта «исправить с помощью AI» для одной строки |
+| Деньги | `LLMUsageLog` `weblate/trans/models/llm_usage.py:27-127` (project/component/language/model/operation/run); `run_spend :164`, `recent_cost_range :199+` | Нет агрегации по месяцу/проекту в API |
+| Письма | `send_notification_email` `weblate/accounts/notifications.py:1463+` | Нет уведомлений «прогон завершён/упал» (только Change-события `:946-961`) |
+| Экспорт | Мультиязычный CSV/XLSX `weblate/trans/multilingual_spreadsheet.py:99-148` (HTML `files.py:276-299`); экспортеры `weblate/formats/exporters.py`; project ZIP `files.py:90-157`; `CHECKS.blocking` `weblate/checks/models.py:55-58`; `Unit.has_failing_check` `weblate/trans/models/unit.py:1040-1053` | Нет JSON-таблицы, нет «пустое значение при блокирующем чеке» (`formats/base.py:1200-1240` всегда пишет target), нет проектного мультиязычного бандла, нет TXT-round-trip |
+| Стор-формат | `AppStoreParser` `weblate/formats/txt.py:128-145`: встроенные лимиты `title/name 30`, `short_description/summary 80`, `full_description/description 4000`, `subtitle 30`, `keywords 100`, `video/marketing_url/privacy_url/support_url 256+url`, `antifeatures/*`,`changelogs/* 500`; `promotional_text.txt` **без** лимита; `AppStoreFormat :203-237` monolingual, `language_format="googleplay"`, `create_style="directory"`; коды `weblate/formats/base.py:80-110` (`en→en-SG`, `zh_Hans→zh-CN`, `ru→ru-RU`); BBCode `weblate/checks/markup.py:290-328` (`bbcode-text`); `max-length` `weblate/checks/chars.py:1064-1081` | Компонент требует ручных filemask/template/new_base (`component.py:6395-6493`); Steam-файл с именем `description.txt` получает чужой лимит 4000; реестра Steam/custom нет; таблицы «язык проекта → локаль площадки» нет (`en` → `en-SG`, а инструкция требует `en-US`) |
+| Прототип | `frontend-wizard/` Next.js (JS), снимок `dd7e71c`: `app/page.js:109-110` монтирует быстрый и подробный wizard, `src/api/client.js` содержит mock/live-функции анализа, extraction, profile, store registry; подробности §3.1 | По-прежнему мок, не подключение к Weblate; две формы черновика и неполные JSDoc-типы, JSON вместо multipart файлов, CSRF из cookie. Нужны единый контракт и перенос на Vite/TS |
+
+### 3.1 Актуальный прототип и его передача
+
+Во время подготовки документа в `main` появился `dd7e71c`
+(`feat(wizard): sync producer console to emergent-wizard universal 4-stage flow`).
+Это последний сохранённый прототип для передачи; `18b3fd1` — историческая
+основа первоначального аудита. Ни один файл прототипа здесь не меняется.
+
+Статически проверено в `dd7e71c`:
+
+- `components/console/wizard2/` реализует четыре этапа на `/localize`;
+  `components/console/wizard/` — восемь на `/localize-legacy`.
+  `GlossaryWorkspace` переиспользуется; добавлены fixtures анализа,
+  исключений, evidence, профиля и реестра сторов.
+- Это **ещё не два режима одного черновика**: `src/api/mock/uploads.js`
+  хранит `hcgl:drafts`, `universal.js` — `hcgl:uwiz`; кнопка «Старый мастер»
+  в `wizard2/UniversalWizard.jsx:118` переходит без upload-id.
+- В universal-моке source предзаполнен `ru`
+  (`src/api/mock/universal.js:75,80`), а `StageLanguages.jsx` обычно
+  показывает lock; карточка выбора условна. Это расхождение с принятым
+  «никогда не выводить source», не новое решение владельца.
+- `UniversalWizard.jsx:29-40` хранит ответы в React state; восстановление
+  читает source и заново строит языки, не восстанавливает профиль/выбор
+  терминов как полный draft. Нужен серверный round-trip всех ответов.
+- `client.js:createUniversalUpload` отправляет `{input}` с именем/
+  сценарием, а не байты файла; `http` всегда JSON и читает CSRF cookie.
+  `types.js` остаётся прежним неполным JSDoc-контрактом. Названия
+  новых функций не доказывают, что live-режим работоспособен.
+
+Переносить новую визуальную проработку, но не эти ограничения. Нельзя
+оставить два несовместимых upload-контракта, автоматический source или
+потерю ответа при смене режима под предлогом «переноса 1:1».
+`frontend-wizard/DESIGN-NOTES.md` содержит и старое описание пяти шагов,
+и новые разделы: при расхождении целевое поведение задаёт этот документ.
+Браузерная приёмка новой сборки не выполнялась в рамках данного аудита.
+
+## 4. Архитектура
+
+### 4.1 Хостинг и вход
+
+- Продакшн-фронт — новая директория `console/` (Vite + React + TypeScript +
+  Tailwind + shadcn/ui). `frontend-wizard/` не изменяется в этой работе.
+  При передаче фиксируется `dd7e71c` (§3.1); следующая сборка не подменяет
+  согласованные решения автоматически.
+- `vite build` создаёт ассеты и manifest для Django static pipeline.
+  `weblate/trans/views/console.py:ConsoleView` (`login_required`) рендерит
+  `weblate/templates/console/index.html`: CSRF через
+  `get_token(request)` в экранированном `<meta name="csrf-token">`,
+  ссылки на локальные ассеты из manifest. Профиль пользователя — из `me/`,
+  не дублируется в HTML. `console/` и `console/<path:route>` отдают оболочку;
+  статические и API-пути не попадают под SPA fallback.
+- Navbar Weblate (`weblate/templates/base.html:103+`) получает ссылку
+  «Консоль»; каждая сущность консоли — кнопку «Открыть в Weblate»
+  (существующая в прототипе, `AppShell.jsx`, `AdvancedPlaceholder.jsx`),
+  URL которой отдаёт бэкенд (`advanced_url` на объектах), а не фикстура.
+- Auth — родная сессия Weblate, `credentials: include`; мутации с
+  `X-CSRFToken` из `<meta>`. Клиент не хранит Bearer-токен. Потеря сессии
+  (`not_authenticated`, в DRF возможен и HTTP 403) ведёт на родной login
+  с безопасным same-origin `next`. `permission_denied` и ошибка CSRF —
+  отдельные состояния, не редирект на login и не повтор мутации вслепую.
+- URL_PREFIX (`weblate/urls.py:1348-1352`) учитывается: базовый путь API и
+  ассетов берётся из `<meta name="console-base">`.
+
+### 4.2 API `/api/producer/`
+
+Отдельный модуль `weblate/api/producer/` (`urls.py`, `views.py`,
+`serializers.py`), включён из `weblate/api/urls.py:46-51` как
+`path("producer/", include(...))`; так он попадает в `/api/schema/` и в
+`docs/specs/openapi.yaml`. Права — только существующие (`project.add`,
+`project.edit`, `upload.perform`, `translation.add`, `unit.edit`,
+`unit.review`, `translation.download`, `translation.auto`), проверяются
+теми же `has_perm`, что и HTML-вьюхи. Закрытый список — §5.
+
+Объектная авторизация обязательна для проекта, компонента, строки, черновика,
+извлечения, прогона и скачиваемого артефакта; угадывание UUID не даёт доступа.
+`capabilities` объясняют доступность кнопок, но не заменяют проверки прав
+на POST и повторную проверку worker-ом перед записью. Нет нового набора
+producer-прав. Ограничения компонента внутри доступного проекта сохраняются.
+Ответы со списками используют фильтры доступа Weblate; секреты, endpoint-ключи
+и полная конфигурация провайдера не сериализуются.
+
+### 4.3 Данные
+
+- **Прогон.** `ProducerRun` получает версионированное поле
+  `stages: JSONField(default=dict)` и `requested_mode=localize`.
+  В `stages` — снимок выбранных компонентов/языков, стадий
+  `import → languages → glossary → translate → checks`, прогресс по языкам,
+  идентификаторы созданных объектов и текущая попытка исполнения.
+  Проектный scope не означает «перевести все компоненты проекта»:
+  оркестратор работает только над набором, подтверждённым в wizard-е.
+  `BatchAutoTranslate._adopt_producer_run` обобщается без удаления
+  существующего строгого claim для `recheck`.
+  Новый orchestrator владеет итоговым статусом; MT-стадия не завершает
+  весь `localize` раньше финальных checks. Один `ProducerRun`, без
+  параллельной модели родителя и без ожидания `.get()` дочерней Celery-задачи.
+- **Возобновление.** `queued/running/completed/failed` — сохранённые статусы;
+  `no-update` — наблюдение liveness, **не доказательство смерти worker-а**.
+  Повтор `localization/` с тем же черновиком/ревизией возвращает тот же run.
+  Claim и разрешение `resume` выполняются атомарно, сверяя actor, scope,
+  draft revision, query и текущую попытку/task id. Только один исполнитель
+  может применять эту попытку; опоздавшая доставка ничего не переписывает.
+  Импорт и публикация терминов возобновляются по сохранённым результатам
+  стадий, не создают второй компонент/термин. MT повторяет только
+  незавершённый разрешённый набор (задача 2.4 для изменённого источника).
+  Публикация после commit; отказ брокера оставляет восстанавливаемое
+  состояние, а не вечное «в очереди». `resume_allowed` и причина отказа
+  возвращаются сервером. HTTP-повтор не обещает exactly-once оплату
+  при потере ответа самого LLM-провайдера.
+- **Черновик wizard-а.** Расширяется существующий `LocKitImportDraft`:
+  новый вид стора, `ui_mode`, текущий шаг, `revision` и JSON ответов/анализа.
+  Существующий `kind` и состояния импорта не создаются заново и не заменяются
+  несовместимыми строковыми значениями. Owner+session сохраняются.
+  Heartbeat продлевает только ещё действующий редактируемый черновик,
+  без повторного анализа; просроченный не оживляется. Очистка не удаляет
+  материалы активного импорта/извлечения; после передачи worker-у действует
+  существующий протокол хранения активных заданий.
+- **Ответы анкеты.** В `Project.machinery_settings["_producer"]` хранятся
+  ответы, версия, `bdhc_title_id`, хеш ответов, хеш сгенерированных полей
+  и время генерации. `_producer` исключается из конфигураций движков
+  и сохраняется при замене настроек через старый API. В запись выбранного
+  `configured_routed_engine` / `available_routed_engine` записываются только
+  генерируемые поля; наследуемые секреты не копируются.
+  Текущие getter и PUT этого не умеют (§3); требуется явное изменение
+  обоих путей, а не простое добавление ключа в JSON.
+  Сохранение использует ревизию настроек: если Advanced уже изменил профиль,
+  поздний ответ LLM не перезаписывает его без нового решения пользователя.
+- **Удалённые ключи.** Проектный `Label` «Нет в последнем ките»;
+  идентификатор служебной метки хранится отдельно от её отображаемого имени.
+  Метка ставится/снимается для отсутствующих/вернувшихся идентичностей
+  только выбранного компонента после полного успешного анализа таблицы.
+  Карантин и неполная загрузка не считаются удалением. Физического удаления
+  юнитов нет; производная очередь/выгрузка консоли исключает помеченные
+  строки и показывает отдельный счётчик. Нативные сырые выгрузки Advanced
+  сохраняют свой контракт — это иной профиль экспорта тех же данных.
+- **Метаданные импорта.** Provenance должна переживать удаление draft.
+  Предлагается одно версионированное `Component.producer_metadata`
+  (JSONField, миграция): происхождение, поддержанный формат/кодировка/
+  разделитель, schema колонок, порядок идентичностей и служебные значения.
+  Source/target/Explanation берутся из Unit, не дублируются в sidecar;
+  Character хранится отдельно от Explanation и связывается по стабильной
+  идентичности строки. Метаданные публикуются с результатом импорта,
+  а экспорт работает и после очистки временных файлов. Для старого
+  компонента происхождение не угадывается по `file_format=po-mono`:
+  нужна проверяемая история импорта, иначе upload остаётся в Advanced.
+- **Обратный перевод.** Предлагаемый `ProducerBackTranslation` хранит
+  unit, хеш всех plural forms target, исходный/целевой языки, модель,
+  версию промпта, текст и время. Повтор использует только запись с текущей
+  идентичностью; не возвращает устаревший текст после правки Advanced.
+- **Стор-пакет.** Нативный `appstore`-компонент,
+  `filemask=metadata/*`, `template=new_base=metadata/<source-locale>`,
+  `vcs=local`, имена полей из реестра. `bbcode-text` — при BBCode-политике,
+  `max-length:<N>` — на исходной строке поля, не на всём компоненте.
+  Один компонент на площадку. Тип глоссария определяется свойством
+  `is_glossary`, а не только TBX. Для `uploadable` нужна сохранённая
+  provenance табличного импорта; произвольный po-mono не считается китом.
+
+### 4.4 LLM-движок подготовки
+
+Модуль `weblate/trans/producer_llm.py` — три операции, каждая со своим
+промптом в `weblate/trans/producer_prompts/*.txt`, JSON-schema ответом и
+записью в `LLMUsageLog` (`Operation` дополняется `terms`, `profile`,
+`back_translation`; `run` = null, `component`/`project` snapshot как есть).
+
+Конфиг по образцу судьи (`settings_docker.py:1732-1775`,
+`deploy/environment.example:133-222`), резолвер и фолбэк — общий helper,
+вынесенный из `weblate/trans/judge.py:418-722` без изменения поведения судьи:
+
+```text
+WEBLATE_PREP_BASE_URL            (default = WEBLATE_JUDGE_BASE_URL)
+WEBLATE_PREP_API_KEY             (default = WEBLATE_JUDGE_API_KEY)
+WEBLATE_PREP_MODEL_TERMS         например kimi-k3
+WEBLATE_PREP_MODEL_PROFILE
+WEBLATE_PREP_MODEL_BACK_TRANSLATION   дешёвая модель
+WEBLATE_PREP_RESPONSE_FORMAT_*   json_schema | json_object | ''
+WEBLATE_PREP_FALLBACK_BASE_URL / _API_KEY / _MODEL_TERMS / _MODEL_PROFILE / _MODEL_BACK_TRANSLATION
+```
+
+Пустая модель задачи = операция «не настроена»: кнопка в консоли
+заблокирована с причиной для админа (`GET me/` → `capabilities`).
+
+**Извлечение терминов** (спецификация из скилла `game-glossary-builder`):
+вход — строки кита или поля стора (`key`, `source`, `targets`, `Character`,
+`Explanation`), исходный/целевые языки, категории из шага 7b, списки
+исключений 7a; батчами по лимиту контекста модели с сохранением provenance;
+выход — кандидаты `{id, context, term, category, why,
+occurrences: [{file, sheet?, key, row}], translations{}, explanation_proposal,
+disputed?: [{lang, options}]}` и вопросы/предложения особых правил.
+Перевод берётся только из подтверждаемого термового фрагмента файла,
+не из всей строки с термином и не по догадке о выравнивании подстрок.
+Пустое остаётся пустым; неуверенное соответствие требует решения.
+Особые правила `read-only|exact|forbidden` — только после построчного
+одобрения; обычный термин не получает ограничения автоматически.
+Исключаются кнопки, целые реплики, маркетинговые слова, CTA; для стора —
+названия игры/персонажей/локаций/валют/режимов. Нормализация source
+группирует кандидатов для просмотра, но не сливает разные контексты.
+Публикуемая идентичность — `(context, source)` по контракту
+`append_glossary_terms`; разные смыслы или переводы требуют решения.
+`read-only` требует согласованного сохранения source; `exact` не обещает
+чувствительность к регистру; `forbidden` запрещает конкретный target,
+предпочтительная замена хранится отдельно. Языковые области правил
+валидируются по возможностям glossary-модели: правило одного языка не
+распространяется молча на остальные через общий CSV-флаг. Пересечение
+правил/смыслов не «разрешается» объединением флагов. Непубликуемый кандидат
+остаётся видимым с причиной, не считается добавленным.
+
+**Генерация профиля** (спецификация из скилла `weblate-machinery-prompts`):
+вход — ответы анкеты (жанр/сеттинг/роль/аудитория, регистр UI, регистр
+диалогов, мат, ja/ko вежливость), блоки B/C карточки БДХК (волна 3),
+измерения кита (`text-evidence`: доли коротких строк, диалогов, разметка,
+плейсхолдеры, `$`, пунктуация, покрытие Explanation, образцы); выход —
+`persona` — описательная английская проза, без «you are» и выдуманных фактов;
+`style` — английские проверяемые правила, без копирования фиксированного
+MT-промпта и списка терминов; `language_instructions` — самодостаточный
+блок на соответствующем целевом языке. Ориентиры скилла для persona/style —
+400–900/800–1800 символов, не повод дописывать несуществующий контекст;
+реальный лимит формы — ≤ 1000 символов на блок языка. Карта инструкций
+только для выбранных языков. Никаких выдуманных фактов: каждое правило
+`style` ссылается на измерение или ответ. Персона/стиль меняют
+`project_context_hash` → кэш судьи инвалидируется; UI предупреждает.
+
+Правило промпта-2 о регистре, мате и ja/ko обязательно и для судьи:
+соответствующие ответы должны входить в его эффективный контекст и хеш.
+Нынешний `project_context_hash` учитывает persona/style, не всю карту
+`language_instructions`; это ограничение реализации, не основание
+игнорировать изменение ответа. Генератор отражает обязательные правила
+в общем контексте. Перед записью сервер сравнивает старый/новый эффективный
+контекст; предупреждение не запускает платную перепроверку автоматически.
+
+Все три операции трактуют строки кита и ответы модели как недоверенные
+данные: ни инструкций из загруженного текста, ни произвольного fetch URL,
+ни записи строк/флагов по ответу LLM. Схема, provenance и ограничения
+проверяются локально. Внешние вызовы ограничены настроенными endpoint-ами,
+дедлайнами и батчами; фолбэк — по подтверждённой политике недоступности
+судьи, не из-за неугодного содержательного ответа. В логах нет секретов;
+перед извлечением показаны отправляемый scope, провайдер и оценка стоимости.
+
+**Обратный перевод**: `target` → исходный язык; кэш с идентичностью
+из §4.3. Существующие улики судьи показываются только если они актуальны.
+
+### 4.5 Стор-реестр и локали
+
+Предлагаются `weblate/formats/store_registry.yaml` и загрузчик
+`weblate/formats/store_registry.py`. Это данные, не ещё один парсер:
+
+| Поле записи | Контракт |
+|---|---|
+| Площадка и поле | Стабильные `platform_id`, `field_id`, переводимое имя поля |
+| Имя файла | Каноническое для Google Play/App Store; префиксное для Steam/custom |
+| Ограничение | Число и единица измерения либо явно подтверждённое «лимита нет» |
+| Основание | URL официальной страницы, дата проверки и версия записи |
+| Разметка | Разрешённая политика `plain/html/bbcode`, не догадка по имени |
+| Локали | Отдельно код `Language` Weblate, поддерживаемый вариант площадки и имя каталога |
+
+В задаче 1.3 разработчик сверяет встроенные ограничения `AppStoreParser`
+с официальными источниками площадок. Steam и отсутствующие в парсере поля
+(например `promotional_text`) заполняются только по проверенному источнику.
+Неподтверждённые значения вроде «300» или «170» не являются требованиями
+этого документа. `limit=null` означает «неизвестно», а не «без ограничений»:
+wizard спрашивает только недостающий факт и не объявляет пакет готовым.
+Custom-ограничение задаёт продюсер с указанием основания.
+
+`en-US` — согласованный вариант английского для стор-сценария, а не
+автоматическая замена любого кода `en`. Существующий `googleplay` mapping
+нужно проверить на round-trip создания/чтения каталогов. Варианты
+`pt-BR/pt-PT`, `es-ES/es-419`, `zh-Hans/zh-Hant` не склеиваются.
+Значения из UI нельзя напрямую подставлять в путь.
+Префиксное имя Steam/custom предотвращает чужие лимиты; переименование
+явно показано до подтверждения пакета. Исходник никогда не обрезается и
+не «чинится» молча.
+
+### 4.6 Экспорт
+
+`weblate/trans/producer_export.py` формирует результат из текущих Unit:
+не удаляет/не обнуляет target в БД, а заменяет значение только в выгрузке.
+Включаются доступные строки выбранного контента, кроме «Нет в последнем
+ките»; активный недисмисснутый блокирующий детерминированный чек даёт
+пустое значение при сохранённой идентичности. Judge advisory не делает
+строку пустой сам по себе. Политика одинакова у summary и файла.
+
+CSV/XLSX переиспользуют сериализаторы `multilingual_spreadsheet`;
+внешний writer сохраняет Character, Explanation и согласованные
+служебные колонки по provenance импорта. Исходный язык выводится первым.
+JSON — записи с `component_id`, key/context, source, targets (списки
+plural forms), Character/Explanation, не плоский словарь с коллизиями.
+Для всего проекта — ZIP результатов по компонентам с manifest; одинаковый
+ключ в двух компонентах не затирается. Стор — ZIP
+`metadata/<locale>/<field>.txt` и представление «поля по языкам».
+
+«Как загружено» в волне 1 — поддержанный табличный CSV/XLSX-контракт,
+не обещание сохранить оформление/макросы Excel. TXT round-trip — волна 3.
+Для старых нетабличных компонентов обзор и скачивание остаются доступны:
+используется нативная identity/plural-модель без уплощения; неподдерживаемый
+конвертер явно предлагает родную выгрузку Advanced, не выдаёт потерю данных
+за успех. JSON-киты не принимаются wizard-ом; это не запрещает JSON-экспорт.
+`summary` возвращает также ревизию scope; при изменении данных до скачивания
+сервер требует обновить сводку либо отдаёт тот же закреплённый снимок.
+
+## 5. Контракт API (закрытый список)
+
+Базовый путь `/api/producer/`. JSON, кроме файловых ответов. Ошибки
+сохраняют принятый `drf_standardized_errors` envelope:
+`{type, errors: [{code, detail, attr}]}`. Код стабилен, русская UI-подпись
+локализуется существующим механизмом Django/DjangoJS; нового `detail_ru`
+рядом с общей инфраструктурой нет. Валидация — 400, нет прав — 403,
+недоступный объект/истёкший черновик — 404, блокировка — 423.
+Новый 409 для конфликта ревизии добавляется в схему ошибок явно.
+Пагинация больших списков — стандартная `count/next/previous/results`.
+Ниже закреплены ресурсы и минимальные поля; это не готовый OpenAPI.
+Задача 0.3 превращает их в схему и генерируемые TS-типы.
+
+```text
+GET  me/                          → {username, full_name, is_superuser,
+                                     capabilities: {judge, prep_terms, prep_profile,
+                                     back_translation, bdhc}, advanced_url}
+GET  projects/                    → [ProjectSummary]   (allowed_projects)
+GET  languages/?q=               → доступные языки с русскими именами
+GET  projects/{slug}/languages/  → выбранные языки и пресет студии
+PATCH projects/{slug}/languages/ {revision, add[]} → итог по компонентам (права как в Advanced)
+POST projects/                    {name} → {slug}       (project.add; зеркало нативной формы)
+GET  projects/{slug}/             → Project {languages[{code,name,strings,status,decisions,in_kit}],
+                                     contents[{id, type: loc_kit|glossary|store, label, store?, keys?, terms?,
+                                     uploadable: bool, advanced_url}], profile_state, advanced_url}
+
+POST projects/{slug}/uploads/     multipart {files[], relative_paths[]?, declared_kind?: glossary, target_component_id?, ui_mode}
+                                  или JSON {declared_kind: store, store_packages, ui_mode}
+                                  → UploadAnalysis (token, revision, kind, answers, analysis)
+GET  projects/{slug}/uploads/active/ → редактируемый черновик текущего owner/session
+GET  uploads/{id}/                → UploadAnalysis
+PATCH uploads/{id}/               {revision, ui_mode?, current_step?, sheet?, archive_member?,
+                                   source_language?, explanation_language?,
+                                   languages?: [{code, include, resolved_as?, platform_locale?}],
+                                   columns?: [{header, role, service_policy?, rename?}],
+                                   duplicates_policy?, split?, store_packages?, resolutions?,
+                                   profile?: {answers},
+                                   glossary?: {upload_id?, selected: [{candidate_id, term?, explanation?, resolved_targets?}],
+                                   exceptions: [{id, approved}]}}
+                                  → UploadAnalysis (анализ только при изменении его входа)
+POST uploads/{id}/heartbeat/      → {expires_at} (не меняет revision и анализ)
+GET  uploads/template/            → CSV-шаблон лок-кита
+GET  uploads/{id}/quarantine/     → файл исключённых строк с причиной и неизменёнными ячейками
+GET  uploads/{id}/rows/?set=quarantine|duplicates|empty_all|sample|family&value=&page=
+GET  uploads/{id}/split-signals/  (волна 3)
+GET  uploads/{id}/text-evidence/  → измерения для профиля
+DELETE uploads/{id}/              (отмена черновика)
+POST uploads/{id}/confirm/        {revision} → Run (обновление target_component, не создание)
+POST projects/{slug}/localization/ {upload_id, revision} → Run (один подтверждённый запуск)
+
+GET  stores/registry/             → реестр §4.5 (version, platforms, fields, locales)
+
+GET  projects/{slug}/runs/        → [Run]
+GET  runs/{id}/                   → Run {id, kind: localize|translate|judge, status:
+                                     queued|running|no-update|completed|failed, title, started, finished,
+                                     stages, resume_allowed, resume_reason?, cost[], outcome?, error?, advanced_url}
+POST runs/{id}/resume/            {attempt} → Run (claim по §4.3)
+POST projects/{slug}/runs/estimate/ {kind: localize|judge|terms, upload_id?, revision?, scope}
+                                  → {estimate_id, scope_hash, strings, cost_usd_min?, cost_usd_max?, minutes_min?, minutes_max?, basis}
+POST projects/{slug}/runs/        {kind: judge, scope, estimate_id} → Run (права нативного запуска)
+
+GET  projects/{slug}/decisions/?language=&kind=blocking|judge&content=&q=&page=
+                                  → [Decision {unit_id, key, language, source, target, back_translation?,
+                                     revision, finding_ids[], reason, kind, severity?, evidence_state,
+                                     checks_advanced[], history[], actions[], advanced_url}]
+POST decisions/{unit}/repair/     {revision, finding_ids[]} → {run_id} (права repair-пути)
+POST decisions/{unit}/accept/     {revision, finding_id, reason} → Decision (только текущая judge-находка)
+POST decisions/{unit}/back-translation/ → {text, cached: bool}
+
+GET  projects/{slug}/glossary/    → [Term {source, targets{}, explanation, rule_ru, advanced_url}]
+POST projects/{slug}/glossary/extractions/ {upload_id? | content_id, revision, estimate_id, categories[], exclusions{}} → {id, status}
+GET  glossary/extractions/{id}/   → {status, stage, processed_rows?, total_rows?, error?}
+GET  projects/{slug}/glossary/candidates/?extraction=  → {terms[], disputed[], questions[]}
+POST projects/{slug}/glossary/terms/ {terms[], exceptions[]} → GlossaryAppendResult (added/existing/skipped по языкам)
+POST projects/{slug}/glossary/exceptions/preview/ → Exception[]
+
+GET  projects/{slug}/profile/     → {revision, answers, summary, profile_state, judge_context_changed}
+PATCH projects/{slug}/profile/    {revision, answers} → {revision, summary, judge_context_changed}
+                                  (project.edit; raw persona/style/LI только в Advanced)
+GET  bdhc/titles/?q= ; GET bdhc/titles/{id}/profile/   (волна 3)
+
+GET  projects/{slug}/export/summary/?content=  → {revision, keys, empty, removed, by_language[], formats[]}
+GET  projects/{slug}/export/?content=&format=&revision= → файл (xlsx|csv|json|as-uploaded|zip)
+GET  projects/{slug}/costs/?period=month|run&run= → {total_usd, by_run[], by_language[], by_model[], by_operation[]}
+```
+
+`UploadAnalysis` — размеченное объединение из промпта-3 §8
+(`detected_kind: loc_kit|store|ambiguous`, `loc_kit: {format, columns, header_map,
+rows, source_language?, source_conflict?, gate}`, `store: {packages[], existing_target_locales[]}`,
+`attention[]`, `errors[]`, `ui_mode`, `current_step`, `revision`, `answers`,
+`diff?` для повторной загрузки; glossary — отдельный существующий kind).
+Инварианты промпта-2 §1 (никогда не выводить исходный язык; карантин виден;
+Character ≠ Explanation; правило split только по началу ключа; исключения
+по построчному одобрению) — правила валидации `PATCH uploads/{id}/`, не
+только UI.
+
+Estimate и запуск связываются с одним scope/revision: изменённый кит или
+набор языков требует новой оценки. Отсутствие исторических цен — «оценка
+недоступна», не $0 и не выдуманная длительность; отдельное подтверждение
+обязательно для terms/judge. Профиль генерируется после явного сохранения
+ответов или запуска, не при чтении страницы и не за каждую введённую букву;
+дополнительного платёжного диалога для него нет. Черновик,
+glossary-upload и extraction-id
+принимаются только из того же проекта и разрешённого owner/session.
+Указание `target_component_id` требует `upload.perform` именно на нём
+и не открывает endpoint создания компонента с более слабыми правами.
+
+## 6. Прототип → продакшн
+
+- Переносится визуальная основа `dd7e71c`: токены (`app/globals.css`,
+  `tailwind.config.js`), экраны `components/console/screens/*`,
+  `wizard/*`, `wizard2/*`, `AppShell`, `primitives`, `/dev/states`,
+  email-превью, фикстуры `src/api/mock/fixtures/*.json`.
+- Не переносится Next.js/Mongo-сервер `app/api/[[...path]]/route.js`.
+  Зависимости нового `console/` определяются реально перенесёнными
+  компонентами; замороженный прототип и его зависимости не «чистятся».
+- Меняется: `src/api/client.ts` — генерируемые типы из OpenAPI, CSRF из
+  `<meta>`, `VITE_API_MODE=mock|live`; мок-фикстуры проходят валидацию по
+  той же схеме (`ajv` в тесте), поэтому расхождение mock/live ловится
+  тестом, а не экраном; sentinel `'store-upload'` заменяется реальным `id`.
+- Достраивается поверх новой сборки: общий draft, переключатель режимов
+  без потери данных, явный source и действующая backend-валидация (§3.1).
+  Карточки «Нужно уточнить», анализ, extraction-workspace и стор-результат
+  уже имеют mock-представление; их надо подключить, а не заново рисовать.
+  «Открыть в Weblate» получает настоящий URL от бэкенда, не placeholder.
+- `DESIGN-NOTES.md` переносится в `console/` и ведётся дальше; любое
+  расхождение с эталоном фиксируется там.
+
+### 6.1 UX-контракт двух режимов
+
+| Подробный режим | Быстрый режим | Общие данные |
+|---|---|---|
+| 1 Лок-кит | 1 Файлы | Файлы/поля, лист или файл из ZIP, анализ, карантин |
+| 2 Исходный язык; 3 Языки | 2 Языки | Явный ru/en для нового контента, варианты локалей |
+| 4 Структура; 5 Компоненты | Уточнения при необходимости | Роли колонок; один компонент до волны 3 |
+| 6 Профиль; 7 Глоссарий | 3 Контекст и термины | Обязательные ответы, извлечение, выбранные кандидаты |
+| 8 Проверка и запуск | 4 Проверка и запуск | Гейт, последствия, единый запуск |
+
+Режим — предпочтение отображения, не другой импорт. Переключение мапит
+текущий шаг в соответствующую стадию и не запускает повторный LLM-вызов.
+Список проектов, обзор, загрузка, очередь, глоссарий, скачивание, настройки
+и Advanced сохраняют навигацию брифа. До появления очереди в волне 2
+блокируемая строка ведёт к реальной строке в Advanced, не к заглушке.
+
+`DESIGN.md` и прототип — визуальная основа: Source Sans 3 / Source Code Pro,
+плоские карточки, тёмная шапка, один основной акцент, без редизайна.
+Соблюдать `ACCESSIBILITY.md` и `docs/contributing/frontend.rst`: связные
+label/error, видимый фокус, клавиатурные таблицы и возврат фокуса из шторки,
+`aria-live` для статуса без спама каждым heartbeat, текст/иконка кроме цвета.
+Проверка desktop и узкого экрана; данные таблицы прокручиваются внутри
+области, действия не уходят за экран. Русский UI использует DjangoJS i18n;
+строки перевода/markup выводятся как текст, с корректным `dir`/`lang`,
+не исполняются через HTML. Истёкший черновик, offline и ошибка сохранения
+явно различаются; «сохранено» появляется только после ответа сервера.
+
+## 7. Существенные режимы отказа
+
+- Для выбранного ru/en нет полного исходного набора импортируемых строк/
+  полей → стоп с конкретными пробелами; пустые target допустимы.
+  5 % — порог обнаружения редкой target-колонки, не готовности исходника.
+- Строки «пусто во всех языках»/дубликаты/без ключа → карантин с номером
+  строки; файл проходит; карантин виден в анализе и в результате прогона.
+- Steam-файл с каноническим именем чужой площадки → валидатор пакета
+  переименовывает в префиксное имя и показывает это; лимит только из реестра.
+- Модель подготовки/судья/обратный перевод не настроены → кнопка
+  заблокирована с причиной для админа; локализация продолжает работать.
+- Потеря liveness → `no-update`; resume разрешён только серверным claim
+  из §4.3. Не показывать «завершён» без сохранённого результата.
+- Изменение обязательных ответов профиля → сравнение эффективного
+  judge-контекста и предупреждение по §4.4; платный recheck сам не стартует.
+- Правка в Advanced → при возврате фокуса консоль перечитывает данные;
+  фоновый polling нужен активным прогонам. Мутация с устаревшей revision
+  получает 409 и показывает свежую строку, не затирает чужую работу.
+- Существующие MT/judge `ProducerRun` видны независимо от интерфейса запуска.
+  Для старой операции без `ProducerRun` не выдумываются стадии/стоимость:
+  её изменения видны через общие Unit/Change, детали — по ссылке Advanced.
+
+## 8. Роадмап: принципы
+
+- Один разработчик, вертикальные срезы: задача = эндпоинт(ы) + экран +
+  pytest + (где есть экран) Playwright-сценарий. Каждая задача формулируется
+  так, чтобы AI-агент выполнил её без этого документа целиком: ссылки на
+  контракт §5, файлы, команду проверки.
+- Волна сдаётся на разрешённом тестовом стеке, не на моках фронта.
+  Модели заменяются локальным тестовым провайдером; проверяются реальные
+  Django/Celery/БД и сохранение результатов. Production LLM не вызывается.
+- Основные команды существующего backend-контура:
+  `./rundev.sh test weblate/api/tests.py`,
+  `./rundev.sh test weblate/trans/tests/test_loc_kit_drafts.py`,
+  `./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py`,
+  `./rundev.sh test weblate/trans/tests/test_multilingual_spreadsheet.py`,
+  `./rundev.sh test weblate/machinery/tests.py`.
+  Новые сценарии добавляются в эти модули либо явно названные новые
+  `weblate/trans/tests/test_producer_*.py`; не создаётся конфликтующий
+  пакет `weblate/api/tests/` рядом с существующим `tests.py`.
+- В 0.3 разработчик добавляет команды `pnpm --dir console typecheck`,
+  `pnpm --dir console test`, `pnpm --dir console e2e` (конфиг
+  `console/e2e/playwright.config.ts`), `pnpm --dir console build`,
+  `pnpm --dir console api:generate` с входом `docs/specs/openapi.yaml`.
+  Это будущие scripts, сейчас их нет. Схема: `make -C docs update-openapi`
+  в тестовом окружении по `.github/workflows/api.yml`;
+  `uv run prek run --all-files` перед завершением волны.
+- Рестарт shared dev-docker, подмена его model settings и остановка
+  Celery требуют разрешения; безопасный сценарий отказа выполняется
+  в выделенном тестовом стеке, не на чужой активной очереди.
+- Изменения публичных endpoints/загрузок/LLM вместе с owning-документацией
+  и `docs/security/threat-model.rst` входят в свою волну, не откладываются
+  до волны 3. Conventional Commits, изолированная рабочая ветка,
+  commit/push после проверки; deployment — отдельное разрешение.
+
+**Зависимости и порядок.** 0.1–0.3 образуют один интеграционный срез
+оболочки/контракта; 0.4 даёт данные, 0.5 — model resolver. Далее
+`1.1 → 1.2 → 1.3 → 1.5 → 1.6 → 1.4 → 1.7 → 1.8 → 1.9`.
+Номер 1.4 сохранён как идентификатор, но оркестратор интегрируется после
+профиля и терминов. `2.1 → 2.2`, `2.3` использует запуск/оценку,
+`2.4` — импорт и run, `2.5` — итоговый статус. Волна 3 опирается
+на принятую волну 2. До 3.2 подробный шаг «Компоненты» объясняет один
+компонент и предлагает Advanced; не имитирует работающий split.
+
+## 9. Роадмап: задачи
+
+Статусы: `todo` · `in progress` · `done` · `blocked`. Формат задачи: результат ·
+файлы/интерфейсы · действия · проверка.
+
+### Волна 0. Фундамент (без пользовательской ценности, но обязательна)
+
+**0.1 Хостинг `/console/` и вход** — `todo`
+
+- Результат: `/console/` открывает статическую SPA под сессией Weblate; без
+  сессии — редирект на login с `next`; CSRF-токен в `<meta>`; ссылка
+  «Консоль» в navbar; URL_PREFIX учтён.
+- Файлы: `weblate/trans/views/console.py`, `weblate/templates/console/index.html`,
+  `weblate/urls.py`, `weblate/templates/base.html`,
+  `console/` (Vite scaffold: `vite.config.ts`, `src/main.tsx`, `src/api/client.ts`),
+  `pyproject.toml`/`scripts/` — сборка бандла в `collectstatic`, Dockerfile-ы
+  (`deploy/Dockerfile`, `dev-docker/weblate-dev/Dockerfile`) — node в build stage.
+- Действия: scaffold Vite+TS; порт `AppShell`, `ProjectsList`, `EmptyProject`
+  на TS; клиент с `credentials: include` + `X-CSRFToken` из meta; Django view
+  и шаблон; navbar; сборка в статику.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_console.py`;
+  анонимный deep link ведёт на родной login, после входа возвращает туда же.
+  В тесте с настоящей CSRF-проверкой разрешённая мутация сохраняется,
+  без токена — отказ. Playwright проверяет deep link, отказ доступа,
+  URL_PREFIX и список проектов после интеграции 0.2; не только наличие meta.
+
+**0.2 Namespace `/api/producer/` + `me/` + `projects/`** — `todo`
+
+- Результат: §5 `me/`, `projects/`, `POST projects/`, `projects/{slug}/`
+  работают на любом существующем проекте (решение 26): `contents` из
+  компонентов по правилам §4.3, `languages` со статусом
+  `ready|decisions|translating`; готовность определяется общей политикой
+  выгрузки и актуальных улик, не числовым «качеством».
+  `advanced_url` для проекта/компонентов; языковой поиск, конфигурируемый
+  пресет Hero Craft и добавление языков с правами/частичным результатом
+  как в Advanced. Новая БД копий проектов не создаётся.
+- Файлы: `weblate/api/producer/{__init__,urls,views,serializers}.py`,
+  `weblate/api/urls.py:46-51`, `docs/specs/openapi.yaml` (регенерация).
+- Действия: viewsets с `IsAuthenticated`, `allowed_projects`; capabilities по
+  settings (`JUDGE_*`, `WEBLATE_PREP_*`); `extend_schema` на всё.
+- Проверка: `./rundev.sh test weblate/api/tests.py`: чужой проект 404,
+  закрытый компонент не попадает в обзор/счётчики, создание требует
+  `project.add`, новый язык появляется и в Advanced. Схема — команда §8.
+
+**0.3 Контрактный контур фронта** — `todo`
+
+- Результат: `console/src/api/types.ts` генерируется из `/api/schema/`;
+  `src/api/client.ts` — единственный модуль с URL; мок-фикстуры
+  валидируются по схеме в `vitest`; `VITE_API_MODE=mock|live`.
+- Файлы: `console/package.json` (`openapi-typescript`, `ajv`, `vitest`,
+  `@playwright/test`), `console/src/api/mock/fixtures/*.json` (перенос из
+  прототипа), `console/e2e/playwright.config.ts`.
+- Проверка: команды typecheck/test/e2e/build/api:generate из §8.
+  Контрактный тест отвергает лишнее поле, неправильный enum и отсутствие
+  обязательного поля; live payload проходит ту же схему, что mock.
+  После генерации типов не остаются ручные дублирующие типы ответов.
+
+**0.4 Тестовые данные** — `todo`
+
+- Результат: детерминированные наборы для XLSX/CSV/TSV/TXT, ZIP и store
+  form/files: неоднозначные языки, редкая колонка, конфликтующие дубликаты,
+  пустые источники/target, Character/Explanation, markup/плейсхолдеры,
+  существующий approved target, одинаковый ключ в двух компонентах.
+  Числа 3864/17/12/5 из прототипа — иллюстрации, не реальные измерения
+  фикстуры и не обязательный размер теста.
+- Файлы: `weblate/trans/tests/data/producer/` — один общий набор,
+  `console/e2e/` использует его; приватные игровые данные не копируются
+  в открытые фикстуры. Один обезличенный репрезентативный кит — дополнительно.
+- Проверка: `uv run --directory loc_kit_ingest pytest` на parser-кейсах;
+  сырой файл с ошибками отклоняется существующим CLI, подготовленный после
+  ответов и карантина проходит; manifest задаёт точные ожидаемые строки.
+
+**0.5 Резолвер моделей подготовки** — `todo`
+
+- Результат: настройки `WEBLATE_PREP_*` и общий resolver (§4.4);
+  модели terms/profile/back_translation и их fallback независимо задаются.
+  Существующие настройки/поведение судьи не меняются; новый endpoint/model
+  не доступен для ввода продюсером.
+- Файлы: `weblate/trans/judge.py`, предлагаемый
+  `weblate/trans/llm_endpoint.py`, `weblate/settings_docker.py`,
+  `weblate/trans/models/llm_usage.py`, `deploy/environment.example`,
+  `docs/admin/config.rst`, `docs/security/threat-model.rst`.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_judge_client.py`
+  и `./rundev.sh test weblate/trans/tests/test_judge_autotranslate.py`;
+  весь judge-регресс перед сдачей интеграции. Mock HTTP: пустая модель
+  блокирует только свою задачу, недоступность primary включает
+  соответствующий fallback, содержательная критика не включает fallback.
+
+### Волна 1. Новый проект: оба режима wizard-а → прогон → скачать
+
+**1.1 Анализ загрузки лок-кита (`POST uploads/`, `GET uploads/{id}/`, `rows/`)** — `todo`
+
+- Результат: XLSX/CSV/TSV/табличный TXT и ZIP анализируются без изменения
+  Unit. Несколько файлов/листов → выбор продюсера; ничего не берётся
+  молча первым. Анализ выдаёт формат/кодировку/разделитель, роли,
+  header map, все языковые колонки (включая low-fill и ambiguous),
+  карантин с исходными координатами. Исходный язык не выводится,
+  требуется явный ответ; существующий `kind=string` сохраняется.
+- Файлы: `loc_kit_ingest/reader.py`, `loc_kit_ingest/infer.py`
+  (явный `source_lang` уже есть — исправить его применение, не изобретать
+  вторую опцию), `weblate/trans/loc_kit.py`,
+  `weblate/trans/models/loc_kit.py` (поля §4.3 и миграция),
+  `weblate/api/producer/`, `docs/security/threat-model.rst`.
+- Действия: расширить reader для TXT по содержимому/кодировке, отделить
+  детерминированный анализ от публикации, реализовать draft/active lookup,
+  шаблон и скачиваемый карантин; ZIP использует безопасную обработку
+  путей/типов entries и существующие ресурсные ограничения, без нового
+  произвольного лимита файла.
+- Проверка: parser-suite из 0.4 и
+  `./rundev.sh test weblate/trans/tests/test_producer_uploads.py`:
+  archive traversal/absolute path/symlink не пишутся за пределы storage;
+  чужой draft не читается; ни один language column/row не исчезает.
+
+**1.2 Ответы wizard-а (`PATCH uploads/{id}/`) и гейт** — `todo`
+
+- Результат: `source_language`, `explanation_language`, `languages`
+  (include/resolved_as), `columns` (роли, service_policy, rename),
+  `duplicates_policy`, `ui_mode` валидируются (инварианты промпта-2 §1),
+  анализ и гейт перезапускаются только для изменённого ввода; исходный набор
+  должен быть полным (§7), выбранный язык становится первой языковой
+  колонкой подготовленного файла. Смена `ui_mode` не меняет импорт.
+  Heartbeat не воскрешает истёкший draft, DELETE не срывает активный run.
+- Файлы: `weblate/trans/loc_kit.py` (`apply_answers`, рендер с явным
+  порядком колонок), `loc_kit_ingest/writer.py`, сериализаторы.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_uploads.py`:
+  confirm без source даёт 400; пропуски источника показаны по строкам;
+  редкий target включается после ответа; `Id` как service не становится
+  индонезийским; `flags` не исполняется. `input = imported + quarantined`,
+  `skipped=0`; metadata/Character/Explanation сохранены раздельно.
+
+**1.3 Анализ стор-пакета (TXT/папка/ZIP `metadata` и форма)** — `todo`
+
+- Результат: `POST uploads/` с `.txt`-файлами, `relative_paths`, ZIP
+  `metadata/*` или `declared_kind=store` + `store_packages` из формы →
+  `UploadAnalysis.store`: детекция площадки по именам/структуре, поля с
+  переводимым именем, `chars`, `limit`, `limit_source`, `markup`, статусы
+  `ready|empty|over_limit|broken_markup|unknown_field|duplicate|unknown_limit`;
+  одиночный `description.txt` требует сопоставления, смешанные площадки —
+  подтверждения группировки, два файла одного поля — явного выбора.
+  Нечитаемый или опасный ZIP отклоняется целиком.
+- Файлы: предлагаемые `weblate/formats/store_registry.{py,yaml}`,
+  `weblate/trans/store_kit.py`, `weblate/api/producer/`,
+  `weblate/trans/models/loc_kit.py` (STORE), owning security/admin docs.
+- Действия: заполнить реестр по источникам (§4.5), свести multipart и JSON
+  формы в один пакет, показать неизвестное ограничение как вопрос;
+  валидировать markup без изменения source, проверить нативный
+  `AppStoreFormat` round-trip каталога и кодов языков.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_stores.py`:
+  одинаковые поля из формы/папки/ZIP дают одинаковый компонент;
+  BBCode с незакрытым тегом называет поле/тег; unknown limit блокирует ready;
+  `promotional_text` не наследует чужой лимит; уже загруженные target-файлы
+  сохраняются, недостающие поля отмечены; Steam-префикс показан до commit.
+
+**1.4 Единый коммит и прогон `localize` (`POST localization/`, `runs/`, `resume/`)** — `todo`
+
+- Результат: из черновика создаются компонент(ы) (лок-кит po-mono через
+  `create_component_from_kit`; стор — `appstore` с `filemask/template/new_base`
+  и флагами; глоссарий TBX при наличии), языки проекта и компонентов,
+  `ProducerRun(requested_mode=localize, scope=project)` со `stages`;
+  оркестратор `localize_project` ведёт стадии import → languages → glossary
+  → translate (по языкам, через `BatchAutoTranslate` с adoption) → checks;
+  готовые переводы из кита не перезаписываются; liveness `queued/running/
+  no-update`; claim/resume/повтор POST — строго §4.3. Профиль применяется
+  до начала MT; snapshot ограничивает выбранные компоненты/языки,
+  glossary не попадает в MT как обычный контент. `completed` только
+  с результатом всех обязательных стадий.
+- Файлы: `weblate/trans/models/judge.py` (`stages`, `localize`; миграция),
+  `weblate/trans/autotranslate.py:1303-1372` (обобщённый adoption),
+  `weblate/trans/tasks.py` (`localize_project`), `weblate/trans/producer_run.py`
+  (сборка компонентов/языков из черновика), `weblate/utils/views.py:704-833`
+  (переиспользование с явным порядком колонок),
+  `weblate/trans/models/component.py` (`producer_metadata`, миграция),
+  `weblate/api/producer/views.py`.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_runs.py`:
+  повтор POST/resume/redelivery не создаёт второй импорт или платный запуск;
+  сбой брокера/между стадиями не теряет подтверждённую работу; после
+  восстановления результат стадий согласован с БД/файлами. Старый
+  `recheck` сохраняет строгий scope/query claim. Fixture с посторонним
+  компонентом подтверждает, что он не переведён «за компанию».
+
+**1.5 Профиль проекта: анкета → генерация** — `todo`
+
+- Результат: ответы анкеты (жанр/сеттинг/роль/аудитория, регистр UI,
+  регистр диалогов, мат, ja/ko) хранятся в
+  `machinery_settings["_producer"]`; `POST localization/` и
+  `PATCH profile/` генерируют `persona/style/language_instructions` через
+  `WEBLATE_PREP_MODEL_PROFILE` из ответов + `text-evidence` и пишут в запись
+  роутед-движка. «Пропустить» относится только к жанру/описанию Q1;
+  базовый профиль студии наследуется из существующей глобальной
+  конфигурации выбранного движка. `GET profile/` отдаёт summary;
+  регистр/мат/ja-ko обязательны. При отсутствии profile-модели можно
+  использовать уже настроенный профиль, но нельзя объявить отсутствующие
+  обязательные правила сгенерированными; предложить настройку в Advanced.
+- Файлы: `weblate/trans/producer_llm.py` (`generate_profile`),
+  `weblate/trans/producer_prompts/profile.txt`, `weblate/trans/loc_kit.py`
+  (`text_evidence`), `weblate/trans/models/project.py:1336` (пропуск `_`),
+  `weblate/api/views.py:2484` (сохранение `_`-ключей), `LLMUsageLog.Operation`.
+- Проверка: pytest с mock LLM: ответы → три поля в `machinery_settings[engine]`,
+  глобальный ключ не дублируется; `get_machinery_settings()` не содержит
+  `_producer`; PUT `machinery_settings` через API сохраняет `_producer`;
+  изменение регистра/ja-ko меняет эффективный judge-контекст (§4.4),
+  неизменённые ответы не инвалидируют его; параллельная Advanced-правка
+  защищена revision. `./rundev.sh test weblate/machinery/tests.py` и
+  `./rundev.sh test weblate/trans/tests/test_producer_profile.py`.
+
+**1.6 Глоссарий в wizard-е: загрузка, извлечение, исключения** — `todo`
+
+- Результат: 7a (таблица терминов → тот же анализ, стоп при несовпадении
+  исходного языка), 7b категории, 7c извлечение через
+  `POST glossary/extractions/` (оценка «≈ N строк · ≈ $X» из
+  `recent_cost_range(operation=terms)` + подтверждение; статусы
+  `queued/running/no-update`, стадии, `no results`, `model not configured`,
+  `failed → retry`), кандидаты с provenance/спорными/вопросами, 7d
+  исключения по построчному одобрению (`forbidden` без замены не
+  одобряется); в wizard-е выбор хранится в черновике («Выбрано — добавится
+  при запуске»); публикация при `localization/` и на странице «Глоссарий»
+  через `append_glossary_terms` с честным partial success.
+- Файлы: `weblate/trans/producer_llm.py` (`extract_terms`),
+  `weblate/trans/producer_prompts/terms.txt`, `weblate/trans/tasks.py`
+  (`extract_glossary_terms`), предлагаемый
+  `weblate/trans/models/producer.py:ProducerExtraction` (project, owner,
+  draft/component, revision, task, status, stage, candidates/review JSON;
+  миграция), `weblate/trans/loc_kit.py:append_glossary_terms`, API.
+- Действия: версии извлечения и редактирование/выбор в draft, evidence
+  в языке Explanation (UI причины по-русски), диапазон «Добавить все»
+  определён явно; конфликты и неподтверждённые special rules исключены.
+  Пропуск глоссария не удаляет уже полученные кандидаты; после успешного
+  run они привязаны к компоненту и доступны вне истёкшего draft.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_glossary.py`:
+  разные контексты не сливаются, пустой target остаётся пустым, чужой
+  extraction отвергнут, `forbidden` без замены — 400, старые термины
+  не изменены; partial success оставляет нерешённое доступным.
+  Повтор GET не запускает модель, повтор POST с тем же запросом
+  не оплачивает второе извлечение; неподготовленная модель — явная ошибка.
+
+**1.7 Экраны wizard-а: два режима, переключатель, все состояния** — `todo`
+
+- Результат: `console/` реализует подробный (8 шагов) и быстрый (4 этапа)
+  режимы над одним черновиком; переключатель «Быстрый ↔ Подробный» на
+  каждом шаге сохраняет ответы (`ui_mode` в черновике); карточка «Нужно
+  уточнить», шторка «Посмотреть анализ», карантин, гейт, стоп-состояния,
+  стор-поля со счётчиками, региональные локали, storyboard извлечения,
+  шаг «Проверка и запуск» с оценкой; перезагрузка страницы возвращает на
+  текущий шаг. Все состояния в `/dev/states`.
+- Файлы: `console/src/screens/wizard/*` (порт из
+  `frontend-wizard/components/console/wizard/` и `wizard2/`, общий state),
+  `console/src/api/client.ts`, фикстуры, `console/DESIGN-NOTES.md`.
+- Проверка: Playwright: (a) XLSX → подробный режим → выбор `ru` → языки с
+  `Portugal→pt_BR` → роли → анкета → извлечение (mock LLM в dev-стеке через
+  `WEBLATE_PREP_*` на локальный stub) → запуск → карточка прогона
+  `completed`; (b) Steam-TXT → быстрый режим → явный source и обязательные
+  ответы профиля → подтверждённая локаль → результат; (c) режим/refresh/back
+  сохраняют ответы и extraction-id; (d) неоднозначное поле требует ровно
+  недостающего решения; (e) клавиатура/узкий экран по §6.1.
+  Команды `pnpm --dir console test` и `pnpm --dir console e2e`.
+
+**1.8 Карточка прогона, обзор проекта, экран-приглашение** — `todo`
+
+- Результат: `RunCard` с стадиями/языками/стоимостью/`no-update`/«Перезапустить
+  незавершённое» (polling `GET runs/{id}/` 5 с); обзор проекта с реальными
+  метриками; пустой проект → приглашение wizard-а; «Открыть в Weblate»
+  везде из `advanced_url`.
+- Файлы: `console/src/screens/{RunCard,ProjectOverview,EmptyProject}.tsx`.
+- Проверка: `pnpm --dir console e2e`: после 1.7(a) числа совпадают
+  с backend; в выделенном тестовом стеке искусственно устаревший heartbeat
+  даёт `no-update`, но не completed и не разрешение второго worker-а.
+  Нормальный ответ worker-а обновляет карточку; возврат из Advanced
+  показывает свежие Unit/настройки без ручного refresh.
+
+**1.9 Скачать результат** — `todo`
+
+- Результат: `export/summary/` и `export/` для лок-кита (XLSX/CSV/JSON,
+  «как загружено» = XLSX/CSV) и стора (ZIP `metadata/…`, «поля по языкам»
+  с копированием): блокируемая строка выгружается пустой с ключом,
+  «Нет в последнем ките» исключается; сводка «N ключей · M пустыми»
+  ведёт к реальным строкам Advanced, после 2.1 — к очереди.
+- Файлы: `weblate/trans/producer_export.py`, `weblate/trans/multilingual_spreadsheet.py`
+  (переиспользование сериализаторов), API, `console/src/screens/DownloadScreen.tsx`.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_export.py`:
+  блокирующий чек → пустое значение в файле, target в БД неизменён;
+  dismissed и judge advisory не обнуляют строку; одинаковые key/context
+  в разных компонентах, plurals, Character/Explanation не теряются.
+  Исходный столбец первый; round-trip сравнивает нормализованные строки,
+  не байты XLSX; метаданные сохранены после истечения/очистки draft.
+  Скачивание со старой revision требует свежей сводки.
+  `pnpm --dir console e2e`: summary и реально скачанный файл совпадают.
+
+**Сдача волны 1:** полный лок-кит-сценарий и все пути store-ввода
+(форма/TXT/папка/ZIP), пропуск/публикация глоссария, переключение режимов,
+карантин и экспорт проходят на тестовом backend. Из старого брифа больше
+не действует предел «≤6 экранов» — подробный режим имеет 8 шагов.
+Тот же проект в Weblate содержит те же данные. Очередь до волны 2 заменяется
+действующей Advanced-ссылкой, не фиктивным экраном.
+
+### Волна 2. Качество и повторный цикл
+
+**2.1 Очередь «Требуют решения» (`GET decisions/`)** — `todo`
+
+- Результат: одна строка очереди на Unit с активным блокирующим чеком
+  или актуальной неразрешённой judge-находкой; все finding-id доступны
+  внутри карточки. Исключение `repeat-drift` из LLM prompt не означает
+  исключение его из UI: очередь использует общую политику checks.
+  Код чека — в Advanced, причина — переводимое объяснение; judge evidence
+  различает fresh/stale/unparsed, не называет pass «одобрением AI».
+  Removed не попадает в очередь; счётчик считает Unit, не число finding.
+- Файлы: `weblate/api/producer/`, предлагаемый
+  `weblate/trans/producer_reasons.py`, `console/src/screens/DecisionsQueue.tsx`,
+  существующие checks/judge readers; не отдельная копия check registry.
+- Проверка: `./rundev.sh test weblate/api/tests.py` и `pnpm --dir console e2e`:
+  права, фильтры, несколько findings на одной строке, свежесть улик,
+  блокирующая строка без accept; числа совпадают с обзором.
+
+**2.2 Действия: repair, accept, back-translation** — `todo`
+
+- Результат: одноюнитный repair переиспользует разрешённые mass-fix
+  политики или текущий LLM candidate/recheck-путь. Candidate записывается
+  только после проверки актуальности source/target и прав. Accept разрешает
+  выбранную текущую judge-находку с причиной; не снимает одновременно
+  детерминированный чек, не массово закрывает остальные findings.
+  Смена строки в Advanced между просмотром и POST → 409.
+- Файлы: `weblate/api/producer/`, `weblate/trans/fix_check.py`,
+  `weblate/trans/judge_loop.py`, `weblate/trans/producer_llm.py`,
+  `weblate/trans/models/producer.py:ProducerBackTranslation`,
+  `console/src/screens/DecisionsQueue.tsx`.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_decisions.py`;
+  accept blocking — 400, stale revision — 409, причина сохраняется;
+  повтор back-translation текущей строки использует кэш, после правки —
+  нет. Playwright проверяет состояние pending и серверный итог.
+  Если переносится undo прототипа, это отмена ещё не отправленного запроса:
+  UI не объявляет решение сохранённым до серверного успеха.
+
+**2.3 Судья из консоли: оценка и запуск** — `todo`
+
+- Результат: существующая оценка судьи плюс `estimate_id/scope_hash`,
+  async запуск через `auto_translate(mode=judge)` с `ProducerRun`.
+  Cap, deferral, liveness, permissions — те же, что у AutoForm/HTML-пути.
+  Прогон не автоматически продолжается платными проверками без согласия.
+- Файлы: `weblate/api/producer/`, `weblate/trans/views/edit.py`
+  (общая логика запуска/оценки), `weblate/trans/judge.py`,
+  `console/src/screens/RunCard.tsx`.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_runs.py`
+  и `./rundev.sh test weblate/trans/tests/test_judge_views.py`;
+  одна scope даёт ту же оценку, что HTML; изменение scope требует новой;
+  неподходящие права/lock отвергаются и при запуске, и worker-ом.
+
+**2.4 Повторная загрузка кита в компонент (`uploads/{id}/confirm/`)** — `todo`
+
+- Результат: полный анализ и diff `new/changed/unchanged/removed` для
+  выбранного компонента. Это **новый** delta-контракт, не уже существующий
+  `append_translation_strings`: тот намеренно сохраняет старые ключи.
+  Нативный full-table spreadsheet upload тоже не заменяет его: там
+  фиксированная схема/полный набор строк, пустой target означает очистку.
+- Действия: reuse durable prepare/apply/finalize и сохранение истории,
+  но отдельная producer-политика: для неизменённого source существующий
+  target (включая approved), Explanation, flags/metadata не перезаписываются
+  пустым/отсутствующим полем; новые target импортируются из файла.
+  Изменённый source явно показан в preview. Старый target уходит в историю,
+  новое значение переводится автоматически по выбранной политике брифа.
+  Не выставлять `STATE_EMPTY` поверх непустого старого target: переход
+  source/target/state атомарный, через существующие методы Unit.
+  Аудированное старое accept сохраняется в истории и становится неактуальным,
+  а не стирается прямым `resolution=null`. Перед записью повторно
+  сверяется revision, чтобы поздний MT не заменил свежую правку Advanced.
+  Removed/возвращённые ключи — только по полному подтверждённому набору
+  и правилам §4.3. Остальные компоненты проекта не затрагиваются.
+- Файлы: `weblate/trans/loc_kit.py`, `weblate/trans/tasks.py`,
+  `weblate/trans/producer_run.py`, `weblate/api/producer/`,
+  `console/src/screens/UploadScreen.tsx`; существующие native append и
+  multilingual upload сохраняют свои контракты.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_updates.py`,
+  existing loc-kit/spreadsheet suites из §8; 3 новых + 2 изменённых
+  без свежих target → 5 переводов, остальные не изменены; removed не
+  удаляется, возвращение снимает метку; partial/quarantine не удаляют
+  живые ключи; история/approved/Character/Explanation защищены.
+
+**2.5 Письма и деньги** — `todo`
+
+- Результат: `completed`/`failed` прогона → письмо actor-у
+  (`send_notification_email`, шаблоны `mail/producer_run_{completed,failed}`)
+  со ссылками и стоимостью; финализация идемпотентна, повтор доставки
+  не шлёт повторное письмо. `GET costs/` агрегирует фактические
+  `LLMUsageLog` по месяцу/прогону/языку/модели/операции, включая preparation
+  без run; неизвестная стоимость не превращается в ноль.
+- Файлы: `weblate/accounts/notifications.py`, `weblate/templates/mail/`,
+  `weblate/trans/models/llm_usage.py`, `weblate/api/producer/`,
+  `console/src/screens/SettingsScreen.tsx`.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_notifications.py`:
+  письмо ровно один раз для итогового состояния, URLs учитывают prefix,
+  расходы сходятся с сохранёнными вызовами. В тестовом maildev письмо
+  открывается после реального завершения Celery.
+
+**Сдача волны 2:** сценарии 2, 4, 5 брифа §9; после `Принять как есть`
+счётчик на обзоре уменьшается; повторный кит переводит только дельту.
+
+### Волна 3. Контекст и расширения
+
+**3.1 БДХК** — `todo`
+
+- Результат: read-only поиск/карточка, блоки B/C → генерация профиля.
+  БДХК не источник терминов, обратной записи нет; недоступная/неполная
+  карточка возвращает к сохранённой анкете, не блокирует локализацию.
+- Файлы: предлагаемый `weblate/trans/producer_bdhc.py`,
+  `weblate/api/producer/`, `console/src/screens/wizard/`;
+  контракт карточки — `docs/product/designs/2026-08-31-bdhc-producer-questionnaire-spec.md`.
+- Действия: согласовать endpoint/auth/schema с командой БДХК, server-side
+  credentials, ограниченные таймауты, только нужные поля B/C;
+  не принимать URL от браузера для произвольного запроса.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_bdhc.py`
+  с mock транспортом (неполная карточка/timeout/чужой объект), затем
+  разрешённый read-only smoke против реального согласованного endpoint.
+
+**3.2 Split кита на компоненты** — `todo`
+
+- Результат: подробный шаг 5 и условная карточка fast используют одну
+  детерминированную схему группировки: листы, колонка группы, внешний
+  список либо якоря в начале key. Семантика текста не маршрутизирует строки.
+- Файлы: `weblate/trans/loc_kit.py`, `weblate/trans/producer_run.py`,
+  `weblate/api/producer/`, `console/src/screens/wizard/`.
+- Действия: signals API, редактор правил/остатка/конфликтов, одинаковые
+  source и колонки всех результатов, per-component гейт до записи;
+  один провал блокирует подтверждение всего набора.
+- Проверка: `./rundev.sh test weblate/trans/tests/test_producer_split.py`,
+  `pnpm --dir console e2e`: substring-ловушка не захватывает чужие key,
+  ни потерь, ни дублей, `вход = компоненты + карантин`; сбой после первого
+  компонента возобновляется без второго экземпляра.
+
+**3.3 «Как загружено» для TXT/TSV** — `todo`
+
+- Результат: поддержанная кодировка/разделитель/колонки/строки сохраняются
+  при экспорте по provenance; JSON-импорт всё ещё в Advanced.
+- Файлы: `loc_kit_ingest/reader.py`, `loc_kit_ingest/writer.py`,
+  `weblate/trans/producer_export.py`, `console/src/screens/DownloadScreen.tsx`.
+- Действия: lossless writer для подтверждённых текстовых форматов,
+  корректные quotes/newline/BOM; явно отказать несовместимому варианту,
+  предложив CSV/XLSX, а не молча изменить формат.
+- Проверка: `uv run --directory loc_kit_ingest pytest` и
+  `./rundev.sh test weblate/trans/tests/test_producer_export.py`:
+  parse→write→parse идентичен по данным/метаданным кроме заявленных
+  export-фильтров; delimiter внутри текста, trailing empty cells, Unicode.
+
+**3.4 Совместимость с Advanced** — `todo`
+
+- Результат: завершённая двусторонняя навигация и обновление состояния
+  всех поддержанных сущностей. Скрытие вкладок/функций существующего UI
+  не входит в этот роадмап; старый UI сохраняется по решению владельца.
+- Файлы: `console/src/screens/`, `weblate/templates/base.html`,
+  `weblate/api/producer/`.
+- Действия: сверить все `advanced_url`, право доступа к вложенным
+  компонентам, возвращение в console после source/target/profile правок.
+- Проверка: `pnpm --dir console e2e`: правка в каждой стороне отражается
+  в другой; stale запись отклоняется; существующий нетабличный проект
+  открывается, родные страницы/выгрузки не потеряны.
+
+**3.5 Интеграционная приёмка и передача** — `todo`
+
+- Результат: актуальные статусы/доказательства §10, без обещаний «доделать
+  после сдачи»; инструкции уже обновлялись вместе с каждой волной.
+- Файлы: этот документ, `docs/product/guides/producer-console.md`,
+  `docs/admin/config.rst`, `docs/changes.rst`,
+  `docs/security/threat-model.rst`.
+- Действия: сверить контракт, права, схемы/фикстуры, миграции на копии БД,
+  сборку статики и нативные пути; отметить остаточные ограничения
+  форматов и внешних доступов. Развёртывание не выполняется этой задачей.
+- Проверка: команды §8 и матрица §10, фактические результаты в документе;
+  после проверки commit/push, отдельное разрешение на rollout.
+
+## 10. Сводный статус
+
+| Волна | Статус | Ветка / план |
+|---|---|---|
+| 0 Фундамент | todo | — |
+| 1 Wizard → прогон → скачать | todo | — |
+| 2 Качество и повторный цикл | todo | — |
+| 3 Контекст и расширения | todo | — |
+
+### Матрица сдачи
+
+| Контракт | Задачи | Наблюдаемое доказательство |
+|---|---|---|
+| Native login, права, CSRF, prefix | 0.1–0.3 | API отказывает чужому actor; browser deep links работают |
+| Таблицы/TXT/ZIP, source, quarantine | 1.1–1.2 | Полное сохранение строк/колонок; source не выведен автоматически |
+| Стор: форма/файлы/папка/ZIP | 1.3, 1.7 | Равные пакеты дают равные Units; unknown limit не ready |
+| Профиль/модели/ground truth | 0.5, 1.5 | Независимые модели/fallback; ответы доходят до MT и judge |
+| Термины/особые правила | 1.6 | Provenance, явное одобрение, сохранность существующих терминов |
+| Один run и восстановление | 1.4, 1.8 | Duplicate POST/redelivery не дублируют импорт/работу |
+| Экспорт и чужие форматы | 1.9, 3.3 | Реальные скачанные файлы, ключи/context/plurals сохранены |
+| Качество и действия | 2.1–2.3 | Свежесть улик, проверки остаются; accept только judge |
+| Повторный кит | 2.4 | Только дельта; история/approved/removed защищены |
+| Письма и фактические расходы | 2.5 | Итоговая почта и сумма сохранённых вызовов |
+| БДХК/split | 3.1–3.2 | Read-only карточка; арифметическое сохранение набора |
+| Два view, accessibility, handoff | 1.7–1.8, 3.4–3.5 | Двусторонние сценарии + клавиатура + узкий экран |
+
+Пока все строки — требования к будущей проверке. Приёмка приложения
+в рамках написания этого документа не выполнялась.
+
+## 11. Открытые пункты
+
+Интервью завершено поручением «пиши»; повторно выбранные решения не
+спрашиваются. Остаточные входные данные и проверки не маскируются как
+согласованные факты:
+
+1. **Реестр площадок (1.3):** разработчик собирает официальные источники,
+   проверяет ограничения/локали на нативном parser round-trip; у владельца
+   запрашивает только недоступную закрытую документацию или custom-правила.
+   Незнание лимита не разрешает тихо выпускать непроверенный пакет.
+2. **Форматы (0.4, 3.3):** реальный обезличенный TXT-кит нужен для
+   подтверждения конкретной внешней грамматики. Поддержка табличного
+   CSV/TSV-TXT с тестовой фикстурой остаётся в волне 1; иные TXT-структуры
+   не обещаются без образца, а стор-TXT уже имеет отдельный контракт.
+3. **БДХК (3.1):** read-only API, разрешённые поля и доступ согласуются
+   с владельцем сервиса до интеграции. Волны 1–2 используют анкету.
+4. **Профиль студии (1.5):** проверить существующую глобальную конфигурацию;
+   если её недостаточно для Q1-default, нужен текст владельца. Регистр,
+   мат и ja/ko не заполняются догадкой и не пропускаются.
+
+Технические safeguards (§4–§7) — предложения для согласования этого
+документа, не разрешение расширить продукт или изменить Advanced.
+Рабочие планы не должны объявляться готовыми к исполнению, пока
+влияющие на их волну входные данные не закрыты.
+
+## 12. Статус одобрения
+
+Подготовка единого документа разрешена. Продуктовые решения интервью
+зафиксированы; технический дизайн и роадмап передаются на согласование.
+Написание/коммит документа **не разрешают реализацию** сложной функции.
+После одобрения — работа по волнам с обновлением их статусов и доказательств.
+Deployment, миграции на живых инстанциях, рестарт shared dev-docker и
+платные LLM-пробы требуют отдельного явного разрешения. Прототип,
+приложение и работающие инстанции в этой задаче не изменяются.
