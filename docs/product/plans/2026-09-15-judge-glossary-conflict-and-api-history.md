@@ -1,9 +1,9 @@
 # Judge: проверка, предложения исправлений и управляемый API
 
 **Дата:** 2026-09-15.
-**Статус:** расширенный план по согласованным в чате решениям; разрешено обновление документа. Реализация, платные эксперименты, production-записи и deployment требуют отдельных разрешений.
+**Статус:** задача 1 реализована, смерджена и развёрнута; задачи 3–8 и 10 — `todo` после решения B1 в пользу контракта роадмапа; задачи 2 и 9 требуют собственных разрешений. Реализация, платные эксперименты, production-записи и deployment согласуются отдельно.
 **Основание:** расследование Pirate Ships / Vietnamese, локальная REST-проба и согласованный сценарий «предпросмотр → запуск → предложение → перепроверка → diff → подтверждение».
-**Проверенная основа:** локальная проба product-кода `dadab98e1ceb1eb51112386e4fe74e27b64ac2a5`; первоначальный план — `40c950b`, исследовательская редакция — `360e06d`. При расширении 2026-09-15 повторно прочитаны текущие границы API, judge, suggestions и Celery.
+**Проверенная основа:** локальная проба product-кода `dadab98e1ceb1eb51112386e4fe74e27b64ac2a5`; первоначальный план — `40c950b`, исследовательская редакция — `360e06d`. Реализация задачи 1 — `7a24a3ac`, слияние `bac40ad8`, уточнение документации `1901547f`. Архитектурный review этой редакции против текущего кода и роадмапа выполнен 2026-09-15: вердикт `approve-with-changes`, пункты B1–B7 и G1–G8 закреплены в тексте.
 **Правила:** `AGENTS.md`. Для согласованной реализации — `ultrasuperpowers-executing-plans`.
 
 ## Цель и выбранный подход
@@ -77,11 +77,30 @@ docker exec \
 
 Выполненная локальная проба не меняла prompt/schema/cache identity и не обращалась к реальным платным моделям. Расширенный план добавляет сравнение разделённых проверок смысла и терминологии, но не объявляет этот подход победителем заранее. Без лингвиста доступны контролируемые искажения и предметные уточнения продюсера; общую точность вьетнамской оценки ими измерить нельзя. Задача 9 фиксирует эту границу и разрешения на эксперимент.
 
+## Отношение к роадмапу консоли
+
+**Решение B1 (2026-09-15, пользователь):** `docs/product/vision/producer-console-design-and-roadmap.md` — источник истины API-контракта. Этот план не создаёт второе семейство эндпоинтов и не вводит свою конвенцию идемпотентности; его требования безопасности перемонтированы на §5 роадмапа, а недостающие там ресурсы внесены в §5 той же правкой документации. Роадмап остаётся источником решений: план не заменяет его.
+
+После реализации задач 3–8 и 10 объём работ роадмапа меняется так:
+
+| Пункт роадмапа | Что меняется |
+|---|---|
+| §5 «Контракт API (закрытый список)» | Требуется правка владельцем роадмапа: `runs/{id}/cancel/`, `decisions/{unit}/apply-candidate/`, `projects/{slug}/decisions/apply/`, `decisions/{unit}/clarification/`, `judge-applications/{id}/undo/` и новые значения `Run.status`. Этой редакцией плана роадмап не изменён |
+| 0.2 «Namespace `/api/producer/`» | Остаётся предпосылкой; если каркас создаёт задача 4 этого плана, 0.2 сокращается до `me/` и `projects/` |
+| 1.4 (поля и adoption `ProducerRun`) | Обобщение adoption, статусы и durable dispatch выполняет задача 5a — 1.4 сокращается до стадий `localize` и своей части черновика; владелец общий |
+| 2.1 «Очередь "Требуют решения"» | Объём сохраняется, но judge-сторона приходит готовой: per-row улики, свежесть и eligibility пишет задача 5a; очередь их читает |
+| 2.2 «repair, accept, back-translation» | Repair/accept реализуются задачами 6 и 7 с более строгим правилом «проверка до записи»; у 2.2 остаются back-translation и экран консоли |
+| 2.3 «Судья из консоли» | Оценка (`estimate_id`/`scope_hash`) и асинхронный прогон с `ProducerRun`, отменой и частичным результатом реализуются задачами 4, 5a и 5b; у 2.3 остаётся `RunCard.tsx` |
+| §4.3 «Данные» | `ProducerRun` получает ledger отправки и новые статусы, `JudgeVerdict` — `subject`/`candidate_target_hash`, `JudgeRunUnit` — исход `PENDING` |
+| DoD волны 2 | D2-2 и D2-3 частично доказываются тестами этого плана; D2-1, D2-4, D2-5, D2-6 не затрагиваются |
+
+Уточняющего цикла продюсера (задача 7) в роадмапе не было вовсе — он вносится как пункт волны 2, иначе его хранилище пересечётся с зоной профиля `_producer` (§4.3).
+
 ## Задача 1. Полная история штатного REST-запуска
 
 **Результат:** разрешённый REST judge-run имеет существующую историю с actor, scope, итогом и участием строк; свежие attempts связаны с run. Синхронность, response shape и существующие правила перевода не меняются.
 
-**Зависимость:** согласование реализации. Лингвист, production и платный provider для этой задачи не нужны.
+**Состояние:** выполнено 2026-09-15. **Зависимость:** отсутствует; лингвист, production и платный provider не требовались.
 
 **Файлы и интерфейсы:**
 
@@ -97,22 +116,24 @@ docker exec \
 
 **Действия:**
 
-- [ ] До изменения action добавить целевую REST-регрессию: translated unit, узкий `q`, review-enabled project, разрешённый пользователь, два внешних mock-ответа и реальные ORM-записи. До исправления требование связанной истории падает; после — проходит.
-- [ ] Переключить constructor на существующий batch с translation scope. Не переносить lifecycle во view, не менять соседний TM-путь создания translation, parser, prompt и исторические orphan records. Защита состояния и новый proposal-only режим принадлежат задаче 3, а не этой правке истории.
-- [ ] Проверить свежую и cached историю, реальные связи attempts/verdicts, cap-skipped участие и failed run при отказе provider. Старое evidence не перепривязывать к новому cached run.
-- [ ] Проверить недостающие границы: нет review permission; locked component; malformed form; ID чужого проекта; exception после создания run. Не должно быть чужой оценки/записи, вызова provider до допуска или зависшего RUNNING после обработанной ошибки. Использовать существующие batch-тесты, не дублировать их целиком.
-- [ ] Проверить существующие `translate`/`suggest` эффекты и неизменность target в `suggest`; не заменять это assert на вызов `perform`. Для затронутого plumbing-теста `test_autotranslate_restrict_direct_editing` проверять наблюдаемый запрет записи/разрешённый suggestion.
-- [ ] Выполнить локальный REST smoke на fixture-translation со stub HTTP provider: один translated unit, настоящий POST и просмотр соответствующего run/report уполномоченным пользователем. История должна показывать этот unit и исход. Production и платный provider не использовать.
-- [ ] После smoke обновить owning docs и changelog. REST JSON `"mode": "judge"` не равен CLI `weblate auto_translate --mode judge`: Django-команда допускает только `translate`, `fuzzy`, `suggest`. HTTP 200 / judge pass не доказывает правильный смысл. До задачи 3 документировать существующие изменения state; после неё описать точную границу защищённой проверки и legacy-поведения.
+- [x] До изменения action добавлена целевая REST-регрессия: translated unit, узкий `q`, review-enabled project, разрешённый пользователь, два внешних mock-ответа и реальные ORM-записи. Красное состояние подтверждено на исходном коде (`ProducerRun.DoesNotExist`), зелёное — после правки.
+- [x] Constructor переключён на существующий batch с translation scope (`weblate/api/views.py:3702`); lifecycle во view не переносился, соседний TM-путь (`:2861`) и исторические orphan records не тронуты.
+- [x] Проверены свежая и cached история, реальные связи attempts/verdicts, cap-skipped участие и failed run при отказе provider; старое evidence к новому cached run не перепривязывается.
+- [x] Проверены границы: нет review permission; locked component; malformed form; ID чужого проекта; необработанное исключение после создания run (run переходит в FAILED, а не остаётся RUNNING). Класс `TranslationJudgeAutotranslateAPITest` использует `APITransactionTestCase`, потому что seats обращаются к HTTP из отдельных потоков со своими соединениями.
+- [x] Существующий `test_autotranslate_restrict_direct_editing` усилен проверкой наблюдаемого эффекта и реального `ProducerRun`, а не вызова `perform`.
+- [x] Runtime smoke: настоящий POST на fixture-translation со stub provider, затем страница `judge-run` уполномоченным пользователем с фильтром `?outcome=passed` — строка и её исход отображаются.
+- [x] Обновлены `docs/api.rst`, `docs/changes.rst` и раздел ограничений судьи в `docs/product/guides/producer-guide-weblate.md`. Ложное утверждение о CLI-паритете исправлено: команда `weblate auto_translate` режима `judge` не имеет вовсе.
 
-**Проверка:** регрессия должна падать на исходном action и проходить на batch. Выполнить целевые существующие наборы в тестовой БД, затем описанный runtime smoke:
+**Проверка (выполнена):** регрессия падала на исходном action и проходит на batch. Полный гейт на изолированном Postgres — `weblate/api/tests.py` и `weblate/trans/tests/test_judge_autotranslate.py`: 650 passed, одно предсуществующее падение `SuggestionAPITest::test_accept_judge_candidate_holds_fuzzy_and_queues_recheck`, воспроизведённое на предшествующем коммите в той же среде и относящееся к задаче 3. Развёрнуто: image revision `bac40ad8`, healthy, страница входа `200`.
 
 ```sh
 ./rundev.sh test -n 0 weblate/api/tests.py -k autotranslate
 ./rundev.sh test -n 0 weblate/trans/tests/test_autotranslate.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_views.py
 ```
 
-Только для задачи 1 wire-схема не меняется. Расширенный API требует обновления `docs/specs/openapi.yaml` и `docs/security/threat-model.rst` в задаче 10: прежнее решение оставить эти файлы неизменными больше не относится ко всему плану.
+**Остаточное ограничение (S6).** После правки синхронный REST judge создаёт `ProducerRun` в состоянии RUNNING до первого исходящего вызова (`weblate/trans/autotranslate.py:1348-1387`) и завершает его в `perform` (`:1463-1494`). Обрыв web-воркера посередине прогона оставляет RUNNING без финализатора — раньше run не создавался вообще. Это не повод менять задачу 1: лечение — durable ledger и resume задачи 5a; до тех пор ограничение документируется в `docs/api.rst` задачей 10.
+
+Wire-схема задачей 1 не менялась. Расширенный API требует регенерации `docs/specs/openapi.yaml` и обновления `docs/security/threat-model.rst` в задаче 10.
 
 ## Задача 2. Адресное восстановление Pirate Ships
 
@@ -150,25 +171,25 @@ docker exec \
 | Подтверждение вместо автозаписи | Проверка, генерация и перепроверка не меняют текущие target/state; запись только после diff и явного действия | 3, 6 |
 | Approved участвуют в проверке | Замечания доступны; проверка сохраняет текст и `30`. Применение построчно предупреждает о переходе в `20`; AI не выдаёт approval | 3, 6 |
 | Конфликт с глоссарием | Отдельный результат, объяснение и предложение; только отдельное подтверждение, без автоматического изменения glossary | 3, 6, 7, 9 |
-| Предпросмотр | Количество выбранных, approved, исключённых, cached и требующих новых вызовов; явное подтверждение запуска | 4 |
-| Прямой API-запуск | Автоматизированный клиент может обойти preview, но обязан указать scope и лимит; сервер выполняет тот же допуск | 4, 5 |
+| Оценка до оплаты | Количество выбранных, approved, исключённых, cached и требующих новых вызовов; запуск только по `estimate_id` той же scope | 4 |
+| Прямой API-запуск | Автоматизированный клиент может не показывать оценку человеку, но обязан получить `estimate_id` и указать scope; сервер выполняет тот же допуск | 4, 5 |
 | Кэш и повтор | По умолчанию только актуальное evidence; force явно оплачивается. Изменение входа, контекста или профиля делает старую оценку непригодной | 3, 4 |
 | Один цикл | Одна генерация исправления и одна перепроверка; неудача не запускает новый семантический цикл автоматически | 3 |
 | Консервативный apply | Все применимые механические gates и обе смысловые оценки кандидата должны пройти; расхождение, unparsed или сбой блокируют apply | 3, 6 |
 | Массовое применение | Только выбранные обычные предложения. Approved и glossary conflicts подтверждаются по одной строке | 6 |
 | Частичный результат | Готовые результаты сохраняются; технически неуспешные строки можно повторить без повторной обработки успешных | 5 |
-| Фоновая работа | `202`, `run_id`, status/results URLs; закрытие страницы не прекращает запуск | 5 |
+| Фоновая работа | `Run` со `status: queued`, чтение по `runs/{id}/` и `decisions/?run=`; закрытие страницы не прекращает запуск | 5 |
 | Права | Существующие project/object permissions, повторная проверка при записи; никаких новых ролей или обхода текущих более строгих candidate guards | 4–8 |
 | Отмена | Прекратить новые HTTP-запросы, сохранить ответы уже отправленных; не обещать возврат их стоимости | 5 |
 | Лимит | Не обрезать scope молча; превышение блокирует admission до явного изменения выбора/лимита | 4 |
-| Совместимость | Старый sync `autotranslate` не превращается в `202`; новый async API отдельный, engine/lifecycle общие | 1, 5 |
+| Совместимость | Старый sync `autotranslate` остаётся синхронным и не меняет контракт; новая асинхронная поверхность живёт в `/api/producer/`, engine/lifecycle общие | 1, 5 |
 | Языки | API поддерживает существующие настроенные языки; исследование сначала только `ru→vi` | 9 |
 | Нет лингвиста | Никаких вымышленных human labels, процентов уверенности и «AI-approved»; продюсер подтверждает действие, не иностранный язык | 9, 10 |
 | Уточнение игры | Вопрос на русском, варианты плюс свой ответ/«не знаю»; уточнение не применяет target и не меняет glossary | 7 |
 | Контекст строки | Ответ видим, редактируем и используется далее только для этой строки; старое evidence становится stale | 7 |
 | Продолжение после ответа | Явный новый ограниченный запуск с платным предупреждением, а не скрытый retry; не знать ответ допустимо | 7 |
 | Конкурентные изменения | Stale proposal не перезаписывает новую работу; bulk возвращает отдельный исход каждой строки | 6 |
-| Повтор запроса | Не дублирует запуск, применение и audit-события; изменённый payload с прежним ключом — конфликт | 5, 6 |
+| Повтор запроса | Не дублирует запуск, применение и audit-события; идемпотентность — `revision`/`estimate_id`/`scope_hash`, иной payload под тем же `estimate_id` — `409` | 5, 6 |
 | Откат | Связан с исходным apply и разрешён только без последующих изменений; восстановление `30` требует review | 8 |
 | Порядок внедрения | Сначала доказательства API-безопасности; действующие промпты меняются только после отдельного сравнения | 9, 10 |
 
@@ -195,43 +216,53 @@ docker exec \
 
 Существующий severity `minor` сворачивается в `pass`; поэтому один агрегированный `pass` недостаточен для нового строгого допуска. Хранить структурированные issues и полноту обеих оценок. Если осталась смысловая ошибка любого уровня, предложение не становится применимым. Конфликт терминологии — отдельная ось: explicit acknowledgement не обходит механический провал или расхождение о смысле.
 
-### Проектируемый HTTP-контракт
+### HTTP-контракт: ресурсы `/api/producer/`
 
-Предпочесть стандартные DRF serializers/router patterns в `weblate/api/`. Названия ниже предлагаются для реализации и должны быть опубликованы в OpenAPI одновременно с кодом. Scope использует существующие типы `ProducerRun.ScopeType` и object permissions; новая поверхность не расширяет доступ actor.
+**Решение B1 (2026-09-15, пользователь):** источник истины контракта — `docs/product/vision/producer-console-design-and-roadmap.md` §5 «Контракт API (закрытый список)». Этот план не заводит собственное семейство `/api/judge-runs/` и не вводит header `Idempotency-Key` (такого header в `weblate/api` и `weblate/trans` нет нигде). Идемпотентность — `revision`, `estimate_id` и `scope_hash` плюс `409` на устаревшую ревизию, как в роадмапе. Ресурсов, отмеченных ниже как отсутствующие, в §5 пока нет: **сам роадмап этой редакцией не изменён**, его правка — предпосылка соответствующих задач и принадлежит владельцу роадмапа. Закрытый список должен остаться один, поэтому реализация задач 6–8 начинается только после внесения этих строк в §5.
 
-| Запрос | Результат |
-|---|---|
-| `POST /api/judge-runs/preview/` | `200`: scope snapshot/token, counts, exclusions, approved/cached/new-call counts, лимит и предупреждения, `can_start`; без LLM-вызовов |
-| `POST /api/judge-runs/` | `202`: `run_id`, `status_url`, `results_url`; preview token либо явные scope/query/limit, `force_recheck`; обязательный `Idempotency-Key` |
-| `GET /api/judge-runs/{id}/` | Состояние выполнения, phase/progress/heartbeat, counts, warnings, доступные действия; состояние качества отдельно |
-| `GET /api/judge-runs/{id}/results/` | Пагинированные строки, evidence provenance/freshness, issues, before/after plurals, diff, apply eligibility и причины запрета |
-| `POST /api/judge-runs/{id}/cancel/` | Идемпотентный запрос остановки новых вызовов; terminal run не возобновляется |
-| `POST /api/judge-runs/{id}/retry/` | Новый связанный run только для технически неуспешных строк; явный лимит и idempotency key |
-| `POST /api/judge-runs/{id}/apply/` | Выбранные candidate IDs и expected revisions; per-row results. Особый кандидат — ровно один и с явными acknowledgement flags |
-| `POST /api/judge-runs/{id}/clarifications/` | ID строки, expected context revision и ответ продюсера; сохраняет контекст, не запускает provider |
-| `POST /api/judge-runs/{id}/applications/{application_id}/undo/` | Guarded audited восстановление конкретного apply, не откат run или проекта |
+Namespace `/api/producer/` на момент этой редакции не существует (роадмап, строка 103): его каркас — задача 0.2 роадмапа (`:840-853`). Задача 4 этого плана либо приходит после 0.2, либо создаёт минимальный каркас `weblate/api/producer/{__init__,urls,views,serializers}.py` и включение `path("producer/", include(...))` в `weblate/api/urls.py:46-51`, и тогда 0.2 сокращается до `me/` и `projects/`. Выбор фиксирует integration owner до начала задачи 4; двух каркасов быть не должно.
 
-Continuation после clarification использует новый `POST /api/judge-runs/` с родительским run и новым снимком; отдельный engine/неограниченный regenerate endpoint не нужен. Для write-команд нужен idempotency key; read/preview не должны создавать платную работу.
+| Операция плана | Ресурс `/api/producer/` | Статус в §5 роадмапа |
+|---|---|---|
+| Оценка scope и допуск | `POST projects/{slug}/runs/estimate/ {kind: judge, scope}` | существует (`:528-529`); ответ дополняется counts/exclusions/ceilings |
+| Запуск проверки | `POST projects/{slug}/runs/ {kind: judge, scope, estimate_id}` | существует (`:530`) |
+| Состояние прогона | `GET runs/{id}/` | существует (`:522-524`); нужны новые значения `status` |
+| Результаты по строкам | `GET projects/{slug}/decisions/?kind=judge&run=` | существует (`:532-535`); питает очередь 2.1, отдельного `results/` не вводится |
+| Возобновление после редоставки | `POST runs/{id}/resume/ {attempt}` | существует (`:527`) |
+| Отмена | `POST runs/{id}/cancel/` | **отсутствует; требуется внести в §5** |
+| Ремонт одной строки | `POST decisions/{unit}/repair/ {revision, finding_ids[]}` | существует (`:536`) |
+| Принятие находки как есть | `POST decisions/{unit}/accept/ {revision, finding_id, reason}` | существует (`:537`) |
+| Применение проверенного кандидата | `POST decisions/{unit}/apply-candidate/ {revision, candidate_id, acknowledge{}}` | **отсутствует; требуется внести в §5** |
+| Пакетное применение | `POST projects/{slug}/decisions/apply/ {items[]}` | **отсутствует; требуется внести в §5** |
+| Уточнение смысла строки | `GET`/`PATCH decisions/{unit}/clarification/` | **отсутствует; требуется внести в §5** |
+| Откат применения | `POST judge-applications/{id}/undo/` | **отсутствует; требуется внести в §5** |
 
-Поля и error codes закрытые, machine-readable, не зависят от локализованного текста. Невалидный payload — `400`, недоступный scope — существующий permission-filtered `403/404`, stale snapshot/несовпадающий idempotency payload/превышенный admission limit — `409` с конкретным code. Preview показывает превышение без LLM, start отказывает. Валидный bulk apply — `200` с отдельными `applied/already_applied/stale/forbidden/needs_individual_confirmation/not_verified` исходами; не превращать частичную запись в ложное «всё применено».
+Continuation после уточнения — новый `POST projects/{slug}/runs/` с родительским run, своей оценкой и новым снимком; отдельного engine/regenerate-эндпоинта нет. Read-операции и оценка не создают платную работу.
 
-Execution status: `queued`, `running`, `cancel_requested`, `completed`, `partial`, `failed`, `cancelled`. `completed` означает законченную обработку, не правильные переводы. Ошибка provider и semantic issue — разные поля. Row result различает checked/no issues, proposal ready, needs clarification, unresolved, technical failure, skipped/stale; применение/откат — отдельная история, а не переписывание исходного evidence.
+Коды ошибок — по шапке §5: `400` невалидный payload, `403` нет прав, `404` недоступный объект, `423` блокировка, `409` конфликт ревизии (устаревшие snapshot/`estimate_id`, превышенный допуск). Валидное пакетное применение — `200` с отдельными исходами `applied/already_applied/stale/forbidden/needs_individual_confirmation/not_verified`; частичная запись никогда не отображается как «всё применено».
 
-Run ID не секрет доступа. GET, retry, cancel, clarify, apply и undo заново фильтруют scope и проверяют действующие права, включая project tokens. Сохранять текущий более строгий guard judge-кандидата (`unit.review` и `translation.auto`) и проверять штатное право редактирования; не ослаблять legacy acceptance ради новой таблицы ролей. Approved требует review и подтверждения потери approval. Уточнение контекста требует существующего права изменения соответствующего контекста.
+**Определение `revision` (B7).** Одно на продукт, общее с `Decision.revision` роадмапа (`:533`): непрозрачный серверный токен из `(unit.pk, unit.last_updated, максимальный Change.pk этой строки)`. Новое поле и миграция не нужны: `Unit.last_updated` — `auto_now` (`weblate/trans/models/unit.py:669`) и растёт на каждом сохранении, включая propagation, а pk `Change` монотонны, причём `ACCEPT`/`CHANGE` хранят `old` и `details.old_state` (`weblate/trans/actions.py:697-701`, `weblate/trans/models/unit.py:2125`). Клиент токен не разбирает и не конструирует. Возврат идентичного текста создаёт новую `Change`, поэтому «изменили и вернули обратно» ловится: сравнение токенов под `select_for_update` даёт `409`. Лишний `409` из-за несмыслового сохранения допустим; молчаливая перезапись — нет.
+
+Статусы прогона: сегодня `queued/running/completed/failed` (`weblate/trans/models/judge.py:310-314`) плюс `no-update` в ответе роадмапа; добавляются `cancel_requested`, `partial`, `cancelled`. `completed` означает законченную обработку, не правильные переводы. Ошибка provider и смысловая проблема — разные поля. Исход строки различает checked/no issues, proposal ready, needs clarification, unresolved, technical failure, skipped/stale; применение и откат — отдельная история, а не переписывание исходного evidence.
+
+Идентификатор run не является секретом доступа. Каждое чтение и каждая команда заново фильтруют scope и проверяют действующие права, включая project tokens, и переиспользуют существующий `user_can_view_producer_run` (`weblate/trans/views/judge.py:358-367`). Сохранить текущий более строгий guard judge-кандидата (`unit.review` и `translation.auto`) и проверять штатное право редактирования; не ослаблять legacy acceptance ради новой таблицы ролей. Approved требует review и подтверждения потери approval. Уточнение контекста требует существующего права изменения соответствующего контекста.
 
 ## Задача 3. Proposal-only проверка и защита состояний
 
 **Результат:** новый цикл не изменяет живой перевод до apply, включая approved, pretranslation, state projection и deterministic `max-length`. Уже существующие candidates используются, но проверяются до записи.
 
-**Зависимости:** согласование реализации; не требует реальных LLM. Задача 1 может выполняться независимо до общей интеграции.
+**Зависимости:** согласование реализации; не требует реальных LLM. Задача 1 выполнена и эту задачу не блокирует. Схемные решения B2/B3/B6 ниже закреплены и не переоткрываются исполнителем.
 
-**Файлы:** `weblate/trans/autotranslate.py`, `weblate/trans/judge_loop.py`, `weblate/trans/models/judge.py`, `weblate/trans/models/suggestion.py`, `weblate/trans/tasks.py`; при необходимости новая миграция в `weblate/trans/migrations/` с номером от актуального graph. Номера и имена новых моделей заранее не выдумывать.
+**Файлы:** `weblate/trans/autotranslate.py`, `weblate/trans/judge_loop.py`, `weblate/trans/models/judge.py`, `weblate/trans/models/suggestion.py`, `weblate/trans/tasks.py`; одна аддитивная миграция в `weblate/trans/migrations/` с номером от актуального graph (`JudgeVerdict.subject`, `JudgeVerdict.candidate_target_hash`).
 
 **Действия:**
 
-- [ ] Сначала закрепить регрессией `approved 30 → 20` и устранить отмену человеческого одобрения простой judge-проверкой в общих вызовах. Не переписывать исторические records.
+- [ ] **Сначала approved-политика (B6).** Закрепить регрессией `approved 30 → 20` и исправить проекцию: в mutating-режимах `state_for_verdict` (`weblate/trans/models/judge.py:902-926`) и запись по `locked.state != state` (`weblate/trans/autotranslate.py:905-920`) никогда не понижают approved на `PASS`/`FLAG`. На `REJECT` approved сохраняет `30`, а замечание остаётся видимым как advisory-улика: вероятностный вердикт не блокирует релиз (`docs/product/vision/llm-first-product-architecture.md:319-323`). Понижение до `20` возможно только через явное подтверждённое apply задачи 6 при действующем `unit.review`. Исторические records не переписывать. Пинящий тест уже есть: `weblate/api/tests.py::TranslationJudgeAutotranslateAPITest::test_judge_keeps_approved_target_but_lowers_state_pre_task3` — он фиксирует текущий дефект и переписывается на новую политику этой задачей.
 - [ ] Ввести явную политику proposal-only для нового run; все ветви, включая MT/pretranslation, max-length и post-judge projection, сохраняют target/state. Не объявлять весь legacy `autotranslate` read-only: его переводные режимы сохраняют назначение.
-- [ ] Разделить проверку текущего текста и кандидата; исходные verdicts и свежая оценка альтернативы имеют разный subject. Сохранить all-plurals, контекст и provenance.
+- [ ] **Дискриминатор subject (B2).** Добавить `JudgeVerdict.subject` (`live|candidate`) и `candidate_target_hash` одной аддитивной миграцией. `_write_verdict` (`weblate/trans/judge_loop.py:295-378`) уже берёт hash/identity из `JudgeRequest`, поэтому кандидат оценивается без подмены `Unit.target`. Каждый читатель живого текста обязан исключать candidate-строки: `_seat_round_rows`/`active_round`/`current_round` (`models/judge.py:984-1031`), `latest_round` (`:929-941`), `judge_status_annotations` (`:1270-1272`), `describe_latest_verdict`, `repair_evidence` (`:1120-1176`). Добавить отдельный `candidate_round(unit, candidate)`. Candidate-строки сохраняют `attempt=0` и получают свежий `request_round` из `_allocate_request_round` (`judge_loop.py:1019-1032`), иначе ломаются unique constraint (`models/judge.py:850-857`) и временное окно `repair_evidence`.
+- [ ] **Deferral для кандидата (B2).** `_persist_verdict_batches` вызывает `_sync_deferral` после каждого вердикта (`judge_loop.py:1079-1087`), а `_select_drain_requests` пересобирает request из живой строки и закрывает deferral с несовпавшей identity (`:1786-1797`): candidate-seat молча закроется и кандидат останется непроверенным. Либо пропускать `_sync_deferral` для candidate-subject, либо дать `JudgeDeferral` тот же subject и собирать request из сохранённого кандидата.
+- [ ] **Механизм бесплатного apply (B2, сохранить намеренно).** `_cached_verdict` сопоставляет по `request_identity` (`judge_loop.py:416-438`): после записи кандидата его проверенные вердикты становятся актуальной уликой живой строки без нового вызова. Это и есть реализация требования «apply не вызывает новый платный recheck»; формулировать её явно, а не как побочный эффект.
+- [ ] **Идентичность кандидата (B3).** Идентичность для API — строка `JudgeRunUnit` (unique `(run, unit_id_snapshot)`, `models/judge.py:665-667`) с `candidate_target_hash`, id проверочных вердиктов и eligibility; pk `Suggestion` — изменяемый указатель, не идентичность. `userdetails` остаётся схемой 1: `JudgeCandidateMetadata` отвергает любой набор ключей, кроме семи закрытых полей (`models/judge.py:116-197`), поэтому новое состояние живёт на judge-таблицах. `_store_candidate` заменяет только кандидатов своего run/verdict lineage — сегодня `SuggestionManager.add` удаляет все judge-кандидаты строки без receipt (`models/suggestion.py:134-139`). Ночной `cleanup_suggestions` (`weblate/trans/tasks.py:511-537,2752-2754`) может удалить кандидата между чтением результатов и apply: apply/undo сравнивают `candidate_target_hash` и revision и отвечают `stale`, а не 404/500.
 - [ ] Генерация по конкретным найденным issues → применимые механические gates → обе оценки кандидата. Не записывать кандидата в Unit ради вызова существующего evaluator.
 - [ ] Ограничить семантический цикл одной генерацией и одной перепроверкой; исчерпанный лимит/расхождение/новая ошибка дают unresolved. Транспортные retries остаются ограниченными и входят в отдельный request ceiling, а не создают новые semantic attempts.
 - [ ] Кэшировать только полное актуальное evidence с профильной identity; cached новый run получает своё участие без переноса старых attempts. Force bypass явный. Неподдерживаемый repair language — явный исход, не fallback на другой движок без контракта.
@@ -242,15 +273,16 @@ Run ID не секрет доступа. GET, retry, cancel, clarify, apply и u
 
 **Результат:** пользователь знает scope до оплаты; работа не обрезается молча и не расширяется между preview и worker.
 
-**Зависимость:** snapshot/cache contract задачи 3. **Файлы:** `weblate/api/views.py`, `serializers.py`, `urls.py`, `tests.py`; `weblate/trans/autotranslate.py`, `models/judge.py`, `forms.py`.
+**Зависимость:** задача 3 (движок и subject) и задача 5a (модель run, snapshot-строки, request key) — preview хранит снимок как строки предсозданного run, а не как подписанный stateless token (G2). **Файлы:** `weblate/api/producer/{urls,views,serializers}.py`, `weblate/api/urls.py:46-51`, `weblate/api/tests.py`; `weblate/trans/autotranslate.py` (`preview_judge_scope`, `judge_initial_request_count` `:758-767`), `models/judge.py`, `forms.py`.
 
 **Действия:**
 
-- [ ] Повторно использовать selection/permissions текущего flow, но отделить подсчёт полного scope от legacy `units[:limit]`. Сохранить closed ordered IDs и per-row snapshots.
-- [ ] Вернуть selected/approved/excluded/cached/new-call counts, причины исключений, возможные фазы и hard limits; preview не генерирует кандидаты и не вызывает LLM.
-- [ ] Admission limit относится к строкам, требующим новых вызовов; резерв покрывает возможное исправление и перепроверку каждой допущенной строки. Cached строки не расходуют его. Отдельный серверный bound ограничивает общий размер snapshot и HTTP attempts с retries.
-- [ ] При превышении отказаться от запуска, не выбирать первые N. Повышение пользовательского лимита не обходит серверный максимум. Не обещать точную денежную стоимость без надёжного тарифа; показывать, что это лимит работы, не валютный бюджет.
-- [ ] Между preview/start проверить actor/scope/config revisions. При drift вернуть явный stale preview и потребовать обновления; при прямом start выполнить те же проверки атомарно. На execution drift не оплачивать повторно без нового допуска.
+- [ ] **Маршрут — роадмап.** Оценка публикуется как `POST /api/producer/projects/{slug}/runs/estimate/ {kind: judge, scope}` → `{estimate_id, scope_hash, strings, cost_usd_min?, cost_usd_max?, minutes_min?, minutes_max?, basis}` (`docs/product/vision/producer-console-design-and-roadmap.md:528-529`). Счётчики этого плана (selected/approved/excluded/cached/new-call, причины исключений, фазы, hard limits) добавляются к тому же ресурсу, отдельного `preview/` эндпоинта не создаётся. Одна scope даёт ту же оценку, что HTML-путь (роадмап D2-3, `:1247-1249`).
+- [ ] Повторно использовать selection/permissions текущего flow, но отделить подсчёт полного scope от legacy `units[:limit]`. Сохранить closed ordered IDs и per-row snapshots. Preview не генерирует кандидаты и не вызывает LLM.
+- [ ] **Арифметика допуска (G3).** `judge_initial_request_count` и `worst_case_calls = initial × (JUDGE_MAX_REPAIR_ATTEMPTS + 1)` (`weblate/trans/autotranslate.py:758-767`) считают только раунды живого текста. Резерв допущенной строки обязан включать repair-MT и проверку кандидата. `RetryBudget` (`judge_loop.py:1346-1352`) действует на вызов `run_judge_batch`, не на run: в ответе указывать, какой именно ceiling показан.
+- [ ] **Стоимость выросла осознанно (S1).** Слитый план триажа откладывал второй раунд до принятия — «Producer keeps current text: 3 total; applies candidate: 5» (`docs/product/plans/2026-09-01-judge-producer-triage-embed.md:95-107`). Здесь кандидат проверяется до решения продюсера, поэтому худший случай помеченной строки — 5 вызовов независимо от применения. Записать это в основание оценки; допустим необязательный knob «проверять выбранные строки по требованию».
+- [ ] При превышении отказаться от запуска, не выбирать первые N. Повышение пользовательского лимита не обходит серверный максимум. Не обещать точную денежную стоимость без надёжного тарифа; показывать, что это лимит работы, не валютный бюджет. Отсутствие тарифа — «оценка недоступна», не `$0` (роадмап `:568-570`).
+- [ ] Между оценкой и запуском сверить actor/scope/config revision и `scope_hash`. Drift — `409` с конкретным кодом и требованием новой оценки; при прямом запуске те же проверки атомарно. На execution drift не оплачивать повторно без нового допуска.
 
 **Проверка:** permission-filtered counts, foreign project/language IDs, locked component, malformed query, mixed cached/fresh, нулевой cap с all-cached и с fresh scope, превышение, drift и прямой start. Ни одного provider call до успешного допуска. Реальный REST smoke на локальном fixture с несколькими строками и точной сверкой preview/результата.
 
@@ -258,16 +290,18 @@ Run ID не секрет доступа. GET, retry, cancel, clarify, apply и u
 
 **Результат:** принятый запуск переживает закрытие клиента, результаты читаются по ID, явный повтор не дублирует работу.
 
-**Зависимость:** 3–4. **Файлы:** `weblate/api/views.py`, `serializers.py`, `urls.py`, `tests.py`; `weblate/trans/models/judge.py`, `autotranslate.py`, `tasks.py`, `judge_loop.py`, `weblate/utils/celery.py`; необходимые миграции. Сначала LSP references для изменяемых exported symbols и всех потребителей новых run statuses.
+**Зависимость:** 3. Задача делится на **5a** (модель и допуск) и **5b** (worker, отмена, повтор): 4 зависит от 5a, поэтому 5a идёт раньше preview. **Файлы:** `weblate/api/producer/`, `weblate/api/tests.py`; `weblate/trans/models/judge.py`, `autotranslate.py`, `tasks.py`, `judge_loop.py`, `weblate/utils/celery.py`; миграции. Сначала LSP `references` для изменяемых exported symbols и всех потребителей статусов run.
 
 **Действия:**
 
-- [ ] Создавать и читать существующий `ProducerRun`; durable request key с unique constraint на actor/scope/operation и fingerprint payload. Одновременные одинаковые POST возвращают один run, иной payload под тем же ключом — conflict.
-- [ ] Связать admission и dispatch так, чтобы crash между DB commit и broker publish не оставлял бесконечный queued. Переиспользовать проверенные repository dispatch/recovery patterns, не обещать надёжность одного `on_commit(delay)`. Не создавать второй общий orchestration framework.
-- [ ] Worker использует pre-created run и snapshots; повторная доставка не создаёт новый run/кандидат/платный вызов для уже сохранённого результата. Источник прав — актуальный actor, не сохранённый флаг допуска.
-- [ ] Развести progress/liveness и качество; расширить все enum consumers/report counts для partial/cancel. Готовые rows фиксируются до перехода к следующим; необработанное исключение даёт наблюдаемый terminal/recoverable исход, не вечный RUNNING.
-- [ ] Проверять cancel перед каждым новым внешним вызовом, включая обе seat-ветви, repair, retries и deferrals. Уже отправленный запрос может завершиться; сохранить его ответ. Cancel не удаляет готовые предложения и не даёт deferred drain обойти остановку.
-- [ ] Retry technical failures создаёт связанный новый run с новым явным лимитом; semantic unresolved не считается техническим сбоем. Успешные rows/seat evidence повторно не оплачивать при неизменном входе.
+- [ ] **5a. Статусы и их потребители (S4).** Добавить `cancel_requested/partial/cancelled` в `ProducerRun.Status` (`weblate/trans/models/judge.py:310-314`) и обновить каждого потребителя: `RUN_KIND_LABELS` (`:279-287`), `JUDGE_MODES`/`HISTORY_MODES` и `user_can_view_producer_run` (`weblate/trans/views/judge.py:358-367`), `weblate/templates/snippets/producer-run.html:21-27`, `producer-runs-menu.html:35`, а также терминальный guard `_finish_producer_run` (`autotranslate.py:1429`), который сейчас считает перезаписываемым всё, кроме COMPLETED/FAILED.
+- [ ] **5a. Durable dispatch — назвать существующий паттерн (B5).** Единственный проверенный ledger в репозитории — лок-китовый: `LocKitImportDraft.dispatch_task_id/dispatch_phase/dispatch_requested_at/dispatch_published_at/dispatch_attempts/dispatch_error` (`weblate/trans/models/loc_kit.py:117-136`, миграция `0127_loc_kit_dispatch_ledger.py`), диспетчер `_publish_loc_kit_dispatch` (`weblate/trans/tasks.py:1696-1786`), запись итога (`:1788-1851`) и периодический `drain_loc_kit_dispatches` (`:2588-2611`, регистрация `:2789-2791`). Перенести те же шесть полей (или общий abstract mixin) на `ProducerRun`, добавить `drain_producer_run_dispatches` и зафиксировать fence: worker забирает run под `select_for_update` по `(pk, task_id)`, per-row upsert идемпотентен по `(run, unit_id_snapshot)`, платный вызов не делается для строк с полной живой/кандидатной уликой. Безопасность дублирующей доставки в лок-ките держится именно на fencing-токене каждой порции — без per-row fence «safe duplicate» превращается в повторную оплату.
+- [ ] **5a. Закрыть существующую дыру QUEUED-навсегда.** `queue_judge_recheck` публикует через голый `transaction.on_commit` и помечает FAILED только при исключении публикации (`weblate/trans/judge_loop.py:2077-2105`); крах между commit и callback оставляет run в QUEUED, после чего `active_recheck_run` (`:1979-1991`) подавляет все будущие перепроверки этой строки. Перевести этот путь на тот же ledger, а не оставлять третий механизм отправки.
+- [ ] **5a. Допуск и claim.** Создавать и читать существующий `ProducerRun`; durable request key с unique constraint на actor/scope/operation и fingerprint payload. Одновременные одинаковые POST возвращают один run; иной payload под тем же ключом — `409`. `_adopt_producer_run` (`weblate/trans/autotranslate.py:1293-1345`) сегодня жёстко фильтрует `requested_mode="recheck"` и QUEUED (`:1316-1322`) — добавить ветвь resume для RUNNING по совпадающему `task_id`, зеркально лок-китовому `dispatch_task_id`. Права берутся у актуального actor, не из сохранённого флага допуска.
+- [ ] **5a. Per-row durability (B4).** Заменить финальный цикл `JudgeRunUnit.update_or_create` в `process_judge` (`weblate/trans/autotranslate.py:953-1010`) на per-row upsert внутри пути сохранения батча (`_persist_verdict_batches`, `judge_loop.py:1034-1091`): строка = пара вердиктов + кандидат + проверка + eligibility. Сейчас на каждый батч сохраняются только `JudgeVerdict`, а участие пишется в конце, поэтому редоставка `acks_late` задачи (`tasks.py:1000-1007`) либо теряет частичный результат, либо платит заново. Добавить значение `PENDING` в `JudgeRunUnit.Outcome` (сейчас `outcome` обязателен и такого значения нет, `models/judge.py:591-602`) — это же значение хранит snapshot preview из задачи 4 — либо назвать альтернативное хранилище снимка.
+- [ ] **5b. Worker и прогресс.** Развести progress/liveness и качество; готовые rows фиксируются до перехода к следующим; необработанное исключение даёт наблюдаемый terminal/recoverable исход, не вечный RUNNING. Phase/heartbeat читать из того же liveness-record, что показывает `/api/tasks/{id}/` (`weblate/api/views.py:5027-5040`, `weblate/utils/celery.py:170-206`); новое имя задачи, если оно появится, добавить в `LIVENESS_TASKS` (`:103-109`). Run-центричный `GET runs/{id}/` остаётся: run живёт дольше задачи.
+- [ ] **5b. Отмена (G4).** Нужен предикат отмены **до** исходящего вызова. Сегодня единственный per-batch шов — `on_batch`/`_persist_verdict_batches`, и он исполняется уже после HTTP; seats работают в потоках с барьером подтверждения того же `batch_index` (`judge_loop.py:1103-1252`). Протянуть предикат в `request_verdicts`/`_SeatJob` и проверять его в обеих seat-ветвях, в repair, retries и deferral-drain. Уже отправленный запрос может завершиться — его ответ сохраняется. Cancel не удаляет готовые предложения и не даёт drain обойти остановку.
+- [ ] **5b. Повтор.** Retry технических сбоев создаёт связанный новый run с новым явным лимитом; semantic unresolved техническим сбоем не считается. Успешные rows/seat evidence повторно не оплачиваются при неизменном входе. Маршруты — `GET /api/producer/runs/{id}/`, `POST /api/producer/runs/{id}/resume/ {attempt}` (роадмап `:525-527`); отдельный `retry/` вводится только если resume семантически не покрывает повтор, и тогда добавляется в §5 роадмапа.
 
 **Граница гарантии:** сервер обеспечивает идемпотентность клиентских команд и сохранённых результатов. Crash после принятия HTTP провайдером, но до сохранения ответа, без provider idempotency не позволяет гарантировать exactly-once billing. Такой outcome показывать как неизвестный, не скрывать за автоматическим платным повтором; отдельное подтверждение сообщает о возможной повторной оплате.
 
@@ -277,16 +311,16 @@ Run ID не секрет доступа. GET, retry, cancel, clarify, apply и u
 
 **Результат:** пользователь применяет только проверенный актуальный diff; массовая команда возвращает честные отдельные исходы.
 
-**Зависимость:** 3–5. **Файлы:** `weblate/trans/judge_loop.py:accept_judge_candidate`, `models/suggestion.py:Suggestion.accept`, `models/judge.py`, `models/unit.py`; API views/serializers/tests и `weblate/trans/views/edit.py`.
+**Зависимость:** 3–5. **Файлы:** `weblate/trans/judge_loop.py:accept_judge_candidate` (`:2108-2208`), `models/suggestion.py:Suggestion.accept` (`:282-288`), `models/judge.py`, `models/unit.py`, `weblate/trans/models/change.py`; `weblate/api/producer/`, `weblate/api/tests.py` и `weblate/trans/views/edit.py`.
 
 **Действия:**
 
-- [ ] Общий guard проверяет actual edit/review/auto permissions, current state/revision, source/context/profile, candidate hash и обе полные оценки кандидата. Legacy API/UI acceptance, bulk и votes не обходят guard; обычные non-judge suggestions сохраняют свои правила.
-- [ ] Применять через штатный `Unit.translate`, без propagation на другие строки и без прямого SQL target update. Audit сохраняет actor, run/candidate/evidence, before/after plurals и state. Сохранить receipt до удаления native suggestion.
-- [ ] Обычный bulk допускает выбранные кандидаты. Approved и glossary conflict исключены из bulk; отдельный запрос подтверждает потерю approval и/или конфликт. Если строка стала approved после preview, старый обычный apply её не меняет.
-- [ ] Применение approved меняет `30` на `20`, не выдаёт новое approval. Другие применённые исправления также не получают AI approval. Неприменённые строки остаются в исходных state.
-- [ ] Каждая строка — отдельная атомарная операция с повторным guard под lock. Ошибка одной не откатывает уже применённые остальные; durable receipts позволяют безопасно повторить прерванный batch без дублирования audit.
-- [ ] Apply не вызывает новый платный recheck: он уже завершён до подтверждения. Сохранённые candidate evidence связываются с применением так, чтобы ни чужой target, ни stale profile не стали current evidence.
+- [ ] **Единственный primitive apply (G5).** `accept_judge_candidate` (`weblate/trans/judge_loop.py:2108-2208`) становится единственной точкой записи кандидата: проверка обеих оценок, флаг подтверждения потери approval, флаг конфликта терминологии, receipt. Сегодня она пишет `STATE_TRANSLATED`, удаляет Suggestion и ставит платную перепроверку (`:2192-2205`) — постфактумный `queue_judge_recheck` убирается, а не остаётся вторым путём, иначе старая карточка UI продолжает платить за то, чего новый API не делает. Все существующие вызывающие обязаны идти через него: `Suggestion.accept` (`models/suggestion.py:282-288`), REST `weblate/api/views.py:4133-4165`, UI `weblate/trans/views/edit.py:1172-1187` и `:2156-2160`, bulk-задача (`weblate/trans/tasks.py:405-428`), автоприём по голосам (`models/suggestion.py:364-368`).
+- [ ] Применять через штатный `Unit.translate`, без propagation на другие строки и без прямого SQL target update. Audit сохраняет actor, run/candidate/evidence, before/after plurals и state. Receipt сохраняется до удаления native suggestion.
+- [ ] **Конфликт терминологии до задачи 9 (G6).** Структурированного признака нет: `JudgeVerdict.errors` — свободные `{severity, category, description}` (`weblate/trans/models/judge.py:874-880`). Промежуточное правило: `category == "terminology"` любой severity ⇒ строка выходит из обычного bulk и требует отдельного подтверждения. Задача 9 может заменить правило измеренным, но задача 6 выходит раньше и без правила выйти не может.
+- [ ] Обычный bulk допускает только выбранные обычные кандидаты. Approved и конфликт терминологии подтверждаются по одной строке с явным acknowledgement; если строка стала approved после чтения результатов, обычный apply её не меняет. Применение approved переводит `30` в `20` и не выдаёт нового approval; остальные применённые исправления тоже не получают AI-approval. Неприменённые строки остаются в исходных state.
+- [ ] Каждая строка — отдельная атомарная операция с повторным guard под `select_for_update`. Ошибка одной не откатывает уже применённые; durable receipts позволяют безопасно повторить прерванный batch без дублирования audit.
+- [ ] **Маршруты и дополнение роадмапа.** Принятие находки как есть — существующий `POST /api/producer/decisions/{unit}/accept/ {revision, finding_id, reason}`, ремонт — `POST decisions/{unit}/repair/ {revision, finding_ids[]}` (роадмап `:536-537`). Записи проверенного кандидата в §5 роадмапа сейчас нет: добавить туда `POST decisions/{unit}/apply-candidate/ {revision, candidate_id, acknowledge{approval_loss?, terminology_conflict?}}` и пакетный `POST projects/{slug}/decisions/apply/ {items[]}` с per-row исходами. Контракт закрытый: дополнение вносится в роадмап до реализации, а не заводится параллельным семейством.
 
 **Проверка:** two users edit/apply race, ABA edit, permission revoked, old candidate after new profile/context, bypass через ordinary suggestion API, approved/conflict в bulk, оба acknowledgement для совмещённого случая, partial commit и retry. Проверить реальные target/state, audit и file/VCS persistence, не только HTTP status. Строка с failed/unparsed candidate evaluation не применяется даже индивидуально. Ручное обычное редактирование остаётся доступно по своим правам, не маскируется под validated apply.
 
@@ -294,13 +328,13 @@ Run ID не секрет доступа. GET, retry, cancel, clarify, apply и u
 
 **Результат:** продюсер отвечает на предметный вопрос на русском, контекст сохраняется, затем явно запускается новая ограниченная попытка.
 
-**Зависимость:** 3–5; экспериментальное обнаружение вопросов — 9. **Файлы:** `weblate/trans/models/judge.py`, `judge_loop.py:build_request`, `weblate/trans/models/unit.py`, API serializers/views/tests; подтверждённая интеграционная граница `weblate/machinery/llm.py` для последующих переводов, при необходимости миграция.
+**Зависимость:** 3–5; экспериментальное обнаружение вопросов — 9. **Требует записи в роадмап:** уточняющего цикла нет ни в §5, ни в §9 роадмапа, а хранилище ответов пересекается с зоной профиля/`_producer` (§4.3) — внести его как пункт волны 2 (или частью 2.2) до реализации. **Файлы:** `weblate/trans/models/judge.py`, `judge_loop.py:build_request`, `weblate/trans/models/unit.py`, `weblate/machinery/llm.py`, `weblate/api/producer/`; миграция.
 
 **Действия:**
 
 - [ ] Возвращать вопрос, основание конфликта, контекст строки и варианты; всегда разрешать свой ответ/«не знаю». Модель не выбирает ответ за продюсера и не выдаёт вариант за установленный факт.
-- [ ] Сохранить actor/version и отдельное уточнение конкретной target unit, не затирать Explanation/Character/flags и не распространять ответ через source explanation или glossary. Переиспользовать подходящее existing storage только при сохранении этих границ; иначе минимальное durable дополнение модели.
-- [ ] Сделать уточнение доступным для чтения/редактирования через API и включить в общую сборку контекста следующих переводов и обеих проверок. Hash/cache identity учитывает его revision. Не ограничивать использование одним текущим run.
+- [ ] **Где живёт уточнение (G1).** Закрепить: новое поле/модель на конкретной target-unit, одно расширение `compute_context_hash` (`weblate/trans/models/judge.py:218-240`, вызывается из ≥10 мест) и явное включение в оба сборщика промпта — `build_request` (`weblate/trans/judge_loop.py:111-138`, читает сейчас только `source_unit.explanation` и `note`) и MT (`weblate/machinery/llm.py:562-572`, берёт explanation целевой unit только когда исходный пуст, то есть для инцидента Pirate Ships уточнение молча не дошло бы). Не писать в `source_unit.explanation`: `Unit.update_explanation` распространяет его на все языковые units и пишет PendingUnitChange (`weblate/trans/models/unit.py:2879-2925`).
+- [ ] Сохранить actor/version; уточнение принадлежит одной target unit и не затирает Explanation/Character/flags. Ответ доступен для чтения и правки через `/api/producer/decisions/{unit}/clarification/` и входит в контекст последующих переводов и обеих проверок; `hash`/cache identity учитывает его revision. Использование не ограничено текущим run.
 - [ ] Clarification write не вызывает LLM, не применяет кандидат и не меняет target/state/glossary. «Не знаю» оставляет unresolved; ответ с новым смыслом инвалидирует старое предложение.
 - [ ] Новая попытка после ответа — отдельное подтверждённое admission с родительской связью и лимитом 1 repair + 1 recheck. Старый исчерпанный semantic cycle не запрещает эту новую авторизованную работу.
 
@@ -310,14 +344,14 @@ Run ID не секрет доступа. GET, retry, cancel, clarify, apply и u
 
 **Результат:** пользователь отменяет конкретное применённое исправление, не теряя последующую работу.
 
-**Зависимость:** receipts/revisions задачи 6. **Файлы:** `weblate/trans/models/judge.py`, `models/unit.py`, `weblate/api/views.py`, `serializers.py`, `tests.py`; существующие audit механизмы.
+**Зависимость:** receipts/revisions задачи 6. **Файлы:** `weblate/trans/models/judge.py`, `models/unit.py`, `weblate/trans/models/change.py`, `weblate/api/producer/`, `weblate/api/tests.py`; существующие audit механизмы.
 
 **Действия:**
 
-- [ ] Хранить before target/state и applied revision в durable receipt, даже когда Suggestion удалена; чтение защищено теми же scope permissions.
-- [ ] Под lock сравнить текущую revision со своей applied revision. Любое последующее изменение, включая возврат идентичного текста, запрещает автоматический undo; вернуть diff/conflict вместо overwrite.
-- [ ] Восстановить через штатный audited edit без propagation; прежний `30` только с действующим review permission. Undo не выдаёт новые judge evidence за проверку восстановленного текста и не запускает платный вызов.
-- [ ] Идемпотентный повтор возвращает прежний undo receipt; нельзя повторно откатить более новую работу. Откат только своего application, не всей истории run.
+- [ ] **Receipt поверх существующего audit (S3).** `Change.revert` уже восстанавливает `old`/`old_state` под блокировкой строки (`weblate/trans/models/change.py:975-1000`), а `accept_judge_candidate` пишет `change_details={judge_verdict_id, judge_run_id}` (`judge_loop.py:2192-2202`). Receipt — тонкая связь `(application_id → Change.pk, run, JudgeRunUnit, candidate_target_hash, applied_revision)`, доступная и после удаления Suggestion; чтение защищено теми же scope permissions. Недостающий guard — «на строке нет более новой отменяемой Change»: сегодня `Change.revert` этого не проверяет.
+- [ ] Под `select_for_update` сравнить текущую revision со своей applied revision. Любое последующее изменение, включая возврат идентичного текста, запрещает автоматический undo; вернуть diff/`409`, не overwrite.
+- [ ] Восстановить через штатный audited edit без propagation; прежний `30` только при действующем review permission. Undo не выдаёт новые judge evidence за проверку восстановленного текста и не запускает платный вызов.
+- [ ] Идемпотентный повтор возвращает прежний undo receipt; нельзя повторно откатить более новую работу. Откат только своего application, не всей истории run. Маршрут плоский — `POST /api/producer/judge-applications/{id}/undo/`: `WeblateRouter` регистрирует только плоские ресурсы (`weblate/api/urls.py:31-48`), вложенный `runs/{id}/applications/{id}/undo/` потребовал бы ручного `path()`.
 
 **Проверка:** apply → undo восстанавливает plural targets и state, повтор не добавляет Change; subsequent edit/ABA и потеря permission блокируют; сохранность файла/VCS и соседних строк проверяется после flush штатного writer.
 
@@ -348,14 +382,15 @@ Run ID не секрет доступа. GET, retry, cancel, clarify, apply и u
 
 **Зависимости:** 1, 3–8; промпты допускаются только по решению 9. Восстановление production из задачи 2 отдельно.
 
-**Файлы:** `docs/api.rst`, `docs/specs/openapi.yaml`, `docs/product/guides/producer-guide-weblate.md`, `docs/changes.rst`, `docs/security/threat-model.rst`; существующие `weblate/trans/views/edit.py`, `weblate/trans/views/judge.py`, `weblate/templates/snippets/judge-verdict.html` и report consumers, найденные через references. Полный новый frontend не является скрытым условием API-плана; существующие поверхности должны оставаться согласованными с общими правилами.
+**Файлы:** `docs/api.rst`, `docs/specs/openapi.yaml` (только регенерация), `docs/product/guides/producer-guide-weblate.md`, `docs/changes.rst`, `docs/security/threat-model.rst`; существующие `weblate/trans/views/edit.py`, `weblate/trans/views/judge.py`, `weblate/templates/snippets/judge-verdict.html` и report consumers, найденные через references. Полный новый frontend не является скрытым условием API-плана; существующие поверхности должны оставаться согласованными с общими правилами.
 
 **Действия:**
 
-- [ ] Документировать preview/start/poll/results/cancel/retry/clarify/apply/undo и HTTP error codes, сроки действительности снимка/хранения receipts, server ceilings и идемпотентность. Значения брать из утверждённой при реализации конфигурации, не обещать бесконечное хранение.
+- [ ] Документировать ресурсы `/api/producer/` этого плана (`runs/estimate/`, `runs/`, `runs/{id}/`, `runs/{id}/resume/`, `decisions/`, `decisions/{unit}/repair|accept|apply-candidate|clarification/`, `projects/{slug}/decisions/apply/`, `judge-applications/{id}/undo/`), коды ошибок `400/403/404/409/423`, сроки действительности снимка и хранения receipts, server ceilings и модель идемпотентности `revision`/`estimate_id`/`scope_hash`. Значения брать из утверждённой при реализации конфигурации, не обещать бесконечное хранение.
+- [ ] **OpenAPI — регенерация, не ручная правка.** `docs/specs/openapi.yaml` обновляется `make -C docs update-openapi`; CI падает на расхождении (`.github/workflows/api.yml:82-88`), а `AGENTS.md` запрещает держать в `docs/specs/` рукописные документы форка. `409` и его enum регистрируются рядом с существующим `423` (`weblate/api/serializers.py:4313-4316`, `weblate/api/spectacular.py` `ENUM_NAME_OVERRIDES`); заблокированный компонент отвечает типизированным `423`, а не `403`, как сейчас в синхронном action (`weblate/api/views.py:3675-3676`).
 - [ ] Показывать «Судьи не обнаружили ошибок», а не «AI-approved»; cached/fresh/stale/unparsed и partial execution отдельно. Русское объяснение и diff помогают принять решение, но не превращают пользователя в проверяющего вьетнамский.
-- [ ] Объяснить платность start/force/continuation/retry и предел cancel, отсутствие платного вызова у apply/clarify/undo. Не показывать некалиброванные проценты уверенности.
-- [ ] Обновить threat model для нового async API, mutable context, candidate evidence, idempotency/retention и проверки до apply вместо после. Scope-bound tokens/CSRF для session клиентов, private project access, отсутствие credentials/raw provider payload в producer report; проверить входы модели как недоверенные данные.
+- [ ] Объяснить платность запуска/force/continuation/повтора и предел cancel, отсутствие платного вызова у apply/clarify/undo. Не показывать некалиброванные проценты уверенности.
+- [ ] **Threat model — конкретные записи (G7).** Новое семейство эндпоинтов, тратящее деньги по токену без UI: отдельный DRF throttle scope и запись actor/ключа на run (`AGENTS.md` перечисляет rate limits среди триггеров модели угроз). Текст уточнения продюсера попадает в два LLM-промпта — распространить существующее правило про explanation. Хранение snapshot-ов preview и receipts сверить с `cleanup_judge_observability` (`weblate/trans/tasks.py:1603-1641`), которая удаляет attempts через N дней. Утверждение модели угроз о том, что применение сохранённого кандидата отказывается без свежей улики (`docs/security/threat-model.rst:378-399`), переписывается под проверку-до-записи.
 - [ ] Совместить текущий UI candidate acceptance с проверкой до apply: не оставлять ссылку, которая записывает непроверенный текст, или обещание автоматического post-apply recheck. Если затронута визуальная поверхность, соблюдать `ACCESSIBILITY.md` и `docs/contributing/frontend.rst`; отдельный большой redesign не добавлять.
 - [ ] После runtime smoke выполнить scoped lint/format, обновить актуальный changelog и owning docs. Commit/push не означают deployment. Миграции и worker restart требуют отдельного разрешения.
 
@@ -372,10 +407,19 @@ Run ID не секрет доступа. GET, retry, cancel, clarify, apply и u
 
 ## Порядок, разрешения и готовность
 
-Порядок реализации: задача 1 независимо; затем 3 → 4 → 5 → 6 → 7/8 → 10. Семантическая линия 9 может исследоваться независимо от API после утверждения экспериментального scope. Задача 2 не является автоматическим последствием остальных. Общие файлы `models/judge.py`, `judge_loop.py`, `autotranslate.py` меняются последовательно одним integration owner; параллельные исполнители допустимы только после фиксации контрактов и разделения ownership.
+Порядок реализации: задача 1 **выполнена**; затем 3 → 5a → 4 → 5b → 6 → 7/8 → 10. Preview (4) поставлен после 5a намеренно: его снимок и stale-`409` опираются на модель run, статусы и request key задачи 5a, а не наоборот. Семантическая линия 9 исследуется независимо после утверждения экспериментального scope. Задача 2 не является автоматическим последствием остальных.
 
-Согласованы продуктовые правила из таблицы, включая отсутствие лингвиста. Предложенные HTTP names, persistence layout, сроки хранения и численные server limits требуют технической фиксации до соответствующей реализации; существующие guards нельзя ослаблять молча. Перед большим изменением провести архитектурный review этого плана против текущего кода и roadmap. План не означает, что новая API-семья уже реализована или что семантическая гипотеза подтверждена.
+`weblate/trans/models/judge.py`, `judge_loop.py` и `autotranslate.py` меняет один integration owner — и этот же владелец держит пересечение с роадмапом: задача 1.4 роадмапа (`docs/product/vision/producer-console-design-and-roadmap.md:1105-1112`) владеет обобщением adoption и полями `ProducerRun`, а задача 2.3 (`:1298-1307`) — запуском судьи из консоли. Две правки `trans_judgerun` из разных планов без единого владельца дадут конфликтующие миграции на таблице с производственными прогонами. Параллельные исполнители допустимы только после фиксации контрактов и разделения ownership.
 
-**Доказано локальной пробой ранее:** исходный REST создаёт orphan evidence; существующий batch закрывает именно этот дефект в выполненных сценариях; approved-state может понизиться после pass в обоих путях. **Подтверждено чтением кода при расширении:** native candidates уже есть, перепроверка сейчас после записи, обычное suggestion acceptance использует общий guard. **Не доказано:** общее качество судей/ремонта, эффективность разделения обязанностей, безопасность ещё не реализованного async цикла.
+**Дополнения, которые нужно внести в роадмап до реализации** (закрытый список §5 не расширяется молча):
 
-**В этой редакции выполнено только обновление плана.** Нет product-правок, новых результатов платного эксперимента, восстановления production или deployment. Следующее разрешение — реализация согласованного технического scope; платные модели и производственные операции согласуются отдельно.
+- `POST decisions/{unit}/apply-candidate/` и `POST projects/{slug}/decisions/apply/` — применение проверенного кандидата и пакетный вариант с per-row исходами (задача 6).
+- `POST decisions/{unit}/clarification/` (+ чтение/правка) и хранение ответа продюсера как контекста строки (задача 7).
+- `POST judge-applications/{id}/undo/` (задача 8).
+- `cancel_requested/partial/cancelled` в перечислении статусов `Run` §5 и отметка, что `results/` этого плана питает очередь `decisions/` волны 2.
+
+Согласованы продуктовые правила из таблицы, включая отсутствие лингвиста. Persistence layout, сроки хранения и численные server limits требуют технической фиксации до соответствующей реализации; существующие guards нельзя ослаблять молча. Архитектурный review этого плана против текущего кода и роадмапа выполнен 2026-09-15 — вердикт `approve-with-changes`, его блокирующие пункты B1–B7 и пробелы G1–G8 закреплены в тексте выше.
+
+**Доказано локальной пробой и реализацией задачи 1:** исходный REST создавал orphan evidence, batch закрывает этот дефект, история появляется на странице отчёта; approved-state понижается после `pass` в обоих путях — дефект воспроизведён на baseline в той же среде и запинен тестом. **Подтверждено чтением кода:** native candidates уже есть, перепроверка сейчас после записи, обычное suggestion acceptance использует общий guard, durable dispatch существует только в лок-кит-пути. **Не доказано:** общее качество судей/ремонта, эффективность разделения обязанностей, безопасность ещё не реализованного async цикла.
+
+**В этой редакции:** задача 1 реализована, смерджена (`bac40ad8`, доп. правка документации `1901547f`) и развёрнута; остальное — обновление плана. Нет других product-правок, новых результатов платного эксперимента, восстановления production. Следующее разрешение — реализация задач 3 и 5a; платные модели и производственные операции согласуются отдельно.
