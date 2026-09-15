@@ -151,6 +151,17 @@ frontend:
         -working: true
         -agent: "main"
         -comment: "All screens built and visually verified via screenshots (list, overview, decisions+sheet, wizard step1, run #12, /dev/states, glossary, settings). Fixed sticky-header overlap on decisions row 1. No horizontal overflow at 1920. Product rules enforced: no quality score, no check codes, per-finding actions (blocking has no accept), money visible, truthful run states."
+  - task: "Universal 4-stage localization wizard (Файлы · Языки · Контекст и термины · Проверка и запуск)"
+    implemented: true
+    working: true
+    file: "components/console/wizard2/*, src/api/mock/universal.js, src/api/mock/fixtures/stores_registry.json, src/api/client.js, app/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Refactored the 8-step wizard into a 4-stage adaptive universal wizard at /projects/{slug}/localize (old kept at /localize-legacy). Universal dropzone auto-detects loc-kit vs store (Steam/Google Play/App Store/custom) via mock scenario engine. Conditional «Нужно уточнить» cards replace permanent technical steps (unknown files, ambiguous file, two stores, over-limit source, broken BBCode, empty file, unknown-in-known, duplicate field, unreadable-zip stop; region locales, source completeness, existing translations in stage 2). Stage 3 folds profile questions + reused GlossaryWorkspace (store-aware labels). Stage 4 dynamic summary + translate-only estimate → run. All 19 spec states wired and clickable on /dev/states (17 open the wizard via ?scenario=&stage=, 2 store-run results render inline). Mock API: getStoresRegistry, createUniversalUpload→UniversalUploadAnalysis, patchUniversalUpload, createUniversalLocalization. Visually verified via screenshots: stage1 initial+Steam preview, stage2 region resolution, stage1 over-limit, stage3 context, stage4 review/estimate, two_stores, custom_unknown, /dev/states desktop+mobile (no overflow). DESIGN-NOTES.md updated with the 4-stage flow + rationale; old section relabeled legacy. User will verify frontend visually (no automated frontend test requested)."
 
 metadata:
   created_by: "main_agent"
@@ -170,3 +181,5 @@ test_plan:
 agent_communication:
     -agent: "main"
     -message: "Prototype complete in mock mode. No backend logic to test (intentional). Awaiting user decision on automated frontend UI testing before invoking deep_testing_frontend_nextjs."
+    -agent: "main"
+    -message: "Added the universal 4-stage localization wizard (loc-kit + store texts) with 19 catalogued states, universal mock API and updated DESIGN-NOTES. Still mock-only, no backend. User opted to verify the frontend visually — not invoking the frontend testing agent."

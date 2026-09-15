@@ -124,3 +124,10 @@ export const LANG_PRESET = [
   { code: 'ko', name: 'Корейский' },
   { code: 'zh_Hans', name: 'Китайский (упр.)' },
 ]
+
+export const LANG_NAMES = {
+  ru: 'Русский', en: 'Английский', de: 'Немецкий', fr: 'Французский', es: 'Испанский',
+  pt: 'Португальский (Португалия)', pt_BR: 'Португальский (Бразилия)', tr: 'Турецкий',
+  ja: 'Японский', ko: 'Корейский', zh_Hans: 'Китайский (упр.)', zh_Hant: 'Китайский (трад.)', id: 'Индонезийский',
+}
+export const langName = (code) => LANG_NAMES[code] || code

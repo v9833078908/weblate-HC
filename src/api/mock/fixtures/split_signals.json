@@ -1,0 +1,14 @@
+{
+  "pirate-ships": {
+    "sheets": [ { "name": "Strings", "rows": 3120 }, { "name": "Dialogues", "rows": 744 } ],
+    "group_columns": [ { "header": "screen", "values": [ { "value": "shop", "rows": 812 }, { "value": "battle", "rows": 1044 }, { "value": "map", "rows": 421 } ] } ],
+    "key_families": [
+      { "anchor": "dialog_text_", "rows": 388, "samples": ["dialog_text_001", "dialog_text_014", "dialog_text_037"] },
+      { "anchor": "dialog_character_", "rows": 96, "samples": ["dialog_character_silver", "dialog_character_mary"] },
+      { "anchor": "tutorial_", "rows": 120, "samples": ["tutorial_move", "tutorial_jump"] },
+      { "anchor": "mission_", "rows": 1045, "samples": ["mission_01_title", "mission_02_brief"] }
+    ],
+    "substring_trap": { "anchor": "dial", "extra_rows": 93, "samples": ["label_continue_dialog", "btn_close_dialog", "hint_open_dialog"] }
+  },
+  "positional": { "sheets": [], "group_columns": [], "key_families": [], "substring_trap": null }
+}
