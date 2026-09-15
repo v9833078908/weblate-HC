@@ -9,7 +9,15 @@ SPDX-License-Identifier: GPL-3.0-or-later
 ## Цель, решения и статус
 
 **Дата:** 2026-09-11. **Последняя доработка:** 2026-09-15.
-**Статус:** доработан после ревью, ожидает согласования; не реализован.
+**Статус:** реализован (ветка `feat/loc-kit-source-validation`, смержена в
+main); production rollout (включение `game-source-markup` на живом
+инстансе) не выполнялся и требует отдельного разрешения deployment. Все
+три задачи — rule и probe, PO-intake warning/strict mode,
+`GameSourceMarkupCheck` — реализованы и покрыты тестами. Задача 0 измерена
+на dev (0 кандидатов на 14 596 source units) и на production (1
+подтверждённый true positive — дефект 525591 — на 28 351 source units, 0
+ложных срабатываний); подробности и ручная классификация —
+`docs/operations/measurements/2026-09-15-source-markup-defects.md`.
 **Ревью:** `docs/product/reviews/2026-09-15-loc-kit-source-validation-plan-review.md`.
 
 Повод — дефект 525591 из полного LQA-аудита французского Anvil Saga
