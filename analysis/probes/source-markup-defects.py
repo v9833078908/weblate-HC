@@ -31,6 +31,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from collections import Counter
@@ -51,6 +52,7 @@ if not TOKEN:
     sys.exit("WEBLATE_API_TOKEN is required")
 
 EXAMPLES_PER_CODE = 3
+RETRY_DELAYS: tuple[int, ...] = (2, 4, 8, 16, 32)
 
 
 def get(url: str, api: str) -> dict | list:
@@ -65,8 +67,22 @@ def get(url: str, api: str) -> dict | list:
     request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage] - host checked above
         url, headers={"Authorization": f"Token {TOKEN}"}
     )
-    with urllib.request.urlopen(request, timeout=120) as response:  # ruff: ignore[suspicious-url-open-usage]
-        return json.loads(response.read().decode())
+    # The path to production drops TLS handshakes intermittently; an HTTP
+    # error (401/404) is an answer, not an outage, and must fail fast.
+    attempt = 0
+    while True:
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:  # ruff: ignore[suspicious-url-open-usage]
+                return json.loads(response.read().decode())
+        except urllib.error.HTTPError:
+            raise
+        except urllib.error.URLError as error:
+            if attempt >= len(RETRY_DELAYS):
+                raise
+            wait = RETRY_DELAYS[attempt]
+            attempt += 1
+            print(f"  transient {type(error).__name__}, retrying in {wait}s")
+            time.sleep(wait)
 
 
 def paginate(url: str, api: str) -> list[dict]:
@@ -172,7 +188,7 @@ def main() -> None:
                 "source_units": comp_units,
                 "is_glossary": comp["is_glossary"],
             }
-        per_project[project]["units_seen"] = project_units
+        per_project.setdefault(project, {})["units_seen"] = project_units
         per_project[project]["candidates"] = project_candidates
         units_seen += project_units
 

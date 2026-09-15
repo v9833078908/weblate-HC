@@ -1,0 +1,214 @@
+{
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-15-prod",
+  "rule": "source.tag_closing_has_attribute",
+  "source_units_seen": 28351,
+  "counts_by_code": {
+    "source.tag_closing_has_attribute": 1
+  },
+  "examples_by_code": {
+    "source.tag_closing_has_attribute": [
+      {
+        "project": "anvil-saga",
+        "component": "locale_v1-02-import-explained-3",
+        "context": "SpawnRate",
+        "source": "Заказчики приходят в </color=yellow>{0}</color> раза реже."
+      }
+    ]
+  },
+  "per_project": {
+    "col4": {
+      "localizecommon": {
+        "source_language": "ru",
+        "source_units": 82,
+        "is_glossary": false
+      },
+      "data": {
+        "source_language": "ru",
+        "source_units": 3941,
+        "is_glossary": false
+      },
+      "all-glossary": {
+        "source_language": "ru",
+        "source_units": 95,
+        "is_glossary": true
+      },
+      "units_seen": 4118,
+      "candidates": 0
+    },
+    "pirate-ships": {
+      "localization-json": {
+        "source_language": "ru",
+        "source_units": 3883,
+        "is_glossary": false
+      },
+      "glossary-ru": {
+        "source_language": "ru",
+        "source_units": 176,
+        "is_glossary": true
+      },
+      "units_seen": 4059,
+      "candidates": 0
+    },
+    "heart-abyss": {
+      "temple": {
+        "source_language": "ru",
+        "source_units": 688,
+        "is_glossary": false
+      },
+      "all-glossary": {
+        "source_language": "ru",
+        "source_units": 221,
+        "is_glossary": true
+      },
+      "hub-1": {
+        "source_language": "ru",
+        "source_units": 396,
+        "is_glossary": false
+      },
+      "units_seen": 1305,
+      "candidates": 0
+    },
+    "strategy-and-tactics-2": {
+      "glosssary": {
+        "source_language": "en",
+        "source_units": 557,
+        "is_glossary": true
+      },
+      "summer-update": {
+        "source_language": "en",
+        "source_units": 127,
+        "is_glossary": false
+      },
+      "units_seen": 684,
+      "candidates": 0
+    },
+    "need-for-greed": {
+      "buyers": {
+        "source_language": "ru",
+        "source_units": 10,
+        "is_glossary": false
+      },
+      "characterdialogue": {
+        "source_language": "ru",
+        "source_units": 25,
+        "is_glossary": false
+      },
+      "loot": {
+        "source_language": "ru",
+        "source_units": 154,
+        "is_glossary": false
+      },
+      "orders": {
+        "source_language": "ru",
+        "source_units": 131,
+        "is_glossary": false
+      },
+      "survey": {
+        "source_language": "ru",
+        "source_units": 34,
+        "is_glossary": false
+      },
+      "tutorial": {
+        "source_language": "ru",
+        "source_units": 102,
+        "is_glossary": false
+      },
+      "ui": {
+        "source_language": "ru",
+        "source_units": 463,
+        "is_glossary": false
+      },
+      "glossary": {
+        "source_language": "ru",
+        "source_units": 300,
+        "is_glossary": true
+      },
+      "google-play": {
+        "source_language": "ru",
+        "source_units": 3,
+        "is_glossary": false
+      },
+      "units_seen": 1222,
+      "candidates": 0
+    },
+    "space-arena": {
+      "lockit": {
+        "source_language": "en",
+        "source_units": 4871,
+        "is_glossary": false
+      },
+      "glossary": {
+        "source_language": "en",
+        "source_units": 339,
+        "is_glossary": true
+      },
+      "units_seen": 5210,
+      "candidates": 0
+    },
+    "victory-banner": {
+      "general": {
+        "source_language": "ru",
+        "source_units": 537,
+        "is_glossary": false
+      },
+      "victory-banner-glossary": {
+        "source_language": "ru",
+        "source_units": 156,
+        "is_glossary": true
+      },
+      "units_seen": 693,
+      "candidates": 0
+    },
+    "anvil-saga": {
+      "anvil-saga-glossary": {
+        "source_language": "ru",
+        "source_units": 184,
+        "is_glossary": true
+      },
+      "locale_v1-02-import-explained-3": {
+        "source_language": "ru",
+        "source_units": 9482,
+        "is_glossary": false
+      },
+      "units_seen": 9666,
+      "candidates": 1
+    },
+    "dead-shell": {
+      "deadshell-glossary": {
+        "source_language": "ru",
+        "source_units": 197,
+        "is_glossary": true
+      },
+      "localization": {
+        "source_language": "ru",
+        "source_units": 963,
+        "is_glossary": false
+      },
+      "units_seen": 1160,
+      "candidates": 0
+    },
+    "test-project-pi": {
+      "localization_tst": {
+        "source_language": "ru",
+        "source_units": 234,
+        "is_glossary": false
+      },
+      "glossary": {
+        "source_language": "ru",
+        "source_units": 0,
+        "is_glossary": true
+      },
+      "units_seen": 234,
+      "candidates": 0
+    },
+    "curse-of-pirates": {
+      "units_seen": 0,
+      "candidates": 0
+    },
+    "chronocracy": {
+      "units_seen": 0,
+      "candidates": 0
+    }
+  }
+}
