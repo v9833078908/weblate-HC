@@ -52,5 +52,10 @@ router.register("reports", ReportViewSet, "report")
 urlpatterns = [
     path("metrics/", Metrics.as_view(), name="metrics"),
     path("search/", Search.as_view(), name="search"),
+    # Producer console contract, see
+    # docs/product/vision/producer-console-design-and-roadmap.md section 5.
+    # Not a WeblateRouter resource: the contract is a fixed list of paths,
+    # not a set of model viewsets.
+    path("producer/", include("weblate.api.producer.urls")),
     path("", include(router.urls)),
 ]

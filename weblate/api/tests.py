@@ -16933,6 +16933,80 @@ class AnnouncementAPITest(APIBaseTest):
         )
 
 
+class ProducerAPITest(APIBaseTest):
+    """
+    The producer console contract.
+
+    Section 5 of ``docs/product/vision/producer-console-design-and-roadmap.md``
+    is the closed list this namespace answers.
+    """
+
+    def test_me_requires_authentication(self) -> None:
+        self.do_request("api:producer-me", authenticated=False, code=401)
+
+    def test_me_reports_the_current_user(self) -> None:
+        response = self.do_request("api:producer-me")
+        self.assertEqual(response.data["username"], self.user.username)
+        self.assertFalse(response.data["is_superuser"])
+        self.assertTrue(
+            response.data["advanced_url"].startswith("http"),
+            response.data["advanced_url"],
+        )
+
+    def test_capabilities_are_off_without_configuration(self) -> None:
+        # An unconfigured server must not offer the action: the console hides
+        # what it cannot run, so a capability is never optimistic.
+        response = self.do_request("api:producer-me")
+        self.assertEqual(
+            response.data["capabilities"],
+            {"judge": False, "glossary_profile_analysis": False},
+        )
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+        LOC_KIT_PROFILE_ANALYSIS_ENABLED=True,
+    )
+    def test_capabilities_follow_configuration(self) -> None:
+        response = self.do_request("api:producer-me")
+        self.assertEqual(
+            response.data["capabilities"],
+            {"judge": True, "glossary_profile_analysis": True},
+        )
+
+    def test_projects_require_authentication(self) -> None:
+        self.do_request("api:producer-projects", authenticated=False, code=401)
+
+    def test_projects_are_permission_filtered(self) -> None:
+        private = self.create_acl().project
+        response = self.do_request("api:producer-projects")
+        self.assertIn("results", response.data)
+        slugs = {item["slug"] for item in response.data["results"]}
+        self.assertIn(self.component.project.slug, slugs)
+        self.assertNotIn(private.slug, slugs)
+
+    def test_projects_include_restricted_for_superuser(self) -> None:
+        private = self.create_acl().project
+        response = self.do_request("api:producer-projects", superuser=True)
+        slugs = {item["slug"] for item in response.data["results"]}
+        self.assertIn(private.slug, slugs)
+
+    def test_project_summary_links_to_the_interface(self) -> None:
+        response = self.do_request("api:producer-projects")
+        summary = next(
+            item
+            for item in response.data["results"]
+            if item["slug"] == self.component.project.slug
+        )
+        self.assertEqual(summary["name"], self.component.project.name)
+        self.assertTrue(
+            summary["advanced_url"].endswith(self.component.project.get_absolute_url()),
+            summary["advanced_url"],
+        )
+
+
 class OpenAPITest(APIBaseTest):
     def get_schema(self) -> dict:
         response = self.do_request("api-schema")

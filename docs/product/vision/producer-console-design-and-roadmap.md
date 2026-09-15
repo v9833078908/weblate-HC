@@ -100,7 +100,7 @@ Advanced; денежные лимиты (только отчётность); о�
 
 | Область | Есть | Ограничение / чего нет |
 |---|---|---|
-| REST-каркас | Роутер `weblate/api/urls.py:28-51`, смонтирован `weblate/urls.py:1092-1098`; схема `SpectacularAPIView`, генератор берёт все пути `/api/` (`weblate/api/generators.py:11-25`); auth Session/Token/Bearer (`weblate/api/spectacular.py:264-303`); throttling `settings_docker.py:1369-1384` | Нет namespace `/api/producer/`; нет `users/me` (`weblate/api/views.py:920-1008`) |
+| REST-каркас | Роутер `weblate/api/urls.py:28-51`, смонтирован `weblate/urls.py:1092-1098`; схема `SpectacularAPIView`, генератор берёт все пути `/api/` (`weblate/api/generators.py:11-25`); auth Session/Token/Bearer (`weblate/api/spectacular.py:264-303`); throttling `settings_docker.py:1369-1384`. Namespace `/api/producer/` смонтирован (`weblate/api/urls.py`, пакет `weblate/api/producer/`) и отвечает `me/` и `projects/` | Из §5 в namespace пока есть только эти два ресурса; `POST projects/`, `projects/{slug}/` и остальное — задача 0.2. Нативного `users/me` по-прежнему нет (`weblate/api/views.py:920-1008`) |
 | Сессия/CSRF | `CSRF_USE_SESSIONS=True`, cookie HttpOnly (`settings_docker.py:865-870,1133-1142`); CORS только для `/api/` по env (`:1484-1487`) | CSRF-токен нельзя прочитать из cookie — прототип это делает (`frontend-wizard/src/api/client.js:getCookie`, `http`), нужен `<meta>` в шаблоне `/console/` |
 | Проекты/компоненты/языки | `ProjectViewSet` create `views.py:2219-2268`, components multipart `:1970-2021`, languages `:2110-2127`; add language `ComponentViewSet.translations` `:2804-2896`; `machinery_settings` `:2409-2507` | Нативные payload-ы, не «статус по языкам / contents / очередь» |
 | Intake лок-кита | `create_component_from_kit` `weblate/utils/views.py:704-833` (ZIP или CSV/TSV/XLSX → po-mono, `LocalRepository`); `loc_kit_ingest/infer.py:258-513` (min_fill 5 %, исходный = крайняя левая заполненная колонка, `notes :447-459`); `parser.py:89-307` (дубликат ключа = ERROR, пусто во всех языках = ERROR); `LocKitImportDraft` `weblate/trans/models/loc_kit.py:47-218` (owner+session, TTL 3600 с, состояния UPLOADED…CONSUMED, private storage) | Всё HTML/session (`weblate/trans/views/create.py:638-763,1119-1668`, URL `weblate/urls.py:379-410`); `.txt` отвергается тестом; нет явного выбора исходного языка с записью его первой колонкой; нет ролей колонок, ambiguous-заголовков, split по семействам ключей; нет diff removed |
@@ -476,7 +476,12 @@ plural forms), Character/Explanation, не плоский словарь с ко
 локализуется существующим механизмом Django/DjangoJS; нового `detail_ru`
 рядом с общей инфраструктурой нет. Валидация — 400, нет прав — 403,
 недоступный объект/истёкший черновик — 404, блокировка — 423.
-Новый 409 для конфликта ревизии добавляется в схему ошибок явно.
+Новый 409 для конфликта ревизии добавляется в схему ошибок явно. `revision`
+в этом контракте — непрозрачный серверный токен из `(unit.pk,
+unit.last_updated, максимальный Change.pk строки)`: клиент его не разбирает
+и не конструирует, новая колонка не нужна, а возврат идентичного текста
+создаёт новую `Change` и потому тоже даёт 409. Определение общее с
+`docs/product/plans/2026-09-15-judge-glossary-conflict-and-api-history.md`.
 Пагинация больших списков — стандартная `count/next/previous/results`.
 Ниже закреплены ресурсы и минимальные поля; это не готовый OpenAPI.
 Задача 0.3 превращает их в схему и генерируемые TS-типы.
@@ -522,8 +527,10 @@ GET  stores/registry/             → реестр §4.5 (version, platforms, fi
 
 GET  projects/{slug}/runs/        → [Run]
 GET  runs/{id}/                   → Run {id, kind: localize|translate|judge, status:
-                                     queued|running|no-update|completed|failed, title, started, finished,
+                                     queued|running|no-update|completed|failed|
+                                     cancel_requested|partial|cancelled, title, started, finished,
                                      stages, resume_allowed, resume_reason?, cost[], outcome?, error?, advanced_url}
+POST runs/{id}/cancel/            → Run (останавливает только новые вызовы; ответы отправленных сохраняются)
 POST runs/{id}/resume/            {attempt} → Run (claim по §4.3)
 POST projects/{slug}/runs/estimate/ {kind: localize|judge|terms, upload_id?, revision?, scope}
                                   → {estimate_id, scope_hash, strings, cost_usd_min?, cost_usd_max?, minutes_min?, minutes_max?, basis}
@@ -536,6 +543,15 @@ GET  projects/{slug}/decisions/?language=&kind=blocking|judge&content=&q=&page=
 POST decisions/{unit}/repair/     {revision, finding_ids[]} → {run_id} (права repair-пути)
 POST decisions/{unit}/accept/     {revision, finding_id, reason} → Decision (только текущая judge-находка)
 POST decisions/{unit}/back-translation/ → {text, cached: bool}
+POST decisions/{unit}/apply-candidate/ {revision, candidate_id,
+                                   acknowledge{approval_loss?, terminology_conflict?}} → Decision
+                                  (применение уже проверенного кандидата; approved и конфликт термина — по одной строке)
+POST projects/{slug}/decisions/apply/ {items[{unit, revision, candidate_id}]}
+                                  → [{unit, outcome: applied|already_applied|stale|forbidden|
+                                     needs_individual_confirmation|not_verified}]
+GET  decisions/{unit}/clarification/  → {answer, answered_by, answered_at, revision}
+PATCH decisions/{unit}/clarification/ {revision, answer} → то же (контекст строки; LLM не вызывается)
+POST judge-applications/{id}/undo/ → Decision (отмена своего применения, если после него нет правок)
 
 GET  projects/{slug}/glossary/    → [Term {source, targets{}, explanation, rule_ru, advanced_url}]
 POST projects/{slug}/glossary/extractions/ {upload_id? | content_id, revision, estimate_id, categories[], exclusions{}} → {id, status}
@@ -837,7 +853,7 @@ DoD описывает наблюдаемый результат будущей 
   без токена — отказ. Playwright проверяет deep link, отказ доступа,
   URL_PREFIX и список проектов после интеграции 0.2; не только наличие meta.
 
-**0.2 Namespace `/api/producer/` + `me/` + `projects/`** — `todo`
+**0.2 Namespace `/api/producer/` + `me/` + `projects/`** — `частично`
 
 - Результат: §5 `me/`, `projects/`, `POST projects/`, `projects/{slug}/`
   работают на любом существующем проекте (решение 26): `contents` из
@@ -847,6 +863,18 @@ DoD описывает наблюдаемый результат будущей 
   `advanced_url` для проекта/компонентов; языковой поиск, конфигурируемый
   пресет Hero Craft и добавление языков с правами/частичным результатом
   как в Advanced. Новая БД копий проектов не создаётся.
+- Сделано: пакет `weblate/api/producer/` смонтирован в `weblate/api/urls.py`,
+  `GET me/` отдаёт identity и `capabilities` только из реальных источников
+  (`judge` — `weblate.trans.judge.judge_configuration_ready`,
+  `glossary_profile_analysis` — `LOC_KIT_PROFILE_ANALYSIS_ENABLED`), `GET
+  projects/` отдаёт пагинированный `ProjectSummary {slug, name,
+  advanced_url}` по `allowed_projects`. Тесты — `ProducerAPITest` в
+  `weblate/api/tests.py`, схема регенерирована. Ключи `prep_terms`,
+  `back_translation`, `bdhc` намеренно не выдуманы: каждый добавляется
+  вместе со своей функцией, иначе консоль предложит действие, которого
+  сервер не умеет.
+- Осталось: `POST projects/`, `projects/{slug}/` с `contents`/`languages`,
+  языковой поиск и пресет, добавление языков.
 - Файлы: `weblate/api/producer/{__init__,urls,views,serializers}.py`,
   `weblate/api/urls.py:46-51`, `docs/specs/openapi.yaml` (регенерация).
 - Действия: viewsets с `IsAuthenticated`, `allowed_projects`; capabilities по
@@ -1116,6 +1144,13 @@ draft, профиль и run, не второй upload-контракт. Быс�
   восстановления результат стадий согласован с БД/файлами. Старый
   `recheck` сохраняет строгий scope/query claim. Fixture с посторонним
   компонентом подтверждает, что он не переведён «за компанию».
+- Пересечение: обобщённый adoption `ProducerRun`, статусы
+  `cancel_requested/partial/cancelled` и durable ledger отправки выполняет
+  задача 5a плана
+  `docs/product/plans/2026-09-15-judge-glossary-conflict-and-api-history.md`.
+  Здесь остаются стадии `localize` и сборка из черновика. Оба изменения
+  трогают `trans_judgerun`, поэтому у них один integration owner и
+  последовательные миграции, а не две параллельные.
 
 **1.5 Профиль проекта: анкета → генерация** — `todo`
 
@@ -1275,6 +1310,10 @@ Unit, фактическое письмо и сверка отчёта с сох
 - Проверка: `./rundev.sh test weblate/api/tests.py` и `pnpm --dir console e2e`:
   права, фильтры, несколько findings на одной строке, свежесть улик,
   блокирующая строка без accept; числа совпадают с обзором.
+- Пересечение: judge-сторона очереди приходит готовой из задач 3 и 5a того
+  же плана — per-row улики, свежесть (fresh/stale/unparsed), eligibility и
+  дискриминатор subject, который не даёт улике кандидата подменить оценку
+  живой строки. Здесь остаются сама очередь, причины и экран.
 
 **2.2 Действия: repair, accept, back-translation** — `todo`
 
@@ -1294,6 +1333,12 @@ Unit, фактическое письмо и сверка отчёта с сох
   нет. Playwright проверяет состояние pending и серверный итог.
   Если переносится undo прототипа, это отмена ещё не отправленного запроса:
   UI не объявляет решение сохранённым до серверного успеха.
+- Пересечение: `apply-candidate` и пакетное применение даёт задача 6 того же
+  плана, `clarification/` — задача 7, `judge-applications/{id}/undo/` —
+  задача 8. Одноюнитный `repair/` остаётся здесь, но обязан идти через
+  proposal-only движок задачи 3 и общий primitive применения задачи 6:
+  `accept_judge_candidate` становится единственной точкой записи кандидата,
+  а постфактумный платный `queue_judge_recheck` из него убирается.
 
 **2.3 Судья из консоли: оценка и запуск** — `todo`
 
@@ -1308,6 +1353,9 @@ Unit, фактическое письмо и сверка отчёта с сох
   и `./rundev.sh test weblate/trans/tests/test_judge_views.py`;
   одна scope даёт ту же оценку, что HTML; изменение scope требует новой;
   неподходящие права/lock отвергаются и при запуске, и worker-ом.
+- Пересечение: оценку с `estimate_id/scope_hash`, асинхронный прогон,
+  отмену и частичный результат выполняют задачи 4, 5a и 5b того же плана.
+  Здесь остаётся `RunCard.tsx` и связывание с экраном.
 
 **2.4 Повторная загрузка кита в компонент (`uploads/{id}/confirm/`)** — `todo`
 
