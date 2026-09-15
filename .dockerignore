@@ -15,6 +15,7 @@ docs/_build
 weblate-mcp
 node_modules
 client/node_modules
+frontend-wizard
 **/__pycache__
 **/.pytest_cache
 **/.mypy_cache
