@@ -146,7 +146,11 @@ from weblate.machinery.models import validate_service_configuration
 from weblate.memory.models import Memory, MemoryScope
 from weblate.screenshots.models import Screenshot
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autotranslate import AutoTranslate, check_auto_translate_permission
+from weblate.trans.autotranslate import (
+    AutoTranslate,
+    BatchAutoTranslate,
+    check_auto_translate_permission,
+)
 from weblate.trans.backups import list_backups
 from weblate.trans.exceptions import (
     FailedCommitError,
@@ -3695,9 +3699,9 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
                 getattr(auto_permission, "reason", "Can not auto translate"),
             )
 
-        auto = AutoTranslate(
+        auto = BatchAutoTranslate(
+            translation,
             user=get_request_user(request),
-            translation=translation,
             q=autoform.cleaned_data["q"],
             mode=autoform.cleaned_data["mode"],
         )

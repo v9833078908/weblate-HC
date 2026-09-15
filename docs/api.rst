@@ -2480,6 +2480,23 @@ Translations
     :<json array engines: Machine translation engines
     :<json string threshold: Score threshold
 
+    .. note::
+
+       ``mode: judge`` requires the same right as approving translations
+       (:guilabel:`Review strings`) and a project with review enabled.
+       Each authorized ``judge`` request now records a producer run
+       (actor, scope, per-string outcome), the same durable history
+       already visible for automatic translation started from the web UI,
+       see :ref:`llm-judge`. The ``weblate auto_translate`` management
+       command does not offer a ``judge`` mode.
+       A ``200`` response only reports how the run ended: the returned
+       details also describe a run that was refused by the machine
+       translation service or that produced no verdict at all. Even a
+       verdict of its own is not a claim that the translation is
+       linguistically correct, and an approved unit can still be lowered
+       to translated by a ``pass`` verdict, because the judge itself is
+       not allowed to approve.
+
 .. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/file/
 
     Download current translation file as it is stored in the VCS (without the ``format``
