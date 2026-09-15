@@ -2493,9 +2493,10 @@ Translations
        details also describe a run that was refused by the machine
        translation service or that produced no verdict at all. Even a
        verdict of its own is not a claim that the translation is
-       linguistically correct, and an approved unit can still be lowered
-       to translated by a ``pass`` verdict, because the judge itself is
-       not allowed to approve.
+       linguistically correct. An already approved unit can also be
+       lowered to translated by a ``pass`` verdict, unless
+       :setting:`JUDGE_MAY_APPROVE` is enabled and the string carries a
+       complete set of current verdicts.
 
 .. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/file/
 
