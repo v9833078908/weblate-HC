@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import csv
+import json
 import operator
 import os
 import tempfile
@@ -28,7 +29,7 @@ from django.templatetags.static import static
 from django.test.utils import modify_settings, override_settings
 from django.urls import reverse
 from django_otp.plugins.otp_totp.models import TOTPDevice
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APITransactionTestCase
 from weblate_language_data.languages import LANGUAGES
 
 from weblate.accounts.models import Profile, Subscription, VerifiedEmail
@@ -72,6 +73,7 @@ from weblate.trans.component_copy import (
     replace_component_checkout,
 )
 from weblate.trans.exceptions import FailedCommitError, FileParseError
+from weblate.trans.judge import validate_judge_configuration
 from weblate.trans.judge_loop import build_request
 from weblate.trans.models import (
     Announcement,
@@ -89,6 +91,8 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.component import ComponentQuerySet
 from weblate.trans.models.judge import (
+    JudgeRequestAttempt,
+    JudgeRunUnit,
     JudgeVerdict,
     ProducerRun,
     compute_context_hash,
@@ -11562,6 +11566,10 @@ class TranslationAPITest(APIBaseTest):
                 code=200,
             )
         perform.assert_called_once()
+        # auto_source="others" never creates run history regardless of
+        # mode; Task 1's swap to BatchAutoTranslate must not start
+        # attaching a ProducerRun to plain translate/suggest requests.
+        self.assertEqual(ProducerRun.objects.count(), 0)
 
     def test_add_monolingual(self) -> None:
         component = self.create_acl()
@@ -12038,6 +12046,256 @@ class TranslationAPITest(APIBaseTest):
         )
 
         self.assertEqual(_translation_count(), start_count - 1)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test-no-real-provider",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_BATCH_SIZE_SEAT_1=1,
+    JUDGE_BATCH_SIZE_SEAT_2=1,
+    JUDGE_STREAM_SEAT_1=False,
+    JUDGE_STREAM_SEAT_2=False,
+    JUDGE_REQUEST_SLEEP=0.0,
+    JUDGE_MAX_REPAIR_ATTEMPTS=0,
+    JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
+    JUDGE_TRANSIENT_HTTP_RETRIES=0,
+    JUDGE_TRANSPORT_RETRIES=0,
+    JUDGE_PROTOCOL_RETRIES=0,
+    JUDGE_FALLBACK_BASE_URL="",
+    JUDGE_FALLBACK_API_KEY="",
+    JUDGE_FALLBACK_MODEL_SEAT_1="",
+    JUDGE_FALLBACK_MODEL_SEAT_2="",
+    JUDGE_MAY_APPROVE=False,
+)
+class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase):
+    """
+    REST ``mode=judge`` autotranslate creates linked ProducerRun history.
+
+    Regression for the orphan-evidence defect: the plain ``AutoTranslate``
+    path left verdicts and attempts with no ``ProducerRun``/``JudgeRunUnit``
+    row at all. ``TranslationViewSet.autotranslate`` now goes through
+    ``BatchAutoTranslate``, the same engine already used by the
+    ``auto_translate`` Celery task, so a REST judge run gets the same
+    durable history as any other producer run.
+
+    Uses ``APITransactionTestCase`` rather than ``APIBaseTest``: judge
+    seats run their HTTP calls on separate threads with their own DB
+    connections (``weblate/trans/judge_loop.py``), which cannot see a
+    ``ProducerRun`` created inside the outer transaction that wraps a
+    plain ``TestCase``.
+    """
+
+    CREATE_GLOSSARIES: bool = True
+    authenticate = APIBaseTest.authenticate
+    do_request = APIBaseTest.do_request
+    grant_perm_to_user = APIBaseTest.grant_perm_to_user
+    create_acl = APIBaseTest.create_acl
+
+    CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+    def setUp(self) -> None:
+        Language.objects.flush_object_cache()
+        self.clone_test_repos()
+        self.component = self.create_component()
+        self.project = self.component.project
+        self.translation_kwargs = {
+            "language__code": "cs",
+            "component__slug": "test",
+            "component__project__slug": "test",
+        }
+        self.tearDown()
+        self.user = User.objects.create_user("apitest", "apitest@example.org", "x")
+        self.user.profile.languages.add(Language.objects.get(code="cs"))
+        self.user.groups.add(Group.objects.get(name="Users"))
+        validate_judge_configuration()
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        self.translation = self.component.translation_set.get(language_code="cs")
+        self.unit = self.translation.unit_set.get(source="Hello, world!\n")
+        self.unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+
+    def post_judge(self, *, q=None, superuser=True, code=200, **overrides):
+        request = {
+            "mode": "judge",
+            "q": q if q is not None else f"id:{self.unit.pk}",
+            "auto_source": "others",
+            "threshold": 80,
+        }
+        request.update(overrides)
+        return self.do_request(
+            "api:translation-autotranslate",
+            self.translation_kwargs,
+            method="post",
+            format="json",
+            superuser=superuser,
+            code=code,
+            request=request,
+        )
+
+    def serve_pass(self) -> None:
+        http_mock.register(
+            "POST",
+            self.CHAT_URL,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "segments": [
+                                        {
+                                            "id": 0,
+                                            "verdict": "pass",
+                                            "errors": [],
+                                            "back_translation": "Hello, world!",
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    @http_mock.activate
+    def test_judge_run_creates_linked_history(self) -> None:
+        self.serve_pass()
+        response = self.post_judge()
+        self.assertContains(response, "details")
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertEqual(run.actor_id, self.user.pk)
+        self.assertEqual(run.scope_type, ProducerRun.ScopeType.TRANSLATION)
+        self.assertEqual(run.scope_id, str(self.translation.pk))
+        self.assertEqual(run.requested_query, f"id:{self.unit.pk}")
+        row = JudgeRunUnit.objects.get()
+        self.assertEqual(row.run_id, run.pk)
+        self.assertEqual(row.unit_id, self.unit.pk)
+        self.assertEqual(JudgeRequestAttempt.objects.filter(run=run).count(), 2)
+        self.assertEqual(JudgeVerdict.objects.filter(run_id=run.pk).count(), 2)
+        # No orphan evidence: every attempt created by this request is
+        # linked to the run, matching what Celery-driven runs guarantee.
+        self.assertFalse(JudgeRequestAttempt.objects.filter(run__isnull=True).exists())
+        # Runtime smoke: the run created through the REST endpoint is a
+        # genuine ProducerRun, visible to an authorized user through the
+        # same report page Celery-driven runs use.
+        self.client.force_login(self.user)
+        report_url = reverse("judge-run", kwargs={"pk": run.pk})
+        report = self.client.get(report_url, {"outcome": "passed"})
+        self.assertEqual(report.status_code, 200)
+        self.assertContains(report, "Hello, world!")
+        self.assertContains(report, "Passed")
+
+    @http_mock.activate
+    def test_judge_run_reuses_cache_without_relinking_old_evidence(self) -> None:
+        self.serve_pass()
+        self.post_judge()
+        first_run = ProducerRun.objects.get()
+        call_count = len(http_mock.calls)
+        self.post_judge()
+        self.assertEqual(ProducerRun.objects.count(), 2)
+        second_run = ProducerRun.objects.exclude(pk=first_run.pk).get()
+        self.assertEqual(len(http_mock.calls), call_count)
+        cached_row = JudgeRunUnit.objects.get(run=second_run)
+        self.assertTrue(cached_row.cached)
+        # The cached run gets its own participation row but makes no new
+        # attempts; the first run's attempts/verdicts are never relinked.
+        self.assertEqual(JudgeRequestAttempt.objects.filter(run=first_run).count(), 2)
+        self.assertEqual(JudgeRequestAttempt.objects.filter(run=second_run).count(), 0)
+
+    @http_mock.activate
+    def test_judge_provider_refusal_fails_run_without_orphan_verdicts(self) -> None:
+        http_mock.register("POST", self.CHAT_URL, status_code=400, json={})
+        self.post_judge()
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertTrue(run.failure)
+        self.assertEqual(JudgeVerdict.objects.count(), 0)
+        self.assertFalse(JudgeRequestAttempt.objects.filter(run__isnull=True).exists())
+
+    @http_mock.activate
+    def test_judge_unexpected_exception_fails_run_not_hanging(self) -> None:
+        # A raw exception downstream of run creation (not a graceful HTTP
+        # refusal, already covered above) must still finalize the run
+        # instead of leaving it RUNNING forever.
+        with (
+            patch(
+                "weblate.trans.autotranslate.run_judge_batch",
+                side_effect=RuntimeError("simulated bug"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            self.post_judge()
+        run = ProducerRun.objects.get()
+        self.assertNotEqual(run.status, ProducerRun.Status.RUNNING)
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+
+    @http_mock.activate
+    def test_judge_denies_actor_without_review_permission(self) -> None:
+        self.grant_perm_to_user(
+            "translation.auto", group_name="Auto only", project=self.project
+        )
+        self.post_judge(superuser=False, code=400)
+        self.assertEqual(ProducerRun.objects.count(), 0)
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @http_mock.activate
+    def test_judge_denies_locked_component(self) -> None:
+        self.component.locked = True
+        self.component.save(update_fields=["locked"])
+        self.post_judge(code=403)
+        self.assertEqual(ProducerRun.objects.count(), 0)
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @http_mock.activate
+    def test_judge_rejects_malformed_form_without_creating_run(self) -> None:
+        self.post_judge(code=400, mode="invalid")
+        self.assertEqual(ProducerRun.objects.count(), 0)
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @http_mock.activate
+    def test_judge_excludes_unit_from_a_foreign_project(self) -> None:
+        foreign_component = self.create_acl()
+        foreign_id = foreign_component.source_translation.unit_set.first().pk
+        self.post_judge(q=f"id:{foreign_id}")
+        self.assertEqual(JudgeRunUnit.objects.count(), 0)
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(JUDGE_MAX_UNITS_PER_RUN=0)
+    @http_mock.activate
+    def test_judge_zero_cap_skips_without_calls(self) -> None:
+        self.post_judge()
+        row = JudgeRunUnit.objects.get()
+        self.assertEqual(row.skip_reason, JudgeRunUnit.SkipReason.CAP)
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @http_mock.activate
+    def test_judge_keeps_approved_target_but_lowers_state_pre_task3(self) -> None:
+        """
+        Documents current (pre-Task-3) behaviour; not an endorsement.
+
+        A ``pass`` verdict leaves the approved text untouched but still
+        projects the unit down to translated, because ``process_judge``
+        runs ``state_for_verdict`` for every current verdict and
+        ``JUDGE_MAY_APPROVE`` is off
+        (``weblate/trans/autotranslate.py``, ``state_for_verdict``
+        projection). The defect predates this change: the previous bare
+        ``AutoTranslate`` REST path did exactly the same, so Task 1's
+        constructor swap must neither introduce nor hide it. Task 3 owns
+        the fix; until then this pins what actually happens, so a future
+        change cannot silently alter it.
+        """
+        self.serve_pass()
+        self.unit.translate(self.user, ["Ahoj světe!\n"], STATE_APPROVED)
+        self.assertEqual(self.unit.state, STATE_APPROVED)
+        before_target = self.unit.target
+        self.post_judge()
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, before_target)
+        self.assertEqual(self.unit.state, STATE_TRANSLATED)
 
 
 class UnitAPITest(APIBaseTest):

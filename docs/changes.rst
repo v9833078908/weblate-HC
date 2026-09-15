@@ -123,6 +123,7 @@ Weblate 2026.8.1
 * :ref:`check-prohibited-initial-character` no longer reports a translation, only the glossary term it translates, so a translation shortened for a narrow interface can start with a character such as ``%``.
 * An LLM judge run whose batch is too large to answer within :setting:`JUDGE_REQUEST_DEADLINE` now reduces the batch for the rest of that run, instead of repeating the same oversized batch until the run ends. A slow model previously lost every verdict of the run this way, because the reduction was recorded but only applied to the next run.
 * A machine translation service stopped after refusing somebody else's :ref:`automatic translation <auto-translation>` run now says so in the editor, instead of answering a single string with no suggestions and no reason; a suggestion already cached for that string is still served, because a stop only has to prevent new requests.
+* The REST ``autotranslate`` endpoint's ``mode: judge`` request now creates the same durable producer run history (actor, scope, per-string outcome) as automatic translation started from the web UI, see :ref:`llm-judge`; the ``weblate auto_translate`` management command does not offer a ``judge`` mode. Previously a REST judge run left verdicts and request attempts with no linked run, invisible to the run report.
 
 .. rubric:: Compatibility
 
