@@ -1,0 +1,162 @@
+{
+  "api": "http://localhost:3001/api",
+  "captured_at": "2026-09-15",
+  "rule": "source.tag_closing_has_attribute",
+  "source_units_seen": 14596,
+  "counts_by_code": {},
+  "examples_by_code": {},
+  "per_project": {
+    "space-arena": {
+      "game-strings": {
+        "source_language": "en",
+        "source_units": 4826,
+        "is_glossary": false
+      },
+      "glossary": {
+        "source_language": "en",
+        "source_units": 300,
+        "is_glossary": true
+      },
+      "units_seen": 5126,
+      "candidates": 0
+    },
+    "need-for-greed": {
+      "glossary": {
+        "source_language": "en",
+        "source_units": 0,
+        "is_glossary": true
+      },
+      "loot": {
+        "source_language": "en",
+        "source_units": 150,
+        "is_glossary": false
+      },
+      "character-dialogue": {
+        "source_language": "en",
+        "source_units": 25,
+        "is_glossary": false
+      },
+      "ui": {
+        "source_language": "en",
+        "source_units": 465,
+        "is_glossary": false
+      },
+      "tutorial": {
+        "source_language": "en",
+        "source_units": 100,
+        "is_glossary": false
+      },
+      "survey": {
+        "source_language": "en",
+        "source_units": 34,
+        "is_glossary": false
+      },
+      "orders": {
+        "source_language": "en",
+        "source_units": 102,
+        "is_glossary": false
+      },
+      "buyers": {
+        "source_language": "en",
+        "source_units": 10,
+        "is_glossary": false
+      },
+      "units_seen": 886,
+      "candidates": 0
+    },
+    "pirate-ships": {
+      "glossary": {
+        "source_language": "en",
+        "source_units": 0,
+        "is_glossary": true
+      },
+      "localization": {
+        "source_language": "ru",
+        "source_units": 3726,
+        "is_glossary": false
+      },
+      "integration-smoke": {
+        "source_language": "ru",
+        "source_units": 1,
+        "is_glossary": false
+      },
+      "units_seen": 3727,
+      "candidates": 0
+    },
+    "heart-abyss": {
+      "temple": {
+        "source_language": "ru",
+        "source_units": 688,
+        "is_glossary": false
+      },
+      "terms": {
+        "source_language": "ru",
+        "source_units": 12,
+        "is_glossary": true
+      },
+      "units_seen": 700,
+      "candidates": 0
+    },
+    "col4": {
+      "glossary": {
+        "source_language": "ru",
+        "source_units": 1,
+        "is_glossary": true
+      },
+      "data": {
+        "source_language": "ru",
+        "source_units": 3941,
+        "is_glossary": false
+      },
+      "common": {
+        "source_language": "ru",
+        "source_units": 82,
+        "is_glossary": false
+      },
+      "units_seen": 4024,
+      "candidates": 0
+    },
+    "test": {
+      "test": {
+        "source_language": "en",
+        "source_units": 1,
+        "is_glossary": false
+      },
+      "glossary": {
+        "source_language": "ru",
+        "source_units": 0,
+        "is_glossary": true
+      },
+      "units_seen": 1,
+      "candidates": 0
+    },
+    "judge-repair-probe": {
+      "st2-summer-update": {
+        "source_language": "ru",
+        "source_units": 124,
+        "is_glossary": false
+      },
+      "glossary": {
+        "source_language": "ru",
+        "source_units": 0,
+        "is_glossary": true
+      },
+      "units_seen": 124,
+      "candidates": 0
+    },
+    "fixcheck-sandbox": {
+      "strings": {
+        "source_language": "en",
+        "source_units": 8,
+        "is_glossary": false
+      },
+      "glossary": {
+        "source_language": "en",
+        "source_units": 0,
+        "is_glossary": true
+      },
+      "units_seen": 8,
+      "candidates": 0
+    }
+  }
+}

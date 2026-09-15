@@ -70,6 +70,15 @@ def main(argv: list[str] | None = None) -> int:
         metavar="CODE",
         help="Import this language even if it is below --min-fill. Repeatable.",
     )
+    parser.add_argument(
+        "--strict-source",
+        action="store_true",
+        help=(
+            "Treat source markup defects (a closing rich-text tag carrying an "
+            "attribute, e.g. </color=yellow>) as errors instead of warnings; "
+            "the run fails before staging."
+        ),
+    )
     args = parser.parse_args(argv)
 
     return run(
@@ -81,4 +90,5 @@ def main(argv: list[str] | None = None) -> int:
         component=args.component,
         min_fill=args.min_fill,
         include_languages=frozenset(args.include_lang),
+        strict_source=args.strict_source,
     )

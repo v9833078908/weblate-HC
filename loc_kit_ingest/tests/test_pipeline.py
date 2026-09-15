@@ -314,6 +314,68 @@ def test_missing_output_parent_exits_2(tmp_path, kit_with_profile):
 
 
 # ---------------------------------------------------------------------------
+# Source markup diagnostics (plan 2026-09-11-loc-kit-source-validation)
+# ---------------------------------------------------------------------------
+
+
+BAD_SOURCE = "Заказчики приходят в </color=yellow>{0}</color> раза реже."
+
+
+def _bad_kit(tmp_path, bad_rows=0, good_rows=0):
+    kit = tmp_path / "UI.csv"
+    rows = ["key;ru;en"]
+    rows += [f"bad_{i};{BAD_SOURCE};Target {i}" for i in range(bad_rows)]
+    rows += [f"good_{i};Просто текст {i};Just text {i}" for i in range(good_rows)]
+    kit.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    return kit
+
+
+def test_source_markup_defect_is_warning_and_publishes(tmp_path):
+    kit = _bad_kit(tmp_path, bad_rows=1)
+    output = tmp_path / "out"
+    assert main([str(kit), "--out", str(output)]) == 0
+    report = (output / "report.txt").read_text(encoding="utf-8")
+    assert report.count("source.tag_closing_has_attribute") == 1
+    assert "key 'bad_0'" in report
+    # The source string itself is still imported.
+    po = (output / "UI" / "ru.po").read_text(encoding="utf-8")
+    assert "</color=yellow>" in po
+
+
+def test_two_source_markup_defects_give_two_diagnostics(tmp_path):
+    kit = _bad_kit(tmp_path, bad_rows=2)
+    output = tmp_path / "out"
+    assert main([str(kit), "--out", str(output)]) == 0
+    report = (output / "report.txt").read_text(encoding="utf-8")
+    assert report.count("source.tag_closing_has_attribute") == 2
+
+
+def test_source_markup_diagnostics_capped_at_99_details_plus_summary(tmp_path):
+    kit = _bad_kit(tmp_path, bad_rows=101)
+    output = tmp_path / "out"
+    assert main([str(kit), "--out", str(output)]) == 0
+    report = (output / "report.txt").read_text(encoding="utf-8")
+    assert report.count("source.tag_closing_has_attribute") == 99
+    assert "source.markup_diagnostics_suppressed" in report
+    assert "suppressed 2 further" in report
+    assert "Source markup diagnostics: 100" in report
+
+
+def test_strict_source_fails_before_staging(tmp_path):
+    kit = _bad_kit(tmp_path, bad_rows=1)
+    output = tmp_path / "out"
+    assert main([str(kit), "--out", str(output), "--strict-source"]) == 2
+    assert not output.exists()
+
+
+def test_strict_source_leaves_clean_kit_publishing(tmp_path):
+    kit = _bad_kit(tmp_path, good_rows=2)
+    output = tmp_path / "out"
+    assert main([str(kit), "--out", str(output), "--strict-source"]) == 0
+    assert (output / "report.txt").is_file()
+
+
+# ---------------------------------------------------------------------------
 # Profile v2 record-map, end to end
 # ---------------------------------------------------------------------------
 

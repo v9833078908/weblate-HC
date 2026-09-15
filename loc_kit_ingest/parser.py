@@ -17,6 +17,9 @@ from loc_kit_ingest.model import (
     StringUnit,
 )
 from loc_kit_ingest.profile import KeyedGrammar, PairsGrammar, RecordMapGrammar
+from loc_kit_ingest.source_markup import (
+    source_markup_defects,
+)
 
 if TYPE_CHECKING:
     from loc_kit_ingest.profile import ComponentProfile
@@ -24,6 +27,14 @@ if TYPE_CHECKING:
 
 # --------------------------------------------------------------------------- #
 GLOSSARY_SOURCE_FLAGS = frozenset({"exact", "read-only", "forbidden"})
+
+# Per-component cap on source-markup diagnostics: the first 99 details in
+# deterministic row/position order plus one summary diagnostic carrying the
+# number of the rest (plan docs/product/plans/2026-09-11-loc-kit-source-
+# validation.md, contract v1). Keeps a broken sheet from growing the report
+# and kit_info["warnings"] without a bound.
+SOURCE_MARKUP_DETAIL_CAP = 99
+SOURCE_MARKUP_SUPPRESSED_CODE = "source.markup_diagnostics_suppressed"
 
 # Helpers
 # --------------------------------------------------------------------------- #
@@ -86,10 +97,21 @@ def _is_in_block(ch: str, block: str) -> bool:
 # --------------------------------------------------------------------------- #
 
 
-def parse_component(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
-    """Dispatch to the appropriate parser based on kind/grammar."""
+def parse_component(
+    component: ComponentProfile,
+    rows: list[list[str]],
+    *,
+    strict_source: bool = False,
+) -> ParseResult:
+    """
+    Dispatch to the appropriate parser based on kind/grammar.
+
+    ``strict_source`` applies to the keyed (PO) grammar only: it raises the
+    source-markup diagnostics of that grammar from warnings to errors. The
+    component-creation UI always uses the default ``False``.
+    """
     if component.kind == "po":
-        return _parse_keyed(component, rows)
+        return _parse_keyed(component, rows, strict_source=strict_source)
     if component.kind == "tbx":
         if isinstance(component.grammar, RecordMapGrammar):
             return _parse_record_map(component, rows)
@@ -118,7 +140,12 @@ def parse_component(component: ComponentProfile, rows: list[list[str]]) -> Parse
 # --------------------------------------------------------------------------- #
 
 
-def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
+def _parse_keyed(
+    component: ComponentProfile,
+    rows: list[list[str]],
+    *,
+    strict_source: bool = False,
+) -> ParseResult:
     grammar = component.grammar
     assert isinstance(grammar, KeyedGrammar)
     assert component.first_data_row is not None
@@ -132,6 +159,8 @@ def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
     diagnostics: list[Diagnostic] = []
     skipped: list[SkippedRow] = []
     seen_keys: dict[str, int] = {}
+    markup_defects = 0
+    markup_suppressed = 0
 
     # Build column maps
     lang_columns = {l.code: l.column for l in component.languages}
@@ -286,6 +315,26 @@ def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
         )
         flags = _cell(rows, row_idx, flags_col.column) if flags_col is not None else ""
 
+        # Source rich-text markup: one diagnostic per bad closing tag, capped
+        # per component. Only the source value is inspected, and only when it
+        # is non-blank; targets and TBX grammars are out of scope for v1.
+        if not _is_blank(source_val):
+            for defect in source_markup_defects(source_val):
+                if markup_defects >= SOURCE_MARKUP_DETAIL_CAP:
+                    markup_suppressed += 1
+                    continue
+                markup_defects += 1
+                diagnostics.append(
+                    Diagnostic(
+                        Severity.ERROR if strict_source else Severity.WARNING,
+                        defect.code,
+                        component.component,
+                        component.sheet,
+                        row_1based,
+                        f"key {key!r}: {defect.message}",
+                    )
+                )
+
         units.append(
             StringUnit(
                 key=key,
@@ -300,6 +349,20 @@ def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
 
         # Warnings
         _add_keyed_warnings(diagnostics, component, row_1based, values, source_lang)
+
+    if markup_suppressed:
+        diagnostics.append(
+            Diagnostic(
+                Severity.ERROR if strict_source else Severity.WARNING,
+                SOURCE_MARKUP_SUPPRESSED_CODE,
+                component.component,
+                component.sheet,
+                0,
+                f"suppressed {markup_suppressed} further source markup "
+                f"diagnostics at the per-component cap of "
+                f"{SOURCE_MARKUP_DETAIL_CAP}",
+            )
+        )
 
     return ParseResult(
         component=component.component,

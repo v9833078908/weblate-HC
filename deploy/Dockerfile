@@ -52,7 +52,7 @@ RUN set -eux; \
     echo "$PYLIB" > "$SITE_PACKAGES/hcgameloc-pylib.pth"; \
     cd /; \
     rm -rf /usr/src/hcgameloc; \
-    /app/venv/bin/python -c "import importlib.util as u, numpy, matplotlib, weblate, loc_kit_ingest; assert u.find_spec('weblate_customization.machinery') and u.find_spec('weblate_customization.checks'); print(weblate.__file__, numpy.__version__)"
+    /app/venv/bin/python -c "import importlib.util as u, numpy, matplotlib, weblate, loc_kit_ingest; assert u.find_spec('weblate_customization.machinery') and u.find_spec('weblate_customization.checks') and u.find_spec('loc_kit_ingest.source_markup'); print(weblate.__file__, numpy.__version__)"
 
 # Lets a deploy prove that the running image was built from the intended commit.
 ARG GIT_SHA=unknown
