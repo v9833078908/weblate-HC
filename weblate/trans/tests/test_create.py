@@ -149,6 +149,15 @@ class CreateTest(ViewTestCase):
         self.assertContains(response, "Project website or store URL")
 
     @modify_settings(INSTALLED_APPS={"remove": "weblate.billing"})
+    def test_create_project_without_web(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+
+        self.client_create_project(True, name="No Web", slug="no-web", web="")
+
+        self.assertEqual(Project.objects.get(slug="no-web").web, "")
+
+    @modify_settings(INSTALLED_APPS={"remove": "weblate.billing"})
     def test_create_project_sets_blank_workspace_license(self) -> None:
         self.user.is_superuser = True
         self.user.save()

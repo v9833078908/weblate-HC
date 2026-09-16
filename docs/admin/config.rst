@@ -3606,7 +3606,7 @@ WEBSITE_REQUIRED
 ----------------
 
 Defines whether :ref:`project-web` has to be specified when creating a project.
-On by default, as that suits public server setups.
+Off by default, as a game project is often published only on a store page.
 
 .. setting:: WEBSITE_ALERTS_ENABLED
 
