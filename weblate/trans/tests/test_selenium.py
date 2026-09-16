@@ -2846,27 +2846,41 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         with self.wait_for_page_load():
             element.submit()
 
-    def click_matrix_load_more(self) -> None:
+    def activate_matrix_load_more(self) -> None:
         """
-        Scroll the fallback button into view and click it once idle.
+        Activate the fallback button from the keyboard once it is idle.
 
-        Waiting for the button to be enabled before scrolling and clicking
-        avoids racing a scroll-triggered automatic load (``scrollIntoView``
-        fires a real ``scroll`` event, which the page's own scroll listener
-        may use to start one) and avoids scrolling to a position that a
-        newly appended batch immediately invalidates.
+        Focus is moved without scrolling and the key is sent to whatever is
+        focused, so the activation neither depends on hit testing nor emits
+        a scroll event of its own. Bootstrap sets ``scroll-behavior:
+        smooth`` on the document, which makes any scroll asynchronous: a
+        pointer click aimed at a freshly scrolled position lands wherever
+        the animation happens to be, and a scroll near the footer also
+        starts an automatic load whose appended rows move the button again.
+        Keyboard activation avoids both, and it is the interaction the
+        accessible fallback exists for.
         """
         WebDriverWait(self.driver, 15).until(
             lambda driver: (
                 driver.find_element(By.ID, "matrix-load-more").get_attribute("disabled")
                 is None
+                or driver.find_element(By.ID, "matrix-load-more").get_attribute(
+                    "hidden"
+                )
+                is not None
             )
         )
         button = self.driver.find_element(By.ID, "matrix-load-more")
-        self.driver.execute_script(
-            "arguments[0].scrollIntoView({block: 'center'});", button
+        if button.get_attribute("hidden") is not None:
+            # An automatic load already reached the terminal batch, so there
+            # is nothing left for the fallback button to reveal.
+            return
+        self.driver.execute_script("arguments[0].focus({preventScroll: true});", button)
+        self.assertEqual(
+            self.driver.switch_to.active_element.get_attribute("id"),
+            "matrix-load-more",
         )
-        self.click(self.driver.find_element(By.ID, "matrix-load-more"))
+        webdriver.ActionChains(self.driver).send_keys(Keys.ENTER).perform()
 
     def test_matrix_load_more_pagination(self) -> None:
         """
@@ -2920,10 +2934,44 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         load_more = self.driver.find_element(By.ID, "matrix-load-more")
         self.assertIsNone(load_more.get_attribute("hidden"))
 
+        # Infinite scroll has to keep working while the fallback button is
+        # on screen. The button sits in the table footer, which is exactly
+        # where a reader scrolls to, so skipping automatic loads whenever it
+        # is inside the viewport silently disables pagination for everybody
+        # who never clicks it.
+        rows_before_scroll = len(
+            self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")
+        )
+        # ``behavior: "instant"`` overrides the document's smooth scrolling
+        # so the position is already final when it is measured below.
+        scroll_state = self.driver.execute_script("""
+            const button = document.getElementById("matrix-load-more");
+            button.scrollIntoView({block: "center", behavior: "instant"});
+            const rect = button.getBoundingClientRect();
+            return {
+                buttonInViewport: rect.bottom > 0 && rect.top < window.innerHeight,
+                nearBottom:
+                    window.scrollY >=
+                    document.documentElement.scrollHeight - 2 * window.innerHeight,
+            };
+        """)
+        self.assertEqual(
+            scroll_state,
+            {"buttonInViewport": True, "nearBottom": True},
+            "the scroll position under test must have the fallback button on "
+            "screen and satisfy the page's own load threshold",
+        )
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr"))
+                > rows_before_scroll
+            )
+        )
+
         rows_before_click = len(
             self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")
         )
-        self.click_matrix_load_more()
+        self.activate_matrix_load_more()
         WebDriverWait(self.driver, 15).until(
             lambda driver: (
                 len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr"))
@@ -2965,7 +3013,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
             online_conditions,
         )
 
-        self.click_matrix_load_more()
+        self.activate_matrix_load_more()
         WebDriverWait(self.driver, 15).until(
             lambda driver: (
                 "Could not load"
@@ -2989,7 +3037,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         self.driver.execute_cdp_cmd(
             "Network.emulateNetworkConditions", online_conditions
         )
-        self.click_matrix_load_more()
+        self.activate_matrix_load_more()
         WebDriverWait(self.driver, 15).until(
             lambda driver: (
                 len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr"))
@@ -3013,7 +3061,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
             current_rows = len(
                 self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")
             )
-            self.click_matrix_load_more()
+            self.activate_matrix_load_more()
 
             def rows_grew_or_finished(
                 driver: WebDriver, expected: int = current_rows

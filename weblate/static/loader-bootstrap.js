@@ -1108,18 +1108,6 @@ onReady(() => {
         window.scrollY >=
         document.documentElement.scrollHeight - 2 * window.innerHeight
       ) {
-        // Once the accessible fallback button intersects the viewport at
-        // all, let the user drive further loads explicitly instead of
-        // racing an automatic load against their click: a successful
-        // auto-load appends rows before the footer and pushes the button
-        // to a new position just as the user reaches for it.
-        const button = document.getElementById("matrix-load-more");
-        if (button && !button.hidden) {
-          const rect = button.getBoundingClientRect();
-          if (rect.bottom > 0 && rect.top < window.innerHeight) {
-            return;
-          }
-        }
         loadMatrix();
       }
     });
