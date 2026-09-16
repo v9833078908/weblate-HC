@@ -2884,12 +2884,14 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
 
     def test_matrix_load_more_pagination(self) -> None:
         """
-        Accessible fallback for matrix pagination.
+        Matrix pagination reaches every row and recovers from a failure.
 
-        The ``Load more`` button reveals the next real batch, a failed
-        request neither advances the cursor nor loses loaded rows, a retry
-        recovers without skipping or duplicating rows, and the button hides
-        only once the real, server-confirmed terminal batch is reached.
+        The table keeps loading while its footer is on screen, including in
+        a window taller than the page, where no scroll event is ever
+        emitted. A failed request neither advances the cursor nor loses
+        loaded rows, a retry recovers without skipping or duplicating rows,
+        and the accessible fallback button hides only once the real,
+        server-confirmed terminal batch is reached.
         """
         project = self.create_component()
         django_component = project.component_set.get(slug="django")
@@ -2920,6 +2922,13 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         self.assertGreater(total, 60)
 
         self.do_login(superuser=True)
+        # A window taller than the page emits no scroll event at all, which
+        # is how a reader on a large screen sees the matrix: pagination that
+        # listens for scrolling stops at its first batch there and never
+        # recovers on its own. Restore the shared browser's size for the
+        # rest of the suite even if an assertion below raises.
+        self.addCleanup(self.driver.set_window_size, 1200, 1024)
+        self.driver.set_window_size(1200, 2000)
         with self.wait_for_page_load():
             self.driver.get(
                 f"{self.live_server_url}"
@@ -2928,38 +2937,34 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
             )
         WebDriverWait(self.driver, 15).until(
             lambda driver: (
-                len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")) == 20
+                len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")) >= 20
+            )
+        )
+        self.assertFalse(
+            self.driver.execute_script(
+                "return document.documentElement.scrollHeight > window.innerHeight;"
+            ),
+            "the window under test must be taller than the page, so that no "
+            "scroll event can drive pagination",
+        )
+        # No scrolling, no clicking: the table has to keep growing past the
+        # first batch on its own.
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")) > 20
             )
         )
         load_more = self.driver.find_element(By.ID, "matrix-load-more")
         self.assertIsNone(load_more.get_attribute("hidden"))
 
-        # Infinite scroll has to keep working while the fallback button is
-        # on screen. The button sits in the table footer, which is exactly
-        # where a reader scrolls to, so skipping automatic loads whenever it
-        # is inside the viewport silently disables pagination for everybody
-        # who never clicks it.
+        # Back to a window the page outgrows, where reaching the footer has
+        # to resume loading without touching the fallback button.
+        self.driver.set_window_size(1200, 1024)
         rows_before_scroll = len(
             self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")
         )
-        # ``behavior: "instant"`` overrides the document's smooth scrolling
-        # so the position is already final when it is measured below.
-        scroll_state = self.driver.execute_script("""
-            const button = document.getElementById("matrix-load-more");
-            button.scrollIntoView({block: "center", behavior: "instant"});
-            const rect = button.getBoundingClientRect();
-            return {
-                buttonInViewport: rect.bottom > 0 && rect.top < window.innerHeight,
-                nearBottom:
-                    window.scrollY >=
-                    document.documentElement.scrollHeight - 2 * window.innerHeight,
-            };
-        """)
-        self.assertEqual(
-            scroll_state,
-            {"buttonInViewport": True, "nearBottom": True},
-            "the scroll position under test must have the fallback button on "
-            "screen and satisfy the page's own load threshold",
+        self.driver.execute_script(
+            "window.scrollTo(0, document.documentElement.scrollHeight);"
         )
         WebDriverWait(self.driver, 15).until(
             lambda driver: (

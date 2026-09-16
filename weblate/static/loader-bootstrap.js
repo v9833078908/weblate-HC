@@ -545,7 +545,11 @@ function describeJudgePhase(result) {
   return "";
 }
 
+// Distance ahead of the table footer at which the next batch is fetched.
+const MATRIX_LOAD_MARGIN = 400;
+
 let matrixLoading = false;
+let matrixObserver = null;
 
 function getMatrixElements() {
   return {
@@ -585,6 +589,22 @@ function setMatrixFinished({ spinner, button, status }) {
   if (status) {
     status.textContent = "";
   }
+  // Nothing is left to observe, and the footer stays on screen once the
+  // table stops growing.
+  matrixObserver?.disconnect();
+  matrixObserver = null;
+}
+
+function matrixFooterInRange() {
+  const footer = document.querySelector(".matrix tfoot");
+  if (footer === null) {
+    return false;
+  }
+  const rect = footer.getBoundingClientRect();
+  return (
+    rect.top < window.innerHeight + MATRIX_LOAD_MARGIN &&
+    rect.bottom > -MATRIX_LOAD_MARGIN
+  );
 }
 
 function loadMatrix() {
@@ -604,6 +624,8 @@ function loadMatrix() {
 
   matrixLoading = true;
   setMatrixBusy(elements);
+
+  let moreToLoad = false;
 
   fetch(`${loader.getAttribute("href")}&offset=${offset}`, {
     headers: { "X-Requested-With": "XMLHttpRequest" },
@@ -625,6 +647,7 @@ function loadMatrix() {
         setMatrixFinished(elements);
       } else {
         setMatrixIdle(elements);
+        moreToLoad = true;
       }
     })
     .catch(() => {
@@ -635,6 +658,14 @@ function loadMatrix() {
     .finally(() => {
       matrixLoading = false;
       hide(spinner);
+      // The observer reports changes only, so a footer that stayed on
+      // screen across the append - the whole page fits the window, or the
+      // reader is sitting at the bottom - never reports again. Continue
+      // here, once the in-flight guard is clear. A failure stops instead,
+      // leaving the retry to the button or to the next scroll.
+      if (moreToLoad && matrixFooterInRange()) {
+        loadMatrix();
+      }
     });
 }
 
@@ -1102,15 +1133,24 @@ onReady(() => {
 
   /* Matrix mode handling */
   if (document.querySelector(".matrix") !== null) {
+    const footer = document.querySelector(".matrix tfoot");
+    if (footer !== null) {
+      // Watching the footer rather than listening for scrolling keeps the
+      // table growing in the cases a scroll listener never hears about: a
+      // window taller than the page emits no scroll event at all, so the
+      // matrix used to stop at its first batch with no way forward except
+      // the fallback button.
+      matrixObserver = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            loadMatrix();
+          }
+        },
+        { rootMargin: `${MATRIX_LOAD_MARGIN}px` },
+      );
+      matrixObserver.observe(footer);
+    }
     loadMatrix();
-    window.addEventListener("scroll", () => {
-      if (
-        window.scrollY >=
-        document.documentElement.scrollHeight - 2 * window.innerHeight
-      ) {
-        loadMatrix();
-      }
-    });
     document
       .getElementById("matrix-load-more")
       ?.addEventListener("click", () => {
