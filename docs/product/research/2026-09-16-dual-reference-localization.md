@@ -26,6 +26,8 @@ TMS/frameworks, научные работы и LQA. Основной агент 
 
 Связанные документы:
 
+- `docs/product/plans/2026-09-16-dual-reference-zh-study.md` — отдельный план
+  исполнения для следующей сессии; датасет и запуск ещё не согласованы.
 - `docs/product/designs/2026-09-16-dual-reference-zh-experiment.md` — условия,
   контроль смещений, LQA, статистика и критерии решения.
 - `docs/operations/reports/2026-09-16-dual-reference-dataset-candidates.md` —
