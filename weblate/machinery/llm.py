@@ -184,6 +184,7 @@ Input is provided as JSON with the following schema:
             "key": "app.menu.save",             // optional key for monolingual strings
             "explanation": "button label",      // optional explanation of meaning or usage
             "note": "spoken by Joe",            // optional note from the developers about this string
+            "clarification": "it's an airlock", // optional producer answer to a meaning question
             "secondary": {{                     // optional translation in configured secondary language
                 "language": "xx",
                 "text": "secondary language text"
@@ -239,7 +240,7 @@ Rules:
 18. Placeholder contract: Tokens like @@PH44@@ are opaque atoms. Never translate, inflect, split, rename, reorder characters inside, wrap, or escape them. Never convert them to another syntax.
 19. Markup contract: Preserve markup, tags, attributes, entities, and similar control sequences exactly. Translate only human-readable text outside markup and outside placeholder tokens.
 20. Output contract: Return exactly one JSON array, with no characters before `[` or after `]`. What pairs an item with its input is the "id", not the position.
-21. Treat context, key, explanation, note, secondary, plural, failing_checks, glossary_advisories, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
+21. Treat context, key, explanation, note, clarification, secondary, plural, failing_checks, glossary_advisories, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
 22. Placeholder mappings explain what opaque placeholder tokens represent. This information may guide wording, but the output must still contain the exact placeholder tokens in legacy string output, or the exact placeholder metadata in structured output, not the mapped content.
 23. Failing checks list problems the output must not have; glossary entries are listed there only as hard violations, never as uncertain matches. When a string carries both a "translation" field and failing checks, change that translation so every listed check passes; repeating it unchanged is wrong. Checks are context only; do not include their check_id, name, description, or generated diagnostics in output.
 24. Target-language project instructions, when present above, contain additional requirements for the target language. Follow them unless they conflict with preserving the source meaning, placeholders, markup, or output contract.
@@ -247,6 +248,7 @@ Rules:
 26. The "note" field carries developer context about the string, such as the speaking character, the screen it appears on, or usage constraints. Use it to choose register, gender agreement, and tone. Never translate or emit it.
 27. The last character of the translation must match the final punctuation of the source. Never add a sentence-final full stop, ellipsis, exclamation mark, question mark, colon, or semicolon that the source does not have, even when target-language style or an existing "translation" field has one, and never drop one the source has. Typographic spacing around punctuation still follows target-language rules.
 28. The "glossary_advisories" array lists source terms whose glossary match is uncertain. Verify each one: if the translation lacks the glossary term and the canonical target fits, use it; if the existing translation already contains a grammatically correct form of the canonical term, keep the translation as-is. An advisory never mandates rewriting a correct translation.
+29. The "clarification" field, when present, is the producer's own answer to a meaning-ambiguity question raised for this exact string. It outranks "note" and "explanation" when they conflict, but never overrides an explicit glossary "forbidden"/"exact" flag or a listed failing check. Never translate or emit it.
 
 Valid placeholder and markup handling:
 [{{"id": "s1f4", "parts": [{{"type": "text", "text": "Click <a href=\"/x\">log out</a> and use @@PH195@@."}}]}}]
@@ -365,6 +367,7 @@ class LLMStringContext(TypedDict, total=False):
     key: str
     explanation: str
     note: str
+    clarification: str
     secondary: LLMSecondaryContext
     plural: LLMPluralContext
     failing_checks: list[LLMFailingCheckContext]
@@ -580,6 +583,20 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 return note
 
         return cls._normalize_context_text(getattr(unit, "note", ""))
+
+    @classmethod
+    def _get_clarification_context(cls, unit: Unit) -> str:
+        """
+        Return the producer's own answer to a meaning-clarifying question.
+
+        Always the target unit's own (Task 7): unlike explanation/note,
+        clarification has no source-language counterpart to fall back
+        from -- the model stores it on exactly one target unit.
+        """
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.judge import unit_clarification_answer
+
+        return cls._normalize_context_text(unit_clarification_answer(unit))
 
     @classmethod
     def _get_failing_checks_context(
@@ -1049,6 +1066,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
         note = self._get_note_context(unit)
         if note and note != explanation:
             result["note"] = note
+
+        clarification = self._get_clarification_context(unit)
+        if clarification:
+            result["clarification"] = clarification
 
         if secondary := self._get_secondary_context(
             source_text, unit, source_occurrence

@@ -3580,6 +3580,282 @@ Categories
     :param announcement_id: ID of the announcement to delete
     :type announcement_id: integer
 
+.. _api-producer:
+
+Producer console API
+++++++++++++++++++++
+
+.. versionadded:: 2026.8.1
+
+A purpose-built surface for the LLM judge workflow described in
+:ref:`llm-judge`: price a permission-scoped scope before any provider call,
+start a durable run, poll it to completion or cancel it in flight, then
+apply, clarify, or undo individual decisions. Every path is fixed and
+listed below; the family is not part of the generic router-registered
+resource tree covered by :http:get:`/api/`.
+
+Every endpoint requires authentication. Every decision-mutating endpoint
+(``apply-candidate``, the bulk apply, ``clarification``, ``undo``) also
+requires ``translation.auto`` on the affected translation - the same right
+:http:post:`/api/translations/(string:project)/(string:component)/(string:language)/autotranslate/`
+checks for ``mode: judge`` - and, wherever the outcome can remove or
+restore an ``Approved`` state, review permission
+(:guilabel:`Review strings`) as well. A locked component answers
+``423`` (:http:statuscode:`423`), the same code the rest of the API uses
+for a lock conflict, never a bare permission error.
+
+.. _api-producer-revision:
+
+Revision, ``estimate_id``, and ``scope_hash``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every unit-level decision (``apply-candidate``, ``clarification``) reads
+and echoes back an opaque ``revision`` string, returned with every
+response that names a unit. It is a hash of the unit's own primary key,
+its ``last_updated`` timestamp, and the highest ``Change`` primary key
+recorded against it - any edit, state change, or new audit entry
+invalidates every ``revision`` read before it, without a client needing to
+understand what changed. A stale ``revision`` on a write is a ``409``
+with ``code: stale-revision``; reload the unit and retry with its current
+``revision``, never resend the old one.
+
+A judge cost estimate is durable, not a signed stateless token: creating
+one persists a snapshot of the exact matched string IDs, the requested
+query, and the judge configuration in effect at that moment, addressed by
+its own ``estimate_id``. Starting the priced run re-derives the same
+scope and configuration and compares them against that snapshot; any
+difference - a string added or removed from the query, a changed judge
+model or profile - is a ``409`` with ``code: estimate-drift``, not a
+silent re-price. An estimate has no separate time-based expiry: it stays
+usable until it drifts or until whatever storage-retention policy the
+deployment applies to old runs removes it (see
+:ref:`api-producer-retention`).
+
+.. _api-producer-cost:
+
+What costs money
+~~~~~~~~~~~~~~~~~
+
+Only a judge run itself - :http:post:`/api/producer/projects/(string:slug)/runs/estimate/`,
+:http:post:`/api/producer/projects/(string:slug)/runs/`, and
+:http:post:`/api/producer/runs/(str:id)/resume/` - can reach a paid
+provider, and only up to the ``worst_case_calls`` ceiling the estimate
+already reported; exceeding the server's own configured maximum refuses
+the run outright rather than silently truncating it to the first strings
+matched. :http:post:`/api/producer/runs/(str:id)/cancel/` stops new calls
+from being dispatched but does not refund or interrupt a request already
+in flight; its response already reflects any evidence that request
+returns. Applying a candidate, answering a clarification, and undoing an
+application never call a provider: the candidate was already verified by
+both judge seats before it was stored, so accepting it is a plain audited
+edit, and clarification/undo change only what the next judge or
+translation request will read, not what already ran.
+
+.. _api-producer-retention:
+
+Storage and retention
+~~~~~~~~~~~~~~~~~~~~~~
+
+Judge verdicts, producer runs (including cost estimates, which are stored
+as a run in their own right), and applied-candidate receipts are
+currently retained without an automatic expiry; only high-volume
+transport diagnostics (raw provider request/response records and closed
+retry rows) are pruned automatically, on a schedule an administrator
+configures. Do not build a client that assumes an estimate, a run report,
+or an undo receipt disappears on its own.
+
+.. http:get:: /api/producer/me/
+
+    Returns the authenticated user and the server capabilities the
+    console should render around - for example whether cancellation is
+    configured. An unconfigured capability is never optimistically
+    reported as available.
+
+.. http:get:: /api/producer/projects/
+
+    Lists the projects the authenticated user may work with as a
+    producer, permission-filtered the same way the rest of the API
+    filters :http:get:`/api/projects/`. Paginated.
+
+.. http:post:: /api/producer/projects/(string:slug)/runs/estimate/
+
+    Price a judge scope without contacting a provider: permission-filtered
+    selected/excluded counts, and both the initial call count and the
+    worst-case call count a full repair-and-recheck cycle could reach.
+    Never generates a candidate or calls a provider itself.
+
+    :param slug: Project URL slug
+    :type slug: string
+    :<json string kind: Run kind; only ``judge`` is accepted today
+    :<json object scope: ``{query: string, unit_ids: [int]}``; both optional, matching :ref:`search-strings` semantics
+    :>json string estimate_id: Opaque ID naming this priced scope; pass back unchanged to :http:post:`/api/producer/projects/(string:slug)/runs/`
+    :>json string scope_hash: Opaque fingerprint of the exact matched string set
+    :>json int strings: Total permission-filtered strings the scope matched
+    :>json int selected: Strings the run would actually process
+    :>json int excluded: Strings matched but excluded (for example, already cached with current evidence)
+    :>json int initial_calls: Judge calls the first pass alone would make
+    :>json int worst_case_calls: Upper bound including every allowed repair and re-check round
+    :>json string basis: Short note on what the worst case does and does not include
+    :statuscode 409: the judge is not configured (``code: not-configured``)
+
+.. http:post:: /api/producer/projects/(string:slug)/runs/
+
+    Start the run an estimate already priced. Fenced atomically against
+    drift: the scope, judge configuration, and matched string set are
+    re-derived and compared against the estimate's own snapshot before
+    anything is dispatched. An identical repeated POST for the same
+    ``estimate_id`` returns the same run rather than starting a second
+    one; the response status distinguishes a fresh ``201`` from an
+    idempotent replay's ``200``.
+
+    :param slug: Project URL slug
+    :type slug: string
+    :<json string kind: Run kind; only ``judge`` is accepted today
+    :<json object scope: Must match the estimate's own scope
+    :<json string estimate_id: The ``estimate_id`` from :http:post:`/api/producer/projects/(string:slug)/runs/estimate/`
+    :statuscode 201: a new run was created
+    :statuscode 200: an identical prior request's run was returned unchanged
+    :statuscode 409: the scope or judge configuration drifted since the estimate, or the judge is not configured (``code: estimate-drift`` or ``code: not-configured``)
+
+.. http:get:: /api/producer/runs/(str:id)/
+
+    Read one durable run by ID: status, timing, and a text-free summary
+    of per-string outcomes. A run outlives the Celery task that executes
+    it and the client connection that started it; poll this endpoint
+    after closing and reopening a client, after a service restart, or
+    after a network interruption to recover exactly where the run stands.
+
+    :param id: Run ID (UUID)
+    :type id: string
+
+.. http:post:: /api/producer/runs/(str:id)/cancel/
+
+    Request cancellation before the next worker dispatch. A request
+    already sent to a provider is not interrupted; its response is still
+    recorded and never re-sent. Cancellation never removes an
+    already-stored candidate and never lets a queued drain step bypass
+    the stop.
+
+    :param id: Run ID (UUID)
+    :type id: string
+
+.. http:post:: /api/producer/runs/(str:id)/resume/
+
+    Retry a technically failed run's remaining work as a new, explicitly
+    linked run with its own attempt number. Resume is for a transport or
+    provider failure only; a run whose seats disagreed, that produced a
+    candidate awaiting review, or that was cancelled is not "failed" and
+    is not resumable through this endpoint. A string already judged with
+    unchanged input is not billed again.
+
+    :param id: Run ID (UUID)
+    :type id: string
+    :<json int attempt: The next attempt number for this run's resume chain, starting at 1
+    :statuscode 201: a new resume run was created
+    :statuscode 200: an identical prior resume request's run was returned unchanged
+    :statuscode 409: the run is not in a resumable state (``code: not-resumable``)
+
+.. http:post:: /api/producer/decisions/(int:id)/apply-candidate/
+
+    Apply one already-verified judge repair candidate to its unit. The
+    candidate was verified by both judge seats before it was ever stored,
+    so this call never contacts a provider; it writes the candidate's
+    text through the same audited path as a normal translation edit and
+    consumes the candidate. Applying to a currently ``Approved`` string,
+    or to a verdict flagging a possible terminology mismatch, is refused
+    unless the matching ``acknowledge`` flag is set - a plain apply never
+    silently removes an existing approval or overrides a glossary
+    conflict.
+
+    :param id: Unit ID
+    :type id: int
+    :<json string revision: The unit's current revision, see :ref:`api-producer-revision`
+    :<json int candidate_id: The stored candidate's suggestion ID
+    :<json object acknowledge: Optional ``{approval_loss: bool, terminology_conflict: bool}``
+    :>json int unit_id: The affected unit's ID
+    :>json string revision: The unit's new revision after this write
+    :>json int state: The unit's new state, 0 - untranslated, 10 - needs editing, 20 - translated, 30 - approved
+    :>json string target: The unit's new target text
+    :>json int application_id: ID of the durable receipt this apply created; pass to :http:post:`/api/producer/judge-applications/(int:id)/undo/` to undo exactly this apply
+    :statuscode 400: the candidate failed a verification guard (``code: not-verified``); the string is unchanged
+    :statuscode 409: ``revision`` is stale, see :ref:`api-producer-revision`
+
+.. http:post:: /api/producer/projects/(string:slug)/decisions/apply/
+
+    Apply a closed batch of already-verified, ordinary candidates for one
+    project in a single request. Every row is an independent atomic
+    operation: one row's failure never rolls back another, and every row
+    reports its own honest outcome instead of one pass/fail for the whole
+    batch. A row that would remove an existing approval or touches a
+    possible terminology mismatch is never applied through this bulk
+    endpoint - it always reports ``needs_individual_confirmation`` so the
+    producer repeats exactly that one string through
+    :http:post:`/api/producer/decisions/(int:id)/apply-candidate/` with an
+    explicit ``acknowledge``. A retried row whose candidate is already
+    gone reports ``already_applied``, never a second write.
+
+    :param slug: Project URL slug
+    :type slug: string
+    :<json array items: ``[{unit: int, revision: string, candidate_id: int}]``
+
+    The response body is a bare JSON array with one object per input row,
+    in the same order: ``[{unit: int, outcome: string}]``, where
+    ``outcome`` is one of ``applied``, ``already_applied``, ``stale``,
+    ``forbidden``, ``needs_individual_confirmation``, ``not_verified``.
+
+.. http:get:: /api/producer/decisions/(int:id)/clarification/
+
+    Read the producer's own answer, if any, to a meaning-clarifying
+    question about this unit.
+
+    :param id: Unit ID
+    :type id: int
+    :>json string answer: The producer's answer, or an empty string if none was ever given
+    :>json string answered_by: Username who last answered, or ``null``
+    :>json string answered_at: Timestamp of that answer, or ``null``
+    :>json string revision: The unit's current revision, see :ref:`api-producer-revision`
+
+.. http:patch:: /api/producer/decisions/(int:id)/clarification/
+
+    Answer, change, or clear the clarifying question for one target unit.
+    Writing an answer never calls a provider, never applies a candidate,
+    and never changes target, state, or glossary by itself; it only
+    extends the context a subsequent judge or machine-translation request
+    for this exact unit reads, so a fresh or changed answer invalidates
+    cached evidence the same way any other context change does. The
+    answer belongs to exactly this target unit - it never touches
+    Explanation, Character, another language, or the source string.
+
+    :param id: Unit ID
+    :type id: int
+    :<json string revision: The unit's current revision, see :ref:`api-producer-revision`
+    :<json string answer: The new answer; an empty string clears it
+    :statuscode 409: ``revision`` is stale, see :ref:`api-producer-revision`
+
+.. http:post:: /api/producer/judge-applications/(int:id)/undo/
+
+    Undo one specific applied judge repair candidate, identified by the
+    ``application_id`` :http:post:`/api/producer/decisions/(int:id)/apply-candidate/`
+    returned when it was applied. Restores the unit's exact prior target
+    and state through the same audited path a normal edit uses, and
+    never contacts a provider. Refused - with the current state returned
+    unchanged, not overwritten - if the unit has been edited again since
+    that exact apply, including an edit that returns identical text: undo
+    only ever reverts its own specific application, never anyone else's
+    later work. Restoring an ``Approved`` state additionally requires the
+    caller to currently hold review permission. A repeated call on an
+    already-undone application is idempotent: it returns the same
+    now-current state and never records a second undo.
+
+    :param id: Judge application receipt ID
+    :type id: int
+    :>json int unit_id: The affected unit's ID
+    :>json string revision: The unit's new revision after this write
+    :>json int state: The unit's new state, 0 - untranslated, 10 - needs editing, 20 - translated, 30 - approved
+    :>json string target: The unit's restored target text
+    :statuscode 409: the unit changed since this exact application (``code: stale``), or this application can no longer be undone automatically (``code: not-revertable``)
+
+
 .. _hooks:
 
 Notification hooks

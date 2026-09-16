@@ -97,6 +97,7 @@ from weblate.trans.models.judge import (
     latest_round,
     repair_evidence,
     resolve_verdict,
+    unit_clarification_answer,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.models.unit import fill_in_source_translation
@@ -1388,6 +1389,7 @@ def _judge_view_context(
             note=unit.source_unit.note,
             explanation=unit.source_unit.explanation,
             glossary_terms=get_matched_glossary_prompt_entries(unit),
+            clarification=unit_clarification_answer(unit),
         )
     )
     judge_resolution_choices: set[str] = set()
@@ -2159,12 +2161,12 @@ def judge_accept_candidate(request: AuthenticatedHttpRequest, pk):
         messages.error(request, str(error))
         return redirect_next(next_url, fallback_url)
 
-    messages.success(
-        request,
-        gettext(
-            "The suggested fix has been applied; one judge re-check has been queued."
-        ),
-    )
+    # Task 10: the candidate was already verified by both judge seats
+    # before it was ever stored (Task 3, proposal-only), so this card no
+    # longer queues a second paid re-check of text the judge already
+    # cleared, and no longer promises one that would only confirm what
+    # apply already proved.
+    messages.success(request, gettext("The suggested fix has been applied."))
     # Auto-advance only on success (Task 8): applying the candidate is a
     # completed decision, so the producer moves on to the next string.
     return redirect_next(request.POST.get("success_next") or next_url, fallback_url)

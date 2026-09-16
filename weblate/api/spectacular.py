@@ -112,6 +112,7 @@ The OpenAPI specification is available as feature preview, feedback welcome!
             "ColorEnum": "weblate.utils.colors.ColorChoices.choices",
             "StringStateEnum": "weblate.utils.state.StringState.choices",
             "ReportKindEnum": "weblate.trans.models.report.REPORT_KIND_CHOICES",
+            "ProducerRunKindEnum": "weblate.api.producer.serializers.PRODUCER_RUN_KIND_CHOICES",
             "NewUnitStateEnum": "weblate.api.serializers.NEW_UNIT_STATE_CHOICES",
             "ErrorResponse400TypeEnum": "weblate.api.serializers.ErrorResponse400TypeEnum.choices",
             "ValidationErrorEnum": "drf_standardized_errors.openapi_serializers.ValidationErrorEnum.choices",
@@ -126,6 +127,7 @@ The OpenAPI specification is available as feature preview, feedback welcome!
             "ErrorCode429Enum": "drf_standardized_errors.openapi_serializers.ErrorCode429Enum.choices",
             "ErrorCode500Enum": "drf_standardized_errors.openapi_serializers.ErrorCode500Enum.choices",
             "ErrorCode423Enum": "weblate.api.serializers.ErrorCode423Enum.choices",
+            "ErrorCode409Enum": "weblate.api.serializers.ErrorCode409Enum.choices",
         },
         "POSTPROCESSING_HOOKS": [
             "drf_standardized_errors.openapi_hooks.postprocess_schema_enums",
@@ -265,7 +267,11 @@ def get_drf_standardized_errors_settings() -> dict[str, Any]:
 
 
 def get_drf_settings(
-    *, require_login: bool, anon_throttle: str, user_throttle: str
+    *,
+    require_login: bool,
+    anon_throttle: str,
+    user_throttle: str,
+    producer_throttle: str = "60/hour",
 ) -> dict[str, Any]:
     return {
         # Use Django's standard `django.contrib.auth` permissions,
@@ -288,6 +294,11 @@ def get_drf_settings(
         "DEFAULT_THROTTLE_RATES": {
             "anon": anon_throttle,
             "user": user_throttle,
+            # Task 10, G7: a separate ceiling for the producer console's
+            # token-spending endpoints (judge estimate/start/resume), on
+            # top of the general user rate above - this family has no
+            # interactive UI of its own pacing a caller.
+            "producer": producer_throttle,
         },
         "DEFAULT_RENDERER_CLASSES": [
             "rest_framework.renderers.JSONRenderer",

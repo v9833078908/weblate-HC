@@ -981,7 +981,16 @@ class Change(models.Model, UserDisplayMixin):
         author: User | None = None,
         request=None,
         change_details: dict[str, str] | None = None,
+        propagate: bool = True,
     ) -> bool:
+        """
+        Restore ``old``/``old_state`` for a revertable action, under lock.
+
+        ``propagate`` defaults to ``True`` to keep every existing caller's
+        behaviour; a judge-application undo (Task 8) passes ``False`` so
+        restoring one producer's own reviewed decision never touches an
+        unrelated unit sharing the same source string.
+        """
         if self.unit is None or self.action not in ACTIONS_REVERTABLE:
             return False
 
@@ -1000,6 +1009,7 @@ class Change(models.Model, UserDisplayMixin):
             request=request,
             select_for_update=False,
             change_details=change_details,
+            propagate=propagate,
         )
 
     def show_source(self) -> bool:

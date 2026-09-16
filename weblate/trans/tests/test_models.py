@@ -505,7 +505,7 @@ class ProjectTest(RepoTestCase):
         self.assertEqual(result, SuggestionAddResult.CREATED)
         self.assertIsNone(JudgeCandidateMetadata.parse(suggestion.userdetails))
 
-    def test_new_verdict_replaces_the_old_active_candidate(self) -> None:
+    def test_new_verdict_keeps_other_verdict_candidates(self) -> None:
         component = self.create_po()
         translation = component.translation_set.get(language_code="cs")
         unit = translation.unit_set.get(source="Hello, world!\n")
@@ -539,7 +539,7 @@ class ProjectTest(RepoTestCase):
             },
         )[0]
         self.assertIsNotNone(new)
-        self.assertFalse(Suggestion.objects.filter(pk=old.pk).exists())
+        self.assertTrue(Suggestion.objects.filter(pk=old.pk).exists())
         self.assertTrue(Suggestion.objects.filter(pk=new.pk).exists())
 
     def test_delete_all(self) -> None:

@@ -915,6 +915,7 @@ REST_FRAMEWORK = get_drf_settings(
     require_login=REQUIRE_LOGIN,
     anon_throttle="100/day",
     user_throttle="5000/hour",
+    producer_throttle="60/hour",
 )
 DRF_STANDARDIZED_ERRORS = get_drf_standardized_errors_settings()
 SPECTACULAR_SETTINGS = get_spectacular_settings(

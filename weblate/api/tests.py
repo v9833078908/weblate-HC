@@ -7,6 +7,7 @@ import json
 import operator
 import os
 import tempfile
+import uuid
 import zipfile
 from contextlib import nullcontext
 from copy import copy
@@ -73,7 +74,7 @@ from weblate.trans.component_copy import (
     replace_component_checkout,
 )
 from weblate.trans.exceptions import FailedCommitError, FileParseError
-from weblate.trans.judge import validate_judge_configuration
+from weblate.trans.judge import JUDGE_SEATS, validate_judge_configuration
 from weblate.trans.judge_loop import build_request
 from weblate.trans.models import (
     Announcement,
@@ -91,11 +92,14 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.component import ComponentQuerySet
 from weblate.trans.models.judge import (
+    JudgeApplication,
     JudgeRequestAttempt,
     JudgeRunUnit,
     JudgeVerdict,
     ProducerRun,
+    UnitClarification,
     compute_context_hash,
+    compute_decision_revision,
     compute_target_hash,
     compute_target_storage_hash,
 )
@@ -12246,7 +12250,8 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
     def test_judge_denies_locked_component(self) -> None:
         self.component.locked = True
         self.component.save(update_fields=["locked"])
-        self.post_judge(code=403)
+        response = self.post_judge(code=423)
+        self.assertEqual(response.data["errors"][0]["code"], "component-locked")
         self.assertEqual(ProducerRun.objects.count(), 0)
         self.assertEqual(len(http_mock.calls), 0)
 
@@ -12273,29 +12278,23 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
         self.assertEqual(len(http_mock.calls), 0)
 
     @http_mock.activate
-    def test_judge_keeps_approved_target_but_lowers_state_pre_task3(self) -> None:
+    def test_judge_keeps_approved_target_and_state(self) -> None:
         """
-        Documents current (pre-Task-3) behaviour; not an endorsement.
+        A probabilistic judge result is advisory evidence, not an approval revocation.
 
-        A ``pass`` verdict leaves the approved text untouched but still
-        projects the unit down to translated, because ``process_judge``
-        runs ``state_for_verdict`` for every current verdict and
-        ``JUDGE_MAY_APPROVE`` is off
-        (``weblate/trans/autotranslate.py``, ``state_for_verdict``
-        projection). The defect predates this change: the previous bare
-        ``AutoTranslate`` REST path did exactly the same, so Task 1's
-        constructor swap must neither introduce nor hide it. Task 3 owns
-        the fix; until then this pins what actually happens, so a future
-        change cannot silently alter it.
+        The approved state may change only through the explicit reviewed apply flow,
+        never through a pass, flag, or reject projection.
         """
         self.serve_pass()
+        self.unit.extra_flags = "max-length:5"
+        self.unit.save(update_fields=["extra_flags"], same_content=True)
         self.unit.translate(self.user, ["Ahoj světe!\n"], STATE_APPROVED)
         self.assertEqual(self.unit.state, STATE_APPROVED)
         before_target = self.unit.target
         self.post_judge()
         self.unit.refresh_from_db()
         self.assertEqual(self.unit.target, before_target)
-        self.assertEqual(self.unit.state, STATE_TRANSLATED)
+        self.assertEqual(self.unit.state, STATE_APPROVED)
 
 
 class UnitAPITest(APIBaseTest):
@@ -13849,6 +13848,12 @@ class SuggestionAPITest(APIBaseTest):
 
     def _make_judge_candidate(self, unit, verdict, target="Navrh"):
         request = build_request(unit)
+        context_hash = compute_context_hash(
+            source=request.source,
+            note=request.note,
+            explanation=request.explanation,
+            glossary_terms=request.glossary_terms,
+        )
         suggestion, _result = Suggestion.objects.add(
             unit,
             [target],
@@ -13861,15 +13866,30 @@ class SuggestionAPITest(APIBaseTest):
                 "judge_verdict_id": verdict.pk,
                 "judge_run_id": str(verdict.run_id),
                 "target_hash": compute_target_hash(unit.get_target_plurals()),
-                "context_hash": compute_context_hash(
-                    source=request.source,
-                    note=request.note,
-                    explanation=request.explanation,
-                    glossary_terms=request.glossary_terms,
-                ),
+                "context_hash": context_hash,
                 "engine": "openrouter",
             },
         )
+        # A candidate is only acceptable once every seat has verified it
+        # (Task 3, B2): back it with the same completed evidence
+        # `run_judge_batch`'s post-generation re-check would have written.
+        candidate_hash = compute_target_hash(suggestion.target_list)
+        # A fresh run id: the live verdict's own (unit, run_id, attempt,
+        # request_round, seat) key is already taken by `verdict` itself.
+        candidate_run_id = uuid.uuid4()
+        for seat in JUDGE_SEATS:
+            JudgeVerdict.objects.create(
+                unit=unit,
+                subject=JudgeVerdict.Subject.CANDIDATE,
+                candidate_target_hash=candidate_hash,
+                target_hash=candidate_hash,
+                context_hash=context_hash,
+                run_id=candidate_run_id,
+                seat=seat,
+                judge_model=f"vendor-{seat}/model",
+                model_verdict=JudgeVerdict.Verdict.PASS,
+                max_severity=JudgeVerdict.Severity.NONE,
+            )
         return suggestion
 
     @override_settings(
@@ -13878,7 +13898,11 @@ class SuggestionAPITest(APIBaseTest):
         JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
     )
-    def test_accept_judge_candidate_holds_fuzzy_and_queues_recheck(self) -> None:
+    def test_accept_judge_candidate_marks_translated_without_a_recheck(self) -> None:
+        # Invariant 4: acceptance looks finished immediately (STATE_TRANSLATED).
+        # G5: the generic suggestion-accept surface never asks for a paid
+        # re-check itself -- only a caller that explicitly wants one (the
+        # verdict-card view) does, so a bulk apply cannot pay for N of them.
         self.project.translation_review = True
         self.project.save(update_fields=["translation_review"])
         unit = self._get_unit()
@@ -13886,7 +13910,7 @@ class SuggestionAPITest(APIBaseTest):
         candidate = self._make_judge_candidate(unit, verdict)
         with (
             patch(
-                "weblate.trans.tasks.auto_translate.delay",
+                "weblate.trans.tasks.auto_translate.apply_async",
                 return_value=SimpleNamespace(id="task-1"),
             ),
             self.captureOnCommitCallbacks(execute=True),
@@ -13899,11 +13923,9 @@ class SuggestionAPITest(APIBaseTest):
                 code=200,
             )
         unit.refresh_from_db()
-        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(unit.state, STATE_TRANSLATED)
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
-        self.assertEqual(
-            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
-        )
+        self.assertFalse(ProducerRun.objects.filter(requested_mode="recheck").exists())
 
     @override_settings(
         JUDGE_ENABLED=True,
@@ -13926,6 +13948,635 @@ class SuggestionAPITest(APIBaseTest):
         self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
         unit.refresh_from_db()
         self.assertNotEqual(unit.state, STATE_FUZZY)
+
+    # -- apply-candidate / bulk apply (Task 6, G5/G6) -----------------------
+
+    def _revision(self, unit):
+        return compute_decision_revision(unit)
+
+    def test_apply_candidate_applies_a_verified_candidate(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        response = self.do_request(
+            "api:producer-decision-apply-candidate",
+            kwargs={"pk": unit.pk},
+            method="post",
+            request={
+                "revision": self._revision(unit),
+                "candidate_id": candidate.pk,
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        unit.refresh_from_db()
+        self.assertEqual(response.data["unit_id"], unit.pk)
+        self.assertEqual(response.data["state"], STATE_TRANSLATED)
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+        # G5: applying a single candidate through the new API never queues
+        # a paid re-check by itself.
+        self.assertFalse(ProducerRun.objects.filter(requested_mode="recheck").exists())
+
+    def test_apply_candidate_rejects_a_stale_revision(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        response = self.do_request(
+            "api:producer-decision-apply-candidate",
+            kwargs={"pk": unit.pk},
+            method="post",
+            request={"revision": "stale-token", "candidate_id": candidate.pk},
+            format="json",
+            superuser=True,
+            code=409,
+        )
+        self.assertEqual(response.data["code"], "stale-revision")
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_apply_candidate_denied_without_permission(self) -> None:
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        self.do_request(
+            "api:producer-decision-apply-candidate",
+            kwargs={"pk": unit.pk},
+            method="post",
+            request={
+                "revision": self._revision(unit),
+                "candidate_id": candidate.pk,
+            },
+            format="json",
+            code=403,
+        )
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_apply_candidate_requires_acknowledgement_for_approval_loss(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        denied = self.do_request(
+            "api:producer-decision-apply-candidate",
+            kwargs={"pk": unit.pk},
+            method="post",
+            request={
+                "revision": self._revision(unit),
+                "candidate_id": candidate.pk,
+            },
+            format="json",
+            superuser=True,
+            code=400,
+        )
+        self.assertEqual(denied.data["code"], "not-verified")
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_APPROVED)
+
+        self.do_request(
+            "api:producer-decision-apply-candidate",
+            kwargs={"pk": unit.pk},
+            method="post",
+            request={
+                "revision": self._revision(unit),
+                "candidate_id": candidate.pk,
+                "acknowledge": {"approval_loss": True},
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+
+    def test_ordinary_suggestion_api_cannot_bypass_approval_loss_acknowledgement(
+        self,
+    ) -> None:
+        # G6 verification: the ordinary suggestion-accept surface never
+        # passes an acknowledgement, so it must not be usable to revoke an
+        # existing approval either.
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        response = self.do_request(
+            "api:suggestion-accept",
+            kwargs={"pk": candidate.pk},
+            method="post",
+            superuser=True,
+            code=400,
+        )
+        self.assertEqual(response.data["result"], "error")
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_APPROVED)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_bulk_apply_reports_honest_per_row_outcomes(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        applied_unit = self._get_unit()
+        applied_verdict = self._make_judge_verdict(applied_unit)
+        applied_candidate = self._make_judge_candidate(applied_unit, applied_verdict)
+
+        approved_unit = Unit.objects.get(
+            translation__language_code="cs", source="Thank you for using Weblate."
+        )
+        approved_unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        approved_verdict = self._make_judge_verdict(approved_unit)
+        approved_candidate = self._make_judge_candidate(approved_unit, approved_verdict)
+
+        # A third, independent unit: its own candidate stays valid, but the
+        # submitted revision is deliberately wrong, isolating "stale" from
+        # "already_applied" (which the other rows in this same batch cover).
+        stale_unit = Unit.objects.get(
+            translation__language_code="cs", source__startswith="Orangutan has "
+        )
+        stale_verdict = self._make_judge_verdict(stale_unit)
+        stale_candidate = self._make_judge_candidate(stale_unit, stale_verdict)
+
+        response = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": applied_unit.pk,
+                        "revision": self._revision(applied_unit),
+                        "candidate_id": applied_candidate.pk,
+                    },
+                    {
+                        "unit": approved_unit.pk,
+                        "revision": self._revision(approved_unit),
+                        "candidate_id": approved_candidate.pk,
+                    },
+                    {
+                        "unit": stale_unit.pk,
+                        "revision": "stale-token",
+                        "candidate_id": stale_candidate.pk,
+                    },
+                    {
+                        "unit": 900010,
+                        "revision": "does-not-matter",
+                        "candidate_id": 900010,
+                    },
+                ]
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        outcomes = {(row["unit"], row["outcome"]) for row in response.data}
+        self.assertIn((applied_unit.pk, "applied"), outcomes)
+        self.assertIn((approved_unit.pk, "needs_individual_confirmation"), outcomes)
+        self.assertIn((stale_unit.pk, "stale"), outcomes)
+        self.assertIn((900010, "forbidden"), outcomes)
+        applied_unit.refresh_from_db()
+        approved_unit.refresh_from_db()
+        self.assertEqual(applied_unit.state, STATE_TRANSLATED)
+        self.assertEqual(approved_unit.state, STATE_APPROVED)
+        self.assertTrue(Suggestion.objects.filter(pk=approved_candidate.pk).exists())
+        self.assertTrue(Suggestion.objects.filter(pk=stale_candidate.pk).exists())
+
+    def test_bulk_apply_retry_reports_already_applied_not_a_second_write(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        item = {
+            "unit": unit.pk,
+            "revision": self._revision(unit),
+            "candidate_id": candidate.pk,
+        }
+        first = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.project.slug},
+            method="post",
+            request={"items": [item]},
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        self.assertEqual(first.data[0]["outcome"], "applied")
+
+        # A retry of the exact same request (a client that never saw the
+        # first response, or a genuine double-submit) must not error out or
+        # attempt a second write; the row is durably gone.
+        second = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.project.slug},
+            method="post",
+            request={"items": [item]},
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        self.assertEqual(second.data[0]["outcome"], "already_applied")
+
+    # -- clarification (Task 7) ----------------------------------------------
+
+    def test_clarification_get_returns_no_answer_by_default(self) -> None:
+        unit = self._get_unit()
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        response = self.do_request(
+            "api:producer-decision-clarification",
+            kwargs={"pk": unit.pk},
+            superuser=True,
+            code=200,
+        )
+        self.assertEqual(response.data["answer"], "")
+        self.assertIsNone(response.data["answered_by"])
+        self.assertIsNone(response.data["answered_at"])
+        self.assertEqual(response.data["revision"], self._revision(unit))
+
+    def test_clarification_patch_saves_an_answer_and_get_reflects_it(self) -> None:
+        unit = self._get_unit()
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        patched = self.do_request(
+            "api:producer-decision-clarification",
+            kwargs={"pk": unit.pk},
+            method="patch",
+            request={
+                "revision": self._revision(unit),
+                "answer": "It's an airlock door, not a house door.",
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        self.assertEqual(
+            patched.data["answer"], "It's an airlock door, not a house door."
+        )
+        self.assertEqual(patched.data["answered_by"], "apitest")
+        self.assertIsNotNone(patched.data["answered_at"])
+
+        fetched = self.do_request(
+            "api:producer-decision-clarification",
+            kwargs={"pk": unit.pk},
+            superuser=True,
+            code=200,
+        )
+        self.assertEqual(
+            fetched.data["answer"], "It's an airlock door, not a house door."
+        )
+
+    def test_clarification_patch_rejects_a_stale_revision(self) -> None:
+        unit = self._get_unit()
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        response = self.do_request(
+            "api:producer-decision-clarification",
+            kwargs={"pk": unit.pk},
+            method="patch",
+            request={"revision": "stale-token", "answer": "It's an airlock."},
+            format="json",
+            superuser=True,
+            code=409,
+        )
+        self.assertEqual(response.data["code"], "stale-revision")
+        self.assertFalse(UnitClarification.objects.filter(unit=unit).exists())
+
+    def test_clarification_denied_without_permission(self) -> None:
+        unit = self._get_unit()
+        self.do_request(
+            "api:producer-decision-clarification",
+            kwargs={"pk": unit.pk},
+            method="patch",
+            request={"revision": self._revision(unit), "answer": "It's an airlock."},
+            format="json",
+            code=403,
+        )
+        self.assertFalse(UnitClarification.objects.filter(unit=unit).exists())
+
+    def test_clarification_answer_flows_into_build_request(self) -> None:
+        unit = self._get_unit()
+        self.assertEqual(build_request(unit).clarification, "")
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+
+        self.do_request(
+            "api:producer-decision-clarification",
+            kwargs={"pk": unit.pk},
+            method="patch",
+            request={
+                "revision": self._revision(unit),
+                "answer": "It's an airlock door, not a house door.",
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+
+        self.assertEqual(
+            build_request(unit).clarification,
+            "It's an airlock door, not a house door.",
+        )
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_clarification_answer_invalidates_an_existing_candidate(self) -> None:
+        # Task 7 verification: "a change of answer blocks the old apply"
+        # (docs/product/plans/2026-09-15-judge-glossary-conflict-and-api-
+        # history.md). The candidate was minted before any clarification
+        # existed, so its stored context_hash never accounted for one.
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+
+        self.do_request(
+            "api:producer-decision-clarification",
+            kwargs={"pk": unit.pk},
+            method="patch",
+            request={
+                "revision": self._revision(unit),
+                "answer": "It's an airlock door, not a house door.",
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+
+        response = self.do_request(
+            "api:suggestion-accept",
+            kwargs={"pk": candidate.pk},
+            method="post",
+            superuser=True,
+            code=400,
+        )
+        self.assertEqual(response.data["result"], "error")
+        self.assertIn("no longer matches", response.data["detail"])
+        unit.refresh_from_db()
+        self.assertNotEqual(unit.target, "Navrh\n")
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_apply_candidate_response_includes_application_id(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        response = self.do_request(
+            "api:producer-decision-apply-candidate",
+            kwargs={"pk": unit.pk},
+            method="post",
+            request={
+                "revision": self._revision(unit),
+                "candidate_id": candidate.pk,
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        application_id = response.data["application_id"]
+        self.assertIsNotNone(application_id)
+        self.assertTrue(JudgeApplication.objects.filter(pk=application_id).exists())
+
+    def _apply_candidate(self, unit, candidate) -> int:
+        response = self.do_request(
+            "api:producer-decision-apply-candidate",
+            kwargs={"pk": unit.pk},
+            method="post",
+            request={
+                "revision": self._revision(unit),
+                "candidate_id": candidate.pk,
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        return response.data["application_id"]
+
+    def test_undo_judge_application_restores_previous_target_and_state(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        before_target = unit.target
+        before_state = unit.state
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        application_id = self._apply_candidate(unit, candidate)
+
+        response = self.do_request(
+            "api:producer-judge-application-undo",
+            kwargs={"pk": application_id},
+            method="post",
+            superuser=True,
+            code=200,
+        )
+
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, before_target)
+        self.assertEqual(unit.state, before_state)
+        self.assertEqual(response.data["unit_id"], unit.pk)
+        self.assertEqual(response.data["target"], before_target)
+
+    def test_undo_judge_application_is_idempotent(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        application_id = self._apply_candidate(unit, candidate)
+        self.do_request(
+            "api:producer-judge-application-undo",
+            kwargs={"pk": application_id},
+            method="post",
+            superuser=True,
+            code=200,
+        )
+        change_count = Change.objects.filter(unit=unit).count()
+
+        self.do_request(
+            "api:producer-judge-application-undo",
+            kwargs={"pk": application_id},
+            method="post",
+            superuser=True,
+            code=200,
+        )
+
+        self.assertEqual(Change.objects.filter(unit=unit).count(), change_count)
+
+    def test_undo_judge_application_rejects_a_subsequent_edit(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        application_id = self._apply_candidate(unit, candidate)
+        unit.refresh_from_db()
+        unit.translate(self.user, "Edited after apply", STATE_TRANSLATED)
+
+        response = self.do_request(
+            "api:producer-judge-application-undo",
+            kwargs={"pk": application_id},
+            method="post",
+            superuser=True,
+            code=409,
+        )
+
+        self.assertEqual(response.data["code"], "stale")
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Edited after apply\n")
+
+    def test_undo_judge_application_denied_without_permission(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        application_id = self._apply_candidate(unit, candidate)
+
+        self.do_request(
+            "api:producer-judge-application-undo",
+            kwargs={"pk": application_id},
+            method="post",
+            code=403,
+        )
+
+        self.assertIsNone(JudgeApplication.objects.get(pk=application_id).undone_at)
+
+    def test_undo_judge_application_requires_review_to_restore_approval(
+        self,
+    ) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        apply_response = self.do_request(
+            "api:producer-decision-apply-candidate",
+            kwargs={"pk": unit.pk},
+            method="post",
+            request={
+                "revision": self._revision(unit),
+                "candidate_id": candidate.pk,
+                "acknowledge": {"approval_loss": True},
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        application_id = apply_response.data["application_id"]
+        self.grant_perm_to_user("translation.auto", project=self.project)
+        self.user.refresh_from_db()
+
+        response = self.do_request(
+            "api:producer-judge-application-undo",
+            kwargs={"pk": application_id},
+            method="post",
+            code=403,
+        )
+
+        self.assertEqual(response.data["code"], "forbidden")
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+
+    def test_undo_judge_application_returns_404_for_missing_application(self) -> None:
+        self.do_request(
+            "api:producer-judge-application-undo",
+            kwargs={"pk": 900010},
+            method="post",
+            superuser=True,
+            code=404,
+        )
+
+    def test_e2e_bulk_apply_clarification_and_undo_chain_through_the_real_api(
+        self,
+    ) -> None:
+        """
+        Task 10 end-to-end acceptance, part 2: apply, clarify, undo together.
+
+        A verified candidate is already-checked evidence (Task 3); this
+        chains its full producer-decision surface through the real REST
+        endpoints against one unit: an ordinary bulk apply, an undo that
+        restores the pre-apply target and state, and a clarification
+        answer that changes what a subsequent judge/MT request would
+        carry. Individually-acknowledged approval-loss and
+        terminology-conflict apply are already covered end-to-end by
+        ``test_apply_candidate_requires_acknowledgement_for_approval_loss``
+        and ``JudgeCandidateAcceptanceTest`` in ``test_judge.py``; the
+        classic suggestion API's own guard against a judge candidate is
+        covered by
+        ``test_ordinary_suggestion_api_cannot_bypass_approval_loss_acknowledgement``;
+        none are repeated here.
+        """
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        before_target = unit.target
+        before_state = unit.state
+        self.assertEqual(build_request(unit).clarification, "")
+
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict, target="E2E fix")
+        bulk_response = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": unit.pk,
+                        "revision": self._revision(unit),
+                        "candidate_id": candidate.pk,
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        self.assertEqual(bulk_response.data, [{"unit": unit.pk, "outcome": "applied"}])
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "E2E fix\n")
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+        application_id = JudgeApplication.objects.get(unit=unit).pk
+
+        self.do_request(
+            "api:producer-judge-application-undo",
+            kwargs={"pk": application_id},
+            method="post",
+            superuser=True,
+            code=200,
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, before_target)
+        self.assertEqual(unit.state, before_state)
+
+        self.do_request(
+            "api:producer-decision-clarification",
+            kwargs={"pk": unit.pk},
+            method="patch",
+            request={
+                "revision": self._revision(unit),
+                "answer": "The button label, not the door.",
+            },
+            format="json",
+            superuser=True,
+            code=200,
+        )
+        self.assertEqual(
+            build_request(unit).clarification, "The button label, not the door."
+        )
 
 
 class ScreenshotAPITest(APIBaseTest):
@@ -17002,9 +17653,433 @@ class ProducerAPITest(APIBaseTest):
         )
         self.assertEqual(summary["name"], self.component.project.name)
         self.assertTrue(
-            summary["advanced_url"].endswith(self.component.project.get_absolute_url()),
-            summary["advanced_url"],
+            summary["advanced_url"].endswith(self.component.project.get_absolute_url())
         )
+
+    def test_run_detail_and_cancel_are_scope_checked(self) -> None:
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="translate",
+            cap=1,
+        )
+
+        detail = self.do_request(
+            "api:producer-run-detail",
+            kwargs={"pk": run.pk},
+            superuser=True,
+        )
+        self.assertEqual(detail.data["status"], ProducerRun.Status.QUEUED)
+        response = self.do_request(
+            "api:producer-run-cancel",
+            kwargs={"pk": run.pk},
+            method="post",
+            superuser=True,
+        )
+        self.assertEqual(response.data["status"], ProducerRun.Status.CANCEL_REQUESTED)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_project_judge_estimate_is_permission_scoped(self) -> None:
+        response = self.do_request(
+            "api:producer-project-judge-estimate",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={"kind": "judge", "scope": {"query": ""}},
+            format="json",
+        )
+        self.assertGreaterEqual(
+            response.data["worst_case_calls"], response.data["initial_calls"]
+        )
+        self.assertEqual(len(response.data["scope_hash"]), 64)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_run_start_dispatches_the_priced_estimate(self) -> None:
+        estimate = self.do_request(
+            "api:producer-project-judge-estimate",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={"kind": "judge", "scope": {"query": ""}},
+            format="json",
+        ).data
+        with (
+            patch(
+                "weblate.trans.tasks.auto_translate.apply_async",
+                return_value=SimpleNamespace(id="task-1"),
+            ) as apply_async,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.do_request(
+                "api:producer-project-run-start",
+                kwargs={"slug": self.component.project.slug},
+                method="post",
+                request={
+                    "kind": "judge",
+                    "scope": {"query": ""},
+                    "estimate_id": estimate["estimate_id"],
+                },
+                format="json",
+                code=201,
+            )
+        run = ProducerRun.objects.get(pk=response.data["id"])
+        self.assertEqual(run.status, ProducerRun.Status.QUEUED)
+        self.assertEqual(run.requested_mode, "judge")
+        self.assertIsNotNone(run.dispatch_published_at)
+        apply_async.assert_called_once()
+
+        # A repeated identical POST returns the same run, not a duplicate.
+        with patch(
+            "weblate.trans.tasks.auto_translate.apply_async",
+            return_value=SimpleNamespace(id="task-1"),
+        ) as apply_async_again:
+            repeat = self.do_request(
+                "api:producer-project-run-start",
+                kwargs={"slug": self.component.project.slug},
+                method="post",
+                request={
+                    "kind": "judge",
+                    "scope": {"query": ""},
+                    "estimate_id": estimate["estimate_id"],
+                },
+                format="json",
+                code=200,
+            )
+        self.assertEqual(repeat.data["id"], response.data["id"])
+        apply_async_again.assert_not_called()
+        self.assertEqual(ProducerRun.objects.filter(requested_mode="judge").count(), 1)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_run_start_refuses_a_scope_that_drifted_since_the_estimate(self) -> None:
+        # The client resubmits the scope on start (roadmap `:537`); a
+        # scope that no longer matches the priced estimate must never be
+        # started silently under that estimate's id.
+        estimate = self.do_request(
+            "api:producer-project-judge-estimate",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={"kind": "judge", "scope": {"query": ""}},
+            format="json",
+        ).data
+        response = self.do_request(
+            "api:producer-project-run-start",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "kind": "judge",
+                "scope": {"query": "state:empty"},
+                "estimate_id": estimate["estimate_id"],
+            },
+            format="json",
+            code=409,
+        )
+        self.assertEqual(response.data["code"], "estimate-drift")
+        self.assertEqual(ProducerRun.objects.filter(requested_mode="judge").count(), 0)
+
+    def test_run_start_requires_an_estimate_from_this_actor(self) -> None:
+        self.do_request(
+            "api:producer-project-run-start",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "kind": "judge",
+                "scope": {"query": ""},
+                "estimate_id": "00000000-0000-0000-0000-000000000000",
+            },
+            format="json",
+            code=404,
+        )
+
+    def make_failed_project_judge_run(self, **overrides) -> ProducerRun:
+        # `unit.review` is denied outright when neither review workflow is
+        # on, regardless of role (`weblate/auth/permissions.py`), so a
+        # judge-mode run is unreachable -- even for a superuser -- without
+        # this flag.
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        fields = {
+            "actor": self.user,
+            "scope_type": ProducerRun.ScopeType.PROJECT,
+            "scope_id": str(self.component.project.pk),
+            "scope_label": str(self.component.project),
+            "scope_path": self.component.project.get_absolute_url(),
+            "requested_query": "",
+            "requested_mode": "judge",
+            "dispatch_phase": "judge-project",
+            "cap": 5,
+            "status": ProducerRun.Status.FAILED,
+        }
+        fields.update(overrides)
+        return ProducerRun.objects.create(**fields)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_resume_creates_a_linked_run_and_dispatches_it(self) -> None:
+        original = self.make_failed_project_judge_run(failure="broker down")
+        with (
+            patch(
+                "weblate.trans.tasks.auto_translate.apply_async",
+                return_value=SimpleNamespace(id="task-resume-1"),
+            ) as apply_async,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.do_request(
+                "api:producer-run-resume",
+                kwargs={"pk": original.pk},
+                method="post",
+                request={"attempt": 1},
+                format="json",
+                superuser=True,
+                code=201,
+            )
+        resumed = ProducerRun.objects.get(pk=response.data["id"])
+        self.assertNotEqual(resumed.pk, original.pk)
+        self.assertEqual(resumed.resumed_from_id, original.pk)
+        self.assertEqual(resumed.requested_mode, original.requested_mode)
+        self.assertEqual(resumed.scope_type, original.scope_type)
+        self.assertEqual(resumed.scope_id, original.scope_id)
+        self.assertEqual(resumed.cap, original.cap)
+        self.assertEqual(resumed.status, ProducerRun.Status.QUEUED)
+        apply_async.assert_called_once()
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_resume_is_idempotent_for_the_same_attempt(self) -> None:
+        original = self.make_failed_project_judge_run()
+        with (
+            patch(
+                "weblate.trans.tasks.auto_translate.apply_async",
+                return_value=SimpleNamespace(id="task-resume-2"),
+            ) as apply_async,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            first = self.do_request(
+                "api:producer-run-resume",
+                kwargs={"pk": original.pk},
+                method="post",
+                request={"attempt": 1},
+                format="json",
+                superuser=True,
+                code=201,
+            )
+        apply_async.assert_called_once()
+        with patch(
+            "weblate.trans.tasks.auto_translate.apply_async",
+            return_value=SimpleNamespace(id="task-resume-2"),
+        ) as apply_async_again:
+            second = self.do_request(
+                "api:producer-run-resume",
+                kwargs={"pk": original.pk},
+                method="post",
+                request={"attempt": 1},
+                format="json",
+                superuser=True,
+                code=200,
+            )
+        self.assertEqual(first.data["id"], second.data["id"])
+        apply_async_again.assert_not_called()
+        self.assertEqual(ProducerRun.objects.filter(resumed_from=original).count(), 1)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_resume_refuses_a_run_that_is_not_failed(self) -> None:
+        original = self.make_failed_project_judge_run(status=ProducerRun.Status.QUEUED)
+        response = self.do_request(
+            "api:producer-run-resume",
+            kwargs={"pk": original.pk},
+            method="post",
+            request={"attempt": 1},
+            format="json",
+            superuser=True,
+            code=409,
+        )
+        self.assertEqual(response.data["code"], "not-resumable")
+        self.assertEqual(ProducerRun.objects.filter(resumed_from=original).count(), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_resume_is_permission_scoped(self) -> None:
+        original = self.make_failed_project_judge_run()
+        self.do_request(
+            "api:producer-run-resume",
+            kwargs={"pk": original.pk},
+            method="post",
+            request={"attempt": 1},
+            format="json",
+            code=404,
+        )
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test-no-real-provider",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_BATCH_SIZE_SEAT_1=1,
+    JUDGE_BATCH_SIZE_SEAT_2=1,
+    JUDGE_STREAM_SEAT_1=False,
+    JUDGE_STREAM_SEAT_2=False,
+    JUDGE_REQUEST_SLEEP=0.0,
+    JUDGE_MAX_REPAIR_ATTEMPTS=0,
+    JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
+    JUDGE_TRANSIENT_HTTP_RETRIES=0,
+    JUDGE_TRANSPORT_RETRIES=0,
+    JUDGE_PROTOCOL_RETRIES=0,
+    JUDGE_FALLBACK_BASE_URL="",
+    JUDGE_FALLBACK_API_KEY="",
+    JUDGE_FALLBACK_MODEL_SEAT_1="",
+    JUDGE_FALLBACK_MODEL_SEAT_2="",
+    JUDGE_MAY_APPROVE=False,
+)
+class ProducerConsoleRealRunEndToEndTest(RepoTestMixin, APITransactionTestCase):
+    """
+    Task 10 end-to-end acceptance, part 1: preview -> start -> poll.
+
+    Exercises the real ``/api/producer/projects/.../runs/`` REST surface
+    (not the older ``autotranslate`` action, and not a mocked dispatch)
+    against a stubbed provider through a real eager worker. Cached
+    evidence reuse and provider-failure handling over this exact dispatch
+    path are already covered end-to-end by
+    ``TranslationJudgeAutotranslateAPITest`` (``test_judge_run_reuses_cache_without_relinking_old_evidence``,
+    ``test_judge_provider_refusal_fails_run_without_orphan_verdicts``) and are not repeated here.
+
+    Uses ``APITransactionTestCase`` for the same reason as that class:
+    judge seats run their HTTP calls on separate threads with their own
+    DB connections, which cannot see a ``ProducerRun`` created inside the
+    outer transaction a plain ``TestCase`` wraps around each test.
+    """
+
+    CREATE_GLOSSARIES: bool = True
+    authenticate = APIBaseTest.authenticate
+    do_request = APIBaseTest.do_request
+    grant_perm_to_user = APIBaseTest.grant_perm_to_user
+    create_acl = APIBaseTest.create_acl
+    CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+    def setUp(self) -> None:
+        Language.objects.flush_object_cache()
+        self.clone_test_repos()
+        self.component = self.create_component()
+        self.project = self.component.project
+        self.tearDown()
+        self.user = User.objects.create_superuser("e2e-run", "e2e-run@example.org", "x")
+        self.user.profile.languages.add(Language.objects.get(code="cs"))
+        validate_judge_configuration()
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        self.translation = self.component.translation_set.get(language_code="cs")
+        self.unit = self.translation.unit_set.get(source="Hello, world!\n")
+
+    def serve_pass(self) -> None:
+        http_mock.register(
+            "POST",
+            self.CHAT_URL,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "segments": [
+                                        {
+                                            "id": 0,
+                                            "verdict": "pass",
+                                            "errors": [],
+                                            "back_translation": "Ahoj svete!",
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    @http_mock.activate
+    def test_estimate_start_and_poll_completes_a_real_run(self) -> None:
+        before_target = self.unit.target
+        before_state = self.unit.state
+        self.serve_pass()
+
+        estimate = self.do_request(
+            "api:producer-project-judge-estimate",
+            kwargs={"slug": self.project.slug},
+            method="post",
+            request={"kind": "judge", "scope": {"query": f"id:{self.unit.pk}"}},
+            format="json",
+            superuser=True,
+        ).data
+        self.assertEqual(estimate["selected"], 1)
+
+        started = self.do_request(
+            "api:producer-project-run-start",
+            kwargs={"slug": self.project.slug},
+            method="post",
+            request={
+                "kind": "judge",
+                "scope": {"query": f"id:{self.unit.pk}"},
+                "estimate_id": estimate["estimate_id"],
+            },
+            format="json",
+            superuser=True,
+            code=201,
+        ).data
+
+        polled = self.do_request(
+            "api:producer-run-detail",
+            kwargs={"pk": started["id"]},
+            superuser=True,
+        ).data
+        self.assertEqual(polled["status"], ProducerRun.Status.COMPLETED)
+
+        # A pass verdict is proposal-only: nothing writable, so the string
+        # is exactly what it was before the run.
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, before_target)
+        self.assertEqual(self.unit.state, before_state)
+
+        # Reconnecting after the client closed reads the same completed
+        # run back by id -- a run outlives the request that started it.
+        reconnected = self.do_request(
+            "api:producer-run-detail",
+            kwargs={"pk": started["id"]},
+            superuser=True,
+        ).data
+        self.assertEqual(reconnected["id"], started["id"])
+        self.assertEqual(reconnected["status"], ProducerRun.Status.COMPLETED)
 
 
 class OpenAPITest(APIBaseTest):

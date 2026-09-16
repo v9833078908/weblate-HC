@@ -5217,6 +5217,31 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(context["explanation"], "Shown on the greeting button.")
         self.assertNotIn("note", context)
 
+    def test_translate_sends_producer_clarification(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Hello")
+
+        with patch.object(
+            type(machine),
+            "_get_clarification_context",
+            return_value="It's an airlock door, not a house door.",
+        ):
+            # ruff: ignore[private-member-access]
+            context = machine._get_string_context(unit.source, cast("Unit", unit))
+
+        self.assertEqual(
+            context["clarification"], "It's an airlock door, not a house door."
+        )
+
+    def test_translate_omits_an_absent_clarification(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Hello")
+
+        # ruff: ignore[private-member-access]
+        context = machine._get_string_context(unit.source, cast("Unit", unit))
+
+        self.assertNotIn("clarification", context)
+
     def test_translate_sends_developer_note(self) -> None:
         machine = self.get_machine()
         unit = make_unit(code="fr", source="Get out of here!", note="Joe")

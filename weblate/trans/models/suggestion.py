@@ -126,17 +126,25 @@ class SuggestionManager(models.Manager["Suggestion"]):
                 same_judge_metadata = None
         same_is_judge = same_judge_metadata is not None
         if judge_metadata is not None:
-            if (
-                same_is_judge
-                and same_judge_metadata.verdict_id == judge_metadata.verdict_id
-            ):
+            if same_is_judge:
+                # Byte-identical repair text is rebound to the newest
+                # verdict instead of duplicated - this also covers a retry
+                # of the same verdict. Candidate identity is its verdict
+                # lineage, but two rows sharing text would otherwise
+                # accumulate across every re-judge round and leave the
+                # producer with no way to tell them apart.
+                same_suggestion.userdetails = judge_metadata.as_dict()
+                same_suggestion.save(update_fields=["userdetails"])
                 return same_suggestion, SuggestionAddResult.DUPLICATE
-            # One verdict has at most one active candidate (invariant 8):
-            # a new verdict replaces the previous judge candidate. Identity
-            # is the verdict, not the text: a fresh verdict whose repair is
-            # byte-identical to the superseded one must still end up bound
-            # to the current verdict, or no candidate is active at all.
-            self.filter(unit=unit, userdetails__kind="judge-repair").delete()
+            # A new candidate must not leave a stale row with different
+            # text behind under the same verdict id (a retried generation
+            # for this exact verdict) or erase a different run's pending
+            # evidence or receipt.
+            self.filter(
+                unit=unit,
+                userdetails__kind="judge-repair",
+                userdetails__judge_verdict_id=judge_metadata.verdict_id,
+            ).delete()
         elif same_suggestion is not None and not same_is_judge:
             if same_suggestion.user == user or not vote:
                 return same_suggestion, SuggestionAddResult.DUPLICATE

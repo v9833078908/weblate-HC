@@ -660,6 +660,12 @@ class ActionEvents(IntegerChoices):
         gettext_lazy("A failing check was fixed automatically."),
         gettext_lazy("Check fixed automatically"),
     )
+    # Translators: Name and description of event in the history
+    JUDGE_UNDO = (
+        107,
+        gettext_lazy("A producer undid a previously applied judge fix."),
+        gettext_lazy("Judge fix undone"),
+    )
 
 
 # Actions which are logged
@@ -731,6 +737,7 @@ ACTIONS_CONTENT = {
     ActionEvents.ENFORCED_CHECK,
     ActionEvents.USER_REVERT,
     ActionEvents.FIX_FAILING_CHECK,
+    ActionEvents.JUDGE_UNDO,
 }
 
 # Actions shown on the repository management page
@@ -772,6 +779,7 @@ ACTIONS_SHOW_CONTENT = {
     ActionEvents.STRING_UPLOAD_UPDATE,
     ActionEvents.NEW_UNIT_UPLOAD,
     ActionEvents.FIX_FAILING_CHECK,
+    ActionEvents.JUDGE_UNDO,
 }
 
 # Actions indicating a repository merge failure

@@ -4325,3 +4325,29 @@ class Error423Serializer(serializers.Serializer):
 class ErrorResponse423Serializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=ServerErrorEnum.choices)
     errors = Error423Serializer(many=True)
+
+
+class ErrorCode409Enum(models.TextChoices):
+    """
+    Conflict codes the producer console API (Task 3-8) can return.
+
+    Unlike ``Error423Serializer``, these endpoints answer with the flat
+    ``{detail, code}`` shape already used by their ``200`` responses
+    (``ProducerDecisionSerializer`` and friends), not the drf-standardized
+    ``{type, errors: [...]}`` envelope: the conflict is always about one
+    specific decision, never a list of field errors.
+    """
+
+    STALE_REVISION = "stale-revision"
+    STALE = "stale"
+    NOT_REVERTABLE = "not-revertable"
+    ESTIMATE_DRIFT = "estimate-drift"
+    NOT_CONFIGURED = "not-configured"
+    NOT_RESUMABLE = "not-resumable"
+
+
+class ProducerConflictSerializer(serializers.Serializer):
+    """A producer decision endpoint's ``409`` body: reload and retry."""
+
+    detail = serializers.CharField()
+    code = serializers.ChoiceField(choices=ErrorCode409Enum.choices)

@@ -76,7 +76,11 @@ from weblate.trans.models.component import (
     prefetch_tasks,
     translation_prefetch_tasks,
 )
-from weblate.trans.models.judge import active_verdict, compute_context_hash
+from weblate.trans.models.judge import (
+    active_verdict,
+    compute_context_hash,
+    unit_clarification_answer,
+)
 from weblate.trans.models.loc_kit import LocKitImportDraft
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
@@ -768,6 +772,7 @@ def _judge_hand_off_blocked(translations: list[Translation]) -> bool:
                 note=unit.source_unit.note,
                 explanation=unit.source_unit.explanation,
                 glossary_terms=get_matched_glossary_prompt_entries(unit),
+                clarification=unit_clarification_answer(unit),
             )
             if verdict.context_hash != context_hash:
                 return True
