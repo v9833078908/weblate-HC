@@ -144,16 +144,22 @@ judge-режиме `auto_source` может быть `others`, а проект �
 
 ### Предупреждение вместо тишины на уровне выполнения
 
-Форма не покрывает уже сохранённые конфигурации add-on'а и прямые
+Форма не покрывает исторические JSON-конфигурации add-on'а и прямые
 вызовы задачи, а `mode=judge` с `auto_source=others` остаётся
-разрешённым. Поэтому место, где пустой набор движков становится
-наблюдаемым фактом, — `fetch_mt`: там уже известен и запрошенный
-список, и результат пересечения с настройками проекта. Различаются два
-случая: ничего не выбрано и выбранное не настроено в этом проекте —
-второй указывает на опечатку в идентификаторе движка, и слить их в одно
-сообщение значило бы потерять диагностику. Предупреждения попадают в
-сообщение задачи и в `ProducerRun.warnings` существующим механизмом
-(`add_warning`, `get_warnings`).
+разрешённым. Новые конфигурации через UI эта форма после задачи 1 уже
+не сохранит: `AutoAddonForm` наследует `AutoForm`
+(`weblate/addons/forms.py:1296-1320`). Поэтому предупреждение нужно для
+устаревшей или программно созданной записи и прямого запуска task.
+
+Место, где пустой набор движков становится наблюдаемым фактом, —
+`fetch_mt`: там известен и запрошенный список, и результат пересечения
+с настройками проекта. Предупреждение выводится только если в scope
+есть хотя бы один юнит: при пустом scope отсутствие движка ничего не
+объясняет. Для непустого scope различаются два случая: ничего не
+выбрано и выбранное не настроено в этом проекте — второй указывает на
+ошибочный идентификатор. Предупреждения попадают в сообщение задачи и в
+`ProducerRun.warnings` существующим механизмом (`add_warning`,
+`get_warnings`).
 
 ### Судья не судит пустое
 
@@ -168,30 +174,50 @@ projection: после обновления юнитов по итогам фа�
 `writable_ids`: строка без перевода не судится ни в обычном прогоне, ни
 в одностроковой перепроверке с `judge_pretranslate=False`.
 
+Ограничение `JUDGE_MAX_UNITS_PER_RUN` сохраняет нынешнюю семантику:
+оно резервирует упорядоченный scope **до** pretranslation. Непереведённая
+после фазы 1 строка остаётся частью выбранного scope, расходует эту
+резервацию и не заменяется следующей строкой. Это сохраняет верхнюю
+границу MT-работы и не позволяет обходить cap последовательным
+pretranslation. `JudgeScopePreview.processed`, лимит и batch
+`judge_remaining` поэтому остаются числом выбранных строк, а не числом
+фактических judge-вызовов.
+
+UI больше не называет `processed` строками, которые «will be
+judge-evaluated»: это строки, выбранные для pretranslation и возможного
+judge. Стоимость, вычисленная до phase 1, явно маркируется как верхняя
+оценка выбранного scope. После запуска `JudgeSummary.evaluated` сообщает
+фактически судившиеся строки, а `JudgeSummary.untranslated` — выбранные,
+но не дошедшие до judge. Так preview, cap и финальный отчёт не
+противоречат друг другу.
+
 Отдельного защитного условия в projection не добавляется: рассинхрон
 «перевод исчез между вердиктом и projection» уже ловит существующая
 проверка снапшота `(locked.target, locked.state) != final_snapshots[...]`
 → `stale_conflicts` (`weblate/trans/autotranslate.py:896-902`).
 
 Строки-пропуски получают собственную причину `SkipReason.UNTRANSLATED`,
-а не переиспользуют `CAP` или `PERMISSION`. Отчёт прогона уже умеет их
-показывать: фильтр `skipped` и построчное пояснение «This string was
-skipped before judging.» существуют
-(`weblate/trans/views/judge.py:111,169-174,249`), само поле
-`skip_reason` нигде не рендерится, поэтому шаблоны не меняются.
+а не переиспользуют `CAP` или `PERMISSION`. `skip_reason` хранится, но
+сейчас не рендерится; поэтому `weblate/trans/views/judge.py` добавит
+локализованное пояснение именно для `UNTRANSLATED` в уже существующую
+колонку :guilabel:`Problem`: «This string had no translation to judge.».
+Фильтр :guilabel:`Skipped` и шаблон `producer-run.html` уже выводят
+строку и `row.problem`, поэтому шаблон не меняется.
 
 ## Карта файлов
 
 |Файл|Ответственность в этой работе|
 |---|---|
 |`weblate/trans/forms.py`|`AutoForm.clean` — отказ при `auto_source=mt` без движков|
-|`weblate/trans/autotranslate.py`|`fetch_mt` — предупреждения о пустом наборе движков; `process_judge` — фильтр непереведённых строк; `JudgeSummary`, `format_judge_summary`, `_summarize_verdicts`, перенос `_record_skipped_judge_units` в `BaseAutoTranslate`|
+|`weblate/trans/autotranslate.py`|`fetch_mt` — предупреждения о пустом наборе движков; `process_judge` — фильтр непереведённых строк и раннее завершение без judge-вызова; `JudgeSummary`, `format_judge_summary`, `_summarize_verdicts`, перенос `_record_skipped_judge_units` в `BaseAutoTranslate`|
 |`weblate/trans/models/judge.py`|`JudgeRunUnit.SkipReason.UNTRANSLATED`|
+|`weblate/trans/views/judge.py`|локализованная причина `UNTRANSLATED` в `row.problem`|
+|`weblate/static/loader-bootstrap.js`|честная формулировка selected scope и верхней оценки judge cost|
 |`weblate/trans/migrations/0128_judge_run_unit_untranslated_skip.py`|новая миграция выбора значений `skip_reason`|
 |`weblate/trans/tests/test_autotranslate.py`|новые тесты формы и предупреждений|
-|`weblate/trans/tests/test_judge_autotranslate.py`|новые тесты фильтра; обновление тестов, чьи юниты не имеют перевода|
+|`weblate/trans/tests/test_judge_autotranslate.py`|новые тесты фильтра, cap reservation и обновление тестов, чьи фальшивые verdicts требуют перевода|
 |`weblate/trans/tests/test_judge_form.py`|обновление двух конструкций формы|
-|`weblate/trans/tests/test_judge_views.py`|обновление POST и GET preview без `engines`|
+|`weblate/trans/tests/test_judge_views.py`|обновление POST и GET preview без `engines`; проверка причины в report и copy preview|
 |`weblate/api/tests.py`|новый тест 400 на `auto_source=mt` без `engines`|
 |`docs/api.rst`|описание обязательности `engines` для `auto_source=mt`|
 |`docs/user/translating.rst`|раздел `auto-translation`: выбор движка обязателен|
@@ -222,16 +248,19 @@ skipped before judging.» существуют
       пустой `cleaned_data.get("engines")` → ошибка поля `engines`.
       Учесть, что `clean` вызывается и когда `auto_source` не прошёл
       собственную валидацию: брать значения через `get`.
-- [ ] Обновить существующие тесты, которые сейчас опираются на
-      допустимость такого запроса: `weblate/trans/tests/test_judge_form.py`
-      (две конструкции формы с `"auto_source": "mt", "engines": []`,
-      проверяющие правило `overwrite_existing`) и
-      `weblate/trans/tests/test_judge_views.py` (POST на
-      `auto_translation` и GET на `auto_translation_preview` с пустым
-      или отсутствующим `engines`). В обоих файлах передавать
-      `["weblate"]`: этот движок присутствует в вариантах формы в
-      тестовом окружении, что уже зафиксировано тестом
-      `test_form_uses_list_initial_for_default_engine`.
+- [ ] Обновить существующие тесты, которые действительно проходят
+      валидацию формы с `auto_source=mt` и пустым `engines`. В
+      `weblate/trans/tests/test_judge_form.py` обе конструкции формы
+      получают `["weblate"]`; в GET preview-тестах
+      `weblate/trans/tests/test_judge_views.py` также передавать
+      `["weblate"]`, потому что preview не запускает MT. В POST-тесте
+      без eager execution допустим тот же список. В
+      `test_project_scope_task_runs_in_eager_mode` **не** включать
+      реальный `weblate`: оставить `engines=[]`, переключить
+      `auto_source` на `others` или замокать `AutoTranslate.process_mt`,
+      чтобы тестировал запуск judge-task, а не реальный machinery.
+      `test_judge_mode_requires_review_permission_at_the_view` не
+      менять: permission проверяется раньше `AutoForm.is_valid()`.
 - [ ] Добавить тест формы в `weblate/trans/tests/test_autotranslate.py`:
       `auto_source=mt` без `engines` невалидна и ошибка стоит на поле
       `engines`; `auto_source=others` без `engines` валидна.
@@ -261,42 +290,42 @@ invalid.», кнопка :guilabel:`Apply` неактивна; вернуть д
 правится задачей 3 — выполнять последовательно, а не параллельно, чтобы
 не разводить конфликты в одном модуле).
 
-**Outcome:** запуск, который во время выполнения не получил ни одного
-движка, возвращает предупреждение с причиной, и это предупреждение
+**Outcome:** запуск с непустым scope, который во время выполнения не
+получил ни одного движка, возвращает предупреждение с причиной, и оно
 видно в сообщении задачи и в отчёте прогона. Различаются «движок не
-выбран» и «выбранные движки не настроены в этом проекте». Поведение
-остальных прогонов и число записанных строк не меняется.
+выбран» и «выбранные движки не настроены в этом проекте». Пустой scope
+такого предупреждения не получает. Поведение остальных прогонов и число
+записанных строк не меняется.
 
 **Files and interfaces:** `AutoTranslate.fetch_mt` в
 `weblate/trans/autotranslate.py` (построение `engines`, строки
-631-641). Предупреждения добавляются существующим `self.add_warning`,
+621-679). Предупреждения добавляются существующим `self.add_warning`,
 попадают в `get_warnings()` и далее в `ProducerRun.warnings`
-(`_finish_producer_run`, строка 1438). Текст — через `gettext`, в
+(`_finish_producer_run`, строка 1437). Текст — через `gettext`, в
 стиле соседнего предупреждения о rate limit (строки 670-676).
 
 **Actions:**
 
 - [ ] После построения отсортированного списка движков в `fetch_mt`
-      добавить: при пустом результате и пустом запрошенном списке —
-      предупреждение «No machine translation engine was selected, so no
-      strings were machine translated.»; при пустом результате и
-      непустом запрошенном списке — предупреждение, называющее
-      запрошенные идентификаторы и сообщающее, что ни один из них не
+      добавить предупреждение только при `num_units > 0` и пустом
+      результате: при пустом запрошенном списке — «No machine
+      translation engine was selected, so no strings were machine
+      translated.»; при непустом запрошенном списке — сообщение,
+      называющее запрошенные идентификаторы и говорящее, что ни один не
       настроен для этого проекта.
 - [ ] Убедиться, что в judge-режиме предупреждение попадает в прогон:
       фаза 1 вызывает `process_mt` → `fetch_mt` внутри
       `process_judge`, а сообщение judge-режима формируется из сводки,
-      поэтому предупреждение должно остаться именно предупреждением, не
-      подменяя сообщение.
-- [ ] Добавить тесты: в `weblate/trans/tests/test_autotranslate.py` —
-      прогон `auto_source=mt`, `engines=[]` через
-      `AutoTranslate.perform` даёт ровно одно предупреждение о
-      невыбранном движке и `updated == 0`; прогон с
-      `engines=["does-not-exist-here"]`, отфильтрованным настройками
-      проекта, даёт предупреждение о ненастроенном движке. В
-      `weblate/trans/tests/test_judge_autotranslate.py` — judge-прогон
-      с `engines=[]` содержит это предупреждение в `get_warnings()`, а
-      после завершения — в `ProducerRun.warnings`.
+      поэтому предупреждение остаётся предупреждением, не подменяет
+      сообщение и сохраняется в `ProducerRun.warnings`.
+- [ ] Добавить тесты: в `weblate/trans/tests/test_autotranslate.py`
+      непустой прогон `auto_source=mt`, `engines=[]` через
+      `AutoTranslate.perform` даёт ровно одно предупреждение и
+      `updated == 0`; неизвестный движок после пересечения настроек
+      даёт отдельное предупреждение; пустой scope с `engines=[]` не
+      предупреждает. В `weblate/trans/tests/test_judge_autotranslate.py`
+      judge-прогон с `engines=[]` сохраняет предупреждение в
+      `ProducerRun.warnings`.
 - [ ] Добавить запись в верхнюю неизданную секцию `docs/changes.rst`,
       рубрика `.. rubric:: Improvements`: автоматический перевод больше
       не принимает машинный перевод без выбранного движка, а прогон, у
@@ -304,11 +333,11 @@ invalid.», кнопка :guilabel:`Apply` неактивна; вернуть д
 
 **Verification:** `./rundev.sh test weblate/trans/tests/test_autotranslate.py
 weblate/trans/tests/test_judge_autotranslate.py` — зелено. Ручная
-проверка на dev-инстансе: установить add-on «Automatic translation» с
-`auto_source=mt` и без движков (конфигурация сохраняется напрямую,
-минуя форму), запустить `component_update` и убедиться, что в
-`AddonActivityLog.details["result"]["warnings"]` есть предупреждение, а
-не пустой список.
+проверка исторической конфигурации: создать `AutoTranslateAddon` в
+тестовом коде через прямую модельную конфигурацию с `auto_source=mt` и
+`engines=[]` (не через `AutoAddonForm`), запустить `component_update` и
+убедиться, что в `AddonActivityLog.details["result"]["warnings"]` есть
+предупреждение.
 
 ### 3. Строка без перевода не судится и не пишется как «переведённая автоматически»
 
@@ -316,35 +345,43 @@ weblate/trans/tests/test_judge_autotranslate.py` — зелено. Ручная
 методам, но выполняются после неё).
 
 **Outcome:** строка, у которой после фазы 1 все формы перевода пусты,
-не отправляется судье: у неё не появляется вердикт, в её истории не
-появляется change `AUTO` с пустым переводом, и она не попадает в
-очередь производителя как `judge:reject`. Прогон сообщает их число
-отдельной фразой в сводке и предупреждением, а в отчёте прогона такие
-строки видны в фильтре :guilabel:`Skipped` с причиной
-`untranslated`. Строка, которую фаза 1 успешно перевела, судится как
-сейчас; уже переведённые строки в объёме судьи не затронуты.
+не отправляется судье: у неё не появляется новый вердикт, в её истории
+не появляется change `AUTO` с пустым переводом, и она не попадает в
+новую очередь производителя как `judge:reject`. Она остаётся в
+предварительно выбранном scope и расходует один reserved cap slot, но
+не вызывает LLM. Прогон сообщает число таких строк в сводке и
+предупреждении; в :guilabel:`Skipped` отчёта они видны с объяснением
+«This string had no translation to judge.». Строка, которую фаза 1
+успешно перевела, судится как сейчас; уже переведённые строки в объёме
+судьи не затронуты.
 
 **Files and interfaces:**
 
 - `AutoTranslate.process_judge` в `weblate/trans/autotranslate.py`:
   после обновления списка юнитов по итогам фазы 1 (строки 816-822) и до
-  вызова `run_judge_batch` (строка 847) — разделение на судимые и
-  пропущенные по признаку `any(unit.get_target_plurals())`.
+  `run_judge_batch` (строка 847) — разделение на судимые и
+  непереведённые по `any(unit.get_target_plurals())`. Число выбранных
+  `preview.processed` и `judge_units_processed` не пересчитывается:
+  это reservation cap, а не число judge-вызовов.
 - `JudgeSummary` (строки 97-127): новое поле `untranslated: int = 0`,
   учтённое в `__add__`; `format_judge_summary` (строки 130-154):
   отдельная фраза, добавляемая только при непустом значении, по образцу
   `repaired` и `cap_remainder`; `_summarize_verdicts` получает это
-  число параметром (сводка по вердиктам его вычислить не может — у
-  пропущенных строк вердикта нет). Поле автоматически попадает в
+  число параметром. Поле автоматически попадает в
   `ProducerRun.summary` через `asdict` (строка 1434).
 - `JudgeRunUnit.SkipReason` в `weblate/trans/models/judge.py`
   (строки 589-591): значение `UNTRANSLATED = "untranslated"`.
 - `_record_skipped_judge_units` (строки 1389-1418) переносится из
   `BatchAutoTranslate` в `BaseAutoTranslate` без изменения тела и
-  сигнатуры, чтобы вызываться и из `AutoTranslate.process_judge`;
-  три существующих вызова (строки 1557, 1579, 1586) остаются рабочими
-  через наследование. Запись выполняется только когда
-  `self.producer_run` не `None`.
+  сигнатуры, чтобы вызываться из `AutoTranslate.process_judge`; три
+  существующих batch-вызова остаются рабочими через наследование.
+- `weblate/trans/views/judge.py:_annotate_row`: для
+  `SKIPPED` + `UNTRANSLATED` ставит локализованный `row.problem`;
+  остальные skip reasons и отображение existing rows не меняются.
+- `weblate/static/loader-bootstrap.js`: текст preview называет
+  `processed` выбранными для pretranslation и возможного judge, а
+  `Estimated judge cost` — верхней оценкой выбранного scope. Ответ
+  preview API, его поля и арифметика цены не меняются.
 - Миграция `weblate/trans/migrations/0128_judge_run_unit_untranslated_skip.py`:
   `AlterField` для `skip_reason` (изменение `choices`, на уровне БД
   no-op), зависимость — `0127_loc_kit_dispatch_ledger`.
@@ -356,64 +393,58 @@ weblate/trans/tests/test_judge_autotranslate.py` — зелено. Ручная
       `docker exec -w /app/src dev-docker-weblate-1 python manage.py
       makemigrations trans -n judge_run_unit_untranslated_skip`.
 - [ ] Перенести `_record_skipped_judge_units` в `BaseAutoTranslate`.
-- [ ] В `process_judge` разделить обновлённый список юнитов на
-      судимые и непереведённые; в `run_judge_batch` передавать только
-      судимые (и `writable_ids`, пересечённые с ними); при пустом
-      списке судимых завершать прогон сводкой без запроса к судье.
-- [ ] Записать пропущенные строки через `_record_skipped_judge_units`
-      с причиной `UNTRANSLATED`, добавить их число в `JudgeSummary`,
-      фразу в `format_judge_summary` и предупреждение вида «%d strings
-      had no translation to judge.» (ngettext).
-- [ ] Обновить тесты, которые сейчас судят юниты без перевода и
-      проверяют бухгалтерию вердиктов, дав их юнитам перевод перед
-      прогоном (`unit.translate(self.user, ["some target"],
-      STATE_TRANSLATED)`), в `weblate/trans/tests/test_judge_autotranslate.py`:
-      `test_judge_summary_reports_verdict_buckets`,
-      `test_unparsed_is_counted_in_the_warnings`,
-      `test_judge_summary_counts_severity_buckets`,
-      `test_judge_summary_counts_unparsed_strings`,
-      `test_judge_summary_counts_repaired_and_rejudged_strings`,
-      `test_cache_only_run_still_summarizes_verdicts`,
-      `test_judge_summary_reports_cap_remainder`,
-      `test_batch_summary_aggregates_across_translations`,
-      `test_project_launch_records_one_run_across_translations`,
-      `test_capped_units_record_a_cap_skip`,
-      `test_deleted_unit_and_verdict_leave_a_safe_dangling_row`,
-      `test_a_zero_cap_processes_no_strings`, а также хелпер
-      `run_batch_with_first_translation_failure` (его используют
-      `test_batch_summary_survives_one_failing_translation` и
-      `test_failed_translation_consumes_selected_cap`) и хелпер
-      `_make_queued_recheck_run` (его используют три теста воркера
-      перепроверки). Изменение переводов фикстур — единственная
-      правка: утверждения этих тестов про счётчики, отчёты и cap
-      остаются как есть.
-- [ ] Добавить новые тесты в `weblate/trans/tests/test_judge_autotranslate.py`:
-      (1) при judge-прогоне на непереведённой строке `run_judge_batch`
-      не получает её вовсе, у строки нет `JudgeVerdict`, нет change с
-      `action=ActionEvents.AUTO`, `state` остался `STATE_EMPTY`, а
-      сводка и предупреждение называют её число; (2) прогон с
-      `ProducerRun` создаёт для неё строку `JudgeRunUnit` с
-      `outcome=SKIPPED` и `skip_reason=UNTRANSLATED`; (3) строка,
-      переведённая фазой 1 (существующий стиль подмены `process_mt`,
-      как в `test_judge_refreshes_units_after_pretranslation`),
-      по-прежнему попадает в батч — фильтр применяется после фазы 1, а
-      не до неё.
+- [ ] В `process_judge` после refresh разделить выбранные строки на
+      судимые и непереведённые, сузить `writable_ids` и `input_targets`
+      до судимых, а непереведённые сразу записать как `SKIPPED /
+      UNTRANSLATED`. Если судимых нет, не вызывать `run_judge_batch`,
+      завершить judge progress, записать сводку и предупреждение, затем
+      пройти обычное завершение `ProducerRun`; не делать ранний return,
+      который пропустит сохранение run result.
+- [ ] Сохранить reservation cap: не менять `preview.processed`,
+      `judge_units_processed`, batch `judge_remaining` и порядок scope;
+      не backfill'ить строки за пределом cap. Добавить
+      `JudgeSummary.untranslated`, текст сводки и `ngettext`-warning
+      «%d strings had no translation to judge.».
+- [ ] В `_annotate_row` отрисовать только новую причину
+      `UNTRANSLATED` как «This string had no translation to judge.»;
+      существующие `CAP` и `PERMISSION` сохраняют generic fallback.
+      Изменить preview copy в `loader-bootstrap.js`, не JSON contract.
+- [ ] Обновить только тесты, чьи фальшивые verdicts должны пройти judge,
+      дав их юнитам перевод до запуска; не подменять target в тестах
+      пустого или нулевого cap scope. В частности, поправить
+      verdict-summary, severity, cache, project-run, cap-row и worker
+      recheck fixtures из текущего списка, но сохранить
+      `test_a_zero_cap_processes_no_strings` как тест именно нулевого
+      cap.
+- [ ] Добавить тесты: (1) на непереведённой строке
+      `run_judge_batch` не вызывается, нового `JudgeVerdict` и change
+      `AUTO` нет, состояние остаётся `STATE_EMPTY`, summary/warning
+      называют строку; (2) `ProducerRun` создаёт единственную строку
+      `SKIPPED / UNTRANSLATED`, а report показывает точную причину;
+      (3) непереведённая selected строка расходует cap и не backfill'ит
+      следующую; (4) строка, переведённая phase 1 (стиль
+      `test_judge_refreshes_units_after_pretranslation`), попадает в
+      batch; (5) UI preview использует selected/upper-bound copy, а не
+      «will be judge-evaluated».
 - [ ] Дополнить раздел `llm-judge` в `docs/admin/checks.rst`: строка
-      без перевода не отправляется судье, а попадает в отчёт прогона
-      как пропущенная; и добавить вторую запись в верхнюю неизданную
-      секцию `docs/changes.rst` (рубрика `Improvements`).
+      без перевода не отправляется судье, попадает в отчёт как
+      пропущенная с этой причиной и расходует заранее выбранный cap; и
+      добавить вторую запись в верхнюю неизданную секцию
+      `docs/changes.rst` (рубрика `Improvements`).
 
 **Verification:** воспроизведение дефекта до правки и его отсутствие
 после. Сценарий нового теста (1) на текущем коде обязан падать именно
 на утверждении об отсутствии change `AUTO`: сейчас projection пишет
 пустой target, `Unit.translate` понижает состояние до `STATE_EMPTY`, и
 change `AUTO` создаётся — это ровно то, что наблюдалось на живом
-инстансе. Команды:
+инстансе. Тест (3) фиксирует выбранную cap-семантику, а не
+неопределённый backfill. Команды:
 `./rundev.sh test weblate/trans/tests/test_judge_autotranslate.py
 weblate/trans/tests/test_judge_views.py` и `./rundev.sh check`.
-Миграция проверяется отдельно на чистой БД
-(`manage.py migrate --noinput` вне тест-раннера), без применения к
-живому инстансу.
+Миграция проверяется без живого инстанса через
+`python manage.py makemigrations --check`, а поведение выбора — тестом
+`JudgeRunUnit.SkipReason.UNTRANSLATED`; отдельный `migrate --noinput`
+на пустой тестовой БД допустим только как smoke check.
 
 ## Integrated verification and handoff
 
