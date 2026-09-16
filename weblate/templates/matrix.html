@@ -31,13 +31,16 @@
       {# djlint:on #}
       <tfoot>
         <tr>
-          <td colspan="3" class="loading-icon">
+          <td colspan="{{ translations|length|add:1 }}" class="loading-icon">
             {% loading_icon "next" %}
             <a href="{% url 'matrix-load' path=object.get_url_path %}?{{ language_codes_url }}"
                class="hidden"
                id="matrix-load"
                data-offset="0"
-               data-last="0"></a>
+               data-last="0"
+               hidden></a>
+            <button type="button" id="matrix-load-more" class="btn btn-default" hidden>{% translate "Load more" %}</button>
+            <div id="matrix-load-status" role="status" aria-live="polite"></div>
           </td>
         </tr>
       </tfoot>

@@ -23,6 +23,7 @@ from django.core.cache import cache
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
+from django.db.models import Max
 from django.template.loader import render_to_string
 from django.test.client import RequestFactory
 from django.test.utils import CaptureQueriesContext, override_settings
@@ -47,6 +48,7 @@ from weblate.trans.models import (
     ComponentLink,
     ComponentList,
     Project,
+    Unit,
     WorkflowSetting,
 )
 from weblate.trans.tests.test_models import RepoTestCase
@@ -56,7 +58,7 @@ from weblate.trans.tests.utils import (
     create_test_user,
     wait_for_celery,
 )
-from weblate.utils.hash import hash_to_checksum
+from weblate.utils.hash import calculate_hash, hash_to_checksum
 from weblate.utils.state import STATE_TRANSLATED
 from weblate.utils.stats import CategoryLanguage, ProjectLanguage
 from weblate.utils.views import zip_download
@@ -67,7 +69,7 @@ if TYPE_CHECKING:
     from django.test.client import _MonkeyPatchedWSGIResponse as TestClientResponse
 
     from weblate.auth.models import User
-    from weblate.trans.models import Translation, Unit
+    from weblate.trans.models import Translation
     from weblate.utils.state import StringState
 
 
@@ -1598,6 +1600,51 @@ class SourceStringsTest(ViewTestCase):
             and query["sql"].lstrip().upper().startswith("SELECT")
         ]
         self.assertEqual(len(unit_queries), 2)
+
+    def create_matrix_source_unit(self, position: int) -> Unit:
+        source = f"Matrix pagination unit {position:03d}"
+        unit = Unit(
+            translation=self.component.source_translation,
+            id_hash=calculate_hash(source, ""),
+            source=source,
+            target=source,
+            state=STATE_TRANSLATED,
+            original_state=STATE_TRANSLATED,
+            position=position,
+        )
+        unit.save(run_checks=False)
+        return unit
+
+    def test_matrix_load_pagination_offsets(self) -> None:
+        source_translation = self.component.source_translation
+        max_position = (
+            source_translation.unit_set.aggregate(Max("position"))["position__max"] or 0
+        )
+        start = max_position + 1
+        for position in range(start, start + 21):
+            self.create_matrix_source_unit(position)
+        ordered_units = list(source_translation.unit_set.order())
+        total = len(ordered_units)
+        self.assertGreater(total, 20)
+
+        url_base = f"{reverse('matrix-load', kwargs=self.kw_component)}?lang=cs&lang=de"
+
+        first = self.client.get(f"{url_base}&offset=0")
+        self.assertEqual(first.content.count(b"<tr"), 20)
+        self.assertNotContains(first, 'id="last-section"')
+
+        second = self.client.get(f"{url_base}&offset=20")
+        self.assertEqual(second.content.count(b"<tr"), total - 20)
+        self.assertContains(second, 'id="last-section"')
+
+        # The boundary strings between the two batches must be neither
+        # skipped nor duplicated by a retry using the following offset.
+        boundary_last_first = ordered_units[19].source
+        boundary_first_second = ordered_units[20].source
+        self.assertContains(first, boundary_last_first)
+        self.assertNotContains(second, boundary_last_first)
+        self.assertContains(second, boundary_first_second)
+        self.assertNotContains(first, boundary_first_second)
 
     def test_toggle_flags(self) -> None:
         # Need extra power

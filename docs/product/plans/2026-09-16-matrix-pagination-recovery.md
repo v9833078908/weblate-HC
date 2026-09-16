@@ -6,7 +6,15 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Надёжная подгрузка строк в matrix view
 
-**Дата:** 2026-09-16. **Статус:** готово к реализации, не начато.
+**Дата:** 2026-09-16. **Статус:** реализовано в ветке
+`fix/matrix-pagination-recovery` (ворктри `.worktrees/matrix-pagination-recovery`);
+задачи 1-3 выполнены, узкие server-тесты (`test_matrix_load`,
+`test_matrix_load_pagination_offsets`) и Selenium-регресс
+(`test_matrix_load_more_pagination`, реальный проход в Chrome, включая
+offline-сбой и повторную загрузку без пропуска/дубля) зелёные, `prek` по
+изменённым файлам чист (кроме уже существующих repo-wide findings в
+`reuse lint`/`typos`, не связанных с этим изменением). Деплой на прод не
+выполнялся и требует отдельного `DEPLOY-OK`.
 
 ## Цель
 
