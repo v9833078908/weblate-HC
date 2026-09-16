@@ -23,6 +23,7 @@ from django.core import mail
 from django.core.cache import cache
 from django.core.files import File
 from django.core.handlers.wsgi import WSGIRequest
+from django.db.models import Max
 from django.http import HttpRequest
 from django.test.utils import modify_settings, override_settings
 from django.urls import reverse
@@ -83,6 +84,7 @@ from weblate.trans.tests.utils import (
 from weblate.trans.widgets import WIDGETS
 from weblate.utils.data import data_dir
 from weblate.utils.files import remove_tree
+from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_TRANSLATED
 from weblate.utils.stats import GlobalStats, ProjectLanguage
 from weblate.vcs.ssh import ssh_file
@@ -2843,6 +2845,204 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         self.click(element)
         with self.wait_for_page_load():
             element.submit()
+
+    def click_matrix_load_more(self) -> None:
+        """
+        Scroll the fallback button into view and click it once idle.
+
+        Waiting for the button to be enabled before scrolling and clicking
+        avoids racing a scroll-triggered automatic load (``scrollIntoView``
+        fires a real ``scroll`` event, which the page's own scroll listener
+        may use to start one) and avoids scrolling to a position that a
+        newly appended batch immediately invalidates.
+        """
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                driver.find_element(By.ID, "matrix-load-more").get_attribute("disabled")
+                is None
+            )
+        )
+        button = self.driver.find_element(By.ID, "matrix-load-more")
+        self.driver.execute_script(
+            "arguments[0].scrollIntoView({block: 'center'});", button
+        )
+        self.click(self.driver.find_element(By.ID, "matrix-load-more"))
+
+    def test_matrix_load_more_pagination(self) -> None:
+        """
+        Accessible fallback for matrix pagination.
+
+        The ``Load more`` button reveals the next real batch, a failed
+        request neither advances the cursor nor loses loaded rows, a retry
+        recovers without skipping or duplicating rows, and the button hides
+        only once the real, server-confirmed terminal batch is reached.
+        """
+        project = self.create_component()
+        django_component = project.component_set.get(slug="django")
+        source_translation = django_component.source_translation
+        # The demo fixture ships too few strings to exercise a failed
+        # request between real batches; pad it with extra source units
+        # using the same direct-creation technique already proven for the
+        # server-side pagination regression test. Missing translations
+        # render as "String missing" in the matrix, which does not affect
+        # row counting or the pagination contract under test.
+        max_position = (
+            source_translation.unit_set.aggregate(Max("position"))["position__max"] or 0
+        )
+        start = max_position + 1
+        for position in range(start, start + 60):
+            source = f"Matrix pagination extra {position:04d}"
+            unit = Unit(
+                translation=source_translation,
+                id_hash=calculate_hash(source, ""),
+                source=source,
+                target=source,
+                state=STATE_TRANSLATED,
+                original_state=STATE_TRANSLATED,
+                position=position,
+            )
+            unit.save(run_checks=False)
+        total = source_translation.unit_set.count()
+        self.assertGreater(total, 60)
+
+        self.do_login(superuser=True)
+        with self.wait_for_page_load():
+            self.driver.get(
+                f"{self.live_server_url}"
+                f"{reverse('matrix', kwargs={'path': django_component.get_url_path()})}"
+                "?lang=cs&lang=he"
+            )
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")) == 20
+            )
+        )
+        load_more = self.driver.find_element(By.ID, "matrix-load-more")
+        self.assertIsNone(load_more.get_attribute("hidden"))
+
+        rows_before_click = len(
+            self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")
+        )
+        self.click_matrix_load_more()
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr"))
+                > rows_before_click
+            )
+        )
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                "Loading" not in driver.find_element(By.ID, "matrix-load-status").text
+            )
+        )
+
+        rows_before_failure = len(
+            self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")
+        )
+        offset_before_failure = self.driver.find_element(
+            By.ID, "matrix-load"
+        ).get_attribute("data-offset")
+
+        # Simulate a failed request over CDP network emulation, matching the
+        # manual "DevTools Offline" verification path. The cleanup restores
+        # connectivity even if a later assertion in this test raises, so the
+        # shared class-level browser never leaks an offline state into a
+        # later test.
+        self.driver.execute_cdp_cmd("Network.enable", {})
+        online_conditions = {
+            "offline": False,
+            "latency": 0,
+            "downloadThroughput": -1,
+            "uploadThroughput": -1,
+        }
+        self.driver.execute_cdp_cmd(
+            "Network.emulateNetworkConditions",
+            {**online_conditions, "offline": True},
+        )
+        self.addCleanup(
+            self.driver.execute_cdp_cmd,
+            "Network.emulateNetworkConditions",
+            online_conditions,
+        )
+
+        self.click_matrix_load_more()
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                "Could not load"
+                in driver.find_element(By.ID, "matrix-load-status").text
+            )
+        )
+        self.assertEqual(
+            len(self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")),
+            rows_before_failure,
+        )
+        self.assertEqual(
+            self.driver.find_element(By.ID, "matrix-load").get_attribute("data-offset"),
+            offset_before_failure,
+        )
+        self.assertIsNone(
+            self.driver.find_element(By.ID, "matrix-load-more").get_attribute(
+                "disabled"
+            )
+        )
+
+        self.driver.execute_cdp_cmd(
+            "Network.emulateNetworkConditions", online_conditions
+        )
+        self.click_matrix_load_more()
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr"))
+                > rows_before_failure
+            )
+        )
+
+        # Drive the remaining real batches to the server-confirmed terminal
+        # state. The loop is observation-driven (row growth or the button
+        # hiding), not a precomputed click count, because a scroll event
+        # from ``scrollIntoView`` may itself start an automatic load.
+        max_iterations = -(-total // 20) + 5
+        for _ in range(max_iterations):
+            if (
+                self.driver.find_element(By.ID, "matrix-load-more").get_attribute(
+                    "hidden"
+                )
+                is not None
+            ):
+                break
+            current_rows = len(
+                self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")
+            )
+            self.click_matrix_load_more()
+
+            def rows_grew_or_finished(
+                driver: WebDriver, expected: int = current_rows
+            ) -> bool:
+                return (
+                    len(driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr"))
+                    > expected
+                    or driver.find_element(By.ID, "matrix-load-more").get_attribute(
+                        "hidden"
+                    )
+                    is not None
+                )
+
+            WebDriverWait(self.driver, 15).until(rows_grew_or_finished)
+        else:
+            self.fail(
+                "Matrix pagination did not reach the terminal batch within "
+                "the iteration budget."
+            )
+
+        self.assertEqual(
+            len(self.driver.find_elements(By.CSS_SELECTOR, ".matrix tbody tr")),
+            total,
+        )
+        WebDriverWait(self.driver, 15).until(
+            lambda driver: (
+                "Loading" not in driver.find_element(By.ID, "matrix-load-status").text
+            )
+        )
 
     def test_translation_workflow(self) -> None:
         """Test translation workflow screenshots."""

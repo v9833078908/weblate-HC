@@ -545,31 +545,96 @@ function describeJudgePhase(result) {
   return "";
 }
 
+let matrixLoading = false;
+
+function getMatrixElements() {
+  return {
+    loader: document.getElementById("matrix-load"),
+    spinner: document.getElementById("loading-next"),
+    button: document.getElementById("matrix-load-more"),
+    status: document.getElementById("matrix-load-status"),
+  };
+}
+
+function setMatrixBusy({ spinner, button, status }) {
+  show(spinner);
+  if (button) {
+    button.disabled = true;
+  }
+  if (status) {
+    status.textContent = gettext("Loading more strings…");
+  }
+}
+
+function setMatrixIdle({ spinner, button, status }, message = "") {
+  hide(spinner);
+  if (button) {
+    button.disabled = false;
+    button.hidden = false;
+  }
+  if (status) {
+    status.textContent = message;
+  }
+}
+
+function setMatrixFinished({ spinner, button, status }) {
+  hide(spinner);
+  if (button) {
+    button.hidden = true;
+  }
+  if (status) {
+    status.textContent = "";
+  }
+}
+
 function loadMatrix() {
-  const loadingNext = document.getElementById("loading-next");
-  const loader = document.getElementById("matrix-load");
-  const offset = Number.parseInt(loader.dataset.offset, 10);
+  const elements = getMatrixElements();
+  const { loader, spinner } = elements;
 
   if (
-    document.getElementById("last-section") !== null ||
-    loadingNext === null ||
-    getComputedStyle(loadingNext).display !== "none"
+    loader === null ||
+    spinner === null ||
+    matrixLoading ||
+    document.getElementById("last-section") !== null
   ) {
     return;
   }
-  show(loadingNext);
 
-  loader.dataset.offset = 20 + offset;
+  const offset = Number.parseInt(loader.dataset.offset, 10);
+
+  matrixLoading = true;
+  setMatrixBusy(elements);
 
   fetch(`${loader.getAttribute("href")}&offset=${offset}`, {
     headers: { "X-Requested-With": "XMLHttpRequest" },
   })
-    .then((response) => response.text())
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("matrix-load-failed");
+      }
+      return response.text();
+    })
     .then((data) => {
-      hide(loadingNext);
-      document
-        .querySelector(".matrix tbody")
-        ?.insertAdjacentHTML("beforeend", data);
+      const template = document.createElement("template");
+      template.innerHTML = data;
+      const rows = [...template.content.querySelectorAll("tr")];
+      document.querySelector(".matrix tbody")?.append(template.content);
+      loader.dataset.offset = String(offset + 20);
+
+      if (rows.length === 0 || rows.some((row) => row.id === "last-section")) {
+        setMatrixFinished(elements);
+      } else {
+        setMatrixIdle(elements);
+      }
+    })
+    .catch(() => {
+      const message = gettext("Could not load more strings. Try again.");
+      setMatrixIdle(elements, message);
+      addAlert(message, "danger");
+    })
+    .finally(() => {
+      matrixLoading = false;
+      hide(spinner);
     });
 }
 
@@ -1043,9 +1108,26 @@ onReady(() => {
         window.scrollY >=
         document.documentElement.scrollHeight - 2 * window.innerHeight
       ) {
+        // Once the accessible fallback button intersects the viewport at
+        // all, let the user drive further loads explicitly instead of
+        // racing an automatic load against their click: a successful
+        // auto-load appends rows before the footer and pushes the button
+        // to a new position just as the user reaches for it.
+        const button = document.getElementById("matrix-load-more");
+        if (button && !button.hidden) {
+          const rect = button.getBoundingClientRect();
+          if (rect.bottom > 0 && rect.top < window.innerHeight) {
+            return;
+          }
+        }
         loadMatrix();
       }
     });
+    document
+      .getElementById("matrix-load-more")
+      ?.addEventListener("click", () => {
+        loadMatrix();
+      });
   }
 
   /* Social auth disconnect */
