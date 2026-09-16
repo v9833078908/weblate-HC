@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import random
 from collections.abc import Mapping
 from typing import Any
 
@@ -14,6 +16,69 @@ GEMINI_MODEL = "google/gemini-3.7-flash"
 GEMINI_TEMPERATURE = 0
 GEMINI_MAX_TOKENS = 1024
 SEGMENTS_PER_BATCH = 5
+
+
+def build_block_schedule(
+    records: list[Mapping[str, Any]],
+    *,
+    arms: tuple[str, ...],
+    batch_size: int,
+    seed: int,
+) -> list[dict[str, Any]]:
+    """Randomize treatment order while preserving paired record blocks."""
+    if batch_size < 1:
+        msg = "batch_size must be positive."
+        raise ValueError(msg)
+    if not arms:
+        msg = "At least one arm is required."
+        raise ValueError(msg)
+    randomizer = random.Random(seed)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+    ordered_records = list(records)
+    randomizer.shuffle(ordered_records)
+    tasks: list[dict[str, Any]] = []
+    for block_index, start in enumerate(range(0, len(ordered_records), batch_size)):
+        block_arms = list(arms)
+        randomizer.shuffle(block_arms)
+        block = ordered_records[start : start + batch_size]
+        tasks.extend(
+            {
+                "arm": arm,
+                "block": block_index,
+                "records": block,
+            }
+            for arm in block_arms
+        )
+    return tasks
+
+
+def safe_response_metadata(
+    *, status: int, headers: Mapping[str, str], body: str
+) -> dict[str, Any]:
+    """Keep response diagnostics without retaining an arbitrary response body."""
+    request_id = headers.get("x-request-id") or headers.get("request-id")
+    content_type = headers.get("content-type")
+    result: dict[str, Any] = {
+        "status": status,
+        "request_id": request_id,
+        "content_type": content_type,
+        "body_sha256": hashlib.sha256(body.encode()).hexdigest(),
+    }
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return result
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("error"), dict):
+        return result
+    error = parsed["error"]
+    safe_error = {
+        name: error[name]
+        for name in ("code", "type")
+        if isinstance(error.get(name), (str, int, float, bool))
+    }
+    if safe_error:
+        result["error"] = safe_error
+    return result
+
 
 GENERATION_SYSTEM_PROMPT = """You are a game-localization translator.
 Translate the source marked primary into Simplified Chinese. A source marked

@@ -84,3 +84,39 @@ Gemini/OpenRouter returned schema-truncation errors for parts of A--C and then
 some `504 Gateway Time-out` responses. The run followed registration: no retry
 and no fallback. Successful receipts total `$0.163776`; rejected/timeout calls
 may lack receipts. H1--H3 are **not confirmed**.
+
+## Recovery smoke and protocol v2
+
+The incomplete pilot cannot be repeated as-is. Its A--D generation requests were
+serial by arm, so a time-varying provider failure is confounded with treatment.
+The original result retained only exception strings: it did not retain HTTP
+request identifiers, safe error fields, response hashes/lengths, finish reasons
+or per-request attempt history. Consequently its `403`, malformed JSON and
+`504` observations were not enough to attribute a root cause.
+
+A 2026-09-16 synthetic, no-corpus smoke reproduced the original Gemini request
+shape against OpenRouter and identified the `403` as an exhausted monthly limit
+on the configured production key. It is a provider-account condition, not an
+arm, prompt or batch result. The smoke sent one minimal JSON request to each
+production LiteLLM judge seat; both returned HTTP 200 with `finish_reason=stop`
+and a request ID. It did not reproduce the historical `504`, so its cause
+remains unproven. The old malformed-JSON responses were HTTP 200, but lack their
+finish reasons; truncation is likewise unproven.
+
+Protocol v2 (`analysis/probes/dual_reference_zh/remote_screening.py`) now:
+
+- randomizes paired five-record blocks and treatment order for A--D, E/F review,
+  and E/F edit with registered seed `20260916`;
+- applies one retry rule to every route: at most two attempts, retrying only
+  transport/malformed-response and `408`, `409`, `425`, `429`, or `5xx`; a
+  `403` is terminal;
+- records every attempt with stage/arm/block/seat, HTTP status, request ID,
+  content type, body hash, and (where applicable) content hash/length and
+  `finish_reason`; it excludes response bodies, prompts and error messages so a
+  provider message cannot leak a key identifier.
+
+The replacement 120-record screening pilot is **blocked** until an owner
+provides an explicitly registered Gemini route with sufficient available quota
+and its safe profile snapshot. After that, run the synthetic smoke again,
+register any required batch/schema/limit change as protocol v2, then run all
+arms from the beginning; do not combine v1 outcomes with v2.

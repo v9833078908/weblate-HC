@@ -37,6 +37,68 @@ def test_arm_a_payload_contains_only_russian_primary_source() -> None:
     ]
 
 
+def test_block_schedule_interleaves_arms_and_preserves_every_pair() -> None:
+    from dual_reference_zh.execution import (  # ruff: ignore[import-outside-top-level]
+        build_block_schedule,
+    )
+
+    schedule = build_block_schedule(
+        [{"record_id": f"record-{index}"} for index in range(10)],
+        arms=("A", "B", "C", "D"),
+        batch_size=5,
+        seed=917,
+    )
+
+    # ruff: ignore[assert]
+    assert [task["arm"] for task in schedule[:4]] != ["A", "A", "B", "B"]
+    # ruff: ignore[assert]
+    assert {task["arm"] for task in schedule[:4]} == {"A", "B", "C", "D"}
+    # ruff: ignore[assert]
+    assert all(
+        [task["records"] for task in schedule[start : start + 4]].count(
+            schedule[start]["records"]
+        )
+        == 4
+        for start in (0, 4)
+    )
+
+
+def test_safe_response_metadata_keeps_debuggable_error_without_request_text() -> None:
+    from dual_reference_zh.execution import (  # ruff: ignore[import-outside-top-level]
+        safe_response_metadata,
+    )
+
+    metadata = safe_response_metadata(
+        status=403,
+        headers={"x-request-id": "req-42", "content-type": "application/json"},
+        body='{"error":{"code":"policy","message":"denied"},"prompt":"secret"}',
+    )
+
+    # ruff: ignore[assert]
+    assert metadata == {
+        "status": 403,
+        "request_id": "req-42",
+        "content_type": "application/json",
+        "body_sha256": "25b01e229ef76db36350480834977b0230e49bbe5c0f9426523be91cf8620562",
+        "error": {"code": "policy"},
+    }
+
+
+def test_safe_response_metadata_drops_error_message_that_can_contain_a_key_id() -> None:
+    from dual_reference_zh.execution import (  # ruff: ignore[import-outside-top-level]
+        safe_response_metadata,
+    )
+
+    metadata = safe_response_metadata(
+        status=403,
+        headers={},
+        body='{"error":{"code":403,"message":"manage key abc123"}}',
+    )
+
+    # ruff: ignore[assert]
+    assert metadata["error"] == {"code": 403}
+
+
 def test_arm_b_payload_contains_only_english_primary_source() -> None:
     from dual_reference_zh.payloads import (  # ruff: ignore[import-outside-top-level]
         build_generation_payload,

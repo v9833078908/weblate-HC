@@ -8,12 +8,21 @@ import argparse
 import base64
 import hashlib
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import django
 import requests
+
+try:
+    from .execution import build_block_schedule, safe_response_metadata
+except ImportError:  # Supports the production container's direct-script entry point.
+    from execution import (
+        build_block_schedule,
+        safe_response_metadata,
+    )
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -23,6 +32,21 @@ GEMINI_MAX_TOKENS = 1024
 BATCH_SIZE = 5
 WORKERS = 4
 TARGET_LANGUAGE = "Simplified Chinese (zh-Hans)"
+MAX_ATTEMPTS = 2
+RETRYABLE_HTTP_STATUSES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+RANDOMIZATION_SEED = 20260916
+
+
+class RequestError(Exception):
+    """An HTTP or response-contract failure with safe request diagnostics."""
+
+    def __init__(self, reason: str, metadata: dict[str, object]) -> None:
+        super().__init__(reason)
+        self.metadata = metadata
+
+    def as_result(self) -> dict[str, object]:
+        """Serialize the failure without leaking a request or full response."""
+        return {"error": str(self), "response": self.metadata}
 
 
 def canonical_hash(forms: list[str]) -> str:
@@ -199,20 +223,45 @@ def post_json(
         json=payload,
         timeout=timeout,
     )
-    response.raise_for_status()
-    body = response.json()
-    content = body["choices"][0]["message"]["content"]
+    response_body = response.text
+    metadata = safe_response_metadata(
+        status=response.status_code,
+        headers=response.headers,
+        body=response_body,
+    )
+    if not response.ok:
+        msg = "HTTP request failed."
+        raise RequestError(msg, metadata)
+    try:
+        body = response.json()
+    except requests.JSONDecodeError as error:
+        msg = "Response body is not JSON."
+        raise RequestError(msg, metadata) from error
+    try:
+        choice = body["choices"][0]
+        content = choice["message"]["content"]
+    except (IndexError, KeyError, TypeError) as error:
+        msg = "Response has no message content."
+        raise RequestError(msg, metadata) from error
     if not isinstance(content, str):
         msg = "Model response content is not a string."
-        raise TypeError(msg)
-    parsed = json.loads(content)
+        raise RequestError(msg, metadata)
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as error:
+        metadata["content_sha256"] = hashlib.sha256(content.encode()).hexdigest()
+        metadata["content_length"] = len(content)
+        metadata["finish_reason"] = choice.get("finish_reason")
+        msg = "Model content is not JSON."
+        raise RequestError(msg, metadata) from error
     if not isinstance(parsed, dict):
         msg = "Model response is not a JSON object."
-        raise TypeError(msg)
+        raise RequestError(msg, metadata)
     receipt = {
         "served_model": body.get("model", model),
         "usage": body.get("usage"),
-        "status": response.status_code,
+        **metadata,
+        "finish_reason": choice.get("finish_reason"),
     }
     return parsed, receipt
 
@@ -292,19 +341,85 @@ def load_records(selected_records: list[dict[str, Any]]) -> list[dict[str, Any]]
 
 
 def run_parallel(
-    work: list[tuple[str, list[dict[str, Any]]]],
+    work: list[dict[str, Any]],
     callback,
 ) -> dict[str, object]:
     """Execute independent batches and retain every success or failure."""
     results: dict[str, object] = {}
     with ThreadPoolExecutor(max_workers=WORKERS) as executor:
-        futures = {executor.submit(callback, batch): key for key, batch in work}
+        futures = {executor.submit(callback, task): task for task in work}
         for future, key in ((future, futures[future]) for future in futures):
             try:
-                results[key] = future.result()
+                results[str(key["key"])] = future.result()
+            except RequestError as error:
+                results[str(key["key"])] = error.as_result()
             except Exception as error:
-                results[key] = {"error": f"{type(error).__name__}: {error}"}
+                results[str(key["key"])] = {"error": f"{type(error).__name__}: {error}"}
     return results
+
+
+def run_with_retry(
+    request, *, label: Mapping[str, object]
+) -> tuple[dict[str, object], dict[str, object], list[dict[str, object]]]:
+    """Use one registered retry policy and retain each safe attempt result."""
+    attempts: list[dict[str, object]] = []
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            body, receipt = request()
+        except RequestError as error:
+            status = error.metadata.get("status")
+            retryable = status in RETRYABLE_HTTP_STATUSES or status is None
+            attempts.append(
+                {
+                    **label,
+                    "attempt": attempt,
+                    "outcome": "failure",
+                    "retryable": retryable,
+                    "response": error.metadata,
+                }
+            )
+            if attempt == MAX_ATTEMPTS or not retryable:
+                error.metadata["attempts"] = attempts
+                raise
+            time.sleep(attempt)
+        else:
+            attempts.append(
+                {
+                    **label,
+                    "attempt": attempt,
+                    "outcome": "success",
+                    "response": receipt,
+                }
+            )
+            return body, receipt, attempts
+    msg = "Retry loop ended without a response."
+    raise RuntimeError(msg)
+
+
+def scheduled_work(
+    records: list[dict[str, Any]], *, arms: tuple[str, ...], seed: int
+) -> list[dict[str, Any]]:
+    """Give every arm the same paired blocks in registered randomized order."""
+    schedule = build_block_schedule(
+        records, arms=arms, batch_size=BATCH_SIZE, seed=seed
+    )
+    for task in schedule:
+        task["key"] = f"{task['arm']}:{task['block']}"
+    return schedule
+
+
+def collect_attempts(value: object) -> list[dict[str, object]]:
+    """Extract the journal from nested result maps exactly once per request."""
+    if isinstance(value, dict):
+        found = value.get("attempts")
+        if isinstance(found, list) and all(isinstance(item, dict) for item in found):
+            return found
+        return [
+            attempt for item in value.values() for attempt in collect_attempts(item)
+        ]
+    if isinstance(value, list):
+        return [attempt for item in value for attempt in collect_attempts(item)]
+    return []
 
 
 def main() -> None:
@@ -343,33 +458,51 @@ def main() -> None:
         "attempts": [],
     }
 
-    def gemini(batch: list[dict[str, Any]], arm: str, messages: list[dict[str, str]]):
-        body, receipt = post_json(
-            openrouter["base_url"],
-            openrouter["key"],
-            GEMINI_MODEL,
-            messages,
-            max_tokens=GEMINI_MAX_TOKENS,
-            timeout=120,
+    def gemini(task: Mapping[str, object], stage: str):
+        batch = task["records"]
+        arm = task["arm"]
+        if not isinstance(batch, list) or not isinstance(arm, str):
+            msg = "Malformed scheduled generation task."
+            raise TypeError(msg)
+        messages = (
+            translation_messages(batch, arm)
+            if stage == "generate"
+            else edit_messages(batch, arm, translations["B"], task["reviews"])
         )
-        mapped = parse_items(
-            body, "translations", tuple(record["record_id"] for record in batch)
+        expected = tuple(record["record_id"] for record in batch)
+
+        def request() -> tuple[dict[str, object], dict[str, object]]:
+            body, receipt = post_json(
+                openrouter["base_url"],
+                openrouter["key"],
+                GEMINI_MODEL,
+                messages,
+                max_tokens=GEMINI_MAX_TOKENS,
+                timeout=120,
+            )
+            try:
+                return {"items": parse_items(body, "translations", expected)}, receipt
+            except (TypeError, ValueError) as error:
+                msg_0 = "Response contract is invalid."
+                raise RequestError(msg_0, {}) from error
+
+        response, receipt, attempts = run_with_retry(
+            request,
+            label={"stage": stage, "arm": arm, "block": task["block"]},
         )
-        return {"items": mapped, "receipt": receipt, "arm": arm}
+        return {**response, "receipt": receipt, "arm": arm, "attempts": attempts}
 
     translations: dict[str, dict[str, str]] = {arm: {} for arm in "ABCD"}
+    results = run_parallel(
+        scheduled_work(records, arms=("A", "B", "C", "D"), seed=RANDOMIZATION_SEED),
+        lambda task: gemini(task, "generate"),
+    )
     for arm in "ABCD":
-        work = [
-            (f"{arm}:{index}", batch) for index, batch in enumerate(batches(records))
-        ]
-        results = run_parallel(
-            work,
-            lambda batch, current_arm=arm: gemini(
-                batch, current_arm, translation_messages(batch, current_arm)
-            ),
-        )
-        output["translations"][arm] = results
-        for result in results.values():
+        arm_results = {
+            key: result for key, result in results.items() if key.startswith(f"{arm}:")
+        }
+        output["translations"][arm] = arm_results
+        for result in arm_results.values():
             if isinstance(result, dict) and "items" in result:
                 translations[arm].update(
                     {
@@ -387,52 +520,76 @@ def main() -> None:
     )
 
     def judge(
-        batch: list[dict[str, Any]],
+        task: Mapping[str, object],
         model: str,
         timeout: float,
         messages: list[dict[str, str]],
         key: str,
+        stage: str,
     ):
-        body, receipt = post_json(
-            judge_base, judge_key, model, messages, max_tokens=None, timeout=timeout
+        expected = tuple(record["record_id"] for record in task["records"])
+
+        def request() -> tuple[dict[str, object], dict[str, object]]:
+            body, receipt = post_json(
+                judge_base, judge_key, model, messages, max_tokens=None, timeout=timeout
+            )
+            try:
+                return {"items": parse_items(body, key, expected)}, receipt
+            except (TypeError, ValueError) as error:
+                msg = "Response contract is invalid."
+                raise RequestError(msg, {}) from error
+
+        response, receipt, attempts = run_with_retry(
+            request,
+            label={
+                "stage": stage,
+                "arm": task["arm"],
+                "block": task["block"],
+                "seat": model,
+            },
         )
         return {
-            "items": parse_items(
-                body, key, tuple(record["record_id"] for record in batch)
-            ),
+            **response,
             "receipt": receipt,
+            "attempts": attempts,
         }
 
     reviews: dict[str, dict[str, dict[str, list[dict[str, object]]]]] = {
         "E": {},
         "F": {},
     }
+    review_eligible = [
+        record for record in records if record["record_id"] in translations["B"]
+    ]
     for arm in ("E", "F"):
-        eligible = [
-            record for record in records if record["record_id"] in translations["B"]
-        ]
         output["reviews"][arm] = {}
         reviews[arm] = {}
-        for seat, model, timeout in judge_profiles:
-            work = [
-                (f"{seat}:{index}", batch)
-                for index, batch in enumerate(batches(eligible))
-            ]
-            results = run_parallel(
-                work,
-                lambda batch, current_arm=arm, current_model=model, current_timeout=timeout: (
-                    judge(
-                        batch,
-                        current_model,
-                        current_timeout,
-                        review_messages(batch, current_arm, translations["B"]),
-                        "reviews",
-                    )
-                ),
-            )
-            output["reviews"][arm][seat] = results
+    for seat, model, timeout in judge_profiles:
+        work = scheduled_work(
+            review_eligible,
+            arms=("E", "F"),
+            seed=RANDOMIZATION_SEED + (1 if seat == "seat-1" else 2),
+        )
+        results = run_parallel(
+            work,
+            lambda task, current_model=model, current_timeout=timeout: judge(
+                task,
+                current_model,
+                current_timeout,
+                review_messages(task["records"], task["arm"], translations["B"]),
+                "reviews",
+                "review",
+            ),
+        )
+        for arm in ("E", "F"):
+            arm_results = {
+                key: result
+                for key, result in results.items()
+                if key.startswith(f"{arm}:")
+            }
+            output["reviews"][arm][seat] = arm_results
             reviews[arm][seat] = {}
-            for result in results.values():
+            for result in arm_results.values():
                 if isinstance(result, dict) and "items" in result:
                     reviews[arm][seat].update(
                         {
@@ -442,37 +599,37 @@ def main() -> None:
                         }
                     )
 
-    for arm in ("E", "F"):
-        eligible = [
-            record
-            for record in records
-            if record["record_id"] in translations["B"]
-            and all(
-                record["record_id"] in reviews[arm][seat]
-                for seat, _model, _timeout in judge_profiles
-            )
-        ]
-        merged_reviews = {
+    editor_eligible = [
+        record
+        for record in records
+        if record["record_id"] in translations["B"]
+        and all(
+            record["record_id"] in reviews[arm][seat]
+            for arm in ("E", "F")
+            for seat, _model, _timeout in judge_profiles
+        )
+    ]
+    editor_reviews = {
+        arm: {
             record["record_id"]: [
                 {"seat": seat, "issues": reviews[arm][seat][record["record_id"]]}
                 for seat, _model, _timeout in judge_profiles
             ]
-            for record in eligible
+            for record in editor_eligible
         }
-        work = [
-            (f"{arm}:{index}", batch) for index, batch in enumerate(batches(eligible))
-        ]
-        results = run_parallel(
-            work,
-            lambda batch, current_arm=arm, current_reviews=merged_reviews: gemini(
-                batch,
-                current_arm,
-                edit_messages(batch, current_arm, translations["B"], current_reviews),
-            ),
-        )
-        output["translations"][arm] = results
+        for arm in ("E", "F")
+    }
+    work = scheduled_work(editor_eligible, arms=("E", "F"), seed=RANDOMIZATION_SEED + 3)
+    for task in work:
+        task["reviews"] = editor_reviews[task["arm"]]
+    results = run_parallel(work, lambda task: gemini(task, "edit"))
+    for arm in ("E", "F"):
+        arm_results = {
+            key: result for key, result in results.items() if key.startswith(f"{arm}:")
+        }
+        output["translations"][arm] = arm_results
         translations[arm] = {}
-        for result in results.values():
+        for result in arm_results.values():
             if isinstance(result, dict) and "items" in result:
                 translations[arm].update(
                     {
@@ -486,24 +643,33 @@ def main() -> None:
         eligible = [record_map[record_id] for record_id in translations[arm]]
         output["ratings"][arm] = {}
         for seat, model, timeout in judge_profiles:
-            work = [
-                (f"{seat}:{index}", batch)
-                for index, batch in enumerate(batches(eligible))
-            ]
+            work = scheduled_work(
+                eligible,
+                arms=(arm,),
+                seed=RANDOMIZATION_SEED + 10 + (1 if seat == "seat-1" else 2),
+            )
             results = run_parallel(
                 work,
-                lambda batch, current_model=model, current_timeout=timeout, current_arm=arm: (
+                lambda task, current_model=model, current_timeout=timeout, current_arm=arm: (
                     judge(
-                        batch,
+                        task,
                         current_model,
                         current_timeout,
-                        evaluation_messages(batch, translations[current_arm]),
+                        evaluation_messages(task["records"], translations[current_arm]),
                         "ratings",
+                        "rating",
                     )
                 ),
             )
             output["ratings"][arm][seat] = results
 
+    output["attempts"] = collect_attempts(
+        {
+            "translations": output["translations"],
+            "reviews": output["reviews"],
+            "ratings": output["ratings"],
+        }
+    )
     args.output.write_text(json.dumps(output, ensure_ascii=False), encoding="utf-8")
 
 

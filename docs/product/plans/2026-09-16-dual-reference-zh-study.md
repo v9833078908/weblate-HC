@@ -609,3 +609,20 @@ The single pilot was incomplete because OpenRouter returned `403` for D and
 E/F editor batches and LiteLLM returned some `504` responses. G3--G5 stay
 open; H1--H3 are not confirmed. See
 `docs/product/measurements/2026-09-16-dual-reference-zh-offline-preflight.md`.
+
+### Amendment: recovery protocol v2 (2026-09-16)
+
+The v1 execution order was A, then B, then C, then D, which violated task 3's
+mixed-block requirement. Its failures were also under-instrumented. A
+synthetic no-corpus smoke identified the OpenRouter `403` as the configured
+key's exhausted monthly limit; the two LiteLLM seats both completed the small
+smoke successfully, so the historical `504` is not yet attributed. Historical
+JSON failures do not include `finish_reason`, so they are not attributed to the
+generation cap.
+
+Before any replacement inference, v2 uses paired randomized blocks, a fixed
+two-attempt retry policy, and a safe per-attempt journal. The owner must provide
+and register an explicit Gemini route with available quota; then the full 120
+records are rerun from the beginning under v2. v1 is retained as an incomplete
+technical incident and is not pooled with v2. See
+`docs/product/measurements/2026-09-16-dual-reference-zh-offline-preflight.md`.
