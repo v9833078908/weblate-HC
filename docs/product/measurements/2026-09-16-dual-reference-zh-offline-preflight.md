@@ -60,3 +60,27 @@ screening: snapshot воспроизводим, eligibility явный, confirma
 LiteLLM, расходный лимит и зарегистрированное разрешение конкретного pilot
 inference. Поэтому этот preflight не сделал model calls и не обращался к
 production.
+
+## Screening pilot result
+
+G2 was subsequently closed for screening only: the owner selected explicit
+`google/gemini-3.7-flash`; production LiteLLM seats were redacted and frozen;
+retry and fallback were disabled. The raw run artifact is local only at
+`/Users/eli/Downloads/dual-reference-zh-2026-09-16/study/2026-09-16-screening-v1/model-run.json`.
+
+| Arm | Assigned | Valid translation | Double-rated | Observed unusable | ITT lower--upper |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| A | 120 | 90 | 85 | 4 | 3.3%--32.5% |
+| B | 120 | 100 | 95 | 4 | 3.3%--24.2% |
+| C | 120 | 85 | 85 | 3 | 2.5%--31.7% |
+| D/E/F | 120 each | 0 | 0 | -- | 0%--100% |
+
+On 65 complete paired proxy records, B--A was -1.54 pp (2 versus 3 unusable)
+and C--B was -3.08 pp (2 versus 4). These are not H1/H2 results: missing
+outcomes are extensive and the ITT bounds overlap. F--E is unmeasured.
+
+Gemini/OpenRouter returned schema-truncation errors for parts of A--C and then
+`403 Forbidden` for every D and E/F editor batch. LiteLLM seat 2 also returned
+some `504 Gateway Time-out` responses. The run followed registration: no retry
+and no fallback. Successful receipts total `$0.163776`; rejected/timeout calls
+may lack receipts. H1--H3 are **not confirmed**.

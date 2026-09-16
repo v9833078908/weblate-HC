@@ -603,3 +603,9 @@ G2 не закрыт: точные Gemini/OpenRouter и LiteLLM seat profiles н
 разрешённого безопасного источника, расходный лимит не утверждён и конкретный
 pilot inference не зарегистрирован. До этого момента запрещены model calls и
 production access.
+
+The later screening G2 registration used explicit `google/gemini-3.7-flash`.
+The single pilot was incomplete because OpenRouter returned `403` for D and
+E/F editor batches and LiteLLM returned some `504` responses. G3--G5 stay
+open; H1--H3 are not confirmed. See
+`docs/product/measurements/2026-09-16-dual-reference-zh-offline-preflight.md`.

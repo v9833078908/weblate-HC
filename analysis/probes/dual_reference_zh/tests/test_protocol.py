@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
+from base64 import b64encode
 from pathlib import Path
 from typing import cast
 
@@ -559,3 +560,72 @@ def test_editor_payload_uses_the_same_language_treatment_as_review(
     assert payload["edit_when_reviews_empty"] is True
     # ruff: ignore[assert]
     assert payload["reviewer_job_ids"] == [f"review:record-1:{arm}:seat-1:1"]
+
+
+def test_generation_prompt_for_arm_a_does_not_expose_english_source() -> None:
+    # ruff: ignore[import-outside-top-level]
+    from dual_reference_zh.execution import build_generation_messages
+
+    messages = build_generation_messages(
+        {
+            "record_id": "record-1",
+            "ru": ["Русский текст"],
+            "en": ["ENGLISH-MUST-NOT-LEAK"],
+            "context": "menu.play",
+        },
+        arm="A",
+    )
+    serialized = json.dumps(messages, ensure_ascii=False)
+
+    # ruff: ignore[assert]
+    assert "Русский текст" in serialized
+    # ruff: ignore[assert]
+    assert "ENGLISH-MUST-NOT-LEAK" not in serialized
+
+
+def test_translation_response_is_matched_by_record_id_not_response_order() -> None:
+    # ruff: ignore[import-outside-top-level]
+    from dual_reference_zh.execution import parse_translation_response
+
+    translations = parse_translation_response(
+        {
+            "translations": [
+                {"record_id": "record-2", "translation": "第二"},
+                {"record_id": "record-1", "translation": "第一"},
+            ]
+        },
+        expected_record_ids=("record-1", "record-2"),
+    )
+
+    # ruff: ignore[assert]
+    assert translations == {"record-1": "第一", "record-2": "第二"}
+
+
+def test_generation_batch_keeps_each_arm_source_visibility() -> None:
+    # ruff: ignore[import-outside-top-level]
+    from dual_reference_zh.execution import build_generation_batch_messages
+
+    messages = build_generation_batch_messages(
+        [
+            {
+                "record_id": "record-1",
+                "ru": ["Русский текст"],
+                "en": ["ENGLISH-MUST-NOT-LEAK"],
+                "context": "menu.play",
+            }
+        ],
+        arm="A",
+    )
+
+    # ruff: ignore[assert]
+    assert "ENGLISH-MUST-NOT-LEAK" not in json.dumps(messages, ensure_ascii=False)
+
+
+def test_remote_selector_decodes_without_a_temp_file() -> None:
+    # ruff: ignore[import-outside-top-level]
+    from dual_reference_zh.remote_screening import load_selector
+
+    encoded = b64encode(json.dumps([{"record_id": "record-1"}]).encode()).decode()
+
+    # ruff: ignore[assert]
+    assert load_selector(None, encoded) == [{"record_id": "record-1"}]
