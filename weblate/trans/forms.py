@@ -135,6 +135,7 @@ from weblate.utils.state import (
     get_state_label,
 )
 from weblate.utils.validators import (
+    WeblateURLValidator,
     validate_component_zip_upload_size,
     validate_file_extension,
     validate_project_backup_upload_size,
@@ -4059,6 +4060,13 @@ class ProjectCreateForm(
     WorkspaceMixin, SettingsBaseForm, ProjectDocsMixin, ProjectAntispamMixin
 ):
     """Project creation form."""
+
+    web = forms.URLField(
+        label=gettext_lazy("Project website or store URL"),
+        help_text=gettext_lazy("Main website of translated project."),
+        required=settings.WEBSITE_REQUIRED,
+        validators=[WeblateURLValidator()],
+    )
 
     class Meta:
         model = Project

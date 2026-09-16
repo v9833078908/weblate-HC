@@ -14991,6 +14991,10 @@ msgstr "Сводка"
 msgid "Project website"
 msgstr "Веб-сайт проекта"
 
+#: weblate/trans/forms.py
+msgid "Project website or store URL"
+msgstr "Сайт проекта или URL на сторе"
+
 #: weblate/templates/snippets/info.html:25
 msgid "Instructions for translators"
 msgstr "Инструкции для переводчиков"
