@@ -7,11 +7,13 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import re
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import threading
+import time
 from functools import partial
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -41,6 +43,7 @@ from weblate.machinery.base import (
     MachineTranslationError,
 )
 from weblate.machinery.dummy import DummyTranslation
+from weblate.trans import tasks
 from weblate.trans.actions import ActionEvents
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.forms import AutoForm
@@ -84,6 +87,59 @@ from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+class _ProcessTask:
+    def __init__(self, task_id: str, retry_result) -> None:
+        self.request = SimpleNamespace(id=task_id)
+        self._retry_result = retry_result
+
+    def retry(self, **_kwargs):
+        return self._retry_result
+
+
+class _ProcessBatch:
+    counter = None
+    ready = None
+    hold = False
+
+    def __init__(self, *_args, **_kwargs) -> None:
+        self.active_producer_run = None
+
+    def perform(self, **_kwargs) -> str:
+        self.counter.value += 1
+        if self.hold:
+            self.ready.set()
+            time.sleep(30)
+        return "provider called"
+
+    def get_warnings(self) -> list[str]:
+        return []
+
+
+def _run_auto_translate_process(
+    task_id: str, counter, ready, hold: bool, result
+) -> None:
+
+    _ProcessBatch.counter = counter
+    _ProcessBatch.ready = ready
+    _ProcessBatch.hold = hold
+    tasks.get_auto_translate_target = lambda **_kwargs: (object(), {})
+    tasks.BatchAutoTranslate = _ProcessBatch
+    task = _ProcessTask(task_id, "retried")
+    output = tasks.auto_translate._orig_run.__func__(  # ruff: ignore[private-member-access]
+        task,
+        user_id=None,
+        mode="judge",
+        q="",
+        auto_source="mt",
+        source_component_id=None,
+        engines=[],
+        threshold=80,
+    )
+    message = output["message"] if isinstance(output, dict) else output
+    for index, character in enumerate(message):
+        result[index] = character
 
 
 class AutoTranslationTest(ViewTestCase):
@@ -2209,6 +2265,7 @@ def max_form_depth(html: str) -> int:
         else:
             depth += 1
             peak = max(peak, depth)
+
     return peak
 
 
@@ -2271,6 +2328,45 @@ class AutoTranslateDurabilityTest(SimpleTestCase):
         )
         heartbeat.assert_not_called()
 
+    def test_duplicate_process_delivery_retries_without_provider_call(self) -> None:
+        context = multiprocessing.get_context("fork")
+        counter = context.Value("i", 0)
+        ready = context.Event()
+        first_result = context.Array("u", 32)
+        second_result = context.Array("u", 32)
+        first = context.Process(
+            target=_run_auto_translate_process,
+            args=("same-delivery", counter, ready, True, first_result),
+        )
+        first.start()
+        try:
+            self.assertTrue(ready.wait(timeout=5))
+            second = context.Process(
+                target=_run_auto_translate_process,
+                args=("same-delivery", counter, ready, False, second_result),
+            )
+            second.start()
+            second.join(timeout=5)
+            self.assertFalse(second.is_alive())
+            self.assertEqual(counter.value, 1)
+            self.assertEqual("".join(second_result).rstrip("\x00"), "retried")
+            first.terminate()
+            first.join(timeout=5)
+            self.assertFalse(first.is_alive())
+            recovery = context.Array("u", 32)
+            third = context.Process(
+                target=_run_auto_translate_process,
+                args=("same-delivery", counter, ready, False, recovery),
+            )
+            third.start()
+            third.join(timeout=5)
+            self.assertFalse(third.is_alive())
+            self.assertEqual(counter.value, 2)
+            self.assertEqual("".join(recovery).rstrip("\x00"), "provider called")
+        finally:
+            if first.is_alive():
+                first.terminate()
+                first.join(timeout=5)
 
     def test_visibility_timeout_covers_long_tasks(self) -> None:
         code = """
