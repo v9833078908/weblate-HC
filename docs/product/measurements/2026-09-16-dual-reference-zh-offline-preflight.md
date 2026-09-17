@@ -120,3 +120,42 @@ provides an explicitly registered Gemini route with sufficient available quota
 and its safe profile snapshot. After that, run the synthetic smoke again,
 register any required batch/schema/limit change as protocol v2, then run all
 arms from the beginning; do not combine v1 outcomes with v2.
+
+## Intermediate v2 run status (2026-09-17)
+
+This is a progress record, not a results table. No conclusion for H1, H2 or H3
+may be drawn from it.
+
+After the OpenRouter monthly limit was raised, a synthetic Gemini smoke against
+the effective production OpenRouter configuration returned HTTP 200 with
+`finish_reason=stop`. The v2 runner then revalidated all 120 frozen RU/EN Unit
+pairs in production before inference; the result was `validated_records: 120`
+and `inference: false`.
+
+The single full v2 run was started at 2026-09-17 10:09 (server time, UTC+02:00).
+At this report's snapshot its host wrapper, `docker exec`, and Python process
+were still active for about 18 minutes. The runner has not written its final
+raw JSON artifact and its stderr log is empty. That is expected from this
+version of the runner, which serializes one artifact at completion; it does not
+prove that any particular arm or batch has completed.
+
+The planned first-attempt volume remains 144 Gemini/OpenRouter requests (720
+generation/edit segment operations) and 384 LiteLLM requests (480 review plus
+1,440 blind proxy-rating segment operations), or 528 requests in total. The
+registered retry policy can at most add one eligible retry per request; it does
+not retry a `403`.
+
+### Registered runtime deviation
+
+The direct v2 runner sends `stream: false` to LiteLLM even though the frozen
+production judge profile resolves `stream: true`. It still uses the two frozen
+LiteLLM aliases, temperature zero, the same response envelope and identical
+behavior for E and F, so this does not expose an arm-specific treatment.
+Nevertheless it is a profile deviation and must be reported with the final
+screening result. It must not be silently described as a byte-for-byte replay
+of the production judge client.
+
+The run reads Units and configuration only. It does not create or update
+Weblate translations, suggestions, changes, or judge-run records. Raw results
+remain temporary inside the production container until the completed artifact
+can be transferred to the local study directory without entering Git.
