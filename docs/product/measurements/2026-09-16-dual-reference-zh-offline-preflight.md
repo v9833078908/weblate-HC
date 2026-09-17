@@ -159,3 +159,73 @@ The run reads Units and configuration only. It does not create or update
 Weblate translations, suggestions, changes, or judge-run records. Raw results
 remain temporary inside the production container until the completed artifact
 can be transferred to the local study directory without entering Git.
+
+## Stopped-run synthesis (2026-09-17)
+
+The owner stopped further inference. There is no active v2 runner and no v2
+final artifact. The process terminated while serializing its in-memory result:
+the retry journal held a circular reference between a failure metadata object
+and its `attempts` list. This is a runner defect, not a model outcome. Its
+in-memory responses are unavailable after process exit, so v2 contributes no
+usable outcomes, costs or H1--H3 observations.
+
+### What the experiment established
+
+| Question | Evidence | Result |
+| --- | --- | --- |
+| Can the approved corpus be frozen and matched safely? | Offline checks and the v2 production preflight matched 120/120 RU/EN pairs. | Yes, for screening. |
+| Did OpenRouter `403` identify a method failure? | Synthetic smoke identified an exhausted monthly key limit; later smoke returned HTTP 200 after the limit was raised. | No; it was a provider-account condition. |
+| Can the two LiteLLM judge routes answer a minimal contract? | Both seats returned HTTP 200 with `finish_reason=stop` in synthetic smoke. | Yes, but this does not explain the historical batch `504`. |
+| Does reviewed EN beat RU, or does RU reference improve ZH? | v1 has incomplete, time-confounded proxy outputs only. | Not established. |
+
+### What can be reported from v1
+
+The sole preserved model artifact is v1. It generated valid translations for
+90/120 A records, 100/120 B records and 85/120 C records; D, E and F had no
+valid outputs. On 65 complete paired, double-rated proxy records, B--A was
+-1.54 percentage points (2 versus 3 unusable) and C--B was -3.08 percentage
+points (2 versus 4 unusable). The observed unusable-rate ITT bounds were
+3.3%--32.5% for A, 3.3%--24.2% for B and 2.5%--31.7% for C. H3 is unmeasured.
+
+These differences are directional complete-case proxy observations, not H1 or
+H2 results: missingness is extensive, provider failures were confounded with
+the serial arm order, and the intervals overlap. They must not guide a source
+language change or a product rollout.
+
+### Final status and decision boundary
+
+G0 and G1 are closed for the 120-record screening corpus. G2 was satisfied for
+the attempted screening runs only. G3 is **open**: there is no complete,
+reproducible pilot. G4 and G5 are also open. The corpus remains ineligible for
+confirmatory analysis because all 120 records lack established RU/EN human
+review provenance and independent Chinese LQA.
+
+No further model calls are planned under this stopped run. A future v3 would
+need a separately reviewed runner that writes durable, append-only output after
+each batch, a fresh G2 registration, and a complete rerun from the beginning.
+It must not pool v1 partial outcomes or lost v2 outputs with its results.
+
+### Exploratory self-review of preserved outputs
+
+At the owner's request, the agent performed an additional screening review of
+the only preserved complete v1 subset. The sample consists of the first four
+complete A/B/C records in stable `(project, component, record_id)` order from
+each approved stratum: Need For Greed UI, Tutorial and Loot, and Heart Abyss
+hub-1. It therefore covers 16 records and 48 candidate forms. Sampling was
+independent of the prior proxy verdicts, but candidate arm labels were visible
+to the reviewer; this is not a blinded or independent LQA sample.
+
+Against both available RU and EN sources, the self-review found no major or
+critical defect in the 48 forms. It noted only minor-risk observations:
+alternative transliterations/levels of specificity for a character name,
+dialogue-register variation, and two forms that render ``mare`` as the more
+general ``马儿``. The UI string describing ``defense`` versus ``resistance``
+also demonstrates a source-language difference rather than a translation
+failure: A follows RU's ``защиту`` while B/C follow EN's ``resistance``.
+
+The self-review supports only the narrow statement that this 48-form coverage
+sample contains no obvious unusable output to this reviewer. It cannot estimate
+an arm rate, resolve whether a source choice is preferable, verify terminology
+consistency without game materials, measure H1/H2, or measure H3: no D/E/F
+output exists. It is an agent self-review, not independent Chinese LQA and not
+a replacement for the registered LiteLLM panel or human assessment.

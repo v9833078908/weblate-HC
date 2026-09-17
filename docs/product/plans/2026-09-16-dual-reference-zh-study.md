@@ -626,3 +626,12 @@ and register an explicit Gemini route with available quota; then the full 120
 records are rerun from the beginning under v2. v1 is retained as an incomplete
 technical incident and is not pooled with v2. See
 `docs/product/measurements/2026-09-16-dual-reference-zh-offline-preflight.md`.
+
+### Stop record (2026-09-17)
+
+The owner stopped inference after v2 terminated during final JSON serialization.
+No v2 result artifact exists, so the process supplied no outcomes for analysis.
+The study remains an incomplete technical screening: H1, H2 and H3 are not
+confirmed; G3--G5 remain open; no product rollout follows. The final synthesis
+is recorded in
+`docs/product/measurements/2026-09-16-dual-reference-zh-offline-preflight.md`.
