@@ -4,8 +4,9 @@
 
 The eight-record end-to-end smoke passed. The owner-authorized 120-record
 screening pilot was dispatched at 2026-09-17 11:30:31 UTC (14:30 Moscow).
-Its results are pending; G3–G5 remain open. No confirmatory inference or
-production translation update is authorized here.
+The process completed at 12:11:50 UTC (15:11 Moscow). Its final artifact was
+preserved, but pilot completeness failed; G3–G5 remain open. No confirmatory
+inference or production translation update is authorized here.
 
 ## Registered changes before inference
 
@@ -95,3 +96,32 @@ contains `launch.json`, registration, frozen inputs, code identity and a
 read-only `collect-and-verify.py` command; its README explains how to collect
 the journal and final artifact into Downloads. An initial local snapshot is
 not the final pilot report.
+
+## Completed pilot: incomplete assessment coverage
+
+The process exited with code zero, and every final batch matched the durable
+journal. There were 288 failed attempts and 140 terminal batch failures.
+Exit code zero indicates that the runner completed, not that inference was
+complete. `technical_gate_pass` is false.
+
+| Arm | Assigned | Valid translations | Double-rated | Proxy unusable among double-rated |
+| --- | ---: | ---: | ---: | ---: |
+| A | 120 | 120 | 0 | Not measured |
+| B | 120 | 120 | 70 | 4 |
+| C | 120 | 120 | 120 | 7 |
+| D | 120 | 120 | 120 | 2 |
+| E | 120 | 1 | 1 | 0 |
+| F | 120 | 1 | 1 | 0 |
+
+Only 70 of the planned 480 reviewer records survived. The intersection of
+both seats and both E/F review conditions left one editor-eligible record.
+All 480 A–D translations are available for further evaluation without
+regeneration. B−A has no complete rated pair; C−B has 70 paired proxy outcomes
+and a −1.43 percentage-point difference; F−E has only one pair. None establishes
+H1–H3. The successful Gemini receipts total USD 0.36182325; absent LiteLLM
+cost fields prevent a complete cost estimate.
+
+The owner subsequently requested an assessment by the assistant itself.
+That separate exploratory assessment and the overall screening conclusion are
+recorded in
+`docs/product/measurements/2026-09-17-dual-reference-zh-assistant-assessment.md`.
