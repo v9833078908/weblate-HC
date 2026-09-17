@@ -1,7 +1,20 @@
 # Судейские прогоны: защита от редоставки и честное покрытие
 
 Дата: 2026-09-17.
-Статус: план для согласования; реализация и деплой не разрешены.
+Статус: одобрен к реализации 2026-09-17 после ревью
+`docs/product/reviews/2026-09-17-judge-redelivery-and-coverage-plan-review.md`.
+Этот план миграций не добавляет. Отдельного разрешения требуют деплой,
+любые действия против живого экземпляра и платные прогоны у провайдеров.
+
+**Исполнителю.** Этот план идёт **первым** и целиком, до
+`docs/product/plans/2026-09-17-mt-prerequisite-before-judge.md`: он кладёт
+guard исполнения и контракт покрытия, на которые тот опирается. Внутри
+плана задача 1 предшествует задаче 2. Параллельное исполнение двух планов
+запрещено — они правят одни и те же `perform`/`_perform`,
+`_finish_producer_run`, точки входа `tasks.py`, `models/judge.py`, отчёт и
+`ProducerRunSerializer`; один владелец общего файла за раз. Работать в
+отдельном worktree (`using-git-worktrees`), исполнять по
+`executing-plans`, валидацию гнать один раз после сборки.
 
 ## Цель и согласованный объём
 
@@ -239,8 +252,12 @@ holder'ов гонки inode не существует). Отдельный GC-�
 `weblate/trans/tasks.py:auto_translate`, `auto_translate_component`,
 `weblate/trans/autotranslate.py:BatchAutoTranslate._adopt_producer_run`,
 `_create_producer_run`, `perform`, `_finish_producer_run`;
-настройка `JUDGE_GUARD_WAIT_RETRIES` в `weblate/settings_*.py`
-и `settings_docker.py`;
+настройка `JUDGE_GUARD_WAIT_RETRIES` по образцу уже существующей
+`JUDGE_MAX_UNITS_PER_RUN`, то есть во всех пяти местах её цепочки:
+дефолт в `weblate/trans/defaults.py:62`, app conf в
+`weblate/trans/models/_conf.py:111`, `weblate/settings_example.py:1029`,
+env-обвязка в `weblate/settings_docker.py:1823` и
+`deploy/environment.example` (префикс `WEBLATE_`);
 `weblate/trans/tests/test_judge_autotranslate.py`,
 `weblate/trans/tests/test_tasks.py`,
 `weblate/trans/tests/test_autotranslate.py`,
@@ -305,7 +322,10 @@ holder'ов гонки inode не существует). Отдельный GC-�
   внутри транзакционного `ViewTestCase`. Внешние LLM/VCS замоканы;
   платные запросы не нужны.
 
-Команда существующего runner:
+Команда существующего runner (`rundev.sh test` жёстко подставляет
+`pytest -n auto`, поэтому завершающий `-n 0` не лишний: он перебивает
+xdist, чтобы процессные барьеры и файловая блокировка не делились между
+worker-процессами pytest):
 
 ```sh
 ./rundev.sh test -n 0 weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_tasks.py weblate/trans/tests/test_autotranslate.py weblate/utils/tests/test_lock.py
