@@ -251,6 +251,170 @@ def _run_guarded_auto_translate_process(
     assert seen, message
 
 
+def _run_held_auto_translate_process(
+    task_id: str, component_id: int, user_id: int, ready, unit_ids: list[int]
+) -> None:
+    """
+    Hold a real delivery's execution guard at the provider boundary.
+
+    The producer run is created and RUNNING when ``ready`` fires; the
+    process then sleeps with the lock held until terminated, so a sibling
+    delivery with a different task ID can prove the guard scopes to the
+    delivery, not to the scope.
+    """
+    for connection in connections.all(initialized_only=True):
+        connection.connection = None
+
+    def fake_judge_batch(units, **kwargs):
+        ready.set()
+        time.sleep(30)
+        return {
+            unit.id: JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity="none",
+                model_verdict=JudgeVerdict.Verdict.PASS,
+                judge_model="vendor-a/model",
+                seat=1,
+                target_hash=compute_target_hash(build_request(unit).target_plurals),
+                context_hash="held-boundary",
+            )
+            for unit in units
+        }
+
+    try:
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.current_task", _fake_current_task(task_id)
+            ),
+            mock.patch.object(tasks, "current_task", _fake_current_task(task_id)),
+            mock.patch.object(
+                tasks, "heartbeat_task", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "touch_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "delete_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "register_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                BatchAutoTranslate,
+                "_preload_workflow_settings",
+                _noop_preload_workflow_settings,
+            ),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch",
+                side_effect=fake_judge_batch,
+            ),
+            mock.patch.object(
+                tasks, "get_auto_translate_target", autospec=True
+            ) as get_target,
+            mock.patch.object(
+                tasks, "store_auto_translate_activity_log", autospec=True
+            ) as store_log,
+        ):
+            get_target.return_value = (Component.objects.get(pk=component_id), {})
+            store_log.side_effect = lambda _log, result, **_kwargs: result
+            tasks.auto_translate._orig_run.__func__(  # ruff: ignore[private-member-access]
+                _ProcessTask(task_id, _GUARD_RETRY_DELIVERY),
+                user_id=user_id,
+                mode="judge",
+                q="",
+                auto_source="mt",
+                source_component_id=None,
+                engines=[],
+                threshold=80,
+                unit_ids=unit_ids,
+                translation_id=None,
+                component_id=None,
+                category_id=None,
+                project_id=None,
+                language_id=None,
+                workspace_id=None,
+                activity_log_id=None,
+                activity_log_task_count=None,
+                enforce_permissions=False,
+                overwrite_existing=False,
+                producer_run_id=None,
+                judge_pretranslate=False,
+                judge_mutating_repairs=True,
+                judge_candidate_severities=("critical", "major"),
+                judge_proposal_only=False,
+            )
+    finally:
+        connections.close_all()
+
+
+def _run_guarded_component_process(
+    task_id: str, component_id: int, user_id: int
+) -> None:
+    """Run one ``auto_translate_component`` delivery against the same boundary."""
+    for connection in connections.all(initialized_only=True):
+        connection.connection = None
+
+    def fake_judge_batch(units, **kwargs):
+        return {
+            unit.id: JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity="none",
+                model_verdict=JudgeVerdict.Verdict.PASS,
+                judge_model="vendor-a/model",
+                seat=1,
+                target_hash=compute_target_hash(build_request(unit).target_plurals),
+                context_hash="component-replay",
+            )
+            for unit in units
+        }
+
+    try:
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.current_task", _fake_current_task(task_id)
+            ),
+            mock.patch.object(tasks, "current_task", _fake_current_task(task_id)),
+            mock.patch.object(
+                tasks, "heartbeat_task", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "touch_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "delete_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "register_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                BatchAutoTranslate,
+                "_preload_workflow_settings",
+                _noop_preload_workflow_settings,
+            ),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch",
+                side_effect=fake_judge_batch,
+            ),
+            mock.patch.object(
+                tasks, "store_auto_translate_activity_log", autospec=True
+            ) as store_log,
+        ):
+            store_log.side_effect = lambda _log, result, **_kwargs: result
+            tasks.auto_translate_component._orig_run.__func__(  # ruff: ignore[private-member-access]
+                _ProcessTask(task_id, _GUARD_RETRY_DELIVERY),
+                component_id,
+                mode="judge",
+                q="",
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                user_id=user_id,
+                enforce_permissions=False,
+            )
+    finally:
+        connections.close_all()
+
+
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
@@ -367,6 +531,80 @@ class PersistedProducerRunRecoveryTest(RepoTestMixin, TransactionTestCase):
         # The summary counts the whole journal, not the last attempt.
         self.assertEqual(recovered.summary["evaluated"], 2)
         self.assertEqual(recovered.summary["nothing_blocking"], 2)
+
+    def test_distinct_run_ids_run_independently(self) -> None:
+        # While A holds its execution guard at the provider boundary, a
+        # delivery with a different task ID judges and completes its own
+        # run: the guard scopes to the delivery, not to the scope.
+        scope = [
+            self._mark_judgeable("cs", "Hello, world!\n", "Ahoj, světe!"),
+            self._mark_judgeable("de", "Hello, world!\n", "Hallo, Welt!"),
+        ]
+        context = multiprocessing.get_context("fork")
+        held = context.Event()
+        owner_a = context.Process(
+            target=_run_held_auto_translate_process,
+            args=("run-a", self.component.pk, self.user.pk, held, scope),
+        )
+        # Never let a child inherit a live parent connection.
+        connections.close_all()
+        try:
+            owner_a.start()
+            self.assertTrue(held.wait(timeout=30))
+            # A's guard is held: B proceeds on its own key.
+            self._run_delivery("run-b", hold_after=99, unit_ids=scope)
+        finally:
+            if owner_a.is_alive():
+                owner_a.terminate()
+            owner_a.join(timeout=10)
+
+        run_b = ProducerRun.objects.get(task_id="run-b")
+        self.assertEqual(run_b.status, ProducerRun.Status.COMPLETED)
+        self.assertEqual(len(self._judged_rows(run_b)), 2)
+        self.assertEqual(run_b.summary["evaluated"], 2)
+        # B never touched A's still-open run.
+        run_a = ProducerRun.objects.get(task_id="run-a")
+        self.assertNotEqual(run_a.pk, run_b.pk)
+        self.assertEqual(run_a.status, ProducerRun.Status.RUNNING)
+        self.assertIsNone(run_a.finished)
+
+    def _run_component_delivery(self, task_id: str, timeout: int = 120) -> None:
+        context = multiprocessing.get_context("fork")
+        process = context.Process(
+            target=_run_guarded_component_process,
+            args=(task_id, self.component.pk, self.user.pk),
+        )
+        connections.close_all()
+        process.start()
+        process.join(timeout=timeout)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+            self.fail("component delivery exceeded its test deadline")
+
+    def test_component_task_terminal_redelivery_is_read_only(self) -> None:
+        # One judgeable string is enough: the guard, not the batch size,
+        # decides the terminal-replay behavior here.
+        self._mark_judgeable("cs", "Hello, world!\n", "Ahoj, světe!")
+        task_id = "component-terminal-replay"
+        self._run_component_delivery(task_id)
+
+        first_run = ProducerRun.objects.get(task_id=task_id)
+        self.assertEqual(first_run.status, ProducerRun.Status.COMPLETED)
+        first_finished = first_run.finished
+        self.assertIsNotNone(first_finished)
+        verdict_count = JudgeVerdict.objects.count()
+        row_count = JudgeRunUnit.objects.filter(run=first_run).count()
+
+        # The same delivery arriving again after completion must not judge
+        # again, must not create a second run and must not touch the report.
+        self._run_component_delivery(task_id)
+
+        self.assertEqual(ProducerRun.objects.filter(task_id=task_id).count(), 1)
+        first_run.refresh_from_db()
+        self.assertEqual(first_run.finished, first_finished)
+        self.assertEqual(JudgeVerdict.objects.count(), verdict_count)
+        self.assertEqual(JudgeRunUnit.objects.filter(run=first_run).count(), row_count)
 
 
 class _ProcessTask:
