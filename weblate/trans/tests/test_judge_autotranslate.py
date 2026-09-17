@@ -1381,6 +1381,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         run.finished = run.started
         run.summary = {"passed": 1}
         run.save(update_fields=["status", "finished", "summary"])
+        terminal_finished = run.finished
         replay = BatchAutoTranslate(
             self.component,
             user=self.user,
@@ -1396,6 +1397,22 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
         self.assertEqual(adopted.pk, run.pk)
         self.assertEqual(adopted.summary, {"passed": 1})
+
+        with (
+            mock.patch("weblate.trans.autotranslate.current_task", task),
+            mock.patch("weblate.trans.autotranslate.run_judge_batch") as judge,
+        ):
+            replay.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        judge.assert_not_called()
+        run.refresh_from_db()
+        self.assertEqual(run.finished, terminal_finished)
+        self.assertEqual(run.summary, {"passed": 1})
 
     def test_finish_producer_run_does_not_overwrite_a_terminal_run(self) -> None:
         unit = self.get_unit()

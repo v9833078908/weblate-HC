@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import multiprocessing
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -17,6 +19,11 @@ from weblate.vcs.base import Repository, RepositoryLock, get_repository_lock_key
 if TYPE_CHECKING:
     from weblate.trans.models import Component
 
+
+def hold_file_lock(lock_path: str, ready) -> None:
+    with FileLock(lock_path):
+        ready.set()
+        time.sleep(30)
 
 class RepositoryLockTest(SimpleTestCase):
     def test_default_redis_lock_uses_scope_and_key(self) -> None:
@@ -62,6 +69,22 @@ class RepositoryLockTest(SimpleTestCase):
         self.assertEqual(
             lock.name, Path(temp_dir, "locks", "judge-delivery.lock").as_posix()
         )
+
+    def test_file_lock_releases_after_process_termination(self) -> None:
+        with TemporaryDirectory() as lock_path:
+            context = multiprocessing.get_context("fork")
+            ready = context.Event()
+            process = context.Process(
+                target=hold_file_lock,
+                args=(str(Path(lock_path, "judge.lock")), ready),
+            )
+            process.start()
+            self.assertTrue(ready.wait(timeout=5))
+            process.terminate()
+            process.join(timeout=5)
+            self.assertFalse(process.is_alive())
+            with FileLock(Path(lock_path, "judge.lock"), timeout=1):
+                pass
 
     def test_default_file_lock_uses_locks_dir(self) -> None:
         with (
