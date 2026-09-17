@@ -42,6 +42,7 @@ from weblate.lang.models import Language, Plural
 from weblate.machinery.base import (
     MACHINERY_DEFAULT_THRESHOLD,
     MachineTranslationError,
+    MachineTranslationServiceError,
 )
 from weblate.machinery.dummy import DummyTranslation
 from weblate.trans import tasks
@@ -49,7 +50,7 @@ from weblate.trans.actions import ActionEvents
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge_loop import build_request
-from weblate.trans.machinery import fetch_machinery_matches
+from weblate.trans.machinery import MachineryBatchOutcome, fetch_machinery_matches
 from weblate.trans.models import (
     Change,
     Component,
@@ -2098,11 +2099,15 @@ class RecordingTranslation(DummyTranslation):
         rate_limited: bool = False,
         stop_clears_after: int | None = None,
         rate_limit_period: int = 0,
+        fatal_error: Exception | None = None,
+        fatal_ids: frozenset[int] = frozenset(),
     ) -> None:
         super().__init__({})
         self.batch_concurrency = concurrency
         self.barrier = barrier
         self.failing_ids = failing_ids
+        self.fatal_error = fatal_error
+        self.fatal_ids = fatal_ids
         self.rate_limited = rate_limited
         # A stop lifted once it has been observed this many times, standing in
         # for one that expires while a run is still going.
@@ -2142,6 +2147,10 @@ class RecordingTranslation(DummyTranslation):
         if self.failing_ids.intersection(unit.id for unit in units):
             msg = "Recorded failure"
             raise MachineTranslationError(msg)
+        if self.fatal_error is not None and self.fatal_ids.intersection(
+            unit.id for unit in units
+        ):
+            raise self.fatal_error
         for unit in units:
             unit.machinery = {
                 "translation": ["translated"],
@@ -2305,6 +2314,104 @@ class MachineryBatchFetchTest(SimpleTestCase):
         self.assertEqual(stored, [])
         self.assertEqual(len(first.batches), 2)
         self.assertEqual(len(second.batches), 2)
+
+    def test_a_confirmed_quota_refusal_stops_new_submissions(self) -> None:
+        # A parallel run keeps batches already in flight, but once a batch
+        # reports a spent quota the remaining batches are never asked.
+        refusal = MachineTranslationServiceError(
+            "quota exhausted",
+            reason_code=MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+            safe_message="The quota is exhausted.",
+        )
+        service = RecordingTranslation(
+            concurrency=2, fatal_error=refusal, fatal_ids=frozenset({0})
+        )
+        failures: list[MachineryBatchOutcome] = []
+
+        result, _progress = self.fetch_with_failures(
+            service, self.make_units(10), failures.append
+        )
+
+        self.assertEqual(failures[0].status, "failed")
+        self.assertEqual(
+            failures[0].reason_code,
+            MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+        )
+        self.assertNotIn("quota exhausted", failures[0].error or "")
+        # Only the first two batches were in flight; the rest never ran.
+        self.assertLessEqual(len(service.batches), 2)
+        asked = {unit_id for batch in service.batches for unit_id in batch}
+        self.assertEqual(sorted(result), sorted(asked - {0, 1}))
+
+    def test_serial_fetch_stops_after_a_fatal_refusal(self) -> None:
+        refusal = MachineTranslationServiceError(
+            "quota exhausted",
+            reason_code=MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+            safe_message="The quota is exhausted.",
+        )
+        service = RecordingTranslation(fatal_error=refusal, fatal_ids=frozenset({0}))
+        failures: list[MachineryBatchOutcome] = []
+
+        result, progress = self.fetch_with_failures(
+            service, self.make_units(6), failures.append
+        )
+
+        self.assertEqual(service.batches, [[0, 1]])
+        self.assertEqual(result, {})
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(progress, [2, 4, 6])
+
+    def test_partial_results_survive_a_later_refusal(self) -> None:
+        refusal = MachineTranslationServiceError(
+            "insufficient credit",
+            reason_code=MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT,
+            safe_message="The credit balance is spent.",
+        )
+        service = RecordingTranslation(fatal_error=refusal, fatal_ids=frozenset({4}))
+        failures: list[MachineryBatchOutcome] = []
+
+        result, _progress = self.fetch_with_failures(
+            service, self.make_units(6), failures.append
+        )
+
+        self.assertEqual(sorted(result), [0, 1, 2, 3])
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0].unit_ids, (4, 5))
+
+    def test_a_generic_failure_is_reported_sanitized(self) -> None:
+        service = RecordingTranslation(failing_ids=frozenset({2}))
+        failures: list[MachineryBatchOutcome] = []
+
+        result, _progress = self.fetch_with_failures(
+            service, self.make_units(4), failures.append
+        )
+
+        self.assertEqual(sorted(result), [0, 1])
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(
+            failures[0].reason_code,
+            MachineTranslationServiceError.REASON_PROVIDER_UNAVAILABLE,
+        )
+        # The raw provider detail ("Recorded failure") stays in the server
+        # log; the outcome carries only fixed safe text.
+        self.assertNotIn("Recorded failure", failures[0].error or "")
+
+    def fetch_with_failures(
+        self,
+        service: RecordingTranslation,
+        units: list[Any],
+        on_failure: Callable[[MachineryBatchOutcome], None],
+    ) -> tuple[dict, list[int]]:
+        progress: list[int] = []
+        result = fetch_machinery_matches(
+            units=units,
+            user=None,
+            services=[service],
+            threshold=75,
+            set_progress=progress.append,
+            on_failure=on_failure,
+        )
+        return result, progress
 
 
 @override_settings(CELERY_RESULT_BACKEND="redis://localhost:6379")

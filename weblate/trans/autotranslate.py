@@ -17,7 +17,10 @@ from django.utils import timezone
 from django.utils.translation import gettext, ngettext
 
 from weblate.checks.models import CHECKS
-from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.base import (
+    MachineTranslationError,
+    MachineTranslationServiceError,
+)
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
 from weblate.trans.judge import (
@@ -32,7 +35,7 @@ from weblate.trans.judge_loop import (
     build_request,
     run_judge_batch,
 )
-from weblate.trans.machinery import fetch_machinery_matches
+from weblate.trans.machinery import MachineryBatchOutcome, fetch_machinery_matches
 from weblate.trans.models import (
     Category,
     Component,
@@ -666,6 +669,7 @@ class AutoTranslate(BaseAutoTranslate):
         engines_list: list[str],
         threshold: int,
         on_batch: Callable[[list[Unit]], None] | None = None,
+        on_failure: Callable[[MachineryBatchOutcome], None] | None = None,
     ) -> dict[int, UnitMemoryResultDict]:
         """Get the translations."""
         units: list[Unit] = list(self.get_units().select_related("source_unit"))
@@ -718,6 +722,7 @@ class AutoTranslate(BaseAutoTranslate):
             set_progress=self.set_progress,
             log_translation=self.translation,
             on_batch=on_batch,
+            on_failure=on_failure,
         )
         for engine in engines:
             if not engine.is_rate_limited():
@@ -737,9 +742,58 @@ class AutoTranslate(BaseAutoTranslate):
             self.set_progress(self.progress_base)
         return translations
 
+    def fetch_mt_checked(
+        self,
+        engines_list: list[str],
+        threshold: int,
+        on_batch: Callable[[list[Unit]], None] | None = None,
+    ) -> tuple[dict[int, UnitMemoryResultDict], list[MachineryBatchOutcome]]:
+        """Fetch translations and report every classified batch failure."""
+        failures: list[MachineryBatchOutcome] = []
+
+        def observe(outcome: MachineryBatchOutcome) -> None:
+            failures.append(outcome)
+            if outcome.reason_code == (
+                MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED
+            ):
+                self.add_warning(
+                    gettext(
+                        "%(service)s refused the request: the translation quota "
+                        "is exhausted. Ask the administrator to top it up, then "
+                        "run the operation again."
+                    )
+                    % {"service": outcome.service}
+                )
+            elif outcome.reason_code == (
+                MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
+            ):
+                self.add_warning(
+                    gettext(
+                        "%(service)s refused the request: the credit balance "
+                        "is spent. Ask the administrator to top it up, then "
+                        "run the operation again."
+                    )
+                    % {"service": outcome.service}
+                )
+            elif outcome.reason_code is not None:
+                self.add_warning(
+                    gettext("%(service)s failed: %(reason)s")
+                    % {"service": outcome.service, "reason": outcome.error or ""}
+                )
+
+        translations = self.fetch_mt(
+            engines_list,
+            threshold,
+            on_batch=on_batch,
+            on_failure=observe,
+        )
+        return translations, failures
+
     def process_mt(self, engines: list[str], threshold: int) -> None:
         """Perform automatic translation based on machine translation."""
-        translations = self.fetch_mt(engines, int(threshold), on_batch=self.store_batch)
+        translations, failures = self.fetch_mt_checked(
+            engines, int(threshold), on_batch=self.store_batch
+        )
 
         # Adjust total number to show correct progress
         self.progress_steps = self.progress_base + len(translations)
@@ -753,8 +807,30 @@ class AutoTranslate(BaseAutoTranslate):
         }
         if remaining:
             self.store_results(remaining)
-
         self.post_process()
+        fatal = next(
+            (
+                outcome
+                for outcome in failures
+                if outcome.reason_code
+                in {
+                    MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+                    MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT,
+                    MachineTranslationServiceError.REASON_AUTHENTICATION,
+                    MachineTranslationServiceError.REASON_PERMISSION,
+                }
+            ),
+            None,
+        )
+        if fatal is not None and self.failure_message is None:
+            # A confirmed refusal is an operation failure even when earlier
+            # batches stored translations: the completion message must not
+            # claim success while strings were left untranslated.
+            self.failure_message = (
+                gettext("Automatic translation failed: %s") % fatal.error
+            )
+            if fatal.error not in self.warnings:
+                self.add_warning(self.failure_message)
 
     def store_batch(self, units: list[Unit]) -> None:
         """Store one fetched batch so a crash cannot discard the whole run."""
@@ -1710,9 +1786,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
         summary = asdict(self.judge_summary or JudgeSummary())
         if run.requested_mode in {"judge", "recheck", "drain"}:
             outcomes = dict(
-                JudgeRunUnit.objects.filter(run=run).values_list("outcome").annotate(
-                    count=Count("pk")
-                )
+                JudgeRunUnit.objects.filter(run=run)
+                .values_list("outcome")
+                .annotate(count=Count("pk"))
             )
             summary.update(
                 evaluated=sum(

@@ -78,6 +78,47 @@ class MachineTranslationError(Exception):
     """Generic Machine translation error."""
 
 
+class MachineTranslationServiceError(MachineTranslationError):
+    """
+    A refusal the provider confirmed, with a closed reason classification.
+
+    ``reason_code`` is deliberately coarse so callers can act on it without
+    parsing provider prose: ``quota-exhausted`` and ``insufficient-credit``
+    stop mandatory preparation permanently, ``authentication`` and
+    ``permission`` name a configuration problem, and
+    ``provider-unavailable`` names everything else a provider confirmed.
+    ``safe_message`` must never carry an API key, a raw response body or a
+    key-management URL: it is stored in durable warnings and shown to users
+    who cannot manage the machinery configuration.
+    """
+
+    REASON_QUOTA_EXHAUSTED = "quota-exhausted"
+    REASON_INSUFFICIENT_CREDIT = "insufficient-credit"
+    REASON_AUTHENTICATION = "authentication"
+    REASON_PERMISSION = "permission"
+    REASON_PROVIDER_UNAVAILABLE = "provider-unavailable"
+
+    REASONS = frozenset(
+        {
+            REASON_QUOTA_EXHAUSTED,
+            REASON_INSUFFICIENT_CREDIT,
+            REASON_AUTHENTICATION,
+            REASON_PERMISSION,
+            REASON_PROVIDER_UNAVAILABLE,
+        }
+    )
+
+    def __init__(
+        self, message: str, *, reason_code: str, safe_message: str | None = None
+    ) -> None:
+        if reason_code not in self.REASONS:
+            msg = f"Unknown MT service failure reason: {reason_code}"
+            raise ValueError(msg)
+        super().__init__(message)
+        self.reason_code = reason_code
+        self.safe_message = safe_message or message
+
+
 class MachineryRateLimitError(MachineTranslationError):
     """Raised when rate limiting is detected."""
 
@@ -304,6 +345,59 @@ class BatchMachineTranslation(DocVersionsMixin):
         if self.allow_private_targets:
             return True
         return self.is_trusted_error_host(response)
+
+    def get_service_failure_reason(self, response: httpx2.Response) -> str | None:
+        """
+        Classify a failed response as a confirmed service refusal, or None.
+
+        HTTP 402 is always a spent balance. A 403 only becomes a money
+        refusal when the provider's own detail confirms a quota or balance
+        limit; other 403s stay plain access errors instead of being
+        mislabeled as a depleted budget. No default for other statuses: a
+        generic failure must not masquerade as a quota refusal.
+        """
+        if response.status_code == 402:
+            return MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
+        if response.status_code == 403:
+            detail = (self.get_error_detail(response) or "").lower()
+            if "monthly limit" in detail or ("quota" in detail and "exceed" in detail):
+                return MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED
+            if (
+                "insufficient" in detail and ("credit" in detail or "balance" in detail)
+            ) or "payment" in detail:
+                return MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
+        return None
+
+    def raise_service_failure(
+        self,
+        response: httpx2.Response,
+        reason_code: str,
+        upstream_status: int | None = None,
+    ) -> None:
+        """
+        Raise a classified refusal without leaking the raw provider payload.
+
+        Providers embed key-management URLs into refusal details; the
+        exception message itself must stay sanitized because batch fetching
+        logs and stores ``str(error)`` durably.
+        """
+        detail = self.get_error_detail(response)
+        status = upstream_status or response.status_code
+        if reason_code == MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED:
+            if "monthly limit" in (detail or "").lower():
+                safe = (
+                    f"{self.name} refused the request: the key's monthly limit "
+                    "is exhausted."
+                )
+            else:
+                safe = f"{self.name} refused the request: the quota is exhausted."
+        elif reason_code == MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT:
+            safe = f"{self.name} refused the request: the credit balance is spent."
+        else:
+            safe = f"{self.name} refused the request: HTTP {status}"
+        raise MachineTranslationServiceError(
+            safe, reason_code=reason_code, safe_message=safe
+        )
 
     def is_trusted_error_host(self, response: httpx2.Response) -> bool:
         if (
