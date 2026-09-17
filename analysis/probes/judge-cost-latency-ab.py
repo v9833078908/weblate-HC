@@ -763,11 +763,13 @@ def cmd_prepare(args: argparse.Namespace) -> int:
             "arms": arms,
             "repeats": args.repeats,
             "schedule": {
-                "slots": [{"id": "s001", "arm": "A0", "repeat": 1, "group": "g"}]
+                "slots": [
+                    {"id": "s001", "arm": next(iter(arms)), "repeat": 1, "group": "g"}
+                ]
             },
             "prices": {"placeholder": dict.fromkeys(PRICE_KEYS, 0)},
             "prices_source": "placeholder",
-            "gates": {"control_arm": "A0"},
+            "gates": {"control_arm": next(iter(arms))},
         },
         require_budget=False,
     )

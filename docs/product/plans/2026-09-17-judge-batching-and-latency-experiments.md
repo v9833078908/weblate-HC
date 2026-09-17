@@ -353,20 +353,20 @@ budget или `low` там нет. Поэтому ограниченный budge
 
 **Действия:**
 
-- [ ] По разрешённому metadata refresh и документации провайдера проверить
+- [x] По разрешённому metadata refresh и документации провайдера проверить
       доступные aliases, цену, strict schema, stream usage, язык и control support.
       Сначала максимум два кандидата для bounded smoke, не весь каталог.
-- [ ] Если текущий proxy/product не поддерживает ограниченный reasoning budget,
+- [x] Если текущий proxy/product не поддерживает ограниченный reasoning budget,
       выбрать ветвь замены модели. Поддержку нового поля не добавлять незаметно
       в probe: отдельное согласование изменения продуктового контракта и новый
       baseline после реализации. Не имитировать budget общим `max_tokens`.
-- [ ] Зафиксировать одну модель/профиль после screening. Полный B сравнивает
+- [x] Зафиксировать одну модель/профиль после screening. Полный B сравнивает
       контрольный DeepSeek с одним кандидатом, batch seat 1 остаётся 2,
       Qwen/prompt/контекст/deadlines/retries неизменны.
-- [ ] Установить реальное прохождение reasoning-control до upstream по
+- [x] Установить реальное прохождение reasoning-control до upstream по
       доступным безопасным diagnostics и usage. HTTP 200 не доказательство,
       что proxy не проигнорировал поле. Неизвестный control не проходит gate.
-- [ ] Оценить уникальные потери seat 1 и итог пары: быстрый кандидат,
+- [x] Оценить уникальные потери seat 1 и итог пары: быстрый кандидат,
       повторяющий только находки Qwen, может ухудшить совокупное обнаружение.
 
 **Проверка:** три повтора на development с фиксированным расписанием и независимое
@@ -537,6 +537,79 @@ wall-clock на таком объёме управляется единичны�
 Сводка воспроизводится офлайн:
 `uv run python analysis/probes/judge-cost-latency-ab.py --summarize --manifest
 analysis/data/judge-cost-latency-ab/real-main/manifest.json`.
+
+## Статус Task 3: эксперимент B, ускорение участника DeepSeek (2026-09-17)
+
+### Metadata refresh и выбор кандидатов
+
+Разрешённый refresh (`GET /model/info` на LiteLLM-прокси, ключ только в
+процессе): 24 alias; DeepSeek-семейство помимо текущего `deepseek-v4-pro`
+представлено `atlas/deepseek-v4-flash-0731`, `atlas/deepseek-v4-pro-0813`,
+`deepseek-ai/deepseek-v4-flash`, `deepseek-ai/deepseek-v3.2`,
+`tencent/DeepSeek-V4.1-Flash`. Прокси per-model цены не публикует (все
+`/model/info` prices = 0), ставки взяты из
+`proxy-rate-metadata.json`; для flash-варианта цен в snapshot нет, поэтому
+он оценён по ставке `deepseek-v4-pro` как консервативная верхняя граница
+(flash-тир не дороже pro; зафиксировано в `prices_source` манифеста).
+
+Изменение runner (коммит `2c55d2f9`): плечи теперь могут переопределять
+`seat_1_model` → `JUDGE_MODEL_SEAT_1` и `seat_1_reasoning` →
+`JUDGE_REASONING_EFFORT_SEAT_1` (значение проверяется по закрытому
+множеству `_LITELLM_REASONING_VALUES`), резолвнутая модель сверяется с
+манифестом как и ширина, и override применяется через восстанавливающий
+context manager (мутация настроек больше не протекает в последующие слоты
+или тесты). 21/21 тестов зелёные.
+
+### Bounded smoke (`real-b-smoke`, 1 слот на кандидата, Qwen batch 5)
+
+- **C1** `atlas/deepseek-v4-flash-0731` +
+  `extra_body.enable_thinking=false`: 3/3 POST parse, unparsed 0, reasoning
+  tokens 0 (контроль дошёл до upstream), seat-1 elapsed 2503–2765 мс.
+- **C2** текущий `deepseek-v4-pro` + `extra_body.enable_thinking=false`:
+  3/3 parse, reasoning 0, elapsed 3418–4752 мс.
+
+Вердикты обоих кандидатов побайтово совпадают с baseline real-main (оба
+дефекта critical, тот же false flag на чистой строке, разногласий 0) —
+сигнал качества не изменился. C2 заодно показал, что значительная часть
+выигрыша — это отключение reasoning как таковое, а не только flash-тир.
+Для полного B зафиксирован C1 как самый быстрый профиль.
+
+### Полный B (`real-main-b`, 3 повтора × B0/B1, 6 слотов, Qwen batch 5)
+
+B0 — контроль `deepseek-v4-pro`, reasoning on (текущий профиль); B1 —
+`atlas/deepseek-v4-flash-0731` + `extra_body.enable_thinking=false`.
+Операционное событие то же, что в A: транзиентный alias-revision дрейф
+(`e412036b…` → `c0801b6a…`) один раз (первая попытка s003), отказ до
+любого POST, $0, повторный запуск чистый.
+
+| Плечо | POST | Wall clock пары | HTTP p50/p95 | Completion/reasoning токены | Расчётная стоимость* |
+|---|---:|---:|---|---|---:|
+| B0 (контроль) | 9 | 79.70 с | 8968/20595 мс | 4744 / 3084 | $0.0196 |
+| B1 (flash + off) | 9 | 27.67 с | 3113/7002 мс | 1672 / 0 | $0.0159 (−19.2%) |
+
+\* по манифестным ценам, cached-токены по cache-ставке (uncached-граница:
+$0.0272 vs $0.0240, −11.8%); провайдер стоимость не отчитывает.
+
+Гейты (preregistered): wall-clock пары −20% — достигнуто **−65.3%**;
+стоимость +5% — вместо роста **−19.2%**; качество — вердикты идентичны
+контролю во всех повторах (major recall 2/2, false flag тот же, unparsed 0,
+разногласия сидов 0, уникальные потери seat 1: 0). Reasoning-control
+подтверждён usage, а не HTTP 200: reasoning_tokens 0 во всех 9 попытках
+B1 против 3084 суммарно у B0.
+
+**Предварительный выбор на development: B1** — профиль
+`atlas/deepseek-v4-flash-0731` с `extra_body.enable_thinking=false` на
+seat 1 и Qwen batch 5 на seat 2; все гейты пройдены с большим запасом. Оговорки те же, что у A: 3
+уникальные строки, один язык, агентская разметка; изменение двухфакторное
+(модель + reasoning), и хотя smoke C2 атрибутирует большую часть выигрыша
+отключению reasoning, разложение по факторам не измерялось в основном B.
+Для production действуют те же требования: human labels по
+en/fr/ja/ko/zh_Hans/zh_Hant, основное сравнение на том корпусе и
+независимое held-out подтверждение (Task 4).
+
+Сводка воспроизводится офлайн:
+`uv run python analysis/probes/judge-cost-latency-ab.py --summarize --manifest
+analysis/data/judge-cost-latency-ab/real-main-b/manifest.json`.
 
 ## Готовность к исполнению и открытые решения
 
