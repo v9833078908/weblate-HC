@@ -79,12 +79,17 @@ class RepositoryLockTest(SimpleTestCase):
                 args=(str(Path(lock_path, "judge.lock")), ready),
             )
             process.start()
-            self.assertTrue(ready.wait(timeout=5))
-            process.terminate()
-            process.join(timeout=5)
-            self.assertFalse(process.is_alive())
-            with FileLock(Path(lock_path, "judge.lock"), timeout=1):
-                pass
+            try:
+                self.assertTrue(ready.wait(timeout=5))
+                process.terminate()
+                process.join(timeout=5)
+                self.assertFalse(process.is_alive())
+                with FileLock(Path(lock_path, "judge.lock"), timeout=1):
+                    pass
+            finally:
+                if process.is_alive():
+                    process.terminate()
+                    process.join(timeout=5)
 
     def test_default_file_lock_uses_locks_dir(self) -> None:
         with (
