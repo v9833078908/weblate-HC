@@ -1709,6 +1709,46 @@ class ProducerRunCreationTest(ViewTestCase):
         self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertEqual(run.failure, "provider unavailable")
 
+    def test_guard_exhaustion_marks_matching_run_failed(self) -> None:
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            task_id="exhausted-redelivery",
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+            status=ProducerRun.Status.RUNNING,
+        )
+        with (
+            patch(
+                "weblate.trans.tasks.producer_execution_guard",
+                side_effect=JudgeExecutionGuardError,
+            ),
+            patch.object(
+                auto_translate, "retry", side_effect=JudgeExecutionGuardError
+            ),
+        ):
+            result = auto_translate.apply(
+                kwargs={
+                    "user_id": self.user.id,
+                    "mode": "judge",
+                    "q": "",
+                    "auto_source": "mt",
+                    "source_component_id": None,
+                    "component_id": self.component.id,
+                    "engines": [],
+                    "threshold": 80,
+                },
+                task_id="exhausted-redelivery",
+            ).get()
+
+        run.refresh_from_db()
+        self.assertEqual(result["message"], "The execution lock was not released.")
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIsNotNone(run.finished)
+
 
 class RecordingTranslation(DummyTranslation):
     """Records received batches instead of translating them."""
@@ -2230,6 +2270,7 @@ class AutoTranslateDurabilityTest(SimpleTestCase):
             exc=mock.ANY, countdown=60, max_retries=settings.JUDGE_GUARD_WAIT_RETRIES
         )
         heartbeat.assert_not_called()
+
 
     def test_visibility_timeout_covers_long_tasks(self) -> None:
         code = """

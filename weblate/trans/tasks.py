@@ -160,7 +160,7 @@ def guard_producer_execution(function):
                     countdown=60,
                     max_retries=settings.JUDGE_GUARD_WAIT_RETRIES,
                 )
-            except MaxRetriesExceededError:
+            except (MaxRetriesExceededError, JudgeExecutionGuardError):
                 run_id = _fail_stalled_producer_run(
                     producer_run_id=producer_run_id, task_id=task_id
                 )
