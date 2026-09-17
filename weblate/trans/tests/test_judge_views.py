@@ -112,7 +112,10 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save(update_fields=["is_superuser"])
         self.component.project.translation_review = True
-        self.component.project.save(update_fields=["translation_review"])
+        self.component.project.machinery_settings = {"weblate": {}}
+        self.component.project.save(
+            update_fields=["translation_review", "machinery_settings"]
+        )
 
     def make_reject(self, unit):
         JudgeVerdict.objects.create(
@@ -164,7 +167,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
             "auto_translation_preview", kwargs={"path": self.project.get_url_path()}
         )
         response = self.client.get(
-            f"{url}?mode=judge&q=state%3Aempty&auto_source=mt&threshold=80"
+            f"{url}?mode=judge&q=state%3Aempty&auto_source=mt&engines=weblate&threshold=80"
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("matched", response.json())
@@ -176,7 +179,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
                 "mode": "judge",
                 "q": "state:empty",
                 "auto_source": "mt",
-                "engines": [],
+                "engines": ["weblate"],
                 "threshold": 80,
             },
         )
@@ -194,7 +197,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
             {
                 "mode": "judge",
                 "q": "state:empty",
-                "auto_source": "mt",
+                "auto_source": "others",
                 "engines": [],
                 "threshold": 80,
             },
@@ -229,6 +232,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
                 "mode": "judge",
                 "q": "state:empty",
                 "auto_source": "mt",
+                "engines": ["weblate"],
                 "threshold": 80,
             },
         )
@@ -285,6 +289,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
                 "mode": "judge",
                 "q": "state:empty",
                 "auto_source": "mt",
+                "engines": ["weblate"],
                 "threshold": 80,
             },
         )
@@ -2347,6 +2352,20 @@ class JudgeRunReportViewTest(ViewTestCase):
         run = self.create_run()
         response = self.client.get(self.report_url(run))
         self.assertTemplateUsed(response, "producer-run.html")
+
+    def test_report_explains_an_untranslated_skip(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run,
+            self.get_unit(),
+            outcome=JudgeRunUnit.Outcome.SKIPPED,
+            skip_reason=JudgeRunUnit.SkipReason.UNTRANSLATED,
+        )
+
+        response = self.client.get(f"{self.report_url(run)}?outcome=skipped")
+
+        self.assertContains(response, "This string had no translation to judge.")
 
     def test_translation_run_needs_only_the_launch_permission(self) -> None:
         self.user.is_superuser = True

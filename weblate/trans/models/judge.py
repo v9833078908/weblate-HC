@@ -705,6 +705,7 @@ class JudgeRunUnit(models.Model):
     class SkipReason(models.TextChoices):
         PERMISSION = "permission"
         CAP = "cap"
+        UNTRANSLATED = "untranslated"
 
     class RepairStatus(models.TextChoices):
         NOT_ATTEMPTED = "not-attempted"

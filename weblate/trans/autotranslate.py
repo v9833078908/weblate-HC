@@ -110,6 +110,7 @@ class JudgeSummary:
     critical_held: int = 0
     unparsed: int = 0
     repaired: int = 0
+    untranslated: int = 0
     cap_remainder: int = 0
 
     def __add__(self, other: JudgeSummary) -> JudgeSummary:
@@ -123,6 +124,7 @@ class JudgeSummary:
             critical_held=self.critical_held + other.critical_held,
             unparsed=self.unparsed + other.unparsed,
             repaired=self.repaired + other.repaired,
+            untranslated=self.untranslated + other.untranslated,
             cap_remainder=self.cap_remainder + other.cap_remainder,
         )
 
@@ -147,6 +149,12 @@ def format_judge_summary(summary: JudgeSummary) -> str:
             "%(repaired)d strings were repaired and re-judged.",
             summary.repaired,
         ) % {"repaired": summary.repaired}
+    if summary.untranslated:
+        message += " " + ngettext(
+            "%(untranslated)d string had no translation to judge.",
+            "%(untranslated)d strings had no translation to judge.",
+            summary.untranslated,
+        ) % {"untranslated": summary.untranslated}
     if summary.cap_remainder:
         message += " " + gettext(
             "%(remaining)d matching strings remain because of the per-run cap."
@@ -155,7 +163,7 @@ def format_judge_summary(summary: JudgeSummary) -> str:
 
 
 def _summarize_verdicts(
-    verdicts: dict[int, JudgeVerdict], *, cap_remainder: int
+    verdicts: dict[int, JudgeVerdict], *, cap_remainder: int, untranslated: int = 0
 ) -> JudgeSummary:
     """Tally one judge run's retained verdicts into producer-facing buckets."""
     nothing_blocking = minor_noted = major_not_fixed = critical_held = 0
@@ -181,6 +189,7 @@ def _summarize_verdicts(
         critical_held=critical_held,
         unparsed=unparsed,
         repaired=repaired,
+        untranslated=untranslated,
         cap_remainder=cap_remainder,
     )
 
@@ -319,6 +328,38 @@ class BaseAutoTranslate:
                 meta["phase_current"] = phase_current
                 meta["phase_total"] = phase_total
             current_task.update_state(state="PROGRESS", meta=meta)
+
+    @staticmethod
+    def _record_skipped_judge_units(
+        run: ProducerRun,
+        units: Sequence[Unit],
+        reason: JudgeRunUnit.SkipReason,
+    ) -> None:
+        for unit in units:
+            request = build_request(unit)
+            JudgeRunUnit.objects.update_or_create(
+                run=run,
+                unit_id_snapshot=unit.id,
+                defaults={
+                    "unit": unit,
+                    "translation_id": unit.translation_id,
+                    "component_id": unit.translation.component_id,
+                    "project_id": unit.translation.component.project_id,
+                    "input_target": unit.get_target_plurals(),
+                    "input_target_hash": compute_target_hash(unit.get_target_plurals()),
+                    "context_hash": compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        explanation=request.explanation,
+                        glossary_terms=request.glossary_terms,
+                        clarification=request.clarification,
+                    ),
+                    "outcome": JudgeRunUnit.Outcome.SKIPPED,
+                    "skip_reason": reason,
+                    "before_target": unit.get_target_plurals(),
+                    "after_target": unit.get_target_plurals(),
+                },
+            )
 
 
 class AutoTranslate(BaseAutoTranslate):
@@ -641,6 +682,22 @@ class AutoTranslate(BaseAutoTranslate):
             key=lambda engine: engine.get_rank(),
             reverse=True,
         )
+        if num_units and not engines:
+            if engines_list:
+                self.add_warning(
+                    gettext(
+                        "The selected machine translation engines (%(engines)s) are "
+                        "not configured for this project."
+                    )
+                    % {"engines": ", ".join(sorted(engines_list))}
+                )
+            else:
+                self.add_warning(
+                    gettext(
+                        "No machine translation engine was selected, so no strings "
+                        "were machine translated."
+                    )
+                )
         run_id = str(self.producer_run.pk) if self.producer_run is not None else None
         for engine in engines:
             engine.usage_run_id = run_id
@@ -771,7 +828,7 @@ class AutoTranslate(BaseAutoTranslate):
             selected,
         )
 
-    def process_judge(  # ruff: ignore[too-many-locals, complex-structure]
+    def process_judge(  # ruff: ignore[too-many-locals, too-many-statements, complex-structure]
         self, *, engines: list[str], threshold: int
     ) -> None:
         preview, units = self.preview_judge_scope()
@@ -866,6 +923,45 @@ class AutoTranslate(BaseAutoTranslate):
             .prefetch()
             .prefetch_source()
         )
+        untranslated_units: list[Unit] = []
+        judge_units: list[Unit] = []
+        for unit in units:
+            if any(unit.get_target_plurals()):
+                judge_units.append(unit)
+            else:
+                untranslated_units.append(unit)
+        units = judge_units
+        writable_ids.intersection_update(unit.id for unit in units)
+        if untranslated_units:
+            if self.producer_run is not None:
+                self._record_skipped_judge_units(
+                    self.producer_run,
+                    untranslated_units,
+                    JudgeRunUnit.SkipReason.UNTRANSLATED,
+                )
+            self.add_warning(
+                ngettext(
+                    "%d string had no translation to judge.",
+                    "%d strings had no translation to judge.",
+                    len(untranslated_units),
+                )
+                % len(untranslated_units)
+            )
+
+        self.progress_range = (split, base_high)
+        self.progress_steps = preview.worst_case_calls
+        if not units:
+            try:
+                self.set_progress(self.progress_steps)
+            finally:
+                self.progress_range = (base_low, base_high)
+            self.judge_summary = _summarize_verdicts(
+                {},
+                cap_remainder=preview.remaining,
+                untranslated=len(untranslated_units),
+            )
+            self.post_process()
+            return
 
         completed_batches = 0
         initial_calls = preview.initial_calls
@@ -916,7 +1012,9 @@ class AutoTranslate(BaseAutoTranslate):
                 % {"language": language_code}
             )
         self.judge_summary = _summarize_verdicts(
-            verdicts, cap_remainder=preview.remaining
+            verdicts,
+            cap_remainder=preview.remaining,
+            untranslated=len(untranslated_units),
         )
         final_snapshots = {
             unit.id: (unit.target, unit.state) for unit in units if unit.id in verdicts
@@ -1535,38 +1633,6 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 judge_configuration_snapshot() if self.mode == "judge" else {}
             ),
         )
-
-    @staticmethod
-    def _record_skipped_judge_units(
-        run: ProducerRun,
-        units: Sequence[Unit],
-        reason: JudgeRunUnit.SkipReason,
-    ) -> None:
-        for unit in units:
-            request = build_request(unit)
-            JudgeRunUnit.objects.update_or_create(
-                run=run,
-                unit_id_snapshot=unit.id,
-                defaults={
-                    "unit": unit,
-                    "translation_id": unit.translation_id,
-                    "component_id": unit.translation.component_id,
-                    "project_id": unit.translation.component.project_id,
-                    "input_target": unit.get_target_plurals(),
-                    "input_target_hash": compute_target_hash(unit.get_target_plurals()),
-                    "context_hash": compute_context_hash(
-                        source=request.source,
-                        note=request.note,
-                        explanation=request.explanation,
-                        glossary_terms=request.glossary_terms,
-                        clarification=request.clarification,
-                    ),
-                    "outcome": JudgeRunUnit.Outcome.SKIPPED,
-                    "skip_reason": reason,
-                    "before_target": unit.get_target_plurals(),
-                    "after_target": unit.get_target_plurals(),
-                },
-            )
 
     def _finish_producer_run(
         self,

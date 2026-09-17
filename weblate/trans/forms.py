@@ -1420,6 +1420,15 @@ class AutoForm(forms.Form):
     def clean(self):
         super().clean()
         if (
+            self.cleaned_data.get("auto_source") == "mt"
+            and "engines" in self.cleaned_data
+            and not self.cleaned_data["engines"]
+        ):
+            self.add_error(
+                "engines",
+                gettext("Select at least one machine translation engine."),
+            )
+        if (
             self.cleaned_data.get("overwrite_existing")
             and self.cleaned_data.get("mode") != "judge"
         ):

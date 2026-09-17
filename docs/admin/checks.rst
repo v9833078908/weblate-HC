@@ -174,6 +174,11 @@ restore the original rule where either seat's critical holds the string.
 Each seat's opinion and any disagreement are shown on the ``judge`` checks
 card of the string.
 
+A selected string with no translation after the pretranslation phase is not sent
+to either judge. The producer report records it as skipped with the reason
+``This string had no translation to judge.``, and it still consumes its
+preselected per-run cap slot.
+
 Both seats receive the glossary entries matched against each string, including
 their source and target explanations and effective flags. Each entry uses the
 same cleanup, filtering and serialization contract as LLM-based automatic

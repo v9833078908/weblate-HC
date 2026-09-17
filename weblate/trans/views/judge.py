@@ -296,7 +296,13 @@ def _annotate_row(row: JudgeRunUnit) -> None:
         row.source_text = " / ".join(unit.get_source_plurals())  # type: ignore[attr-defined]
         row.target_text = " / ".join(unit.get_target_plurals())  # type: ignore[attr-defined]
     primary = verdict.primary_error if verdict else None
-    if primary is not None:
+    if row.outcome == _OUTCOME.SKIPPED and (
+        row.skip_reason == JudgeRunUnit.SkipReason.UNTRANSLATED
+    ):
+        row.problem = gettext_lazy(  # type: ignore[attr-defined]
+            "This string had no translation to judge."
+        )
+    elif primary is not None:
         label = _CATEGORY_LABELS.get(
             primary.get("category"), primary.get("category", "")
         )

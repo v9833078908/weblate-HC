@@ -1501,7 +1501,7 @@ onReady(() => {
             const scope = isJudge()
               ? interpolate(
                   gettext(
-                    "%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap.",
+                    "%(matched)s matching strings: %(processed)s selected for pretranslation and possible judge evaluation, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap.",
                   ),
                   data,
                   true,
@@ -1517,11 +1517,13 @@ onReady(() => {
             if (isJudge()) {
               const judgeCost = data.judge_cost.available
                 ? interpolate(
-                    gettext("Estimated judge cost: %(min)s to %(max)s USD."),
+                    gettext(
+                      "Estimated judge cost upper bound: %(min)s to %(max)s USD.",
+                    ),
                     data.judge_cost,
                     true,
                   )
-                : gettext("Estimated judge cost is unavailable.");
+                : gettext("Estimated judge cost upper bound is unavailable.");
               preview.textContent += ` ${judgeCost}`;
             }
             showPreview();

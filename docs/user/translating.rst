@@ -459,6 +459,10 @@ Two modes of operation are possible:
 - Using selected machine translation services with translations above a certain
   quality threshold.
 
+When using machine translation, select at least one configured engine. A run
+without a selected engine is rejected instead of silently completing without
+translating strings.
+
 When using other components as the source, Weblate applies translations only
 when plural forms are compatible. If the source component uses different plural
 rules, pluralized strings are skipped and Weblate shows a warning, while

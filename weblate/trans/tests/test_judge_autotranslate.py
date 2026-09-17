@@ -10,6 +10,7 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.test import override_settings
 
+from weblate.trans.actions import ActionEvents
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.judge import JudgeError, JudgeResult, judge_configuration_snapshot
 from weblate.trans.judge_loop import (
@@ -29,6 +30,7 @@ from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import (
     FUZZY_STATES,
     STATE_APPROVED,
+    STATE_EMPTY,
     STATE_FUZZY,
     STATE_TRANSLATED,
 )
@@ -64,6 +66,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         severity="none",
         q="",
         overwrite=False,
+        judgeable=False,
         attempt=0,
         unit_ids=None,
     ):
@@ -97,6 +100,9 @@ class JudgeAutoTranslateTest(ViewTestCase):
             overwrite_existing=overwrite,
             unit_ids=unit_ids,
         )
+        if judgeable:
+            for unit in auto.get_units():
+                unit.translate(self.user, ["Judgeable target"], STATE_TRANSLATED)
         with mock.patch(
             "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
         ):
@@ -113,6 +119,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         translation = self.get_translation()
         done_unit = self.get_unit()
         pending_unit = self.get_unit(source="Thank you for using Weblate.")
+        pending_unit.translate(self.user, ["Judgeable target"], STATE_EMPTY)
         run = ProducerRun.objects.create(
             actor=self.user,
             scope_type=ProducerRun.ScopeType.TRANSLATION,
@@ -344,7 +351,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertIn("0 evaluated", auto.get_message())
 
     def test_judge_summary_reports_verdict_buckets(self) -> None:
-        auto = self.perform(JudgeVerdict.Verdict.PASS)
+        auto = self.perform(JudgeVerdict.Verdict.PASS, judgeable=True)
 
         self.assertIn("evaluated", auto.get_message())
         self.assertIn("no blocking concern", auto.get_message())
@@ -370,8 +377,96 @@ class JudgeAutoTranslateTest(ViewTestCase):
         )
         self.assertIn("0 evaluated", auto.get_message())
 
+    def test_judge_run_records_empty_engine_warning(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Judgeable target"], STATE_EMPTY)
+        auto = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            overwrite_existing=True,
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+
+        with mock.patch("weblate.trans.autotranslate.run_judge_batch", return_value={}):
+            auto.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        warning = (
+            "No machine translation engine was selected, so no strings were "
+            "machine translated."
+        )
+        self.assertEqual(auto.get_warnings(), [warning])
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.warnings, [warning])
+
+    def test_untranslated_unit_is_skipped_before_judging(self) -> None:
+        unit = self.get_unit()
+        initial_auto_changes = unit.change_set.filter(action=ActionEvents.AUTO).count()
+        auto = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+
+        def fake_batch(units, **_kwargs):
+            candidate = units[0]
+            request = build_request(candidate)
+            return {
+                candidate.id: JudgeVerdict.objects.create(
+                    unit=candidate,
+                    max_severity="critical",
+                    model_verdict=JudgeVerdict.Verdict.REJECT,
+                    judge_model="vendor-a/model",
+                    seat=1,
+                    target_hash=compute_target_hash(request.target_plurals),
+                    context_hash=compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        explanation=request.explanation,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                )
+            }
+
+        with (
+            mock.patch.object(AutoTranslate, "process_mt"),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+            ) as run_batch,
+        ):
+            auto.perform(
+                auto_source="others",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        run_batch.assert_not_called()
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_EMPTY)
+        self.assertEqual(
+            unit.change_set.filter(action=ActionEvents.AUTO).count(),
+            initial_auto_changes,
+        )
+        self.assertFalse(JudgeVerdict.objects.filter(unit=unit).exists())
+        self.assertEqual(auto.judge_summary.untranslated, 1)
+        self.assertIn("no translation to judge", auto.get_message())
+        row = JudgeRunUnit.objects.get(unit_id_snapshot=unit.id)
+        self.assertEqual(row.outcome, JudgeRunUnit.Outcome.SKIPPED)
+        self.assertEqual(row.skip_reason, JudgeRunUnit.SkipReason.UNTRANSLATED)
+
     def test_unparsed_is_counted_in_the_warnings(self) -> None:
-        auto = self.perform(JudgeVerdict.Verdict.UNPARSED)
+        auto = self.perform(JudgeVerdict.Verdict.UNPARSED, judgeable=True)
         self.assertTrue(
             any("unjudged" in warning for warning in auto.warnings),
             auto.warnings,
@@ -387,6 +482,8 @@ class JudgeAutoTranslateTest(ViewTestCase):
         unit2 = translations[1].unit_set.first()
         assert unit1 is not None
         assert unit2 is not None
+        unit1.translate(self.user, ["Judgeable target"], STATE_EMPTY)
+        unit2.translate(self.user, ["Judgeable target"], STATE_EMPTY)
         auto = BatchAutoTranslate(
             self.component,
             user=self.user,
@@ -530,12 +627,14 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
     def test_judge_progress_never_goes_backwards_across_both_phases(self) -> None:
         unit = self.get_unit()
+        unit.translate(self.user, ["Judgeable target"], STATE_EMPTY)
         auto = AutoTranslate(
             translation=self.get_translation(),
             user=self.user,
             q="",
             mode="judge",
             unit_ids=[unit.id],
+            overwrite_existing=True,
         )
         auto.progress_range = (20, 40)
         reported: list[int] = []
@@ -570,6 +669,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
     @override_settings(JUDGE_MAX_REPAIR_ATTEMPTS=1)
     def test_judge_progress_keeps_moving_through_a_repair_round(self) -> None:
         unit = self.get_unit()
+        unit.translate(self.user, ["Judgeable target"], STATE_EMPTY)
         auto = AutoTranslate(
             translation=self.get_translation(),
             user=self.user,
@@ -610,54 +710,77 @@ class JudgeAutoTranslateTest(ViewTestCase):
     def test_judge_summary_counts_severity_buckets(self) -> None:
         unit = self.get_unit()
         auto = self.perform(
-            JudgeVerdict.Verdict.FLAG, severity="major", unit_ids=[unit.id]
+            JudgeVerdict.Verdict.FLAG,
+            severity="major",
+            unit_ids=[unit.id],
+            judgeable=True,
         )
         self.assertEqual(auto.judge_summary.major_not_fixed, 1)
         self.assertEqual(auto.judge_summary.nothing_blocking, 0)
         self.assertIn("major not fixed", auto.get_message())
 
         auto = self.perform(
-            JudgeVerdict.Verdict.REJECT, severity="critical", unit_ids=[unit.id]
+            JudgeVerdict.Verdict.REJECT,
+            severity="critical",
+            unit_ids=[unit.id],
+            judgeable=True,
         )
         self.assertEqual(auto.judge_summary.critical_held, 1)
         self.assertIn("critical held", auto.get_message())
 
         auto = self.perform(
-            JudgeVerdict.Verdict.PASS, severity="minor", unit_ids=[unit.id]
+            JudgeVerdict.Verdict.PASS,
+            severity="minor",
+            unit_ids=[unit.id],
+            judgeable=True,
         )
         self.assertEqual(auto.judge_summary.minor_noted, 1)
         self.assertIn("minor noted", auto.get_message())
 
     def test_judge_summary_counts_unparsed_strings(self) -> None:
         unit = self.get_unit()
-        auto = self.perform(JudgeVerdict.Verdict.UNPARSED, unit_ids=[unit.id])
+        auto = self.perform(
+            JudgeVerdict.Verdict.UNPARSED, unit_ids=[unit.id], judgeable=True
+        )
         self.assertEqual(auto.judge_summary.unparsed, 1)
         self.assertIn("1 unparsed", auto.get_message())
 
     def test_judge_summary_counts_repaired_and_rejudged_strings(self) -> None:
         unit = self.get_unit()
-        auto = self.perform(JudgeVerdict.Verdict.PASS, attempt=1, unit_ids=[unit.id])
+        auto = self.perform(
+            JudgeVerdict.Verdict.PASS,
+            attempt=1,
+            unit_ids=[unit.id],
+            judgeable=True,
+        )
         self.assertEqual(auto.judge_summary.repaired, 1)
         self.assertIn("repaired and re-judged", auto.get_message())
 
-        auto = self.perform(JudgeVerdict.Verdict.PASS, attempt=0, unit_ids=[unit.id])
+        auto = self.perform(
+            JudgeVerdict.Verdict.PASS,
+            attempt=0,
+            unit_ids=[unit.id],
+            judgeable=True,
+        )
         self.assertEqual(auto.judge_summary.repaired, 0)
         self.assertNotIn("repaired and re-judged", auto.get_message())
 
     def test_cache_only_run_still_summarizes_verdicts(self) -> None:
         """fake_batch never calls on_batch, exactly like an all-cached run."""
         unit = self.get_unit()
-        auto = self.perform(JudgeVerdict.Verdict.PASS, unit_ids=[unit.id])
+        auto = self.perform(
+            JudgeVerdict.Verdict.PASS, unit_ids=[unit.id], judgeable=True
+        )
         self.assertEqual(auto.judge_summary.evaluated, 1)
         self.assertEqual(auto.judge_summary.nothing_blocking, 1)
 
     def test_judge_summary_reports_cap_remainder(self) -> None:
-        baseline = self.perform(JudgeVerdict.Verdict.PASS)
+        baseline = self.perform(JudgeVerdict.Verdict.PASS, judgeable=True)
         total_matched = baseline.judge_units_matched
         if total_matched < 2:
             self.skipTest("fixture needs at least two units")
         with override_settings(JUDGE_MAX_UNITS_PER_RUN=1):
-            auto = self.perform(JudgeVerdict.Verdict.PASS)
+            auto = self.perform(JudgeVerdict.Verdict.PASS, judgeable=True)
         self.assertEqual(auto.judge_summary.cap_remainder, total_matched - 1)
         self.assertIn("remain because of the per-run cap", auto.get_message())
 
@@ -671,6 +794,8 @@ class JudgeAutoTranslateTest(ViewTestCase):
         unit2 = translations[1].unit_set.first()
         assert unit1 is not None
         assert unit2 is not None
+        unit1.translate(self.user, ["Judgeable target"], STATE_EMPTY)
+        unit2.translate(self.user, ["Judgeable target"], STATE_EMPTY)
 
         def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             out = {}
@@ -757,6 +882,8 @@ class JudgeAutoTranslateTest(ViewTestCase):
         unit2 = translations[1].unit_set.first()
         assert unit1 is not None
         assert unit2 is not None
+        unit1.translate(self.user, ["Judgeable target"], STATE_EMPTY)
+        unit2.translate(self.user, ["Judgeable target"], STATE_EMPTY)
         calls: list[list[int]] = []
 
         def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
@@ -885,6 +1012,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
     @override_settings(JUDGE_MAX_REPAIR_ATTEMPTS=0)
     def test_judge_progress_reports_judging_phase(self) -> None:
         unit = self.get_unit()
+        unit.translate(self.user, ["Judgeable target"], STATE_EMPTY)
         auto = AutoTranslate(
             translation=self.get_translation(),
             user=self.user,
@@ -925,6 +1053,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self,
     ) -> None:
         unit = self.get_unit()
+        unit.translate(self.user, ["Judgeable target"], STATE_EMPTY)
         auto = AutoTranslate(
             translation=self.get_translation(),
             user=self.user,
@@ -1095,6 +1224,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
     def test_task_exception_marks_the_run_failed(self) -> None:
         unit = self.get_unit()
+        unit.translate(self.user, ["Judgeable target"], STATE_EMPTY)
         batch = BatchAutoTranslate(
             self.component,
             user=self.user,
@@ -1362,6 +1492,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
     def test_deleted_unit_and_verdict_leave_a_safe_dangling_row(self) -> None:
         unit = self.get_unit()
+        unit.translate(self.user, ["Judgeable target"], STATE_TRANSLATED)
 
         def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             current = units[0]
@@ -1651,6 +1782,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
     def test_worker_adopts_the_queued_recheck_run(self) -> None:
         unit = self.get_unit()
+        unit.translate(self.user, ["Judgeable target"], STATE_TRANSLATED)
         run = self._make_queued_recheck_run(unit)
         batch = BatchAutoTranslate(
             self.component,

@@ -65,7 +65,7 @@ class JudgeAutoFormTest(ViewTestCase):
             user=self.user,
             data={
                 "mode": "translate",
-                "auto_source": "mt",
+                "auto_source": "others",
                 "engines": [],
                 "threshold": 80,
                 "q": "state:empty",
@@ -83,7 +83,7 @@ class JudgeAutoFormTest(ViewTestCase):
             user=self.user,
             data={
                 "mode": "judge",
-                "auto_source": "mt",
+                "auto_source": "others",
                 "engines": [],
                 "threshold": 80,
                 "q": "state:empty",

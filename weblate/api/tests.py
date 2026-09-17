@@ -11479,6 +11479,21 @@ class TranslationAPITest(APIBaseTest):
             request={
                 "mode": "suggest",
                 "q": "state:<translated",
+                "auto_source": "mt",
+                "threshold": "90",
+            },
+            format=format,
+            code=400,
+        )
+        self.assertEqual(response.data["errors"][0]["attr"], "engines")
+        response = self.do_request(
+            "api:translation-autotranslate",
+            self.translation_kwargs,
+            superuser=True,
+            method="post",
+            request={
+                "mode": "suggest",
+                "q": "state:<translated",
                 "auto_source": "others",
                 "threshold": "100",
             },
@@ -11502,6 +11517,8 @@ class TranslationAPITest(APIBaseTest):
             code=200,
         )
         self.assertContains(response, "Automatic translation completed")
+        self.project.machinery_settings = {"weblate": {}}
+        self.project.save(update_fields=["machinery_settings"])
         response = self.do_request(
             "api:translation-autotranslate",
             self.translation_kwargs,

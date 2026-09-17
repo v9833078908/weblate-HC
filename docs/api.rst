@@ -2477,7 +2477,7 @@ Translations
     :<json string q: Automatic translation search string, see :ref:`search-strings`.
     :<json string auto_source: Automatic translation source - ``mt`` or ``others``
     :<json string component: Turn on contribution to shared translation memory for the project to get access to additional components.
-    :<json array engines: Machine translation engines
+    :<json array engines: Machine translation engines. Required when ``auto_source`` is ``mt``.
     :<json string threshold: Score threshold
 
     .. note::

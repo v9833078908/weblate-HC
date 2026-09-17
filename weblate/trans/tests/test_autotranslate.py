@@ -808,6 +808,7 @@ class AutoTranslationTest(ViewTestCase):
         self.component.source_language = Language.objects.get(code="de")
         self.project.save(update_fields=["workspace"])
         self.component.save(update_fields=["source_language"])
+        self.get_unit().translate(self.user, ["Judgeable target"], STATE_TRANSLATED)
 
         with (
             patch.object(AutoTranslate, "process_mt"),
@@ -819,7 +820,7 @@ class AutoTranslationTest(ViewTestCase):
                 workspace_id=str(workspace.pk),
                 user_id=self.user.id,
                 mode="judge",
-                q="state:empty",
+                q="",
                 auto_source="others",
                 source_component_id=self.component.id,
                 engines=[],
@@ -1145,6 +1146,28 @@ class AutoTranslationTest(ViewTestCase):
         self.assertEqual(activity_log.status, AddonActivityLog.Status.SUCCESS)
         self.assertEqual(activity_log.details["result"], result)
 
+    def test_autotranslate_component_records_empty_engine_warning(self) -> None:
+        activity_log = self.create_autotranslate_activity_log()
+
+        result = auto_translate_component(
+            self.component2.id,
+            mode="translate",
+            q="state:empty",
+            auto_source="mt",
+            engines=[],
+            threshold=80,
+            user_id=self.user.id,
+            activity_log_id=activity_log.id,
+        )
+
+        warning = (
+            "No machine translation engine was selected, so no strings were "
+            "machine translated."
+        )
+        self.assertEqual(result["warnings"], [warning])
+        activity_log.refresh_from_db()
+        self.assertEqual(activity_log.details["result"]["warnings"], [warning])
+
     def test_autotranslate_component_failure_updates_activity_log(self) -> None:
         activity_log = self.create_autotranslate_activity_log()
 
@@ -1316,6 +1339,24 @@ class AutoTranslationMtTest(ViewTestCase):
 
         self.assertEqual(form.fields["engines"].initial, ["weblate"])
 
+    def test_form_requires_an_engine_for_machine_translation(self) -> None:
+        data = {
+            "auto_source": "mt",
+            "engines": [],
+            "threshold": "80",
+            "q": "state:empty",
+            "mode": "translate",
+        }
+        form = AutoForm(self.component3, self.user, data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("engines", form.errors)
+
+        data["auto_source"] = "others"
+        form = AutoForm(self.component3, self.user, data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+
     def test_form_preselects_openrouter_when_only_openrouter_is_configured(
         self,
     ) -> None:
@@ -1475,6 +1516,74 @@ class AutoTranslationMtTest(ViewTestCase):
         translation = self.component3.translation_set.get(language_code="cs")
         translation.invalidate_cache()
         self.assertEqual(translation.stats.translated, 0)
+
+    def test_empty_engine_selection_warns_for_a_nonempty_scope(self) -> None:
+        auto = AutoTranslate(
+            translation=self.component3.translation_set.get(language_code="cs"),
+            user=self.user,
+            q="",
+            mode="translate",
+        )
+
+        auto.perform(
+            auto_source="mt",
+            engines=[],
+            threshold=80,
+            source_component_ids=None,
+        )
+
+        self.assertEqual(auto.updated, 0)
+        self.assertEqual(
+            auto.get_warnings(),
+            [
+                (
+                    "No machine translation engine was selected, so no strings "
+                    "were machine translated."
+                )
+            ],
+        )
+
+    def test_unconfigured_engine_selection_names_the_requested_engine(self) -> None:
+        auto = AutoTranslate(
+            translation=self.component3.translation_set.get(language_code="cs"),
+            user=self.user,
+            q="",
+            mode="translate",
+        )
+
+        auto.perform(
+            auto_source="mt",
+            engines=["missing"],
+            threshold=80,
+            source_component_ids=None,
+        )
+
+        self.assertEqual(
+            auto.get_warnings(),
+            [
+                (
+                    "The selected machine translation engines (missing) are not "
+                    "configured for this project."
+                )
+            ],
+        )
+
+    def test_empty_engine_selection_does_not_warn_for_an_empty_scope(self) -> None:
+        auto = AutoTranslate(
+            translation=self.component3.translation_set.get(language_code="cs"),
+            user=self.user,
+            q="context:does-not-exist",
+            mode="translate",
+        )
+
+        auto.perform(
+            auto_source="mt",
+            engines=[],
+            threshold=80,
+            source_component_ids=None,
+        )
+
+        self.assertEqual(auto.get_warnings(), [])
 
 
 class ProducerRunCreationTest(ViewTestCase):
