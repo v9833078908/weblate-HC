@@ -668,3 +668,10 @@ analysis/data/judge-cost-latency-ab/real-holdout/manifest.json`.
 
 **План исчерпан: задачи 1–4 исполнены; итог —reject кандидата, исходная
 пара сохранена.**
+
+Следующая итерация подготовлена (черновик, ожидает утверждения):
+`docs/product/plans/2026-09-17-judge-seat1-latency-iteration-2.md` —
+полный handoff с контекстом итерации 1, операционной средой и детальным
+планом: parse-stability стресс до платного сравнения, кандидаты
+`deepseek-v4-pro` + thinking off (K1) и flash с thinking on (K2), новый
+held-out, двойная агрегация качества (консервативная + collegium).
