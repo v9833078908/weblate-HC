@@ -387,6 +387,21 @@ class ProducerRun(models.Model):
         blank=True,
         related_name="resumptions",
     )
+    # Mandatory pre-judge machine translation: the closed preparation scope
+    # (ids and per-language missing counts fixed before any paid call) and
+    # where that preparation currently stands. Empty defaults keep runs
+    # created before this contract readable without a backfill.
+    preparation_snapshot = models.JSONField(default=dict, blank=True)
+    preparation_phase = models.CharField(
+        max_length=20,
+        choices=[
+            ("pending", "Pending"),
+            ("preparing", "Preparing"),
+            ("ready", "Ready"),
+            ("blocked", "Blocked"),
+        ],
+        blank=True,
+    )
 
     class Meta:
         # State-only rename: the table still holds every judge run written
@@ -773,6 +788,10 @@ class JudgeRunUnit(models.Model):
         PERMISSION = "permission"
         CAP = "cap"
         UNTRANSLATED = "untranslated"
+        # The mandatory pre-judge machine translation did not complete for
+        # this unit's language, so the judge was never asked. Distinct from
+        # UNTRANSLATED: here the run itself is responsible for the absence.
+        MT_PREREQUISITE = "mt-prerequisite"
 
     class RepairStatus(models.TextChoices):
         NOT_ATTEMPTED = "not-attempted"
