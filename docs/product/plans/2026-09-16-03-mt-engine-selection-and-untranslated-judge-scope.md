@@ -407,9 +407,14 @@ weblate/trans/tests/test_judge_autotranslate.py` — зелено. Task-level
       UNTRANSLATED`. `JudgeRunUnit`-заглушки `PENDING`, созданные до
       phase 1, для этих строк должны быть заменены теми же
       `update_or_create`, а не остаться pending.
-- [ ] Если судимых строк нет, завершить auto-обработку
-      (`post_process`), сохранить summary и warning, затем допустим
-      ранний `return` из **`process_judge`**. Не завершать
+- [ ] Если судимых строк нет, после установки judge phase
+      (`self.progress_range = (split, base_high)`,
+      `self.progress_steps = preview.worst_case_calls`) явно вызвать
+      `self.set_progress(self.progress_steps)`, чтобы task bar дошёл до
+      конца judge phase. Восстановить `progress_range` тем же
+      `try`/`finally`-контрактом, что у ветки с `run_judge_batch`, затем
+      завершить auto-обработку (`post_process`), сохранить summary и
+      warning и вернуть управление из **`process_judge`**. Не завершать
       `ProducerRun` внутри этого метода и не обходить
       `BatchAutoTranslate._finish_translation` /
       `_finish_producer_run`: внешний batch сохраняет итоговый report и
@@ -433,7 +438,8 @@ weblate/trans/tests/test_judge_autotranslate.py` — зелено. Task-level
 - [ ] Добавить тесты: (1) на непереведённой строке
       `run_judge_batch` не вызывается, нового `JudgeVerdict` и change
       `AUTO` нет, состояние остаётся `STATE_EMPTY`, summary/warning
-      называют строку; (2) `ProducerRun` создаёт единственную строку
+      называют строку, а последний judge progress доходит до
+      `progress_steps`; (2) `ProducerRun` создаёт единственную строку
       `SKIPPED / UNTRANSLATED`, а report показывает точную причину;
       (3) непереведённая selected строка расходует cap и не backfill'ит
       следующую; (4) строка, переведённая phase 1 (стиль
