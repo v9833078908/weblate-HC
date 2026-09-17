@@ -46,6 +46,23 @@ class RepositoryLockTest(SimpleTestCase):
         )
         self.assertEqual(lock.name, "lock:vcs:api:throttle:github")
 
+    def test_file_only_lock_ignores_redis_cache(self) -> None:
+        with (
+            TemporaryDirectory() as temp_dir,
+            self.settings(DATA_DIR=temp_dir),
+            patch("weblate.utils.lock.is_redis_cache", return_value=True),
+        ):
+            lock = WeblateLock(
+                scope="judge",
+                key="delivery",
+                slug="ignored",
+                file_only=True,
+            )
+
+        self.assertEqual(
+            lock.name, Path(temp_dir, "locks", "judge-delivery.lock").as_posix()
+        )
+
     def test_default_file_lock_uses_locks_dir(self) -> None:
         with (
             TemporaryDirectory() as temp_dir,

@@ -17,6 +17,7 @@ from django.db import models, transaction
 from django.db.models import (
     Case,
     CharField,
+    Count,
     Exists,
     F,
     IntegerField,
@@ -429,6 +430,72 @@ class ProducerRun(models.Model):
     def get_requested_mode_label(self) -> str:
         """Return a short human label for the launch mode, for history rows."""
         return str(RUN_KIND_LABELS.get(self.requested_mode, self.requested_mode))
+
+    def get_coverage(self) -> dict[str, object]:
+        """Summarize the evidence this run recorded for its judge scope."""
+        rows = self.judgerununit_set
+        outcome_counts = {
+            row["outcome"]: row["count"]
+            for row in rows.values("outcome").annotate(count=Count("pk"))
+        }
+        skip_reasons = {
+            row["skip_reason"]: row["count"]
+            for row in rows.filter(outcome=JudgeRunUnit.Outcome.SKIPPED)
+            .values("skip_reason")
+            .annotate(count=Count("pk"))
+            if row["skip_reason"]
+        }
+        result_outcomes = {
+            JudgeRunUnit.Outcome.PASSED,
+            JudgeRunUnit.Outcome.MINOR,
+            JudgeRunUnit.Outcome.MAJOR,
+            JudgeRunUnit.Outcome.CRITICAL,
+        }
+        with_result = sum(outcome_counts.get(outcome, 0) for outcome in result_outcomes)
+        recorded = sum(outcome_counts.values())
+        without_result_by_outcome = {
+            outcome: count
+            for outcome, count in outcome_counts.items()
+            if outcome not in result_outcomes
+        }
+        cap_remainder = self.summary.get("cap_remainder")
+        if not isinstance(cap_remainder, int) or isinstance(cap_remainder, bool):
+            cap_remainder = None
+        snapshot = {
+            unit_id
+            for unit_id in self.scope_snapshot
+            if isinstance(unit_id, int) and not isinstance(unit_id, bool)
+        }
+        terminal = self.status in {
+            self.Status.COMPLETED,
+            self.Status.CANCELLED,
+            self.Status.PARTIAL,
+        }
+        if not terminal or not snapshot:
+            scope_complete: bool | None = None
+        elif recorded - with_result or (
+            set(
+                rows.filter(outcome__in=result_outcomes).values_list(
+                    "unit_id_snapshot", flat=True
+                )
+            )
+            < snapshot
+        ):
+            scope_complete = False
+        elif cap_remainder is None:
+            scope_complete = None
+        else:
+            scope_complete = cap_remainder == 0
+        return {
+            "recorded": recorded,
+            "with_result": with_result,
+            "without_result": recorded - with_result,
+            "without_result_by_outcome": without_result_by_outcome,
+            "skip_reasons": skip_reasons,
+            "cached": rows.filter(outcome__in=result_outcomes, cached=True).count(),
+            "cap_remainder": cap_remainder,
+            "scope_complete": scope_complete,
+        }
 
 
 class JudgeRequestAttempt(models.Model):

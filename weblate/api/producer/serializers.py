@@ -13,7 +13,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 if TYPE_CHECKING:
-    from weblate.trans.models import Project
+    from weblate.trans.models import ProducerRun, Project
 
 # The only run kind this contract accepts today. A named module-level
 # constant, not an inline tuple literal: drf-spectacular otherwise cannot
@@ -80,6 +80,14 @@ class ProducerRunSerializer(serializers.Serializer):
     finished = serializers.DateTimeField(read_only=True, allow_null=True)
     summary = serializers.JSONField(read_only=True)
     failure = serializers.CharField(read_only=True)
+    warnings = serializers.JSONField(read_only=True)
+    coverage = serializers.SerializerMethodField(read_only=True)
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_coverage(self, obj: ProducerRun) -> dict[str, object] | None:
+        if obj.requested_mode in {"judge", "recheck", "drain"}:
+            return obj.get_coverage()
+        return None
 
 
 class ProducerJudgeEstimateRequestSerializer(serializers.Serializer):

@@ -38499,11 +38499,14 @@ components:
           type: integer
           readOnly: true
         web:
-          type: string
-          format: uri
           title: Project website
           description: Main website of translated project.
-          maxLength: 200
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
         web_url:
           type: string
           readOnly: true
@@ -39198,7 +39201,14 @@ components:
         failure:
           type: string
           readOnly: true
+        warnings:
+          readOnly: true
+        coverage:
+          type: object
+          additionalProperties: {}
+          readOnly: true
       required:
+      - coverage
       - created
       - failure
       - finished
@@ -39207,6 +39217,7 @@ components:
       - started
       - status
       - summary
+      - warnings
     ProducerRunKindEnum:
       enum:
       - judge
@@ -39666,11 +39677,14 @@ components:
           type: integer
           readOnly: true
         web:
-          type: string
-          format: uri
           title: Project website
           description: Main website of translated project.
-          maxLength: 200
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
         web_url:
           type: string
           readOnly: true
@@ -39947,7 +39961,6 @@ components:
       - slug
       - statistics_url
       - url
-      - web
       - web_url
     ProjectComponent:
       type: object

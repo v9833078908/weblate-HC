@@ -1335,6 +1335,68 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertEqual(run.scope_label, str(self.project))
         self.assertEqual(run.scope_path, self.project.get_absolute_url())
 
+    def test_redelivered_task_reuses_its_ui_run(self) -> None:
+        unit = self.get_unit()
+        first = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        second = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        task = mock.MagicMock()
+        task.request.id = "redelivered-task"
+
+        with mock.patch("weblate.trans.autotranslate.current_task", task):
+            first_run = first._create_producer_run()  # ruff: ignore[private-member-access]
+            second_run = second._create_producer_run()  # ruff: ignore[private-member-access]
+
+        self.assertEqual(first_run.pk, second_run.pk)
+        self.assertEqual(ProducerRun.objects.count(), 1)
+
+    def test_terminal_redelivery_adopts_run_read_only(self) -> None:
+        unit = self.get_unit()
+        task = mock.MagicMock()
+        task.request.id = "terminal-redelivery"
+        original = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with mock.patch("weblate.trans.autotranslate.current_task", task):
+            run = original._create_producer_run()  # ruff: ignore[private-member-access]
+        run.status = ProducerRun.Status.COMPLETED
+        run.finished = run.started
+        run.summary = {"passed": 1}
+        run.save(update_fields=["status", "finished", "summary"])
+        replay = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+            producer_run_id=str(run.pk),
+        )
+
+        with mock.patch("weblate.trans.autotranslate.current_task", task):
+            adopted = replay._adopt_producer_run()  # ruff: ignore[private-member-access]
+
+        self.assertEqual(adopted.pk, run.pk)
+        self.assertEqual(adopted.summary, {"passed": 1})
+
     def test_finish_producer_run_does_not_overwrite_a_terminal_run(self) -> None:
         unit = self.get_unit()
         batch = BatchAutoTranslate(

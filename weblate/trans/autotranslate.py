@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from celery import current_task
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
-from django.db.models import Case, IntegerField, QuerySet, Value, When
+from django.db import IntegrityError, transaction
+from django.db.models import Case, Count, IntegerField, QuerySet, Value, When
 from django.db.models.functions import MD5, Lower
 from django.utils import timezone
 from django.utils.translation import gettext, ngettext
@@ -1510,19 +1510,29 @@ class BatchAutoTranslate(BaseAutoTranslate):
         with transaction.atomic():
             claimed = (
                 ProducerRun.objects.select_for_update()
-                .filter(
-                    pk=self.producer_run_id,
-                    status__in=[
-                        ProducerRun.Status.QUEUED,
-                        ProducerRun.Status.RUNNING,
-                    ],
-                )
+                .filter(pk=self.producer_run_id)
                 .first()
             )
             matches = claimed is not None and self._producer_run_request_matches(
                 claimed
             )
-            if matches and claimed.status == ProducerRun.Status.RUNNING:
+            if matches and claimed.status in {
+                ProducerRun.Status.COMPLETED,
+                ProducerRun.Status.FAILED,
+                ProducerRun.Status.CANCELLED,
+                ProducerRun.Status.PARTIAL,
+            }:
+                return claimed
+            if claimed is not None and claimed.status not in {
+                ProducerRun.Status.QUEUED,
+                ProducerRun.Status.RUNNING,
+            }:
+                claimed = None
+            if (
+                matches
+                and claimed is not None
+                and claimed.status == ProducerRun.Status.RUNNING
+            ):
                 if task_id and claimed.task_id == task_id:
                     return claimed
                 # Someone else's in-flight attempt (or a call outside any
@@ -1530,7 +1540,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 # worker does not own.
                 matches = False
                 claimed = None
-            if matches and claimed.status == ProducerRun.Status.QUEUED:
+            if (
+                matches
+                and claimed is not None
+                and claimed.status == ProducerRun.Status.QUEUED
+            ):
                 claimed.status = ProducerRun.Status.RUNNING
                 claimed.started = timezone.now()
                 if task_id:
@@ -1612,27 +1626,56 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 raise ValueError(msg)
 
     def _create_producer_run(self) -> ProducerRun:
-        scope = self.judge_scope
-        scope_type = self._scope_type_for(scope)
         task_id = (
             current_task.request.id if current_task and current_task.request.id else ""
         )
-        return ProducerRun.objects.create(
-            actor=self.user,
-            task_id=task_id,
-            started=timezone.now(),
-            scope_type=scope_type,
-            scope_id=str(scope.pk),
-            scope_label=str(scope),
-            scope_path=scope.get_absolute_url(),
-            requested_query=self.q,
-            requested_mode=self.mode,
-            cap=settings.JUDGE_MAX_UNITS_PER_RUN,
-            status=ProducerRun.Status.RUNNING,
-            configuration_snapshot=(
+        if task_id:
+            existing_runs = list(ProducerRun.objects.filter(task_id=task_id))
+            if existing_runs:
+                if len(existing_runs) != 1 or not self._producer_run_request_matches(
+                    existing_runs[0]
+                ):
+                    msg = gettext("The task identity does not match the requested run.")
+                    raise ValueError(msg)
+                return existing_runs[0]
+
+        scope = self.judge_scope
+        scope_type = self._scope_type_for(scope)
+        idempotency_key = f"celery:{task_id}" if task_id else ""
+        create_kwargs = {
+            "actor": self.user,
+            "task_id": task_id,
+            "started": timezone.now(),
+            "scope_type": scope_type,
+            "scope_id": str(scope.pk),
+            "scope_label": str(scope),
+            "scope_path": scope.get_absolute_url(),
+            "requested_query": self.q,
+            "requested_mode": self.mode,
+            "cap": settings.JUDGE_MAX_UNITS_PER_RUN,
+            "status": ProducerRun.Status.RUNNING,
+            "configuration_snapshot": (
                 judge_configuration_snapshot() if self.mode == "judge" else {}
             ),
-        )
+            "idempotency_key": idempotency_key,
+        }
+        try:
+            with transaction.atomic():
+                return ProducerRun.objects.create(**create_kwargs)
+        except IntegrityError as error:
+            if not idempotency_key:
+                raise
+            existing = ProducerRun.objects.get(
+                actor=self.user,
+                scope_type=scope_type,
+                scope_id=str(scope.pk),
+                requested_mode=self.mode,
+                idempotency_key=idempotency_key,
+            )
+            if not self._producer_run_request_matches(existing):
+                msg = gettext("The task identity does not match the requested run.")
+                raise ValueError(msg) from error
+            return existing
 
     def _finish_producer_run(
         self,
@@ -1665,6 +1708,32 @@ class BatchAutoTranslate(BaseAutoTranslate):
         run.finished = timezone.now()
         run.failure = failure
         summary = asdict(self.judge_summary or JudgeSummary())
+        if run.requested_mode in {"judge", "recheck", "drain"}:
+            outcomes = dict(
+                JudgeRunUnit.objects.filter(run=run).values_list("outcome").annotate(
+                    count=Count("pk")
+                )
+            )
+            summary.update(
+                evaluated=sum(
+                    count
+                    for outcome, count in outcomes.items()
+                    if outcome != JudgeRunUnit.Outcome.SKIPPED
+                ),
+                nothing_blocking=outcomes.get(JudgeRunUnit.Outcome.PASSED, 0),
+                minor_noted=outcomes.get(JudgeRunUnit.Outcome.MINOR, 0),
+                major_not_fixed=outcomes.get(JudgeRunUnit.Outcome.MAJOR, 0),
+                critical_held=outcomes.get(JudgeRunUnit.Outcome.CRITICAL, 0),
+                unparsed=outcomes.get(JudgeRunUnit.Outcome.UNPARSED, 0),
+                untranslated=JudgeRunUnit.objects.filter(
+                    run=run,
+                    outcome=JudgeRunUnit.Outcome.SKIPPED,
+                    skip_reason=JudgeRunUnit.SkipReason.UNTRANSLATED,
+                ).count(),
+                cap_remainder=run.summary.get(
+                    "cap_remainder", summary["cap_remainder"]
+                ),
+            )
         summary["written"] = self.updated
         run.summary = summary
         run.warnings = self.get_warnings()
@@ -1742,6 +1811,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
         else:
             producer_run = None
         self.active_producer_run = producer_run
+        if producer_run is not None and producer_run.status in {
+            ProducerRun.Status.COMPLETED,
+            ProducerRun.Status.FAILED,
+            ProducerRun.Status.CANCELLED,
+            ProducerRun.Status.PARTIAL,
+        }:
+            return gettext("Automatic translation completed.")
         if judge_preview is not None:
             self.judge_summary = JudgeSummary()
         judge_remaining = judge_preview.processed if judge_preview is not None else None

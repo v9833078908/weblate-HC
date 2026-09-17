@@ -17690,6 +17690,7 @@ class ProducerAPITest(APIBaseTest):
             superuser=True,
         )
         self.assertEqual(detail.data["status"], ProducerRun.Status.QUEUED)
+        self.assertIsNone(detail.data["coverage"])
         response = self.do_request(
             "api:producer-run-cancel",
             kwargs={"pk": run.pk},
@@ -17697,6 +17698,32 @@ class ProducerAPITest(APIBaseTest):
             superuser=True,
         )
         self.assertEqual(response.data["status"], ProducerRun.Status.CANCEL_REQUESTED)
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_judge_run_detail_includes_coverage(self) -> None:
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+            status=ProducerRun.Status.COMPLETED,
+            scope_snapshot=[999],
+            summary={"cap_remainder": 0},
+        )
+
+        detail = self.do_request(
+            "api:producer-run-detail",
+            kwargs={"pk": run.pk},
+            superuser=True,
+        )
+
+        self.assertEqual(detail.data["coverage"]["recorded"], 0)
+        self.assertFalse(detail.data["coverage"]["scope_complete"])
 
     @override_settings(
         JUDGE_ENABLED=True,

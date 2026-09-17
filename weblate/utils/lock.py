@@ -58,6 +58,7 @@ class WeblateLock:
         timeout: int = 1,
         expiry_timeout: int = 3600,
         origin: str | None = None,
+        file_only: bool = False,
     ) -> None:
         self._timeout = timeout
         self._lock_path = lock_path or data_dir("locks")
@@ -65,7 +66,7 @@ class WeblateLock:
         self._key = key
         self._slug = slug
         self._origin = origin
-        self._using_redis = is_redis_cache()
+        self._using_redis = is_redis_cache() and not file_only
         self._local = threading.local()
         self._local.depth = 0
         self._redis_expiry_timeout = expiry_timeout

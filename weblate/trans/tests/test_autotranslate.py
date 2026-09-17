@@ -12,6 +12,7 @@ import re
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import threading
+from functools import partial
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest import mock
@@ -54,7 +55,11 @@ from weblate.trans.models import (
     Unit,
     WorkflowSetting,
 )
-from weblate.trans.tasks import auto_translate, auto_translate_component
+from weblate.trans.tasks import (
+    JudgeExecutionGuardError,
+    auto_translate,
+    auto_translate_component,
+)
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.util import split_plural
 from weblate.utils.celery import (
@@ -2192,6 +2197,39 @@ class AutoTranslateDurabilityTest(SimpleTestCase):
             self.assertTrue(
                 task.reject_on_worker_lost, f"{task.name} is lost on worker death"
             )
+
+    def test_producer_tasks_are_bound_for_guard_retries(self) -> None:
+        for task in (auto_translate, auto_translate_component):
+            self.assertIsInstance(task.__header__, partial)
+
+    def test_busy_guard_retries_before_heartbeat(self) -> None:
+        retry_result = object()
+        with (
+            patch(
+                "weblate.trans.tasks.producer_execution_guard",
+                side_effect=JudgeExecutionGuardError,
+            ),
+            patch.object(auto_translate, "retry", return_value=retry_result) as retry,
+            patch("weblate.trans.tasks.heartbeat_task") as heartbeat,
+        ):
+            result = auto_translate.apply(
+                kwargs={
+                    "user_id": None,
+                    "mode": "judge",
+                    "q": "",
+                    "auto_source": "mt",
+                    "source_component_id": None,
+                    "engines": [],
+                    "threshold": 80,
+                },
+                task_id="guarded-redelivery",
+            ).get()
+
+        self.assertIs(result, retry_result)
+        retry.assert_called_once_with(
+            exc=mock.ANY, countdown=60, max_retries=settings.JUDGE_GUARD_WAIT_RETRIES
+        )
+        heartbeat.assert_not_called()
 
     def test_visibility_timeout_covers_long_tasks(self) -> None:
         code = """
