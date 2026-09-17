@@ -61,11 +61,18 @@ _spec.loader.exec_module(probe)
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 SEAT_1_MODEL = "judge-ab-deepseek-test"
 SEAT_2_MODEL = "judge-ab-qwen-test"
+# Experiment B's screened DeepSeek-seat replacement in the fake-provider run.
+SEAT_1_CANDIDATE = "judge-ab-flash-candidate"
 BOUNDARY_RE = re.compile(
     r"<untrusted_translation_data_[0-9a-f]+>\n(.*)\n</untrusted", re.DOTALL
 )
 PRICES = {
     SEAT_1_MODEL: {
+        "input_cost_per_token": 6.19962e-07,
+        "cache_read_input_token_cost": 7.89815e-08,
+        "output_cost_per_token": 1.239924e-06,
+    },
+    SEAT_1_CANDIDATE: {
         "input_cost_per_token": 6.19962e-07,
         "cache_read_input_token_cost": 7.89815e-08,
         "output_cost_per_token": 1.239924e-06,
@@ -508,6 +515,69 @@ class RunnerEndToEndTest(TempDirMixin, RepoTestMixin, TransactionTestCase):
         self.assertEqual(wide[0].batch_size, 4)
 
     @http_mock.activate
+    def test_seat_1_model_override_reaches_the_payload_and_profiles(self) -> None:
+        # Experiment B swaps the DeepSeek seat per arm. The fake provider
+        # dispatches on the payload's model, so flag-major answers under the
+        # candidate name prove the override reached the request, and the
+        # per-arm frozen profile must pin the same model.
+        candidate = SEAT_1_CANDIDATE
+        register_fake_provider(
+            {SEAT_1_MODEL: "ok", candidate: "flag-major", SEAT_2_MODEL: "ok"}
+        )
+        manifest_path = write_experiment(
+            self.tmp,
+            records_from_units(self.units),
+            arms={
+                "A0": {
+                    "title": "control",
+                    "overrides": {
+                        "seat_2_batch_size": 5,
+                        "seat_1_model": SEAT_1_MODEL,
+                    },
+                },
+                "B1": {
+                    "title": "flash seat 1",
+                    "overrides": {
+                        "seat_2_batch_size": 5,
+                        "seat_1_model": candidate,
+                        "seat_1_reasoning": "extra_body.enable_thinking=false",
+                    },
+                },
+            },
+        )
+        self.assertEqual(self.run_execute(manifest_path, "s001"), 0)
+        self.assertEqual(self.run_execute(manifest_path, "s002"), 0)
+        attempts = list(JudgeRequestAttempt.objects.all().order_by("pk"))
+        seat_1_models = {row.model for row in attempts if row.seat == 1}
+        self.assertIn(candidate, seat_1_models)
+        self.assertIn(SEAT_1_MODEL, seat_1_models)
+        control_seat_1 = [
+            row for row in attempts if row.seat == 1 and row.model == SEAT_1_MODEL
+        ]
+        candidate_seat_1 = [
+            row for row in attempts if row.seat == 1 and row.model == candidate
+        ]
+        self.assertEqual(len(control_seat_1), 2)
+        self.assertEqual(len(candidate_seat_1), 2)
+        frozen_b1 = json.loads((self.tmp / "frozen-profiles-B1.json").read_text())
+        seat_1_snapshot = next(seat for seat in frozen_b1["seats"] if seat["seat"] == 1)
+        self.assertEqual(seat_1_snapshot["model"], candidate)
+        self.assertEqual(
+            seat_1_snapshot["reasoning"], "extra_body.enable_thinking=false"
+        )
+        # Only the candidate arm flags major: the provider dispatch proves
+        # the payload carried the overridden model name.
+        run_ids = {
+            event["slot"]: event["run_id"]
+            for event in journal_of(manifest_path)["events"]
+            if event["event"] == "block_start"
+        }
+        control_verdicts = JudgeVerdict.objects.filter(run_id=run_ids["s001"], seat=1)
+        candidate_verdicts = JudgeVerdict.objects.filter(run_id=run_ids["s002"], seat=1)
+        self.assertTrue(all(row.max_severity == "none" for row in control_verdicts))
+        self.assertTrue(all(row.max_severity == "major" for row in candidate_verdicts))
+
+    @http_mock.activate
     def test_parser_failures_stay_in_the_denominator(self) -> None:
         register_fake_provider({SEAT_1_MODEL: "duplicate-id", SEAT_2_MODEL: "partial"})
         manifest_path = write_experiment(self.tmp, records_from_units(self.units))
@@ -680,6 +750,75 @@ class ApplyArmTest(SimpleTestCase):
         with mock.patch.object(settings, "JUDGE_BATCH_SIZE_SEAT_2", "inherit"):
             probe.apply_arm({"overrides": {"seat_2_batch_size": 5}})
             self.assertEqual(settings.JUDGE_BATCH_SIZE_SEAT_2, 5)
+
+    def test_apply_arm_sets_the_seat_1_model_and_reasoning(self) -> None:
+        # Experiment B swaps the DeepSeek seat per arm; the overrides must
+        # reach resolve_judge_seat_profile through the same settings path.
+        with (
+            mock.patch.object(settings, "JUDGE_MODEL_SEAT_1", "deepseek-v4-pro"),
+            mock.patch.object(settings, "JUDGE_REASONING_EFFORT_SEAT_1", ""),
+        ):
+            probe.apply_arm(
+                {
+                    "overrides": {
+                        "seat_1_model": "atlas/deepseek-v4-flash-0731",
+                        "seat_1_reasoning": "extra_body.enable_thinking=false",
+                    }
+                }
+            )
+            self.assertEqual(
+                settings.JUDGE_MODEL_SEAT_1, "atlas/deepseek-v4-flash-0731"
+            )
+            self.assertEqual(
+                settings.JUDGE_REASONING_EFFORT_SEAT_1,
+                "extra_body.enable_thinking=false",
+            )
+
+    def _manifest(self, overrides: dict) -> dict:
+        return {
+            "schema": probe.SCHEMA,
+            "experiment_id": "x",
+            "corpus": {"path": "p", "sha256": "h"},
+            "seat_models": {"seat_1": "a", "seat_2": "b"},
+            "seat_1_batch_size": 2,
+            "arms": {"A0": {"overrides": overrides}},
+            "repeats": 1,
+            "schedule": {
+                "slots": [
+                    {
+                        "id": "s001",
+                        "arm": "A0",
+                        "repeat": 1,
+                        "group": "g",
+                    }
+                ]
+            },
+            "prices": {"m": dict.fromkeys(probe.PRICE_KEYS, 1)},
+            "prices_source": "s",
+            "gates": {"control_arm": "A0"},
+        }
+
+    def test_validate_manifest_accepts_seat_1_model_and_reasoning(self) -> None:
+        # "" is a member of the closed value set: an explicit "send no
+        # reasoning control" arm, comparable against a thinking-off arm.
+        for reasoning in ("", "extra_body.enable_thinking=false"):
+            manifest = self._manifest(
+                {
+                    "seat_1_model": "atlas/deepseek-v4-flash-0731",
+                    "seat_1_reasoning": reasoning,
+                }
+            )
+            probe.validate_manifest(manifest, require_budget=False)
+
+    def test_validate_manifest_rejects_bad_seat_1_overrides(self) -> None:
+        for overrides in (
+            {"seat_1_model": ""},
+            {"seat_1_model": "   "},
+            {"seat_1_reasoning": "thinking=off"},
+            {"seat_1_reasoning": "disable"},
+        ):
+            with self.assertRaises(probe.ManifestError):
+                probe.validate_manifest(self._manifest(overrides), require_budget=False)
 
     def test_validate_manifest_rejects_unknown_overrides(self) -> None:
         with self.assertRaises(probe.ManifestError):

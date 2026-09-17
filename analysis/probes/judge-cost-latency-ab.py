@@ -58,6 +58,7 @@ git ignores; documents get aggregates and manifest hashes only.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import math
@@ -100,7 +101,7 @@ from weblate.trans.util import join_plural
 from weblate.utils.state import STATE_TRANSLATED
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterator, Sequence
     from datetime import datetime
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -113,8 +114,15 @@ SEVERITIES = ("minor", "major", "critical")
 STRATA = ("ui", "long", "terminology", "ambiguous", "glossary")
 # The A experiment touches only the Qwen seat; seat 1 stays at the frozen
 # baseline width and every other transport knob is inherited from settings.
-OVERRIDE_KEYS = frozenset({"seat_2_batch_size"})
-OVERRIDE_TO_SETTING = {"seat_2_batch_size": "JUDGE_BATCH_SIZE_SEAT_2"}
+# Experiment B replaces the seat-1 model (and its reasoning control) per
+# arm: the override must reach resolve_judge_seat_profile through settings,
+# exactly like the batch width, so the frozen-profile snapshot pins it.
+OVERRIDE_KEYS = frozenset({"seat_2_batch_size", "seat_1_model", "seat_1_reasoning"})
+OVERRIDE_TO_SETTING = {
+    "seat_2_batch_size": "JUDGE_BATCH_SIZE_SEAT_2",
+    "seat_1_model": "JUDGE_MODEL_SEAT_1",
+    "seat_1_reasoning": "JUDGE_REASONING_EFFORT_SEAT_1",
+}
 # The dev-docker stack runs background Celery workers: racing them would both
 # double-pay batches and let them mutate QA state mid-measurement.
 FORBIDDEN_SETTINGS_MODULES = frozenset(
@@ -349,6 +357,26 @@ def validate_manifest(manifest: object, *, require_budget: bool) -> dict:
             msg = (
                 f"manifest.arms.{arm_id}.overrides.seat_2_batch_size must be a "
                 "positive integer"
+            )
+            raise ManifestError(msg)
+        seat_1_model = overrides.get("seat_1_model")
+        if seat_1_model is not None and (
+            not isinstance(seat_1_model, str) or not seat_1_model.strip()
+        ):
+            msg = (
+                f"manifest.arms.{arm_id}.overrides.seat_1_model must be a "
+                "non-empty model name"
+            )
+            raise ManifestError(msg)
+        seat_1_reasoning = overrides.get("seat_1_reasoning")
+        if seat_1_reasoning is not None and (
+            not isinstance(seat_1_reasoning, str)
+            or seat_1_reasoning not in judge._LITELLM_REASONING_VALUES
+        ):
+            msg = (
+                f"manifest.arms.{arm_id}.overrides.seat_1_reasoning must be one "
+                "of the closed LiteLLM reasoning values "
+                f"{sorted(judge._LITELLM_REASONING_VALUES)}"
             )
             raise ManifestError(msg)
     repeats = manifest.get("repeats")
@@ -1098,6 +1126,41 @@ def apply_arm(arm: dict) -> None:
         setattr(settings, OVERRIDE_TO_SETTING[key], value)
 
 
+class _MissingSetting:
+    """Sentinel: the setting did not exist before the arm touched it."""
+
+
+@contextlib.contextmanager
+def arm_overrides(arm: dict) -> Iterator[None]:
+    """
+    Apply one arm's seat overrides and always restore them afterwards.
+
+    apply_arm mutates the process-global settings in place; without a
+    restore, an arm that overrides JUDGE_MODEL_SEAT_1 leaks its candidate
+    into every later consumer of this process (in the test runner, the
+    alphabetically following test cases resolve the leaked model and refuse
+    with a manifest mismatch). The measurement process itself exits after
+    one slot, but the runner must not rely on that.
+    """
+    saved: dict[str, object] = {}
+    for key in arm["overrides"]:
+        name = OVERRIDE_TO_SETTING[key]
+        try:
+            saved[name] = getattr(settings, name)
+        except AttributeError:
+            saved[name] = _MissingSetting
+    apply_arm(arm)
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is _MissingSetting:
+                with contextlib.suppress(AttributeError):
+                    delattr(settings, name)
+            else:
+                setattr(settings, name, value)
+
+
 def freeze_or_check_profiles(
     frozen_path: pathlib.Path, profiles: Sequence[judge.JudgeSeatProfile]
 ) -> dict:
@@ -1522,58 +1585,74 @@ def cmd_execute(args: argparse.Namespace) -> int:
     check_split_reproducible(manifest, records)
     split = _read_split_for_scope(manifest)
     units, excluded = load_slot_units(manifest, records, split)
-    apply_arm(manifest["arms"][slot["arm"]])
-    # Resolving profiles performs the alias capability GET on the LiteLLM
-    # host; execute mode is the explicit permission for that refresh.
-    profiles = judge.judge_seat_profiles()
-    # The resolved widths must be the manifest's widths: a QA setting that
-    # silently disagrees would measure a different experiment.
-    expected_widths = {
-        1: manifest["seat_1_batch_size"],
-        2: manifest["arms"][slot["arm"]]["overrides"].get(
-            "seat_2_batch_size", manifest["seat_1_batch_size"]
-        ),
-    }
-    for profile in profiles:
-        expected = expected_widths[profile.seat]
-        if profile.batch_size != expected:
-            msg = (
-                f"resolved seat {profile.seat} batch width {profile.batch_size} "
-                f"!= manifest width {expected}; align the QA settings "
-                "(JUDGE_BATCH_SIZE / JUDGE_BATCH_SIZE_SEAT_2) with the manifest"
-            )
-            raise RunnerError(msg)
-    frozen = freeze_or_check_profiles(
-        directory / f"frozen-profiles-{slot['arm']}.json", profiles
-    )
-    guard = PostGuard(
-        budget=budget,
-        prices=manifest["prices"],
-        wall_deadline=time.monotonic() + budget.max_wall_clock_minutes_per_slot * 60,
-    )
-    journal.append(
-        {
-            "event": "slot_start",
-            "slot": slot["id"],
-            "arm": slot["arm"],
-            "repeat": slot["repeat"],
-            "group": slot["group"],
-            "units": len(units),
-            "excluded_before_llm": excluded,
-            "resumed": bool(args.resume),
-            "frozen_profiles_at": frozen.get("frozen_at"),
+    arm = manifest["arms"][slot["arm"]]
+    overrides = arm["overrides"]
+    with arm_overrides(arm):
+        # Resolving profiles performs the alias capability GET on the LiteLLM
+        # host; execute mode is the explicit permission for that refresh.
+        profiles = judge.judge_seat_profiles()
+        # The resolved widths must be the manifest's widths: a QA setting that
+        # silently disagrees would measure a different experiment.
+        expected_widths = {
+            1: manifest["seat_1_batch_size"],
+            2: overrides.get("seat_2_batch_size", manifest["seat_1_batch_size"]),
         }
-    )
-    guard.install()
-    try:
-        result = run_block(manifest, slot, units, profiles, guard, journal)
-    except BudgetExceeded:
-        # In-flight POSTs completed and are journaled by run_block; no new
-        # POST may start after the guard tripped.
-        print(f"GUARD TRIPPED: {guard.tripped}")
-        return 3
-    finally:
-        guard.uninstall()
+        # Experiment B swaps the seat-1 model per arm; the resolved model must
+        # be exactly the one the arm asks for (baseline when not overridden).
+        expected_models = {
+            1: overrides.get("seat_1_model", manifest["seat_models"]["seat_1"]),
+            2: manifest["seat_models"]["seat_2"],
+        }
+        for profile in profiles:
+            expected = expected_widths[profile.seat]
+            if profile.batch_size != expected:
+                msg = (
+                    f"resolved seat {profile.seat} batch width "
+                    f"{profile.batch_size} != manifest width {expected}; align "
+                    "the QA settings (JUDGE_BATCH_SIZE / "
+                    "JUDGE_BATCH_SIZE_SEAT_2) with the manifest"
+                )
+                raise RunnerError(msg)
+            expected_model = expected_models[profile.seat]
+            if profile.model != expected_model:
+                msg = (
+                    f"resolved seat {profile.seat} model {profile.model!r} != "
+                    f"manifest model {expected_model!r}; align the QA settings "
+                    "(JUDGE_MODEL_SEAT_1 / JUDGE_MODEL_SEAT_2) with the manifest"
+                )
+                raise RunnerError(msg)
+        frozen = freeze_or_check_profiles(
+            directory / f"frozen-profiles-{slot['arm']}.json", profiles
+        )
+        guard = PostGuard(
+            budget=budget,
+            prices=manifest["prices"],
+            wall_deadline=time.monotonic()
+            + budget.max_wall_clock_minutes_per_slot * 60,
+        )
+        journal.append(
+            {
+                "event": "slot_start",
+                "slot": slot["id"],
+                "arm": slot["arm"],
+                "repeat": slot["repeat"],
+                "group": slot["group"],
+                "units": len(units),
+                "excluded_before_llm": excluded,
+                "resumed": bool(args.resume),
+                "frozen_profiles_at": frozen.get("frozen_at"),
+            }
+        )
+        guard.install()
+        try:
+            result = run_block(manifest, slot, units, profiles, guard, journal)
+        except BudgetExceeded:
+            # In-flight POSTs completed and are journaled by run_block; no new
+            # POST may start after the guard tripped.
+            print(f"GUARD TRIPPED: {guard.tripped}")
+            return 3
+        finally:
+            guard.uninstall()
     print(
         f"slot {slot['id']} complete: {result['guard']['posts_sent']} POSTs, "
         f"wall clock {result['wall_clock_seconds']}s, "
