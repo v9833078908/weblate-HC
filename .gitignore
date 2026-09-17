@@ -58,3 +58,8 @@ weblate-*.tar.*
 /deploy/*.ovpn
 .env.local
 /.worktrees/
+
+# Judge A/B experiment artifacts: closed storage for corpus texts and
+# measurement ledgers; only this README and the manifest template are tracked
+# (see analysis/data/judge-cost-latency-ab/README.md).
+/analysis/data/judge-cost-latency-ab/*/

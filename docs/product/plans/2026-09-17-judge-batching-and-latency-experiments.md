@@ -412,6 +412,21 @@ Rollout не часть исполнения этого плана. Для не�
 Учитывать инвалидирование verdict cache при смене profile: первая переоценка
 старого scope может стоить дороже steady-state. Не инициировать её автоматически.
 
+## Статус Task 1 (зарегистрирован 2026-09-17)
+
+Только офлайн-инструмент (`analysis/probes/judge-cost-latency-ab.py`) + тесты + артефакты под `analysis/data/judge-cost-latency-ab/`; **без платных стадий**. Команда смоука (только синтетический корпус для проверки структуры, не production-данные):
+
+    uv run python analysis/probes/judge-cost-latency-ab.py --prepare \
+        --corpus analysis/data/judge-cost-latency-ab/smoke-corpus.json \
+        --experiment-id smoke-offline --repeats 1 --held-out-fraction 0.25 \
+        --seat-1-model deepseek-v4-pro --seat-2-model atlas/qwen3.8-max
+
+Проверено: подготовка создаёт manifest, фиксирует split, выводит 24 записи (10 семей), но при малой выборке `held_out_fraction=0.25` даёт `heldout=0`. Добавлена защита в `build_split`: если `held_out_fraction > 0` и `heldout_count == 0`, выбрасывается явный `RunnerError` вместо молчаливого ослабления подтверждения. Вывод: `ERROR: every corpus record is excluded` или явная ошибка split — это безопасное поведение.
+
+Тесты (`weblate/trans/tests/test_judge_cost_latency_ab.py`): 16/16 зелёных через `./rundev.sh test ... -n 0 --no-cov`. Использован настоящий `judge._post_batch` с `PostGuard`, `judge.seat_profiles`, `judge.validate_request_settings`, `judge._batch_digest`, `_payload`, `_parse_reply` и `judge_loop.run_judge_batch`; фейковый HTTP-провайдер работает через `weblate.utils.tests.http_mock` с резолвящимся хостом (`openrouter.ai` вместо `.invalid`, как в существующих тестах джаджа), а не второй парсер. Сняты DEBUG-печати; удалён `dev-docker/data/probe-debug.py`. Ширина batch проверена: `width5` даёт 1 POST для seat 2; `execute` — 6 POST с правильными verdict-разборами; `timeout` учитывает адаптивное сжатие бюджета (7 POST, все `deadline`); `crash_between_post_and_save` проверяет resume; `parse_failures` проверяет denominator; `swapped_ids` и `duplicate-id` проверяют сохранение для adjudication; `auth` проверяет `JudgeError` с сохранением оплаченных попыток; `guard` проверяет резерв до отправки.
+
+Не выполнено (требует отдельного разрешения): `--execute` (платный), заполнение бюджета/цен в manifest, заполнение `est_tokens` из архива, заполнение `prices`, человеческая разметка (`max_unique_units` в `BUDGET` = 4 — это пример, не утверждённый корпус), проведение A/B с реальным корпусом, подтверждение на held-out, отчёт `docs/product/measurements/`. Эти шаги явно требуют отдельного численного разрешения (`max_http_attempts_per_slot`, `max_wall_clock_minutes_per_slot`, `money_cap_usd`) и не выполнены автоматически.
+
 ## Готовность к исполнению и открытые решения
 
 Порядок: регистрация/offline runner → A → B → независимое подтверждение →

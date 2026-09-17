@@ -1,0 +1,100 @@
+{
+  "schema": "judge-cost-latency-ab/manifest-v1",
+  "plan": "docs/product/plans/2026-09-17-judge-batching-and-latency-experiments.md",
+  "experiment_id": "2026-09-17-anvil-qwen-batch",
+  "artifact_dir": "analysis/data/judge-cost-latency-ab/2026-09-17-anvil-qwen-batch",
+  "registered_at": "fill-by-prepare",
+  "source_commit": "fill-by-prepare",
+  "corpus": {
+    "path": "analysis/data/judge-cost-latency-ab/<id>/corpus.json",
+    "sha256": "fill-by-prepare",
+    "records": 0,
+    "clean_records": 0,
+    "excluded": 0,
+    "families": 0,
+    "languages": [
+      "fr",
+      "ja",
+      "ko",
+      "zh_Hans",
+      "zh_Hant"
+    ],
+    "labels_origin": "human adjudication, per language",
+    "split_seed": 20260917,
+    "held_out_fraction": 0.5
+  },
+  "seat_models": {
+    "seat_1": "deepseek-v4-pro",
+    "seat_2": "atlas/qwen3.8-max"
+  },
+  "seat_1_batch_size": 2,
+  "arms": {
+    "A0": {
+      "title": "control: Qwen batch 1",
+      "overrides": {
+        "seat_2_batch_size": 1
+      }
+    },
+    "A2": {
+      "title": "candidate: Qwen batch 2",
+      "overrides": {
+        "seat_2_batch_size": 2
+      }
+    },
+    "A5": {
+      "title": "candidate: Qwen batch 5",
+      "overrides": {
+        "seat_2_batch_size": 5
+      }
+    }
+  },
+  "repeats": 3,
+  "schedule": {
+    "note": "slots alternate arms within each repeat so control and candidates share the time of day; one slot = one paid block",
+    "slots": []
+  },
+  "est_tokens": {
+    "prefix_prompt_tokens": null,
+    "per_string_prompt_tokens": null,
+    "per_string_completion_tokens": null
+  },
+  "caveats": {
+    "observed_cache_share": null
+  },
+  "prices": {
+    "deepseek-v4-pro": {
+      "input_cost_per_token": null,
+      "cache_read_input_token_cost": null,
+      "output_cost_per_token": null
+    },
+    "atlas/qwen3.8-max": {
+      "input_cost_per_token": null,
+      "cache_read_input_token_cost": null,
+      "output_cost_per_token": null
+    }
+  },
+  "prices_source": "docs/operations/measurements/2026-09-17-judge-cost-investigation/evidence/proxy-rate-metadata.json (rates at measurement time, not a promise of future rates)",
+  "budget": {
+    "max_unique_units": null,
+    "max_http_attempts_per_slot": null,
+    "max_wall_clock_minutes_per_slot": null,
+    "money_cap_usd": null,
+    "worst_case_completion_tokens": null,
+    "provider_side_limit": false,
+    "acknowledge_residual_risk": false
+  },
+  "gates": {
+    "control_arm": "A0",
+    "note": "proposed engineering policy from the plan; the owner must confirm or replace these numbers before the paid comparison",
+    "critical_misses": "zero new confirmed critical misses on held-out",
+    "major_recall_drop_pp": 2,
+    "false_flag_growth_pp": 3,
+    "terminal_unparsed_growth_pp": 1,
+    "cost_drop_percent_A": 10,
+    "wall_clock_growth_percent_A": 5,
+    "wall_clock_drop_percent_B": 20,
+    "cost_growth_percent_B": 5
+  },
+  "frozen_profiles": null,
+  "excluded_records": []
+}
