@@ -8,9 +8,11 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 import django
@@ -28,7 +30,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
 GEMINI_MODEL = "google/gemini-3.7-flash"
-GEMINI_MAX_TOKENS = 1024
+GEMINI_MAX_TOKENS = 8192
 BATCH_SIZE = 5
 WORKERS = 4
 TARGET_LANGUAGE = "Simplified Chinese (zh-Hans)"
@@ -43,10 +45,34 @@ class RequestError(Exception):
     def __init__(self, reason: str, metadata: dict[str, object]) -> None:
         super().__init__(reason)
         self.metadata = metadata
+        self.attempts: list[dict[str, object]] = []
 
     def as_result(self) -> dict[str, object]:
         """Serialize the failure without leaking a request or full response."""
-        return {"error": str(self), "response": self.metadata}
+        return {
+            "error": str(self),
+            "response": self.metadata,
+            "attempts": self.attempts,
+        }
+
+
+class Journal:
+    """Persist completed attempts and batches before continuing execution."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.lock = Lock()
+        with path.open("x", encoding="utf-8"):
+            pass
+        path.chmod(0o600)
+
+    def append(self, event: dict[str, object]) -> None:
+        """Write a complete JSONL event and synchronize it to storage."""
+        line = json.dumps({"timestamp": time.time(), **event}, ensure_ascii=True)
+        with self.lock, self.path.open("a", encoding="utf-8") as stream:
+            stream.write(line + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
 
 
 def canonical_hash(forms: list[str]) -> str:
@@ -283,6 +309,32 @@ def parse_items(
         if record_id in mapped:
             msg = f"Response repeats {record_id}."
             raise ValueError(msg)
+        if key == "translations" and (
+            not isinstance(item.get("translation"), str)
+            or not item["translation"].strip()
+        ):
+            msg_0 = "Translation must be a nonempty string."
+            raise ValueError(msg_0)
+        if key == "reviews":
+            issues = item.get("issues")
+            if not isinstance(issues, list) or any(
+                not isinstance(issue, dict)
+                or issue.get("severity") not in {"minor", "major", "critical"}
+                or not isinstance(issue.get("category"), str)
+                or not isinstance(issue.get("message"), str)
+                for issue in issues
+            ):
+                msg_0 = "Review issues have an invalid schema."
+                raise ValueError(msg_0)
+        if key == "ratings" and (
+            not isinstance(item.get("unusable"), bool)
+            or item.get("severity") not in {"pass", "minor", "major", "critical"}
+            or item["unusable"] != (item["severity"] in {"major", "critical"})
+            or not isinstance(item.get("categories"), list)
+            or any(not isinstance(category, str) for category in item["categories"])
+        ):
+            msg_0 = "Rating has an invalid or inconsistent schema."
+            raise ValueError(msg_0)
         mapped[record_id] = item
     if set(mapped) != set(expected):
         msg = f"Response {key} IDs do not match request."
@@ -343,44 +395,67 @@ def load_records(selected_records: list[dict[str, Any]]) -> list[dict[str, Any]]
 def run_parallel(
     work: list[dict[str, Any]],
     callback,
+    *,
+    journal: Journal | None = None,
+    group: str = "",
 ) -> dict[str, object]:
     """Execute independent batches and retain every success or failure."""
     results: dict[str, object] = {}
     with ThreadPoolExecutor(max_workers=WORKERS) as executor:
         futures = {executor.submit(callback, task): task for task in work}
-        for future, key in ((future, futures[future]) for future in futures):
+        for future in as_completed(futures):
+            key = futures[future]
             try:
                 results[str(key["key"])] = future.result()
             except RequestError as error:
                 results[str(key["key"])] = error.as_result()
             except Exception as error:
-                results[str(key["key"])] = {"error": f"{type(error).__name__}: {error}"}
+                results[str(key["key"])] = {"error": type(error).__name__}
+            if journal is not None:
+                journal.append(
+                    {
+                        "kind": "batch",
+                        "group": group,
+                        "key": str(key["key"]),
+                        "result": results[str(key["key"])],
+                    }
+                )
     return results
 
 
 def run_with_retry(
-    request, *, label: Mapping[str, object]
+    request, *, label: Mapping[str, object], journal: Journal | None = None
 ) -> tuple[dict[str, object], dict[str, object], list[dict[str, object]]]:
     """Use one registered retry policy and retain each safe attempt result."""
     attempts: list[dict[str, object]] = []
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             body, receipt = request()
-        except RequestError as error:
+        except (RequestError, requests.RequestException) as caught:
+            error = (
+                caught
+                if isinstance(caught, RequestError)
+                else RequestError(
+                    "Transport failure.",
+                    {"status": None, "exception_type": type(caught).__name__},
+                )
+            )
             status = error.metadata.get("status")
-            retryable = status in RETRYABLE_HTTP_STATUSES or status is None
+            retryable = status in RETRYABLE_HTTP_STATUSES or status in {None, 200}
             attempts.append(
                 {
                     **label,
                     "attempt": attempt,
                     "outcome": "failure",
                     "retryable": retryable,
-                    "response": error.metadata,
+                    "response": dict(error.metadata),
                 }
             )
+            if journal is not None:
+                journal.append({"kind": "attempt", **attempts[-1]})
             if attempt == MAX_ATTEMPTS or not retryable:
-                error.metadata["attempts"] = attempts
-                raise
+                error.attempts = attempts
+                raise error from caught
             time.sleep(attempt)
         else:
             attempts.append(
@@ -391,6 +466,8 @@ def run_with_retry(
                     "response": receipt,
                 }
             )
+            if journal is not None:
+                journal.append({"kind": "attempt", **attempts[-1], "body": body})
             return body, receipt, attempts
     msg = "Retry loop ended without a response."
     raise RuntimeError(msg)
@@ -422,12 +499,27 @@ def collect_attempts(value: object) -> list[dict[str, object]]:
     return []
 
 
+def save_result(path: Path, output: dict[str, object]) -> None:
+    """Atomically publish the complete artifact without replacing prior results."""
+    if path.exists():
+        msg = "Refusing to overwrite a previous run."
+        raise FileExistsError(msg)
+    temporary = path.with_suffix(".tmp")
+    with temporary.open("x", encoding="utf-8") as stream:
+        temporary.chmod(0o600)
+        stream.write(json.dumps(output, ensure_ascii=True))
+        stream.flush()
+        os.fsync(stream.fileno())
+    temporary.replace(path)
+
+
 def main() -> None:
     """Execute all registered stages and write one local-only raw result file."""
     parser = argparse.ArgumentParser()
     selector_group = parser.add_mutually_exclusive_group(required=True)
     selector_group.add_argument("--selector", type=Path)
     selector_group.add_argument("--selector-json")
+    selector_group.add_argument("--records", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
@@ -440,7 +532,20 @@ def main() -> None:
     # ruff: ignore[import-outside-top-level]
     from weblate.configuration.models import Setting, SettingCategory
 
-    records = load_records(load_selector(args.selector, args.selector_json))
+    if args.records is not None:
+        records = json.loads(args.records.read_text(encoding="utf-8"))
+        for record in records:
+            if any(
+                canonical_hash([record[lang]]) != record[f"{lang}_text_sha256"]
+                for lang in ("ru", "en")
+            ):
+                msg = "Local record does not match frozen text hashes."
+                raise ValueError(msg)
+    else:
+        records = load_records(load_selector(args.selector, args.selector_json))
+    if not records or len({record["record_id"] for record in records}) != len(records):
+        msg = "Records must be nonempty and unique."
+        raise ValueError(msg)
     if args.validate_only:
         args.output.write_text(
             json.dumps({"validated_records": len(records), "inference": False}),
@@ -448,7 +553,16 @@ def main() -> None:
         )
         return
     openrouter = Setting.objects.get_settings_dict(SettingCategory.MT)["openrouter"]
-    record_map = {record["record_id"]: record for record in records}
+    if (settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2) != (
+        "deepseek-v4-pro",
+        "atlas/qwen3.8-max",
+    ):
+        msg = "Judge aliases changed from the registered profiles."
+        raise ValueError(msg)
+    if args.output.exists():
+        msg = "Refusing to overwrite a previous run."
+        raise FileExistsError(msg)
+    journal = Journal(args.output.with_suffix(".events.jsonl"))
     output: dict[str, object] = {
         "generator_model": GEMINI_MODEL,
         "records": records,
@@ -456,7 +570,11 @@ def main() -> None:
         "reviews": {},
         "ratings": {},
         "attempts": [],
+        "protocol": "v3",
+        "max_tokens": GEMINI_MAX_TOKENS,
+        "judge_models": [settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2],
     }
+    journal.append({"kind": "start", "metadata": output})
 
     def gemini(task: Mapping[str, object], stage: str):
         batch = task["records"]
@@ -484,11 +602,12 @@ def main() -> None:
                 return {"items": parse_items(body, "translations", expected)}, receipt
             except (TypeError, ValueError) as error:
                 msg_0 = "Response contract is invalid."
-                raise RequestError(msg_0, {}) from error
+                raise RequestError(msg_0, receipt) from error
 
         response, receipt, attempts = run_with_retry(
             request,
             label={"stage": stage, "arm": arm, "block": task["block"]},
+            journal=journal,
         )
         return {**response, "receipt": receipt, "arm": arm, "attempts": attempts}
 
@@ -496,6 +615,8 @@ def main() -> None:
     results = run_parallel(
         scheduled_work(records, arms=("A", "B", "C", "D"), seed=RANDOMIZATION_SEED),
         lambda task: gemini(task, "generate"),
+        journal=journal,
+        group="generate",
     )
     for arm in "ABCD":
         arm_results = {
@@ -537,7 +658,7 @@ def main() -> None:
                 return {"items": parse_items(body, key, expected)}, receipt
             except (TypeError, ValueError) as error:
                 msg = "Response contract is invalid."
-                raise RequestError(msg, {}) from error
+                raise RequestError(msg, receipt) from error
 
         response, receipt, attempts = run_with_retry(
             request,
@@ -547,6 +668,7 @@ def main() -> None:
                 "block": task["block"],
                 "seat": model,
             },
+            journal=journal,
         )
         return {
             **response,
@@ -580,6 +702,8 @@ def main() -> None:
                 "reviews",
                 "review",
             ),
+            journal=journal,
+            group=f"review:{seat}",
         )
         for arm in ("E", "F"):
             arm_results = {
@@ -622,7 +746,9 @@ def main() -> None:
     work = scheduled_work(editor_eligible, arms=("E", "F"), seed=RANDOMIZATION_SEED + 3)
     for task in work:
         task["reviews"] = editor_reviews[task["arm"]]
-    results = run_parallel(work, lambda task: gemini(task, "edit"))
+    results = run_parallel(
+        work, lambda task: gemini(task, "edit"), journal=journal, group="edit"
+    )
     for arm in ("E", "F"):
         arm_results = {
             key: result for key, result in results.items() if key.startswith(f"{arm}:")
@@ -640,7 +766,9 @@ def main() -> None:
                 )
 
     for arm in "ABCDEF":
-        eligible = [record_map[record_id] for record_id in translations[arm]]
+        eligible = [
+            record for record in records if record["record_id"] in translations[arm]
+        ]
         output["ratings"][arm] = {}
         for seat, model, timeout in judge_profiles:
             work = scheduled_work(
@@ -660,6 +788,8 @@ def main() -> None:
                         "rating",
                     )
                 ),
+                journal=journal,
+                group=f"rating:{arm}:{seat}",
             )
             output["ratings"][arm][seat] = results
 
@@ -670,7 +800,13 @@ def main() -> None:
             "ratings": output["ratings"],
         }
     )
-    args.output.write_text(json.dumps(output, ensure_ascii=False), encoding="utf-8")
+    save_result(args.output, output)
+    journal.append(
+        {
+            "kind": "complete",
+            "output_sha256": hashlib.sha256(args.output.read_bytes()).hexdigest(),
+        }
+    )
 
 
 if __name__ == "__main__":
