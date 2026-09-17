@@ -110,6 +110,17 @@ assert_pushed() {
     fi
 }
 
+assert_contains() {
+    local label=$1 needle=$2
+    if grep -Fq "$needle" "$OUT_LOG"; then
+        pass=$((pass + 1))
+    else
+        fail=$((fail + 1))
+        echo "FAIL $label: missing [$needle]"
+        cat "$OUT_LOG"
+    fi
+}
+
 # --- Scenario 1: unknown flag never reaches git push -----------------------
 status=0
 run_scenario 'deploy_stack --bogus' || status=$?
@@ -148,6 +159,15 @@ run_scenario '
 ' || status=$?
 assert_eq "--force exit code" 0 "$status"
 assert_pushed "--force" 1
+
+# --- Scenario 5: preflight payload runs as Python on the VPS ----------------
+run_scenario '
+    run_root_python_script() {
+        python3 "$1"
+    }
+    auto_translate_preflight_report
+'
+assert_contains "preflight Python transport" "PREFLIGHT-ERROR"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

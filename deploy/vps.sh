@@ -142,6 +142,16 @@ run_root_script() {
     ssh_retry "echo '$VPS_PASSWORD' | sudo -S -v 2>/dev/null; echo $payload | base64 -d | sudo bash"
 }
 
+# Runs a local Python script on the VPS as root; avoids a shell interpreting
+# the Python payload before the remote interpreter receives it.
+run_root_python_script() {
+    require_gateway
+    local payload
+    payload=$(base64 < "$1" | tr -d '\n')
+    ssh_retry "echo '$VPS_PASSWORD' | sudo -S -v 2>/dev/null; echo $payload | base64 -d | sudo python3"
+}
+
+
 # Runs a local script on the VPS as $VPS_USER, detached, logging to $REMOTE_LOG.
 # Detached because an image build outlives the tunnel's re-key interval.
 start_remote_script() {
@@ -238,7 +248,7 @@ for _worker, tasks in (payload.get("active") or {}).items():
             print(f"TASK {task.get('id')} {name} since {age}s")
 print(f"QUEUED {payload.get('queued', '?')}")
 PYEOF
-    run_root_script "$tmp"
+    run_root_python_script "$tmp"
     rm -f "$tmp"
 }
 
