@@ -1,0 +1,1726 @@
+{
+  "glossary": {
+    "Форт": {
+      "flags": "terminology",
+      "source": "Форт",
+      "source_explanation": "The player's home base. It is upgraded tier by tier; its garrison holds ships and its workshops produce building materials and gold.",
+      "target": "Bến tàu",
+      "target_explanation": ""
+    }
+  },
+  "meta": {
+    "builder": "analysis/probes/judge-role-split-build.py",
+    "built_at": "2026-09-17T05:28:40+00:00",
+    "component": "pirate-ships/localization",
+    "corpus_majority_target": "pháo đài",
+    "incident_target": "Bến tàu",
+    "instance": "http://localhost:3001/api/",
+    "label_policy": "deterministic = injected, certain against its own base; corpus_inconsistency = two renderings coexist, correct one not established; established_meaning = recorded in the plan; unknown = untouched production text. No record is a human linguistic gold label.",
+    "language": "vi"
+  },
+  "records": [
+    {
+      "base_target": "Bến tàu",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": false,
+        "note": "Same source term rendered two ways across the corpus. The inconsistency is observable; the correct reading is not established here. Scored on whether the arm raises the terminology question at all."
+      },
+      "explanation": "",
+      "family": "glossary_incident",
+      "glossary_terms": [
+        {
+          "flags": "terminology",
+          "source": "Форт",
+          "source_explanation": "The player's home base. It is upgraded tier by tier; its garrison holds ships and its workshops produce building materials and gold.",
+          "target": "Bến tàu",
+          "target_explanation": ""
+        }
+      ],
+      "mutation": null,
+      "note": "",
+      "provenance": "corpus_inconsistency",
+      "record_id": "glossary_incident-ship_name_fort_1",
+      "source": "Форт",
+      "split": "control",
+      "target": "Bến tàu",
+      "unit_id": 298699,
+      "unit_key": "ship_name_fort_1"
+    },
+    {
+      "base_target": "Bến tàu",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": false,
+        "note": "Same source term rendered two ways across the corpus. The inconsistency is observable; the correct reading is not established here. Scored on whether the arm raises the terminology question at all."
+      },
+      "explanation": "",
+      "family": "glossary_incident",
+      "glossary_terms": [
+        {
+          "flags": "terminology",
+          "source": "Форт",
+          "source_explanation": "The player's home base. It is upgraded tier by tier; its garrison holds ships and its workshops produce building materials and gold.",
+          "target": "Bến tàu",
+          "target_explanation": ""
+        }
+      ],
+      "mutation": null,
+      "note": "",
+      "provenance": "corpus_inconsistency",
+      "record_id": "glossary_incident-dialog_name_fort_fleet",
+      "source": "Форт",
+      "split": "control",
+      "target": "Bến tàu",
+      "unit_id": 299747,
+      "unit_key": "dialog_name_fort_fleet"
+    },
+    {
+      "base_target": "Bến tàu",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": false,
+        "note": "Same source term rendered two ways across the corpus. The inconsistency is observable; the correct reading is not established here. Scored on whether the arm raises the terminology question at all."
+      },
+      "explanation": "",
+      "family": "glossary_incident",
+      "glossary_terms": [
+        {
+          "flags": "terminology",
+          "source": "Форт",
+          "source_explanation": "The player's home base. It is upgraded tier by tier; its garrison holds ships and its workshops produce building materials and gold.",
+          "target": "Bến tàu",
+          "target_explanation": ""
+        }
+      ],
+      "mutation": null,
+      "note": "",
+      "provenance": "corpus_inconsistency",
+      "record_id": "glossary_incident-screen_name_fort_equipment",
+      "source": "Форт",
+      "split": "dev",
+      "target": "Bến tàu",
+      "unit_id": 299758,
+      "unit_key": "screen_name_fort_equipment"
+    },
+    {
+      "base_target": "Bến tàu",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": false,
+        "note": "Same source term rendered two ways across the corpus. The inconsistency is observable; the correct reading is not established here. Scored on whether the arm raises the terminology question at all."
+      },
+      "explanation": "",
+      "family": "glossary_incident",
+      "glossary_terms": [
+        {
+          "flags": "terminology",
+          "source": "Форт",
+          "source_explanation": "The player's home base. It is upgraded tier by tier; its garrison holds ships and its workshops produce building materials and gold.",
+          "target": "Bến tàu",
+          "target_explanation": ""
+        }
+      ],
+      "mutation": null,
+      "note": "",
+      "provenance": "corpus_inconsistency",
+      "record_id": "glossary_incident-fort_label",
+      "source": "Форт",
+      "split": "control",
+      "target": "Bến tàu",
+      "unit_id": 300812,
+      "unit_key": "fort_label"
+    },
+    {
+      "base_target": "Bến tàu Hải Tặc",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "A corsair pier, not the player's fort. Demanding the glossary target here is a false positive, and replacing the pier is a wrong repair."
+      },
+      "explanation": "",
+      "family": "glossary_not_applicable",
+      "glossary_terms": [
+        {
+          "flags": "terminology",
+          "source": "Форт",
+          "source_explanation": "The player's home base. It is upgraded tier by tier; its garrison holds ships and its workshops produce building materials and gold.",
+          "target": "Bến tàu",
+          "target_explanation": ""
+        }
+      ],
+      "mutation": null,
+      "note": "",
+      "provenance": "established_meaning",
+      "record_id": "glossary_not_applicable-fort_enemy_name_3",
+      "source": "Причал Корсаров",
+      "split": "dev",
+      "target": "Bến tàu Hải Tặc",
+      "unit_id": 300818,
+      "unit_key": "fort_enemy_name_3"
+    },
+    {
+      "base_target": "Cứ mỗi 4 giây, tăng tốc độ tiếp cận của tàu thêm {2} trong {1}s, đồng thời hồi phục 10% độ bền của tàu.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "number_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "4",
+        "kind": "number_swap",
+        "to": "5"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "number_swap-ability_description_ship_speed",
+      "source": "Каждые 4 секунды увеличивает скорость сближения корабля на {2} на {1}с., а также восстанавливает 10% прочности корабля.",
+      "split": "dev",
+      "target": "Cứ mỗi 5 giây, tăng tốc độ tiếp cận của tàu thêm {2} trong {1}s, đồng thời hồi phục 10% độ bền của tàu.",
+      "unit_id": 300265,
+      "unit_key": "ability_description_ship_speed"
+    },
+    {
+      "base_target": "Sau ba đòn tấn công thành công, ném một viên đạn đại bác vào kẻ địch, gây {0} sát thương và làm tê liệt trong {1}s. Thủy thủ trong bán kính 1 mét quanh điểm va chạm bị tản ra.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "number_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "1",
+        "kind": "number_swap",
+        "to": "7"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "number_swap-ability_description_captain_cannonball_power_throw",
+      "source": "После трёх успешных атак бросает в противника ядро, которое наносит {0} урона и парализует на {1}с. Матросы, находящиеся в радиусе одного метра от места попадания, разбрасываются в стороны.",
+      "split": "dev",
+      "target": "Sau ba đòn tấn công thành công, ném một viên đạn đại bác vào kẻ địch, gây {0} sát thương và làm tê liệt trong {1}s. Thủy thủ trong bán kính 7 mét quanh điểm va chạm bị tản ra.",
+      "unit_id": 300271,
+      "unit_key": "ability_description_captain_cannonball_power_throw"
+    },
+    {
+      "base_target": "Giảm tốc độ tiếp cận của tàu xuống {2} trong {1} giây và gây sát thương cho tàu địch (10% độ bền của nó).\nThời gian hồi: {0} giây.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "number_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "10",
+        "kind": "number_swap",
+        "to": "11"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "number_swap-ability_description_overload",
+      "source": "Замедляет скорость сближения корабля на {2} в течение {1}с. и наносит урон кораблю противника(10% прочности)\nПерезарядка: {0}с.",
+      "split": "dev",
+      "target": "Giảm tốc độ tiếp cận của tàu xuống {2} trong {1} giây và gây sát thương cho tàu địch (11% độ bền của nó).\nThời gian hồi: {0} giây.",
+      "unit_id": 300291,
+      "unit_key": "ability_description_overload"
+    },
+    {
+      "base_target": "Sau ba đòn tấn công thành công, phóng một cây thương gây sát thương gấp đôi và xuyên qua mọi mục tiêu trên đường đi của nó. Sau lần trúng đầu tiên, sát thương giảm 50% và tiếp tục giảm thêm {0} sau mỗi lần trúng tiếp theo (tối đa {1}).",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "number_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "50",
+        "kind": "number_swap",
+        "to": "51"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "number_swap-ability_description_captain_spear_throw",
+      "source": "После трёх успешных атак бросает копьё, наносящее двойной урон и пробивающее все цели на линии атаки. После первого попадания урон уменьшается на 50% и далее, после каждого попадания на {0} (максимум {1})",
+      "split": "control",
+      "target": "Sau ba đòn tấn công thành công, phóng một cây thương gây sát thương gấp đôi và xuyên qua mọi mục tiêu trên đường đi của nó. Sau lần trúng đầu tiên, sát thương giảm 51% và tiếp tục giảm thêm {0} sau mỗi lần trúng tiếp theo (tối đa {1}).",
+      "unit_id": 300293,
+      "unit_key": "ability_description_captain_spear_throw"
+    },
+    {
+      "base_target": "Sau ba đòn tấn công thành công, phóng ra ngọn lửa thiêu đốt mọi mục tiêu trên đường tấn công trong 5s.\nNếu lửa không tắt trong 2s, nó sẽ bắt đầu lan sang các ô liền kề.\nSát thương lên thủy thủ: {0}/giây\nSát thương lên tàu: {1}/giây",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "number_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "5",
+        "kind": "number_swap",
+        "to": "6"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "number_swap-ability_description_ap_fire_trail_shot",
+      "source": "После трёх успешных атак выпускает пламя, поджигающее все цели на линии атаки на 5 сек.\nЕсли огонь не потух в течени 2х секунд, он начинает распространяться на соседние клетки.\nУрон команде: {0}/с\nУрон кораблю: {1}/с",
+      "split": "control",
+      "target": "Sau ba đòn tấn công thành công, phóng ra ngọn lửa thiêu đốt mọi mục tiêu trên đường tấn công trong 6s.\nNếu lửa không tắt trong 2s, nó sẽ bắt đầu lan sang các ô liền kề.\nSát thương lên thủy thủ: {0}/giây\nSát thương lên tàu: {1}/giây",
+      "unit_id": 300344,
+      "unit_key": "ability_description_ap_fire_trail_shot"
+    },
+    {
+      "base_target": " +1 rương trong: {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "number_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "1",
+        "kind": "number_swap",
+        "to": "7"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "number_swap-skirmish_add_chest_timer",
+      "source": " +1 сундук через: {0}",
+      "split": "control",
+      "target": " +7 rương trong: {0}",
+      "unit_id": 300382,
+      "unit_key": "skirmish_add_chest_timer"
+    },
+    {
+      "base_target": "{0} cơ hội gây sát thương x3 <sprite name=\"fire\"><sprite name=\"ice\"><sprite name=\"decay\"><sprite name=\"lightning\">",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "number_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "3",
+        "kind": "number_swap",
+        "to": "4"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "number_swap-ship_gear_short_description_crit_weather",
+      "source": "{0} шанс тройного урона <sprite name=\"fire\"><sprite name=\"ice\"><sprite name=\"decay\"><sprite name=\"lightning\">",
+      "split": "dev",
+      "target": "{0} cơ hội gây sát thương x4 <sprite name=\"fire\"><sprite name=\"ice\"><sprite name=\"decay\"><sprite name=\"lightning\">",
+      "unit_id": 300703,
+      "unit_key": "ship_gear_short_description_crit_weather"
+    },
+    {
+      "base_target": "Quái vật biển tấn công tàu địch từ dưới nước mỗi {1} giây, gây sát thương bằng 20% độ bền tối đa của nó.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "number_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "20",
+        "kind": "number_swap",
+        "to": "21"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "number_swap-ability_description_summon_damage_venom",
+      "source": "Корабль сопровождает морское чудовище, атакующее вражеское судно из-под воды каждые {1}с.",
+      "split": "control",
+      "target": "Quái vật biển tấn công tàu địch từ dưới nước mỗi {1} giây, gây sát thương bằng 21% độ bền tối đa của nó.",
+      "unit_id": 301463,
+      "unit_key": "ability_description_summon_damage_venom"
+    },
+    {
+      "base_target": "{0} <color=#b2ff59>({1})</color>",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}…{1}",
+        "kind": "placeholder_swap",
+        "to": "{1}…{0}"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_swap-item_upgrade_stat_value",
+      "source": "{0} <color=#b2ff59>({1})</color>",
+      "split": "control",
+      "target": "{1} <color=#b2ff59>({0})</color>",
+      "unit_id": 299865,
+      "unit_key": "item_upgrade_stat_value"
+    },
+    {
+      "base_target": "Mỗi {0} giây, thủy thủ được tăng tốc {1} lần trong {2} giây.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}…{1}",
+        "kind": "placeholder_swap",
+        "to": "{1}…{0}"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_swap-ability_description_crew_boost",
+      "source": "Каждые {0}с. матрос ускоряется в {1} раз(а) на {2}с.",
+      "split": "control",
+      "target": "Mỗi {1} giây, thủy thủ được tăng tốc {0} lần trong {2} giây.",
+      "unit_id": 300163,
+      "unit_key": "ability_description_crew_boost"
+    },
+    {
+      "base_target": "{0} cơ hội gây ra x{1} sát thương tầm xa",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}…{1}",
+        "kind": "placeholder_swap",
+        "to": "{1}…{0}"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_swap-ability_description_crew_explosive_bullets",
+      "source": "{0} шанс нанести x{1} урона в дальней атаке",
+      "split": "control",
+      "target": "{1} cơ hội gây ra x{0} sát thương tầm xa",
+      "unit_id": 300187,
+      "unit_key": "ability_description_crew_explosive_bullets"
+    },
+    {
+      "base_target": "{0} cơ hội bắn {1} phát trong một loạt; mỗi phát bắn tiếp theo yếu hơn {2} lần so với phát trước.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}…{1}",
+        "kind": "placeholder_swap",
+        "to": "{1}…{0}"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_swap-ability_description_crew_rapid_fire",
+      "source": "С шансом {0} делает {1} выстрела(ов) подряд; каждый следующий выстрел на {2} слабее предыдущего",
+      "split": "control",
+      "target": "{1} cơ hội bắn {0} phát trong một loạt; mỗi phát bắn tiếp theo yếu hơn {2} lần so với phát trước.",
+      "unit_id": 300189,
+      "unit_key": "ability_description_crew_rapid_fire"
+    },
+    {
+      "base_target": "{0} cơ hội né tránh trong {1} giây sau khi nhận sát thương",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}…{1}",
+        "kind": "placeholder_swap",
+        "to": "{1}…{0}"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_swap-ability_description_crew_wary",
+      "source": "{0} шанса увернуться на {1}с. после получения урона",
+      "split": "control",
+      "target": "{1} cơ hội né tránh trong {0} giây sau khi nhận sát thương",
+      "unit_id": 300193,
+      "unit_key": "ability_description_crew_wary"
+    },
+    {
+      "base_target": "{0} cơ hội ném {1} lựu đạn theo nhiều hướng khi phát nổ",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}…{1}",
+        "kind": "placeholder_swap",
+        "to": "{1}…{0}"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_swap-ability_description_crew_second_detonation",
+      "source": "С шансом {0} в момент взрыва кидает {1} гранаты в разные стороны",
+      "split": "dev",
+      "target": "{1} cơ hội ném {0} lựu đạn theo nhiều hướng khi phát nổ",
+      "unit_id": 300200,
+      "unit_key": "ability_description_crew_second_detonation"
+    },
+    {
+      "base_target": "Có {0} cơ hội bắn {1} phát liên tiếp, mỗi phát gây {2} lần ít sát thương hơn phát trước.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}…{1}",
+        "kind": "placeholder_swap",
+        "to": "{1}…{0}"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_swap-ability_description_cannon_burst",
+      "source": "С шансом {0} делает {1} выстрелов подряд, каждый следующий на {2} слабее предыдущего",
+      "split": "dev",
+      "target": "Có {1} cơ hội bắn {0} phát liên tiếp, mỗi phát gây {2} lần ít sát thương hơn phát trước.",
+      "unit_id": 300212,
+      "unit_key": "ability_description_cannon_burst"
+    },
+    {
+      "base_target": "Quái vật biển tấn công tàu địch từ dưới nước mỗi {1} giây, gây {0} sát thương cho thân tàu.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_swap",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{1}…{0}",
+        "kind": "placeholder_swap",
+        "to": "{0}…{1}"
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_swap-ability_description_summon_damage",
+      "source": "Морское чудовище атакует вражеский корабль из-под воды каждые {1} секунд, нанося {0} урона корпусу",
+      "split": "control",
+      "target": "Quái vật biển tấn công tàu địch từ dưới nước mỗi {0} giây, gây {1} sát thương cho thân tàu.",
+      "unit_id": 300223,
+      "unit_key": "ability_description_summon_damage"
+    },
+    {
+      "base_target": "lvl {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}",
+        "kind": "placeholder_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_drop-label_level_param",
+      "source": "ур. {0}",
+      "split": "dev",
+      "target": "lvl",
+      "unit_id": 298622,
+      "unit_key": "label_level_param"
+    },
+    {
+      "base_target": "Cấp {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}",
+        "kind": "placeholder_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_drop-label_level_full_param",
+      "source": "Уровень {0}",
+      "split": "dev",
+      "target": "Cấp",
+      "unit_id": 298624,
+      "unit_key": "label_level_full_param"
+    },
+    {
+      "base_target": " → {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}",
+        "kind": "placeholder_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_drop-label_upgrade_to_level_param",
+      "source": " → {0}",
+      "split": "dev",
+      "target": "→",
+      "unit_id": 298625,
+      "unit_key": "label_upgrade_to_level_param"
+    },
+    {
+      "base_target": "Gõ \"{0}\"",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}",
+        "kind": "placeholder_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_drop-label_delete_profile_confirm",
+      "source": "Введите \"{0}\"",
+      "split": "control",
+      "target": "Gõ \"\"",
+      "unit_id": 298664,
+      "unit_key": "label_delete_profile_confirm"
+    },
+    {
+      "base_target": "Tốc độ quay {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}",
+        "kind": "placeholder_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_drop-ability_description_rotation_speed",
+      "source": "Скорость поворота {0}",
+      "split": "dev",
+      "target": "Tốc độ quay",
+      "unit_id": 298920,
+      "unit_key": "ability_description_rotation_speed"
+    },
+    {
+      "base_target": "lvl {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}",
+        "kind": "placeholder_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_drop-home_button_restrictions_level",
+      "source": "ур {0}",
+      "split": "dev",
+      "target": "lvl",
+      "unit_id": 299062,
+      "unit_key": "home_button_restrictions_level"
+    },
+    {
+      "base_target": "<b>{0}</b>",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}",
+        "kind": "placeholder_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_drop-shop_confirm_dialog",
+      "source": "<b>{0}</b>",
+      "split": "control",
+      "target": "<b></b>",
+      "unit_id": 299069,
+      "unit_key": "shop_confirm_dialog"
+    },
+    {
+      "base_target": "Miễn phí mỗi {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": true,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "placeholder_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "{0}",
+        "kind": "placeholder_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "placeholder_drop-shop_free_restock_time",
+      "source": "Бесплатно каждые {0}",
+      "split": "dev",
+      "target": "Miễn phí mỗi",
+      "unit_id": 299098,
+      "unit_key": "shop_free_restock_time"
+    },
+    {
+      "base_target": "{0} sẽ bắt đầu, đừng bỏ lỡ nó!",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "negation_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "đừng",
+        "kind": "negation_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "negation_drop-push_text_game_event_started",
+      "source": "Начинается {0}, не пропусти!",
+      "split": "dev",
+      "target": "{0} sẽ bắt đầu, bỏ lỡ nó!",
+      "unit_id": 299231,
+      "unit_key": "push_text_game_event_started"
+    },
+    {
+      "base_target": "Đánh bại campaign_enemy[gen|{0} trong chế độ chiến dịch] campaign_enemy_type[gen|{0}|một đối thủ] enemy_ship[prep|trên {0}] battle_type[prep|trong {0}] equip_required[acc|sử dụng {0}] win_distance[|tại khoảng cách {0}] win_before_distance[|không muộn hơn khoảng cách {0}] battle_end_type[|với kết quả {0}] once_per_day[|(một lần mỗi ngày)]",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "negation_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "không",
+        "kind": "negation_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "negation_drop-mission_descr_win_battle",
+      "source": "Победи campaign_enemy[gen|{0} в кампании] campaign_enemy_type[gen|{0}|противника] enemy_ship[prep|на {0}] battle_type[prep|в {0}] equip_required[acc|используя {0}] win_distance[|на {0} дистанции] win_before_distance[|не позже {0} дистанции] battle_end_type[|с исходом {0}] once_per_day[|(один в день)]",
+      "split": "control",
+      "target": "Đánh bại campaign_enemy[gen|{0} trong chế độ chiến dịch] campaign_enemy_type[gen|{0}|một đối thủ] enemy_ship[prep|trên {0}] battle_type[prep|trong {0}] equip_required[acc|sử dụng {0}] win_distance[|tại khoảng cách {0}] win_before_distance[|muộn hơn khoảng cách {0}] battle_end_type[|với kết quả {0}] once_per_day[|(một lần mỗi ngày)]",
+      "unit_id": 299588,
+      "unit_key": "mission_descr_win_battle"
+    },
+    {
+      "base_target": "Tên không được dài hơn {0} ký tự",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "negation_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "không",
+        "kind": "negation_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "negation_drop-dialog_profile_edit_error_name_too_long",
+      "source": "Имя должно быть не больше {0} символов",
+      "split": "control",
+      "target": "Tên được dài hơn {0} ký tự",
+      "unit_id": 299789,
+      "unit_key": "dialog_profile_edit_error_name_too_long"
+    },
+    {
+      "base_target": "Nếu kẻ thù bị tiêu diệt, có {0} cơ hội rằng phát bắn tiếp theo sẽ không cần nạp đạn.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "negation_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "không",
+        "kind": "negation_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "negation_drop-ability_description_crew_instant_reload",
+      "source": "В случае убийства противника, С шансом {0} следующий выстрел будет без перезарядки",
+      "split": "control",
+      "target": "Nếu kẻ thù bị tiêu diệt, có {0} cơ hội rằng phát bắn tiếp theo sẽ cần nạp đạn.",
+      "unit_id": 300196,
+      "unit_key": "ability_description_crew_instant_reload"
+    },
+    {
+      "base_target": "Bạn có muốn tiếp tục trận chiến trên tàu tiếp theo không ({0})?",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "negation_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "không",
+        "kind": "negation_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "negation_drop-dialog_title_raid_stop_content",
+      "source": "Хотите продожить бой на следующем корабле ({0})?",
+      "split": "dev",
+      "target": "Bạn có muốn tiếp tục trận chiến trên tàu tiếp theo ({0})?",
+      "unit_id": 300635,
+      "unit_key": "dialog_title_raid_stop_content"
+    },
+    {
+      "base_target": "Bạn không thể gửi tin nhắn cho đến {0} do vi phạm quy tắc trò chuyện",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "negation_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "không",
+        "kind": "negation_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "negation_drop-chat_mute_message",
+      "source": "Вы не можете отправлять сообщения до {0} из-за нарушений правил чата",
+      "split": "control",
+      "target": "Bạn thể gửi tin nhắn cho đến {0} do vi phạm quy tắc trò chuyện",
+      "unit_id": 302018,
+      "unit_key": "chat_mute_message"
+    },
+    {
+      "base_target": "Mỗi giờ bạn nhận được {0} vàng và một tài nguyên hoặc bùa ngẫu nhiên.\nLượng lưu trữ tối đa bị giới hạn, đừng quên thu phần của bạn mỗi 3 giờ.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "negation_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "đừng",
+        "kind": "negation_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "negation_drop-description_idle_reward_per_hour_hint",
+      "source": "Каждый час вы получаете {0} золота и случайный ресурс или амулет.\nМаксимальное количество накоплений ограничено, не забывайте собирать долю с прибыли каждые 3 часа!",
+      "split": "control",
+      "target": "Mỗi giờ bạn nhận được {0} vàng và một tài nguyên hoặc bùa ngẫu nhiên.\nLượng lưu trữ tối đa bị giới hạn, quên thu phần của bạn mỗi 3 giờ.",
+      "unit_id": 302136,
+      "unit_key": "description_idle_reward_per_hour_hint"
+    },
+    {
+      "base_target": "Nhiều không gian, nhiều thủy thủ đoàn! Bây giờ bạn có thể lắp đặt <color=#1DEEFC>một đại bác nữa</color>!",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "critical",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "negation_drop",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "không",
+        "kind": "negation_drop",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "negation_drop-tutorial_message_upgraded_ship",
+      "source": "Больше места - больше команда! Теперь влезет <color=#1DEEFC>еще одна пушка</color>!",
+      "split": "dev",
+      "target": "Nhiều gian, nhiều thủy thủ đoàn! Bây giờ bạn có thể lắp đặt <color=#1DEEFC>một đại bác nữa</color>!",
+      "unit_id": 298959,
+      "unit_key": "tutorial_message_upgraded_ship"
+    },
+    {
+      "base_target": "Thuyền trưởng {0}, nhận phần của bạn!",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "major",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "clause_omission",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "nhận phần của bạn!",
+        "kind": "clause_omission",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "clause_omission-push_text_idle_full",
+      "source": "Капитан {0}, забирай свою долю!",
+      "split": "dev",
+      "target": "Thuyền trưởng {0}.",
+      "unit_id": 299210,
+      "unit_key": "push_text_idle_full"
+    },
+    {
+      "base_target": "{0}, chúng ta đang bị tấn công!💥",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "major",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "clause_omission",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "chúng ta đang bị tấn công!💥",
+        "kind": "clause_omission",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "clause_omission-push_name_return_to_game1",
+      "source": "{0}, на нас напали!💥",
+      "split": "dev",
+      "target": "{0}.",
+      "unit_id": 299213,
+      "unit_key": "push_name_return_to_game1"
+    },
+    {
+      "base_target": "{0}, một phần thưởng đặc biệt đang chờ đón!",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "major",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "clause_omission",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "một phần thưởng đặc biệt đang chờ đón!",
+        "kind": "clause_omission",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "clause_omission-push_name_return_reward",
+      "source": "{0}, особая награда ждет!",
+      "split": "control",
+      "target": "{0}.",
+      "unit_id": 299222,
+      "unit_key": "push_name_return_reward"
+    },
+    {
+      "base_target": "{0}, một kẻ thù đang ở trong lãnh thổ của chúng ta! 💥",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "major",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "clause_omission",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "một kẻ thù đang ở trong lãnh thổ của chúng ta! 💥",
+        "kind": "clause_omission",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "clause_omission-push_name_map_full",
+      "source": "{0}, враг на нашей территории! 💥",
+      "split": "control",
+      "target": "{0}.",
+      "unit_id": 299228,
+      "unit_key": "push_name_map_full"
+    },
+    {
+      "base_target": "Sau mỗi {0} lần tấn công, trái lựu đạn sẽ kích hoạt tàu.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "major",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "clause_omission",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "trái lựu đạn sẽ kích hoạt tàu.",
+        "kind": "clause_omission",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "clause_omission-ability_description_crew_ignite",
+      "source": "Раз в {0} атаки граната подожжёт корабль",
+      "split": "control",
+      "target": "Sau mỗi {0} lần tấn công.",
+      "unit_id": 300194,
+      "unit_key": "ability_description_crew_ignite"
+    },
+    {
+      "base_target": "Đã kết nối với trò chuyện {0}\n\nNhững điều bị cấm trong trò chuyện:\n- Lăng mạ và lời tục tĩu, bao gồm cả trong biệt danh.\n- Spam, tin nhắn lặp lại và thường xuyên.\n- Quảng cáo, chính trị, tôn giáo và kích động xung đột.\n- Nội dung bất hợp pháp và phản cảm.\nVi phạm có thể dẫn đến việc tài khoản của bạn bị chặn.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "major",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "clause_omission",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "tôn giáo và kích động xung đột.\n- Nội dung bất hợp pháp và phản cảm.\nVi phạm có thể dẫn đến việc tài khoản của bạn bị chặn.",
+        "kind": "clause_omission",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "clause_omission-chat_connection_message",
+      "source": "Подключен к чату {0}\n\nВ чате запрещено: \n- Оскорбления и мат, в том числе в никнеймах.\n- Спам, частые и повторяющиеся сообщения.\n- Реклама, политика, религия и разжигание конфликтов.\n- Незаконный и откровенный контент.\nНарушение правил может привести к блокировке вашего аккаунта.",
+      "split": "dev",
+      "target": "Đã kết nối với trò chuyện {0}\n\nNhững điều bị cấm trong trò chuyện:\n- Lăng mạ và lời tục tĩu, bao gồm cả trong biệt danh.\n- Spam, tin nhắn lặp lại và thường xuyên.\n- Quảng cáo, chính trị.",
+      "unit_id": 301809,
+      "unit_key": "chat_connection_message"
+    },
+    {
+      "base_target": "Tàu đã mua <color=#E07800>sẽ thay thế vĩnh viễn tàu trong slot hiện tại!</color> Theo thời gian, ngày càng nhiều tàu mạnh mẽ hơn sẽ trở nên khả dụng cho bạn.",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "major",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "clause_omission",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "ngày càng nhiều tàu mạnh mẽ hơn sẽ trở nên khả dụng cho bạn.",
+        "kind": "clause_omission",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "clause_omission-tutorial_message_buy_ship",
+      "source": "Приобретенный корабль <color=#E07800>навсегда заменит судно в текущем слоте!</color> Со временем тебе станут доступны все более мощные корабли.",
+      "split": "control",
+      "target": "Tàu đã mua <color=#E07800>sẽ thay thế vĩnh viễn tàu trong slot hiện tại!</color> Theo thời gian.",
+      "unit_id": 298973,
+      "unit_key": "tutorial_message_buy_ship"
+    },
+    {
+      "base_target": "Bây giờ bạn có thể <color=#1DEEFC>chiến đấu chống lại những người chơi thật</color>! Nhưng hãy cẩn thận, những người này thực sự rất nguy hiểm!",
+      "checks": [],
+      "expected": {
+        "defect_injected": true,
+        "mechanically_visible": false,
+        "min_severity": "major",
+        "must_not_rewrite": false,
+        "note": "Injected into the corpus's own target; certain relative to it."
+      },
+      "explanation": "",
+      "family": "clause_omission",
+      "glossary_terms": [],
+      "mutation": {
+        "from": "những người này thực sự rất nguy hiểm!",
+        "kind": "clause_omission",
+        "to": ""
+      },
+      "note": "",
+      "provenance": "deterministic",
+      "record_id": "clause_omission-tutorial_message_first_pvp_fight",
+      "source": "Теперь ты можешь <color=#1DEEFC>сражаться с настоящими игроками</color>! Но будь осторожен, эти ребята по-настоящему опасны!",
+      "split": "dev",
+      "target": "Bây giờ bạn có thể <color=#1DEEFC>chiến đấu chống lại những người chơi thật</color>! Nhưng hãy cẩn thận.",
+      "unit_id": 298977,
+      "unit_key": "tutorial_message_first_pvp_fight"
+    },
+    {
+      "base_target": "Chương {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-region_chapter_title",
+      "source": "Глава {0}",
+      "split": "control",
+      "target": "Chương {0}",
+      "unit_id": 299134,
+      "unit_key": "region_chapter_title"
+    },
+    {
+      "base_target": "Mặt hàng được giảm giá {0}🔥",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-push_name_return_offer",
+      "source": "Товары со скидкой {0}🔥",
+      "split": "control",
+      "target": "Mặt hàng được giảm giá {0}🔥",
+      "unit_id": 299219,
+      "unit_key": "push_name_return_offer"
+    },
+    {
+      "base_target": "{0} thêm có sẵn",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-push_text_shop_event_started",
+      "source": "Скидка заканчивается через {0}",
+      "split": "control",
+      "target": "{0} thêm có sẵn",
+      "unit_id": 299233,
+      "unit_key": "push_text_shop_event_started"
+    },
+    {
+      "base_target": "Mở khóa ở cấp độ {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-label_restriction_level",
+      "source": "Откроется на {0} уровне",
+      "split": "control",
+      "target": "Mở khóa ở cấp độ {0}",
+      "unit_id": 299244,
+      "unit_key": "label_restriction_level"
+    },
+    {
+      "base_target": "Thu thập phần thưởng reward_source[|cho {0}]",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_collect_reward",
+      "source": "Собери награду reward_source[|за {0}]",
+      "split": "dev",
+      "target": "Thu thập phần thưởng reward_source[|cho {0}]",
+      "unit_id": 299591,
+      "unit_key": "mission_descr_collect_reward"
+    },
+    {
+      "base_target": "Đạt giá trị Cấp value[|{0}]",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_acquire_level",
+      "source": "Достигни value[|{0}] уровня",
+      "split": "dev",
+      "target": "Đạt giá trị Cấp value[|{0}]",
+      "unit_id": 299594,
+      "unit_key": "mission_descr_acquire_level"
+    },
+    {
+      "base_target": "Đạt đến liên minh skirmish_league_id[|{0}]",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_unlock_skirmish_league",
+      "source": "Достигни лиги skirmish_league_id[|{0}]",
+      "split": "control",
+      "target": "Đạt đến liên minh skirmish_league_id[|{0}]",
+      "unit_id": 299609,
+      "unit_key": "mission_descr_unlock_skirmish_league"
+    },
+    {
+      "base_target": "Ở lại skirmish_league_place[|tại vị trí {0}] skirmish_league_id[|trong {0}|trong bất kỳ league nào] trong vài ngày liên tiếp",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_hold_league_place_for_days",
+      "source": "Удержись skirmish_league_place[|на {0} месте] skirmish_league_id[|в {0}|в любой лиге] несколько дней подряд",
+      "split": "dev",
+      "target": "Ở lại skirmish_league_place[|tại vị trí {0}] skirmish_league_id[|trong {0}|trong bất kỳ league nào] trong vài ngày liên tiếp",
+      "unit_id": 299610,
+      "unit_key": "mission_descr_hold_league_place_for_days"
+    },
+    {
+      "base_target": "Đạt mức xếp hạng value[|{0}] trong Skirmish",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_achieve_rating",
+      "source": "Достигни рейтинга value[|{0}] в Схватке",
+      "split": "control",
+      "target": "Đạt mức xếp hạng value[|{0}] trong Skirmish",
+      "unit_id": 299611,
+      "unit_key": "mission_descr_achieve_rating"
+    },
+    {
+      "base_target": "Mở khóa giá value[|{0}] khu vực",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_unlock_campaign_region",
+      "source": "Открой регион value[|{0}]",
+      "split": "dev",
+      "target": "Mở khóa giá value[|{0}] khu vực",
+      "unit_id": 299612,
+      "unit_key": "mission_descr_unlock_campaign_region"
+    },
+    {
+      "base_target": "Hoàn thành vùng giá value[|{0}]",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_complete_campaign_region",
+      "source": "Пройди регион value[|{0}]",
+      "split": "dev",
+      "target": "Hoàn thành vùng giá value[|{0}]",
+      "unit_id": 299613,
+      "unit_key": "mission_descr_complete_campaign_region"
+    },
+    {
+      "base_target": "Đánh bại campaign_enemy_type[gen|{0}] campaign_enemy[gen|{0}]",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_win_campaign_battle",
+      "source": "Победи campaign_enemy_type[gen|{0}] campaign_enemy[gen|{0}]",
+      "split": "dev",
+      "target": "Đánh bại campaign_enemy_type[gen|{0}] campaign_enemy[gen|{0}]",
+      "unit_id": 299614,
+      "unit_key": "mission_descr_win_campaign_battle"
+    },
+    {
+      "base_target": "Cài đặt item_type[|{0}] trên tàu",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_equip_items",
+      "source": "Установи item_type[|{0}] на корабль",
+      "split": "control",
+      "target": "Cài đặt item_type[|{0}] trên tàu",
+      "unit_id": 299619,
+      "unit_key": "mission_descr_equip_items"
+    },
+    {
+      "base_target": "Mua vật phẩm_mẫu[|{0}]",
+      "checks": [
+        "game-token"
+      ],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_unlock_craft_receipt",
+      "source": "Купи item_template[|{0}]",
+      "split": "control",
+      "target": "Mua vật phẩm_mẫu[|{0}]",
+      "unit_id": 299620,
+      "unit_key": "mission_descr_unlock_craft_receipt"
+    },
+    {
+      "base_target": "Mua vật phẩm_mẫu[|{0}]",
+      "checks": [
+        "game-token"
+      ],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_ship_unlock",
+      "source": "Купи item_template[|{0}]",
+      "split": "control",
+      "target": "Mua vật phẩm_mẫu[|{0}]",
+      "unit_id": 299621,
+      "unit_key": "mission_descr_ship_unlock"
+    },
+    {
+      "base_target": "Mở khóa fort_name[|{0}]",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-mission_descr_unlock_fort",
+      "source": "Открой fort_name[|{0}]",
+      "split": "dev",
+      "target": "Mở khóa fort_name[|{0}]",
+      "unit_id": 299624,
+      "unit_key": "mission_descr_unlock_fort"
+    },
+    {
+      "base_target": "Số ngày: {0}",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-offer_try_ship_days_count",
+      "source": "Количество дней: {0}",
+      "split": "control",
+      "target": "Số ngày: {0}",
+      "unit_id": 299729,
+      "unit_key": "offer_try_ship_days_count"
+    },
+    {
+      "base_target": "Tham gia các trận chiến chiến dịch/đụng độ {0}",
+      "checks": [
+        "duplicate"
+      ],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-daily1_description",
+      "source": "Участвуй в {0} боях в кампании/схватке",
+      "split": "control",
+      "target": "Tham gia các trận chiến chiến dịch/đụng độ {0}",
+      "unit_id": 299805,
+      "unit_key": "daily1_description"
+    },
+    {
+      "base_target": "Thắng {0} trận chiến chiến dịch/đụng độ",
+      "checks": [
+        "duplicate"
+      ],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-daily2_description",
+      "source": "Выиграй {0} сражений в кампании/схватке",
+      "split": "control",
+      "target": "Thắng {0} trận chiến chiến dịch/đụng độ",
+      "unit_id": 299806,
+      "unit_key": "daily2_description"
+    },
+    {
+      "base_target": "Thắng {0} trận chiến liên tiếp",
+      "checks": [],
+      "expected": {
+        "defect_injected": false,
+        "mechanically_visible": false,
+        "min_severity": null,
+        "must_not_rewrite": true,
+        "note": "Untouched production text of unknown quality. A rewrite is an intervention to be counted, not proven damage."
+      },
+      "explanation": "",
+      "family": "control_unchanged",
+      "glossary_terms": [],
+      "mutation": null,
+      "note": "",
+      "provenance": "unknown",
+      "record_id": "control_unchanged-daily3_description",
+      "source": "Одержи {0} победы подряд в схватке",
+      "split": "control",
+      "target": "Thắng {0} trận chiến liên tiếp",
+      "unit_id": 299807,
+      "unit_key": "daily3_description"
+    }
+  ]
+}
