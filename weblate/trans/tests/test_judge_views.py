@@ -2347,6 +2347,34 @@ class JudgeRunReportViewTest(ViewTestCase):
             ),
         )
 
+    def test_coverage_separates_results_from_skip_reasons(self) -> None:
+        run = self.create_run()
+        unit = self.get_unit()
+        run.scope_snapshot = [unit.id, 999]
+        run.summary = {"cap_remainder": 1}
+        run.save(update_fields=["scope_snapshot", "summary"])
+        self.add_row(run, unit, cached=True)
+        self.add_row(
+            run,
+            unit_id_snapshot=999,
+            outcome=JudgeRunUnit.Outcome.SKIPPED,
+            skip_reason=JudgeRunUnit.SkipReason.CAP,
+        )
+
+        coverage = run.get_coverage()
+
+        self.assertEqual(coverage["recorded"], 2)
+        self.assertEqual(coverage["with_result"], 1)
+        self.assertEqual(coverage["without_result"], 1)
+        self.assertEqual(coverage["without_result_by_outcome"], {"skipped": 1})
+        self.assertEqual(coverage["skip_reasons"], {"cap": 1})
+        self.assertEqual(coverage["cached"], 1)
+        self.assertFalse(coverage["scope_complete"])
+        self.enable_review()
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.context["coverage"], coverage)
+        self.assertContains(response, "Coverage incomplete")
+
     def test_report_uses_the_producer_run_template(self) -> None:
         self.enable_review()
         run = self.create_run()

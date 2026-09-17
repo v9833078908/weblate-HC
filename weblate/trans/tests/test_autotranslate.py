@@ -7,11 +7,14 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import re
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import threading
+import time
+from functools import partial
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest import mock
@@ -21,8 +24,9 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connections
 from django.template.loader import render_to_string
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TransactionTestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
@@ -30,7 +34,7 @@ from weblate.addons.autotranslate import AutoTranslateAddon
 from weblate.addons.events import AddonEvent
 from weblate.addons.models import AddonActivityLog
 from weblate.auth.data import SELECTION_ALL
-from weblate.auth.models import Group, Role, TeamMembership, User
+from weblate.auth.models import Group, Role, TeamMembership, User, setup_project_groups
 from weblate.checks.chars import MaxLengthCheck
 from weblate.checks.models import CHECKS
 from weblate.configuration.models import Setting, SettingCategory
@@ -40,9 +44,11 @@ from weblate.machinery.base import (
     MachineTranslationError,
 )
 from weblate.machinery.dummy import DummyTranslation
+from weblate.trans import tasks
 from weblate.trans.actions import ActionEvents
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.forms import AutoForm
+from weblate.trans.judge_loop import build_request
 from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Change,
@@ -54,8 +60,19 @@ from weblate.trans.models import (
     Unit,
     WorkflowSetting,
 )
-from weblate.trans.tasks import auto_translate, auto_translate_component
+from weblate.trans.models.judge import (
+    JudgeRunUnit,
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+)
+from weblate.trans.tasks import (
+    JudgeExecutionGuardError,
+    auto_translate,
+    auto_translate_component,
+)
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.tests.utils import RepoTestMixin, create_test_user
 from weblate.trans.util import split_plural
 from weblate.utils.celery import (
     PENDING_TASK_MAX_AGE,
@@ -79,6 +96,330 @@ from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def _noop_preload_workflow_settings(_self) -> None:
+    pass
+
+
+def _fake_current_task(task_id: str) -> Mock:
+    task = Mock()
+    task.request = SimpleNamespace(id=task_id)
+    return task
+
+
+_GUARD_RETRY_DELIVERY = object()
+
+
+def _run_guarded_auto_translate_process(
+    task_id: str,
+    component_id: int,
+    user_id: int,
+    hold_after: int,
+    unit_ids: list[int],
+) -> None:
+    """
+    Run one real ``auto_translate`` delivery against a patched judge boundary.
+
+    Only the external provider is replaced: the guard, the durable producer
+    run, its rows and the finalization all execute their production code.
+    With ``hold_after`` below the persisted unit count, the process exits
+    right after that many durable rows, before the run is finalized.
+    """
+    # A forked child inherits the parent's socket: abandon the connection
+    # object without closing it, so the parent's own connection survives.
+    for connection in connections.all(initialized_only=True):
+        connection.connection = None
+    seen: list[int] = []
+
+    def fake_judge_batch(
+        units, *, writable_ids, user, on_batch=None, run=None, **kwargs
+    ):
+        # PENDING placeholders must already be durably reserved for every
+        # unit about to be judged before any provider call.
+        pending = set(
+            JudgeRunUnit.objects.filter(
+                run_id=run.pk if run else None,
+                outcome=JudgeRunUnit.Outcome.PENDING,
+            ).values_list("unit_id_snapshot", flat=True)
+        )
+        assert pending == {unit.id for unit in units}
+        out = {}
+        for unit in units:
+            request = build_request(unit)
+            out[unit.id] = JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity="none",
+                model_verdict=JudgeVerdict.Verdict.PASS,
+                judge_model="vendor-a/model",
+                seat=1,
+                target_hash=compute_target_hash(request.target_plurals),
+                context_hash=compute_context_hash(
+                    source=request.source,
+                    note=request.note,
+                    explanation=request.explanation,
+                    glossary_terms=request.glossary_terms,
+                ),
+            )
+            seen.append(unit.id)
+        if on_batch is not None:
+            on_batch([], [])
+        return out
+
+    real_process_judge = AutoTranslate.process_judge
+
+    def stop_after_first_translation(self, **kwargs):
+        # Block before the batch advances to the next translation or
+        # finalizes the run: the durable judge rows of the first
+        # translation stay, the producer run is left RUNNING.
+        result = real_process_judge(self, **kwargs)
+        if len(seen) >= hold_after:
+            os._exit(0)
+        return result
+
+    try:
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.current_task", _fake_current_task(task_id)
+            ),
+            mock.patch.object(tasks, "current_task", _fake_current_task(task_id)),
+            mock.patch.object(
+                tasks, "heartbeat_task", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "touch_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "delete_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                tasks, "register_task_liveness", side_effect=lambda *_a, **_k: None
+            ),
+            mock.patch.object(
+                BatchAutoTranslate,
+                "_preload_workflow_settings",
+                _noop_preload_workflow_settings,
+            ),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch",
+                side_effect=fake_judge_batch,
+            ),
+            mock.patch.object(
+                AutoTranslate,
+                "process_judge",
+                autospec=True,
+                side_effect=stop_after_first_translation,
+            ),
+            mock.patch.object(
+                tasks, "get_auto_translate_target", autospec=True
+            ) as get_target,
+            mock.patch.object(
+                tasks, "store_auto_translate_activity_log", autospec=True
+            ) as store_log,
+        ):
+            get_target.return_value = (Component.objects.get(pk=component_id), {})
+            store_log.side_effect = lambda _log, result, **_kwargs: result
+            output = tasks.auto_translate._orig_run.__func__(  # ruff: ignore[private-member-access]
+                _ProcessTask(task_id, _GUARD_RETRY_DELIVERY),
+                user_id=user_id,
+                mode="judge",
+                q="",
+                auto_source="mt",
+                source_component_id=None,
+                engines=[],
+                threshold=80,
+                unit_ids=unit_ids,
+                translation_id=None,
+                component_id=None,
+                category_id=None,
+                project_id=None,
+                language_id=None,
+                workspace_id=None,
+                activity_log_id=None,
+                activity_log_task_count=None,
+                enforce_permissions=False,
+                overwrite_existing=False,
+                producer_run_id=None,
+                judge_pretranslate=False,
+                judge_mutating_repairs=True,
+                judge_candidate_severities=("critical", "major"),
+                judge_proposal_only=False,
+            )
+        message = output["message"] if isinstance(output, dict) else str(output)
+    finally:
+        connections.close_all()
+    assert seen, message
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_UNITS_PER_RUN=2000,
+    JUDGE_MAY_APPROVE=False,
+    JUDGE_GUARD_WAIT_RETRIES=3,
+)
+class PersistedProducerRunRecoveryTest(RepoTestMixin, TransactionTestCase):
+    """
+    Two independent processes race one Celery delivery through a crash.
+
+    The first worker persists one judge outcome and dies before the run is
+    finalized. The second delivery must adopt the same durable run, skip
+    the already recorded unit and finish the rest with the full summary.
+    """
+
+    def setUp(self) -> None:
+        self.clone_test_repos()
+        super().setUp()
+        self.component = self.create_component()
+        self.component.create_path()
+        self.project = self.component.project
+        setup_project_groups(self, self.project)
+        self.translation = self.component.translation_set.get(language__code="cs")
+        self.user = create_test_user()
+        self.user.groups.add(Group.objects.get(name="Users"))
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+
+    def get_unit(self, language: str, source: str):
+        translation = self.component.translation_set.get(language__code=language)
+        return translation.unit_set.get(source__startswith=source)
+
+    def _mark_judgeable(self, language: str, source: str, target: str) -> int:
+        unit = self.get_unit(language, source)
+        unit.translate(self.user, [target], STATE_TRANSLATED)
+        return unit.pk
+
+    def _run_delivery(
+        self,
+        task_id: str,
+        hold_after: int,
+        unit_ids: list[int],
+        timeout: int = 120,
+    ) -> None:
+        context = multiprocessing.get_context("fork")
+        process = context.Process(
+            target=_run_guarded_auto_translate_process,
+            args=(task_id, self.component.pk, self.user.pk, hold_after, unit_ids),
+        )
+        # Never let a child inherit a live parent connection.
+        connections.close_all()
+        process.start()
+        process.join(timeout=timeout)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+            self.fail("guarded delivery exceeded its test deadline")
+
+    def _judged_rows(self, run):
+        return list(
+            JudgeRunUnit.objects.filter(run=run)
+            .exclude(outcome=JudgeRunUnit.Outcome.SKIPPED)
+            .order_by("unit_id_snapshot")
+        )
+
+    def test_killed_owner_leaves_persisted_rows_and_recovery_finishes_run(self) -> None:
+        # One judgeable string per translation, so the batch needs two
+        # provider calls and can be interrupted between them.
+        scope = [
+            self._mark_judgeable("cs", "Hello, world!\n", "Ahoj, světe!"),
+            self._mark_judgeable("de", "Hello, world!\n", "Hallo, Welt!"),
+        ]
+
+        task_id = "persisted-crash-delivery"
+        # First worker: persists the first translation's outcome and dies
+        # before the producer run is finalized.
+        self._run_delivery(task_id, hold_after=1, unit_ids=scope)
+
+        first_run = ProducerRun.objects.get(task_id=task_id)
+        self.assertEqual(first_run.status, ProducerRun.Status.RUNNING)
+        self.assertIsNone(first_run.finished)
+        rows = self._judged_rows(first_run)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].outcome, JudgeRunUnit.Outcome.PASSED)
+        self.assertEqual(rows[0].verdict.max_severity, "none")
+        persisted_verdict_id = rows[0].verdict_id
+        persisted_unit_id = rows[0].unit_id_snapshot
+
+        # Redelivery after the crash: same task ID, same durable run.
+        self._run_delivery(task_id, hold_after=99, unit_ids=scope)
+
+        recovered = ProducerRun.objects.get(task_id=task_id)
+        self.assertEqual(recovered.pk, first_run.pk)
+        self.assertEqual(recovered.status, ProducerRun.Status.COMPLETED)
+        self.assertIsNotNone(recovered.finished)
+        recovered_rows = self._judged_rows(recovered)
+        self.assertEqual(len(recovered_rows), 2)
+        self.assertEqual(
+            {row.outcome for row in recovered_rows},
+            {JudgeRunUnit.Outcome.PASSED},
+        )
+        # The already recorded unit keeps its first attempt's evidence: it
+        # was never sent to the provider again.
+        persisted = next(
+            row for row in recovered_rows if row.unit_id_snapshot == persisted_unit_id
+        )
+        self.assertEqual(persisted.verdict_id, persisted_verdict_id)
+        self.assertEqual(
+            JudgeVerdict.objects.filter(unit_id=persisted_unit_id).count(), 1
+        )
+        # The summary counts the whole journal, not the last attempt.
+        self.assertEqual(recovered.summary["evaluated"], 2)
+        self.assertEqual(recovered.summary["nothing_blocking"], 2)
+
+
+class _ProcessTask:
+    def __init__(self, task_id: str, retry_result) -> None:
+        self.request = SimpleNamespace(id=task_id)
+        self._retry_result = retry_result
+
+    def retry(self, **_kwargs):
+        return self._retry_result
+
+
+class _ProcessBatch:
+    counter = None
+    ready = None
+    hold = False
+
+    def __init__(self, *_args, **_kwargs) -> None:
+        self.active_producer_run = None
+
+    def perform(self, **_kwargs) -> str:
+        self.counter.value += 1
+        if self.hold:
+            self.ready.set()
+            time.sleep(30)
+        return "provider called"
+
+    def get_warnings(self) -> list[str]:
+        return []
+
+
+def _run_auto_translate_process(
+    task_id: str, counter, ready, hold: bool, result
+) -> None:
+
+    _ProcessBatch.counter = counter
+    _ProcessBatch.ready = ready
+    _ProcessBatch.hold = hold
+    tasks.get_auto_translate_target = lambda **_kwargs: (object(), {})
+    tasks.BatchAutoTranslate = _ProcessBatch
+    task = _ProcessTask(task_id, "retried")
+    output = tasks.auto_translate._orig_run.__func__(  # ruff: ignore[private-member-access]
+        task,
+        user_id=None,
+        mode="judge",
+        q="",
+        auto_source="mt",
+        source_component_id=None,
+        engines=[],
+        threshold=80,
+    )
+    message = output["message"] if isinstance(output, dict) else output
+    for index, character in enumerate(message):
+        result[index] = character
 
 
 class AutoTranslationTest(ViewTestCase):
@@ -1704,6 +2045,44 @@ class ProducerRunCreationTest(ViewTestCase):
         self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertEqual(run.failure, "provider unavailable")
 
+    def test_guard_exhaustion_marks_matching_run_failed(self) -> None:
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            task_id="exhausted-redelivery",
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+            status=ProducerRun.Status.RUNNING,
+        )
+        with (
+            patch(
+                "weblate.trans.tasks.producer_execution_guard",
+                side_effect=JudgeExecutionGuardError,
+            ),
+            patch.object(auto_translate, "retry", side_effect=JudgeExecutionGuardError),
+        ):
+            result = auto_translate.apply(
+                kwargs={
+                    "user_id": self.user.id,
+                    "mode": "judge",
+                    "q": "",
+                    "auto_source": "mt",
+                    "source_component_id": None,
+                    "component_id": self.component.id,
+                    "engines": [],
+                    "threshold": 80,
+                },
+                task_id="exhausted-redelivery",
+            ).get()
+
+        run.refresh_from_db()
+        self.assertEqual(result["message"], "The execution lock was not released.")
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIsNotNone(run.finished)
+
 
 class RecordingTranslation(DummyTranslation):
     """Records received batches instead of translating them."""
@@ -2164,6 +2543,7 @@ def max_form_depth(html: str) -> int:
         else:
             depth += 1
             peak = max(peak, depth)
+
     return peak
 
 
@@ -2192,6 +2572,79 @@ class AutoTranslateDurabilityTest(SimpleTestCase):
             self.assertTrue(
                 task.reject_on_worker_lost, f"{task.name} is lost on worker death"
             )
+
+    def test_producer_tasks_are_bound_for_guard_retries(self) -> None:
+        for task in (auto_translate, auto_translate_component):
+            self.assertIsInstance(task.__header__, partial)
+
+    def test_busy_guard_retries_before_heartbeat(self) -> None:
+        retry_result = object()
+        with (
+            patch(
+                "weblate.trans.tasks.producer_execution_guard",
+                side_effect=JudgeExecutionGuardError,
+            ),
+            patch.object(auto_translate, "retry", return_value=retry_result) as retry,
+            patch("weblate.trans.tasks.heartbeat_task") as heartbeat,
+        ):
+            result = auto_translate.apply(
+                kwargs={
+                    "user_id": None,
+                    "mode": "judge",
+                    "q": "",
+                    "auto_source": "mt",
+                    "source_component_id": None,
+                    "engines": [],
+                    "threshold": 80,
+                },
+                task_id="guarded-redelivery",
+            ).get()
+
+        self.assertIs(result, retry_result)
+        retry.assert_called_once_with(
+            exc=mock.ANY, countdown=60, max_retries=settings.JUDGE_GUARD_WAIT_RETRIES
+        )
+        heartbeat.assert_not_called()
+
+    def test_duplicate_process_delivery_retries_without_provider_call(self) -> None:
+        context = multiprocessing.get_context("fork")
+        counter = context.Value("i", 0)
+        ready = context.Event()
+        first_result = context.Array("u", 32)
+        second_result = context.Array("u", 32)
+        first = context.Process(
+            target=_run_auto_translate_process,
+            args=("same-delivery", counter, ready, True, first_result),
+        )
+        first.start()
+        try:
+            self.assertTrue(ready.wait(timeout=5))
+            second = context.Process(
+                target=_run_auto_translate_process,
+                args=("same-delivery", counter, ready, False, second_result),
+            )
+            second.start()
+            second.join(timeout=5)
+            self.assertFalse(second.is_alive())
+            self.assertEqual(counter.value, 1)
+            self.assertEqual("".join(second_result).rstrip("\x00"), "retried")
+            first.terminate()
+            first.join(timeout=5)
+            self.assertFalse(first.is_alive())
+            recovery = context.Array("u", 32)
+            third = context.Process(
+                target=_run_auto_translate_process,
+                args=("same-delivery", counter, ready, False, recovery),
+            )
+            third.start()
+            third.join(timeout=5)
+            self.assertFalse(third.is_alive())
+            self.assertEqual(counter.value, 2)
+            self.assertEqual("".join(recovery).rstrip("\x00"), "provider called")
+        finally:
+            if first.is_alive():
+                first.terminate()
+                first.join(timeout=5)
 
     def test_visibility_timeout_covers_long_tasks(self) -> None:
         code = """

@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import multiprocessing
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -11,11 +13,24 @@ from unittest.mock import MagicMock, patch
 from django.test import SimpleTestCase
 from filelock import FileLock
 
+from weblate.trans.tasks import JudgeExecutionGuardError, producer_execution_guard
 from weblate.utils.lock import WeblateLock
 from weblate.vcs.base import Repository, RepositoryLock, get_repository_lock_key
 
 if TYPE_CHECKING:
     from weblate.trans.models import Component
+
+
+def hold_file_lock(lock_path: str, ready) -> None:
+    with FileLock(lock_path):
+        ready.set()
+        time.sleep(30)
+
+
+def hold_producer_execution_guard(task_id: str, ready) -> None:
+    with producer_execution_guard(producer_run_id=None, task_id=task_id):
+        ready.set()
+        time.sleep(30)
 
 
 class RepositoryLockTest(SimpleTestCase):
@@ -45,6 +60,75 @@ class RepositoryLockTest(SimpleTestCase):
             thread_local=True,
         )
         self.assertEqual(lock.name, "lock:vcs:api:throttle:github")
+
+    def test_file_only_lock_ignores_redis_cache(self) -> None:
+        with (
+            TemporaryDirectory() as temp_dir,
+            self.settings(DATA_DIR=temp_dir),
+            patch("weblate.utils.lock.is_redis_cache", return_value=True),
+        ):
+            lock = WeblateLock(
+                scope="judge",
+                key="delivery",
+                slug="ignored",
+                file_only=True,
+            )
+
+        self.assertEqual(
+            lock.name, Path(temp_dir, "locks", "judge-delivery.lock").as_posix()
+        )
+
+    def test_file_lock_releases_after_process_termination(self) -> None:
+        with TemporaryDirectory() as lock_path:
+            context = multiprocessing.get_context("fork")
+            ready = context.Event()
+            process = context.Process(
+                target=hold_file_lock,
+                args=(str(Path(lock_path, "judge.lock")), ready),
+            )
+            process.start()
+            try:
+                self.assertTrue(ready.wait(timeout=5))
+                process.terminate()
+                process.join(timeout=5)
+                self.assertFalse(process.is_alive())
+                with FileLock(Path(lock_path, "judge.lock"), timeout=1):
+                    pass
+            finally:
+                if process.is_alive():
+                    process.terminate()
+                    process.join(timeout=5)
+
+    def test_producer_guard_excludes_duplicate_process_delivery(self) -> None:
+
+        with TemporaryDirectory() as lock_path, self.settings(DATA_DIR=lock_path):
+            context = multiprocessing.get_context("fork")
+            ready = context.Event()
+            process = context.Process(
+                target=hold_producer_execution_guard,
+                args=("duplicate-delivery", ready),
+            )
+            process.start()
+            try:
+                self.assertTrue(ready.wait(timeout=5))
+                with (
+                    self.assertRaises(JudgeExecutionGuardError),
+                    producer_execution_guard(
+                        producer_run_id=None, task_id="duplicate-delivery"
+                    ),
+                ):
+                    pass
+                process.terminate()
+                process.join(timeout=5)
+                self.assertFalse(process.is_alive())
+                with producer_execution_guard(
+                    producer_run_id=None, task_id="duplicate-delivery"
+                ):
+                    pass
+            finally:
+                if process.is_alive():
+                    process.terminate()
+                    process.join(timeout=5)
 
     def test_default_file_lock_uses_locks_dir(self) -> None:
         with (

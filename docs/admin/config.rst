@@ -1893,13 +1893,28 @@ JUDGE_MAX_UNITS_PER_RUN
 .. versionadded:: 2026.8.1
 
 Maximum number of strings a single judge run may touch. Defaults to 2000. A
-run whose filter matches more strings than this is refused entirely, before
-any request is sent, so a broad filter cannot silently spend beyond this
-cap.
+filter wider than this is truncated to the cap; the run report records the
+unselected strings as cap skips and labels its coverage incomplete.
 
 .. seealso::
 
    * :setting:`JUDGE_ENABLED`
+
+
+.. setting:: JUDGE_GUARD_WAIT_RETRIES
+
+JUDGE_GUARD_WAIT_RETRIES
+------------------------
+
+.. versionadded:: 2026.8.1
+
+Number of 60-second retries a duplicate Celery delivery waits for the
+file-only producer execution guard. Defaults to 480 (about eight hours).
+The lock prevents two live workers of the same Weblate instance from executing
+the same delivery concurrently; it is not a multi-host or exactly-once
+provider-billing guarantee. Lock files remain under ``DATA_DIR/locks`` after
+release. Do not delete them while judge workers are active; manual cleanup is
+safe only in a maintenance window with no active judge execution.
 
 .. setting:: JUDGE_REQUEST_SLEEP
 

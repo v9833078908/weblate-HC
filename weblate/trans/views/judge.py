@@ -555,6 +555,7 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
 
     outcome = request.GET.get("outcome", "")
     is_judge_run = run.requested_mode in JUDGE_MODES
+    coverage = run.get_coverage() if is_judge_run else None
     operation = (
         LLMUsageLog.Operation.JUDGE
         if is_judge_run
@@ -691,6 +692,7 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
             "query_string": f"outcome={outcome}" if outcome else "",
             "page_obj": page,
             "is_judge_run": is_judge_run,
+            "coverage": coverage,
             "run_spend": spend,
             "written": run.summary.get("written", 0),
             "language_spend": language_spend,

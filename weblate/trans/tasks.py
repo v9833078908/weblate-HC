@@ -6,14 +6,16 @@ from __future__ import annotations
 
 import os
 import time
-from contextlib import suppress
+from contextlib import ExitStack, contextmanager, suppress
 from datetime import datetime, timedelta
+from functools import wraps
 from glob import glob
 from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from celery import current_task
+from celery.exceptions import MaxRetriesExceededError
 from celery.schedules import crontab
 from django.conf import settings
 from django.core.cache import cache
@@ -68,7 +70,7 @@ from weblate.utils.celery import (
 from weblate.utils.data import data_dir
 from weblate.utils.errors import report_error
 from weblate.utils.files import VCS_METADATA_DIRS, remove_tree
-from weblate.utils.lock import WeblateLockTimeoutError
+from weblate.utils.lock import WeblateLock, WeblateLockTimeoutError
 from weblate.utils.state import STATE_APPROVED, STATE_TRANSLATED
 from weblate.utils.stats import ProjectLanguage, prefetch_stats
 from weblate.vcs.base import RepositoryError
@@ -80,6 +82,97 @@ if TYPE_CHECKING:
     from weblate.trans.models.change import RevertUserEditsResult
     from weblate.trans.models.unit import UnitQuerySet
     from weblate.workspaces.models import Workspace
+
+
+class JudgeExecutionGuardError(Exception):
+    """A duplicate delivery found its producer execution already running."""
+
+
+def _requires_producer_execution_guard(
+    *, mode: str, auto_source: Literal["mt", "others"], task_id: str
+) -> bool:
+    return bool(task_id) and (mode == "judge" or auto_source == "mt")
+
+
+@contextmanager
+def producer_execution_guard(*, producer_run_id: str | None, task_id: str):
+    """Acquire a file-only guard for one Celery delivery's producer run."""
+    lock = WeblateLock(
+        scope="producer-execution",
+        key=producer_run_id or task_id,
+        slug="judge",
+        timeout=0,
+        file_only=True,
+    )
+    with ExitStack() as stack:
+        try:
+            stack.enter_context(lock)
+        except WeblateLockTimeoutError as error:
+            raise JudgeExecutionGuardError from error
+        yield
+
+
+def _fail_stalled_producer_run(
+    *, producer_run_id: str | None, task_id: str
+) -> str | None:
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.judge import ProducerRun
+
+    run = (
+        ProducerRun.objects.filter(pk=producer_run_id).first()
+        if producer_run_id
+        else ProducerRun.objects.filter(task_id=task_id).first()
+    )
+    if run is None or (
+        run.task_id != task_id and str(run.dispatch_task_id or "") != task_id
+    ):
+        return None
+    if run.status in {ProducerRun.Status.QUEUED, ProducerRun.Status.RUNNING}:
+        run.status = ProducerRun.Status.FAILED
+        run.finished = timezone.now()
+        run.failure = gettext("The execution lock was not released.")
+        run.save(update_fields=["status", "finished", "failure"])
+    return str(run.pk)
+
+
+def guard_producer_execution(function):
+    """Serialize one task delivery before it can create or adopt a run."""
+
+    @wraps(function)
+    def wrapper(self, *args, **kwargs):
+        task_id = self.request.id or ""
+        mode = kwargs["mode"]
+        auto_source = kwargs["auto_source"]
+        producer_run_id = kwargs.get("producer_run_id")
+        if not _requires_producer_execution_guard(
+            mode=mode, auto_source=auto_source, task_id=task_id
+        ):
+            return function(self, *args, **kwargs)
+        try:
+            with producer_execution_guard(
+                producer_run_id=producer_run_id, task_id=task_id
+            ):
+                return function(self, *args, **kwargs)
+        except JudgeExecutionGuardError as error:
+            try:
+                return self.retry(
+                    exc=error,
+                    countdown=60,
+                    max_retries=settings.JUDGE_GUARD_WAIT_RETRIES,
+                )
+            except (MaxRetriesExceededError, JudgeExecutionGuardError):
+                run_id = _fail_stalled_producer_run(
+                    producer_run_id=producer_run_id, task_id=task_id
+                )
+                result = {
+                    "message": gettext("The execution lock was not released."),
+                    "warnings": [],
+                }
+                if run_id:
+                    result["report_url"] = reverse("judge-run", kwargs={"pk": run_id})
+                return result
+
+    return wrapper
 
 
 def commit_lock_retries_exhausted() -> bool:
@@ -1008,9 +1101,12 @@ def get_auto_translate_target(
     retry_backoff_max=3600,
     acks_late=True,
     reject_on_worker_lost=True,
+    bind=True,
 )
+@guard_producer_execution
 # ruff: ignore[too-many-arguments]
 def auto_translate(
+    self,
     *,
     user_id: int | None,
     mode: str,
@@ -1149,8 +1245,11 @@ def auto_translate(
     retry_backoff_max=3600,
     acks_late=True,
     reject_on_worker_lost=True,
+    bind=True,
 )
+@guard_producer_execution
 def auto_translate_component(
+    self,
     component_id: int,
     *,
     mode: str,

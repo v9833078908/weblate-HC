@@ -139,12 +139,16 @@ Scope and intended use
        a string with no candidate, so that path cannot be reached from the
        string page at all. Deduplication is scoped to work already in
        flight - a cache lock for generation, a single queued or running
-       capped run for re-check - so a double-click or a reloaded form cannot
-       multiply outbound spend. A deliberate repeat after the previous
-       attempt has finished (:guilabel:`Generate another`, or re-checking a
-       string again) is a new authorised request and is charged as one; the
-       spend ceiling for these endpoints is the reviewer's own permission,
-       not a per-string cap. Reading a producer's durable run report,
+       capped run for re-check, and a file-only process lock for one
+       redelivery of a producer task on one Weblate instance - so a
+       double-click or redelivery cannot multiply concurrent outbound spend.
+       The file lock requires every worker to share the same local data
+       directory; it does not provide a multi-host guarantee and cannot
+       promise exactly-once provider billing after process loss. A deliberate
+       repeat after the previous attempt has finished (:guilabel:`Generate another`,
+       or re-checking a string again) is a new authorised request and is
+       charged as one; the spend ceiling for these endpoints is the reviewer's
+       own permission, not a per-string cap. Reading a producer's durable run report,
        and running the guarded :wladmin:`judge_release_advisory_holds`
        cleanup command, are both local, read/local-write operations gated by
        the same automatic translation and review permissions, re-checked for
@@ -380,8 +384,9 @@ Reachability preconditions:
 * An LLM judge finding is in model only when reachable from an authenticated
   automatic translation run in judge mode, and an outbound request finding
   only when :setting:`JUDGE_ENABLED`, the site-wide key, and both seat
-  models are configured. A run over :setting:`JUDGE_MAX_UNITS_PER_RUN` is
-  refused before any request is sent. Repair of a parsed major or critical
+  models are configured. :setting:`JUDGE_MAX_UNITS_PER_RUN` caps a run's
+  selected scope; rows beyond that cap are recorded as skipped and the
+  report marks the coverage incomplete. Repair of a parsed major or critical
   finding uses the already-modelled, project-configured machine-translation
   data flow. Only the deterministic ``max-length`` repair still writes to a
   target, and it remains restricted to strings the run explicitly marked

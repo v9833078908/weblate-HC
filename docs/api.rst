@@ -3719,11 +3719,16 @@ or an undo receipt disappears on its own.
 
 .. http:get:: /api/producer/runs/(str:id)/
 
-    Read one durable run by ID: status, timing, and a text-free summary
-    of per-string outcomes. A run outlives the Celery task that executes
-    it and the client connection that started it; poll this endpoint
-    after closing and reopening a client, after a service restart, or
-    after a network interruption to recover exactly where the run stands.
+    Read one durable run by ID: status, timing, a text-free summary of
+    per-string outcomes, warnings, and ``coverage``. For judge runs,
+    ``coverage`` separates rows with a usable conclusion from every other
+    recorded outcome and lists skip reasons; ``scope_complete`` is true only
+    when the saved scope is fully evidenced, false for a known incomplete
+    terminal run, and null when the run cannot prove its denominator. A run
+    outlives the Celery task that executes it and the client connection that
+    started it; poll this endpoint after closing and reopening a client,
+    after a service restart, or after a network interruption to recover
+    exactly where the run stands.
 
     :param id: Run ID (UUID)
     :type id: string
