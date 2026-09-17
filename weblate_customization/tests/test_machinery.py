@@ -13,6 +13,7 @@ from asgiref.sync import async_to_sync
 from django.test import SimpleTestCase, TestCase
 from weblate_customization.machinery import (
     LITELLM_DEFAULT_BASE_URL,
+    OPENROUTER_MACHINE_TRANSLATION_TITLE,
     RoutedLiteLLMTranslation,
     RoutedLLMMachineryForm,
     RoutedLLMTranslation,
@@ -224,6 +225,16 @@ class RoutedResolveTest(SimpleTestCase):
         machine = self.machine({"ja": DEEPSEEK})
         self.assertTrue(machine.is_supported("en", "ja"))
         self.assertFalse(machine.is_supported("en", "fr"))
+
+    def test_openrouter_request_has_service_title(self) -> None:
+        self.assertEqual(
+            self.machine().get_headers()["X-OpenRouter-Title"],
+            OPENROUTER_MACHINE_TRANSLATION_TITLE,
+        )
+
+    def test_non_openrouter_request_omits_service_title(self) -> None:
+        machine = RoutedLiteLLMTranslation(as_settings(dict(LITELLM_CONFIGURATION)))
+        self.assertNotIn("X-OpenRouter-Title", machine.get_headers())
 
 
 def batch_content(count: int) -> str:

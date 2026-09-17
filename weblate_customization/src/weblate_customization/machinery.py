@@ -10,6 +10,7 @@ import json
 import re
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, ClassVar, cast
+from urllib.parse import urlsplit
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -33,6 +34,7 @@ LANGUAGE_CODE_PART_RE = re.compile(r"[-_@]")
 FALLBACK_KEY = "*"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 LITELLM_DEFAULT_BASE_URL = "https://hcbifrost.herocraft.com/litellm/v1"
+OPENROUTER_MACHINE_TRANSLATION_TITLE = "HCGameLoc Weblate - Machine Translation"
 
 
 def normalize_language_code(code: str) -> str:
@@ -150,6 +152,13 @@ class RoutedLLMTranslation(OpenAITranslation):
 
     def get_runtime_base_url(self) -> str:
         return self.settings.get("base_url") or DEFAULT_BASE_URL
+
+    def get_headers(self) -> dict[str, str]:
+        """Identify this service to OpenRouter without affecting other proxies."""
+        headers = super().get_headers()
+        if urlsplit(self.get_runtime_base_url()).hostname == "openrouter.ai":
+            headers["X-OpenRouter-Title"] = OPENROUTER_MACHINE_TRANSLATION_TITLE
+        return headers
 
     def get_routing(self) -> dict[str, str]:
         settings = cast("dict[str, object]", self.settings)

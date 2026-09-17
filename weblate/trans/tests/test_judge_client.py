@@ -19,6 +19,7 @@ from weblate.trans.judge import (
     _ALIAS_CACHE,
     _FAILOVER_FAILURE_KINDS,
     FAILURE_KINDS,
+    OPENROUTER_JUDGE_TITLE,
     JudgeEndpoint,
     JudgeError,
     JudgeRequest,
@@ -1230,6 +1231,17 @@ class JudgeEndpointCanonicalizationTest(SimpleTestCase):
     JUDGE_REQUEST_SLEEP=0.0,
 )
 class JudgeClientTest(SimpleTestCase):
+    @http_mock.activate
+    def test_openrouter_request_has_service_title(self) -> None:
+        http_mock.register("POST", CHAT_URL, json=_reply([]))
+
+        request_verdicts([REQ], model="vendor/model-a")
+
+        self.assertEqual(
+            http_mock.calls[0].request.headers.get("X-OpenRouter-Title"),
+            OPENROUTER_JUDGE_TITLE,
+        )
+
     @http_mock.activate
     def test_parses_a_verdict(self) -> None:
         http_mock.register(

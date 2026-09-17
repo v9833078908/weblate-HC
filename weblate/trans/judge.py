@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 
 _OPENROUTER_HOST = "openrouter.ai"
 _LITELLM_HOST = "hcbifrost.herocraft.com"
+OPENROUTER_JUDGE_TITLE = "HCGameLoc Weblate - AI Judge"
 JUDGE_SEATS = (1, 2)
 MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
 PROMPT_SCHEMA_REVISION = "judge-verdict-v3"
@@ -1340,13 +1341,16 @@ def _decode_non_stream(
 def _post_response(
     payload: dict, profile: JudgeSeatProfile, started: float
 ) -> _BatchResponse:
+    headers = {
+        "Authorization": f"Bearer {profile.api_key}",
+        "Content-Type": "application/json",
+    }
+    if profile.provider == "openrouter":
+        headers["X-OpenRouter-Title"] = OPENROUTER_JUDGE_TITLE
     with stream_validated_url(
         "POST",
         f"{profile.base_url.rstrip('/')}/chat/completions",
-        headers={
-            "Authorization": f"Bearer {profile.api_key}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
         json=payload,
         timeout=_request_timeout(profile),
         follow_redirects=False,

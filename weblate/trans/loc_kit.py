@@ -50,6 +50,7 @@ if TYPE_CHECKING:
 # from settings or user input.
 OPENROUTER_API_ROOT = "https://openrouter.ai/api/v1"
 OPENROUTER_CHAT_COMPLETIONS_URL = f"{OPENROUTER_API_ROOT}/chat/completions"
+OPENROUTER_LOC_KIT_PROFILE_TITLE = "HCGameLoc Weblate - Loc-kit Profile Analysis"
 
 # Fixed request timeout matching the LLM machinery expectations (seconds).
 OPENROUTER_REQUEST_TIMEOUT = 120
@@ -473,6 +474,7 @@ def request_profile_proposal(sample: dict[str, object]) -> dict[str, object]:
             headers={
                 "Authorization": (f"Bearer {settings.LOC_KIT_PROFILE_OPENROUTER_KEY}"),
                 "Content-Type": "application/json",
+                "X-OpenRouter-Title": OPENROUTER_LOC_KIT_PROFILE_TITLE,
             },
             json=payload,
             timeout=OPENROUTER_REQUEST_TIMEOUT,

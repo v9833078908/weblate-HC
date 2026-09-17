@@ -349,6 +349,10 @@ class ProposalRequestShapeTest(SimpleTestCase):
             "Bearer sk-test-secret-do-not-leak",
         )
         self.assertEqual(call.request.headers.get("Content-Type"), "application/json")
+        self.assertEqual(
+            call.request.headers.get("X-OpenRouter-Title"),
+            loc_kit.OPENROUTER_LOC_KIT_PROFILE_TITLE,
+        )
 
     @_ENABLED
     @http_mock.activate
