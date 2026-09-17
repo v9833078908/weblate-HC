@@ -21,10 +21,23 @@
   {% if run.status == "queued" or run.status == "running" %}
     <div class="alert alert-info">{% translate "This run is still in progress; counts may be incomplete." %}</div>
   {% endif %}
+  {% if run.status == "cancel_requested" %}
+    <div class="alert alert-warning">
+      {% translate "Cancellation has been requested; the run will stop before its next batch. A request already sent still completes and is kept." %}
+    </div>
+  {% endif %}
   {% if run.status == "failed" %}
     <div class="alert alert-danger">
       {% translate "This run failed." %}
       {% if run.failure %}{{ run.failure }}{% endif %}
+    </div>
+  {% endif %}
+  {% if run.status == "cancelled" %}
+    <div class="alert alert-secondary">{% translate "This run was cancelled before any string was checked." %}</div>
+  {% endif %}
+  {% if run.status == "partial" %}
+    <div class="alert alert-warning">
+      {% translate "This run was cancelled after only some strings were checked; the results below are partial." %}
     </div>
   {% endif %}
   {% for warning in run.warnings %}

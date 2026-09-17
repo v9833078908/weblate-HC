@@ -20,6 +20,7 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     active_round,
     active_verdict,
+    candidate_round,
     collegium_severity,
     compute_context_hash,
     compute_target_hash,
@@ -72,6 +73,53 @@ class JudgeRoundTest(ViewTestCase):
                 "judge_has_parsed_history": False,
                 "judge_latest_incomplete": False,
             },
+        )
+
+    def test_status_annotations_exclude_candidate_evidence(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "critical",
+            subject=JudgeVerdict.Subject.CANDIDATE,
+            candidate_target_hash=compute_target_hash(["Candidate"]),
+        )
+
+        self.assertEqual(
+            self.judge_status(unit),
+            {
+                "judge_active_severity": None,
+                "judge_has_parsed_history": False,
+                "judge_latest_incomplete": False,
+            },
+        )
+
+    def test_candidate_round_reads_only_matching_candidate_target(self) -> None:
+        unit = self.get_unit()
+        candidate = ["Candidate"]
+        request = build_request(unit)
+        context_hash = compute_context_hash(
+            source=request.source,
+            note=request.note,
+            explanation=request.explanation,
+            glossary_terms=request.glossary_terms,
+        )
+        matched = self.make(
+            unit,
+            "none",
+            subject=JudgeVerdict.Subject.CANDIDATE,
+            candidate_target_hash=compute_target_hash(candidate),
+            context_hash=context_hash,
+        )
+        self.make(
+            unit,
+            "critical",
+            subject=JudgeVerdict.Subject.CANDIDATE,
+            candidate_target_hash=compute_target_hash(["Other candidate"]),
+            context_hash=context_hash,
+        )
+
+        self.assertEqual(
+            [row.pk for row in candidate_round(unit, candidate)], [matched.pk]
         )
 
     def test_status_annotations_reduce_the_fresh_round(self) -> None:

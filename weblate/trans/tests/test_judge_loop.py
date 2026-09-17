@@ -304,6 +304,77 @@ class JudgeSeatConnectionCleanupTest(TransactionTestCase):
         self.assert_worker_connections_closed(self._run_seats(RuntimeError("worker")))
 
 
+class SeatCancellationThreadingTest(TransactionTestCase):
+    """G4: each seat's own cancellation predicate reaches ``request_verdicts``."""
+
+    def test_run_seats_threads_each_jobs_cancelled_predicate(self) -> None:
+        request = JudgeRequest(
+            unit_key="k",
+            source="s",
+            target="t",
+            source_language="ru",
+            target_language="en",
+            note="",
+            explanation="",
+            glossary_terms=[],
+            failing_checks=[],
+            project_id_snapshot=1,
+            component_id_snapshot=1,
+            component_slug="cancel",
+        )
+        received: dict[int, object] = {}
+
+        def fake_request_verdicts(
+            requests, *, model, on_batch, seat, cancelled=None, **kwargs
+        ):
+            received[seat] = cancelled
+            on_batch(requests, [PASS])
+            return [PASS]
+
+        def seat_one_cancelled() -> bool:
+            return False
+
+        def seat_two_cancelled() -> bool:
+            return True
+
+        jobs = [
+            _SeatJob(
+                seat=1,
+                model="vendor-1/model",
+                requests=[request],
+                persist=lambda *_a: None,
+                run=None,
+                retry_budget=RetryBudget(),
+                attempt=0,
+                retry_deadline=None,
+                cancelled=seat_one_cancelled,
+            ),
+            _SeatJob(
+                seat=2,
+                model="vendor-2/model",
+                requests=[request],
+                persist=lambda *_a: None,
+                run=None,
+                retry_budget=RetryBudget(),
+                attempt=0,
+                retry_deadline=None,
+                cancelled=seat_two_cancelled,
+            ),
+        ]
+        with mock.patch(
+            "weblate.trans.judge_loop.request_verdicts", new=fake_request_verdicts
+        ):
+            _run_seats(
+                jobs,
+                project_slug="cancel-thread",
+                project_context="",
+                run_id=uuid.uuid4(),
+            )
+
+        self.assertIs(received[1], seat_one_cancelled)
+        self.assertIs(received[2], seat_two_cancelled)
+
+
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
@@ -621,6 +692,72 @@ class JudgeLoopTest(ViewTestCase):
             JudgeVerdict.objects.filter(run_id=run.id).count(),
             1 if failure == "persistence" else 2,
         )
+
+    def test_an_already_cancelled_run_never_dispatches_a_seat(self) -> None:
+        unit = self.get_unit()
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(unit.translation_id),
+            scope_label=str(unit.translation),
+            scope_path=unit.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+            status=ProducerRun.Status.CANCEL_REQUESTED,
+        )
+        client = mock_request_verdicts([[PASS], [PASS]])
+
+        with mock.patch("weblate.trans.judge_loop.request_verdicts", client):
+            verdicts = run_judge_batch(
+                [unit], writable_ids=set(), user=self.user, run=run
+            )
+
+        client.assert_not_called()
+        self.assertNotIn(unit.id, verdicts)
+
+    def test_cancellation_observed_before_repair_skips_the_repair_call(self) -> None:
+        # G4: an already-sent judge request may complete and its verdict is
+        # kept, but a cancellation observed before the repair pass must
+        # stop it from spending a repair MT call.
+        unit = self.get_unit()
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(unit.translation_id),
+            scope_label=str(unit.translation),
+            scope_path=unit.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+        )
+
+        def flip_to_cancelled(_requests, _results) -> None:
+            # `on_batch` runs on the calling thread after each batch's
+            # verdict rows are already durably written (`_persist_verdict_
+            # batches`), so this is where the producer's cancel POST
+            # becomes observable to the run's own transaction.
+            ProducerRun.objects.filter(pk=run.pk).update(
+                status=ProducerRun.Status.CANCEL_REQUESTED
+            )
+
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        repair_mock = mock.Mock()
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            verdicts = run_judge_batch(
+                [unit],
+                writable_ids={unit.id},
+                user=self.user,
+                run=run,
+                on_batch=flip_to_cancelled,
+            )
+
+        repair_mock.assert_not_called()
+        # The verdict is dropped from this round's result rather than
+        # recorded with a false "no-candidate" repair status: the verdict
+        # itself is already cached, so a resume reuses it and only retries
+        # repair, without a second paid judge call.
+        self.assertNotIn(unit.id, verdicts)
+        self.assertEqual(unit.judge_verdicts.filter(run_id=run.id).count(), 2)
 
     @override_settings(
         JUDGE_MODEL_SEAT_1="vendor/model",
@@ -1008,7 +1145,7 @@ class JudgeLoopTest(ViewTestCase):
         self.enable_repair_engine()
         unit = self.get_unit()
         writable_ids = {unit.id}
-        client = mock_request_verdicts([[CRITICAL], [MINOR]])
+        client = mock_request_verdicts([[CRITICAL], [MINOR], [PASS], [PASS]])
         repair_mock = mock.Mock(return_value={unit.id: ["repaired text"]})
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
@@ -1024,25 +1161,34 @@ class JudgeLoopTest(ViewTestCase):
         repair_mock.assert_called_once()
         self.assertEqual(unit.suggestion_set.count(), 1)
 
-    def test_flag_stores_a_candidate_without_a_second_round(self) -> None:
-        # The flagged round generates one candidate and ends: the judged
-        # text is never mutated, so there is nothing to re-judge.
+    def test_flag_candidate_is_verified_without_mutating_the_unit(self) -> None:
         self.enable_repair_engine()
         original = self.get_unit().target
-        unit, verdict, client = self.run_batch([MAJOR, MAJOR], repair=["fixed text"])
+        unit, verdict, client = self.run_batch(
+            [MAJOR, MAJOR, MINOR, MINOR], repair=["fixed text"]
+        )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
-        self.assertEqual(verdict.attempt, 0)
-        self.assertEqual(client.call_count, 2)
+        self.assertEqual(client.call_count, 4)
         self.assertEqual(self.get_unit().target, original)
         candidate = unit.suggestion_set.get(userdetails__kind="judge-repair")
-        self.assertEqual(candidate.target.strip(), "fixed text")
+        candidate_rows = JudgeVerdict.objects.filter(
+            unit=unit,
+            subject=JudgeVerdict.Subject.CANDIDATE,
+            candidate_target_hash=compute_target_hash(candidate.target_list),
+        )
+        self.assertEqual(candidate_rows.count(), 2)
+        self.assertTrue(all(row.max_severity == "minor" for row in candidate_rows))
 
     def test_one_flag_round_ends_after_storing_the_candidate(self) -> None:
         self.enable_repair_engine()
-        unit, verdict, client = self.run_batch([MAJOR, MAJOR], repair=["still wrong"])
+        unit, verdict, client = self.run_batch(
+            [MAJOR, MAJOR, MAJOR, MAJOR], repair=["still wrong"]
+        )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(verdict.attempt, 0)
-        self.assertEqual(client.call_count, 2)
+        # 2 seats for the round, then 2 more verifying the generated
+        # candidate before it is offered to the producer (Task 3, B2).
+        self.assertEqual(client.call_count, 4)
         self.assertEqual(unit.suggestion_set.count(), 1)
 
     def test_repair_fetch_failure_does_not_crash_the_batch(self) -> None:
@@ -1083,6 +1229,10 @@ class JudgeLoopTest(ViewTestCase):
             [
                 [MAJOR, MAJOR],
                 [MAJOR, MAJOR],
+                [PASS],
+                [PASS],
+                [PASS],
+                [PASS],
             ]
         )
         with (
@@ -1101,8 +1251,9 @@ class JudgeLoopTest(ViewTestCase):
         )
         first.refresh_from_db()
         second.refresh_from_db()
-        # One paid generation for both, no re-judge round, no mutation.
-        self.assertEqual(client.call_count, 2)
+        # One paid generation for both, then each candidate is re-judged
+        # once per seat before being offered to the producer (Task 3, B2).
+        self.assertEqual(client.call_count, 6)
         self.assertEqual(first.target, first_target)
         self.assertEqual(second.target, "second original target")
         self.assertEqual(
@@ -1130,6 +1281,8 @@ class JudgeLoopTest(ViewTestCase):
             [
                 [MAJOR, MAJOR],
                 [MAJOR, MAJOR],
+                [PASS],
+                [PASS],
             ]
         )
         with (
@@ -1142,7 +1295,9 @@ class JudgeLoopTest(ViewTestCase):
                 user=self.user,
             )
         repair_mock.assert_called_once()
-        self.assertEqual(client.call_count, 2)
+        # 2 seats for the round, then 2 more verifying first's generated
+        # candidate before it is offered to the producer (Task 3, B2).
+        self.assertEqual(client.call_count, 4)
         first.refresh_from_db()
         second.refresh_from_db()
         self.assertEqual(first.target, original_first_target)
@@ -1184,9 +1339,9 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(second.judge_verdicts.count(), 2)
 
     def test_a_partial_candidate_fetch_stores_only_answered_units(self) -> None:
-        # The repair call answers only the first unit. The new semantics do
-        # not re-judge a candidate, so the round ends after one fetch: the
-        # answered unit gets a stored candidate, its sibling stays final.
+        # The repair call answers only the first unit: the answered unit
+        # gets a stored candidate (re-judged once per seat before being
+        # offered to the producer, Task 3 B2), its sibling stays final.
         first = self.get_unit()
         second = self.get_unit(source="Thank you for using Weblate.")
         second.translate(self.user, ["second original target"], STATE_TRANSLATED)
@@ -1207,6 +1362,8 @@ class JudgeLoopTest(ViewTestCase):
             [
                 [MAJOR, MAJOR],
                 [MAJOR, MAJOR],
+                [PASS],
+                [PASS],
             ]
         )
         with (
@@ -1224,7 +1381,7 @@ class JudgeLoopTest(ViewTestCase):
         second.refresh_from_db()
         self.assertEqual(first.target, original_first_target)
         self.assertEqual(second.target, original_second_target)
-        self.assertEqual(client.call_count, 2)
+        self.assertEqual(client.call_count, 4)
         self.assertEqual(verdicts[second.id].verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(
             first.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
@@ -1467,11 +1624,13 @@ class JudgeLoopTest(ViewTestCase):
         self.enable_repair_engine()
         original = self.get_unit().target
         unit, verdict, client = self.run_batch(
-            [CRITICAL, CRITICAL], repair=["fixed text"]
+            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"]
         )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
         self.assertEqual(verdict.attempt, 0)
-        self.assertEqual(client.call_count, 2)
+        # 2 seats for the round, then 2 more verifying the generated
+        # candidate before it is offered to the producer (Task 3, B2).
+        self.assertEqual(client.call_count, 4)
         self.assertEqual(self.get_unit().target, original)
         self.assertEqual(
             unit.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
@@ -1481,10 +1640,12 @@ class JudgeLoopTest(ViewTestCase):
     def test_one_negative_round_ends_after_storing_the_candidate(self) -> None:
         self.enable_repair_engine()
         _, verdict, client = self.run_batch(
-            [CRITICAL, CRITICAL], repair=["still wrong"]
+            [CRITICAL, CRITICAL, CRITICAL, CRITICAL], repair=["still wrong"]
         )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
-        self.assertEqual(client.call_count, 2)
+        # 2 seats for the round, then 2 more verifying the generated
+        # candidate before it is offered to the producer (Task 3, B2).
+        self.assertEqual(client.call_count, 4)
 
     def test_repair_that_changes_nothing_stops_the_loop(self) -> None:
         _, _verdict, client = self.run_batch([CRITICAL, CRITICAL], repair=None)
@@ -1546,7 +1707,7 @@ class JudgeLoopTest(ViewTestCase):
     def test_a_fresh_verdict_rebinds_an_identical_candidate(self) -> None:
         self.enable_repair_engine()
         unit = self.get_unit()
-        first_client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        first_client = mock_request_verdicts([[CRITICAL], [CRITICAL], [PASS], [PASS]])
         repair_mock = mock.Mock(return_value={unit.id: ["same repair text"]})
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", first_client),
@@ -1554,7 +1715,7 @@ class JudgeLoopTest(ViewTestCase):
         ):
             first = run_judge_batch([unit], writable_ids=set(), user=self.user)
         first_verdict = first[unit.id]
-        second_client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        second_client = mock_request_verdicts([[CRITICAL], [CRITICAL], [PASS], [PASS]])
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", second_client),
             mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
@@ -1574,7 +1735,7 @@ class JudgeLoopTest(ViewTestCase):
         self.enable_repair_engine()
         unit = self.get_unit()
         repair_mock = mock.Mock(return_value={unit.id: ["stored repair"]})
-        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL], [PASS], [PASS]])
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
@@ -1736,7 +1897,9 @@ class JudgeLoopTest(ViewTestCase):
         unit = self.get_unit()
         unit.translate(self.user, ["Human translation"], STATE_TRANSLATED)
         _, _verdict, _client = self.run_batch(
-            [CRITICAL, CRITICAL], repair=["MACHINE OVERWRITE"], writable=False
+            [CRITICAL, CRITICAL, CRITICAL, CRITICAL],
+            repair=["MACHINE OVERWRITE"],
+            writable=False,
         )
         self.assertNotEqual(self.get_unit().target, "MACHINE OVERWRITE")
         self.assertEqual(
@@ -1914,6 +2077,42 @@ class JudgeUnparsedRetryRoundTest(ViewTestCase):
         )
         self.assertTrue(all(row.unparsed for row in rows[:2]))
         self.assertTrue(all(not row.unparsed for row in rows[2:]))
+
+    def test_cancellation_skips_the_unparsed_retry_round(self) -> None:
+        unit = self.get_unit()
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(unit.translation_id),
+            scope_label=str(unit.translation),
+            scope_path=unit.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+        )
+
+        def flip_to_cancelled(_requests, _results) -> None:
+            ProducerRun.objects.filter(pk=run.pk).update(
+                status=ProducerRun.Status.CANCEL_REQUESTED
+            )
+
+        client = mock_request_verdicts([[DEAD], [DEAD]])
+        with mock.patch("weblate.trans.judge_loop.request_verdicts", client):
+            verdicts = run_judge_batch(
+                [unit],
+                writable_ids={unit.id},
+                user=self.user,
+                run=run,
+                on_batch=flip_to_cancelled,
+            )
+
+        # Both seats complete their first round (2 calls); the retry round
+        # for the all-unparsed result never dispatches once cancellation
+        # is observed. The already-completed (if unparsed) round's result
+        # still stands as evidence -- it is not silently discarded.
+        self.assertEqual(client.call_count, 2)
+        self.assertTrue(verdicts[unit.id].unparsed)
+        self.assertEqual(
+            unit.judge_verdicts.filter(run_id=run.id, request_round=1).count(), 0
+        )
 
 
 @override_settings(

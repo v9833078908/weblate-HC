@@ -1371,6 +1371,7 @@ REST_FRAMEWORK = get_drf_settings(
     require_login=REQUIRE_LOGIN,
     anon_throttle=get_env_ratelimit("WEBLATE_API_RATELIMIT_ANON", "100/day"),
     user_throttle=get_env_ratelimit("WEBLATE_API_RATELIMIT_USER", "5000/hour"),
+    producer_throttle=get_env_ratelimit("WEBLATE_API_RATELIMIT_PRODUCER", "60/hour"),
 )
 DRF_STANDARDIZED_ERRORS = get_drf_standardized_errors_settings()
 SPECTACULAR_SETTINGS = get_spectacular_settings(

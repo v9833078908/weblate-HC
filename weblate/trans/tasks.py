@@ -30,6 +30,7 @@ from weblate.addons.events import AddonActivityLogReason, AddonActivityLogStatus
 from weblate.auth.models import AuthenticatedHttpRequest, User, get_anonymous
 from weblate.lang.models import Language
 from weblate.logger import LOGGER
+from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD
 from weblate.trans.actions import ActionEvents
 from weblate.trans.autotranslate import BatchAutoTranslate
 from weblate.trans.component_copy import copy_component_addons
@@ -41,6 +42,7 @@ from weblate.trans.fix_check import (
 )
 from weblate.trans.inherited_settings import apply_create_inheritance_defaults
 from weblate.trans.judge import JudgeError
+from weblate.trans.judge_loop import DEFAULT_CANDIDATE_SEVERITIES
 from weblate.trans.models import (
     Category,
     Change,
@@ -58,7 +60,9 @@ from weblate.trans.removal import RemovalBatch, removal_batch_context
 from weblate.utils.celery import (
     INTERACTIVE_TASK_PRIORITY,
     app,
+    delete_task_liveness,
     heartbeat_task,
+    register_task_liveness,
     touch_task_liveness,
 )
 from weblate.utils.data import data_dir
@@ -1031,6 +1035,7 @@ def auto_translate(
     judge_pretranslate: bool = True,
     judge_mutating_repairs: bool = True,
     judge_candidate_severities: tuple[str, ...] = ("critical", "major"),
+    judge_proposal_only: bool = False,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {"warnings": []}
     heartbeat_task(current_task.request.id if current_task else None)
@@ -1085,6 +1090,7 @@ def auto_translate(
             judge_pretranslate=judge_pretranslate,
             judge_mutating_repairs=judge_mutating_repairs,
             judge_candidate_severities=judge_candidate_severities,
+            judge_proposal_only=judge_proposal_only,
         )
         try:
             message = auto.perform(
@@ -1679,6 +1685,120 @@ def generate_judge_candidate(
 # reserves a fresh UUID and intent; payload, cursor and counters are never
 # touched by dispatch bookkeeping.
 LOC_KIT_DISPATCH_MAX_ATTEMPTS = 5
+
+# How many persistent broker failures a queued producer run's dispatch
+# intent may record before it is failed outright, mirroring the loc-kit
+# ledger's own bound. A transient broker hiccup alone must not fail a run
+# the periodic drain (`drain_producer_run_dispatches`) would have retried.
+PRODUCER_RUN_DISPATCH_MAX_ATTEMPTS = 5
+
+
+def _producer_run_dispatch_kwargs(run) -> dict[str, Any] | None:
+    """
+    Build the ``auto_translate`` kwargs for a run's dispatch phase.
+
+    Returns ``None`` when the run's recorded scope/mode does not match the
+    phase it claims to own - never publish a generation the row does not
+    actually describe.
+    """
+    common = {
+        "user_id": run.actor_id,
+        "mode": "judge",
+        "auto_source": "mt",
+        "source_component_id": None,
+        "engines": [],
+        "threshold": MACHINERY_DEFAULT_THRESHOLD,
+        "producer_run_id": str(run.pk),
+        "judge_pretranslate": False,
+        "judge_mutating_repairs": False,
+    }
+    scope_type = type(run).ScopeType
+    if run.dispatch_phase == "judge-recheck":
+        if (
+            run.scope_type != scope_type.TRANSLATION
+            or run.requested_mode != "recheck"
+            or not run.requested_query.startswith("id:")
+        ):
+            return None
+        return {
+            **common,
+            "q": run.requested_query,
+            "translation_id": int(run.scope_id),
+            "unit_ids": [int(run.requested_query.removeprefix("id:"))],
+            "judge_candidate_severities": ("critical",),
+        }
+    if run.dispatch_phase == "judge-project":
+        if run.scope_type != scope_type.PROJECT or run.requested_mode != "judge":
+            return None
+        return {
+            **common,
+            "q": run.requested_query,
+            "project_id": int(run.scope_id),
+            "unit_ids": run.scope_snapshot or None,
+            "judge_proposal_only": True,
+            "judge_candidate_severities": DEFAULT_CANDIDATE_SEVERITIES,
+        }
+    return None
+
+
+def publish_producer_run_dispatch(*, run_id, skip_locked: bool = False) -> bool:
+    """
+    Publish a queued producer run's reserved task UUID.
+
+    The durable intent is committed with the run. Re-publishing after a crash
+    uses the same UUID; the worker's run claim fences duplicate deliveries.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.judge import ProducerRun
+
+    with transaction.atomic():
+        queryset = ProducerRun.objects.select_for_update(
+            of=("self",), skip_locked=skip_locked
+        )
+        run = queryset.filter(pk=run_id).first()
+        if run is None or run.dispatch_task_id is None:
+            return False
+        if run.dispatch_published_at is not None:
+            return True
+        if run.status != ProducerRun.Status.QUEUED or run.actor_id is None:
+            return False
+        task_id = run.dispatch_task_id
+        kwargs = _producer_run_dispatch_kwargs(run)
+        if kwargs is None:
+            return False
+
+    register_task_liveness(str(task_id))
+    try:
+        auto_translate.apply_async(
+            kwargs=kwargs,
+            task_id=str(task_id),
+            priority=INTERACTIVE_TASK_PRIORITY,
+        )
+    except Exception:
+        delete_task_liveness(str(task_id))
+        LOGGER.exception("Failed to dispatch producer run %s", run_id)
+        with transaction.atomic():
+            run = ProducerRun.objects.select_for_update().get(pk=run_id)
+            if run.dispatch_task_id == task_id and run.dispatch_published_at is None:
+                run.dispatch_attempts += 1
+                run.dispatch_error = "The background task could not be queued."
+                fields = ["dispatch_attempts", "dispatch_error"]
+                if run.dispatch_attempts >= PRODUCER_RUN_DISPATCH_MAX_ATTEMPTS:
+                    run.status = ProducerRun.Status.FAILED
+                    run.finished = timezone.now()
+                    run.failure = gettext("The background task could not be queued.")
+                    fields.extend(["status", "finished", "failure"])
+                run.save(update_fields=fields)
+        return False
+
+    ProducerRun.objects.filter(
+        pk=run_id, dispatch_task_id=task_id, dispatch_published_at__isnull=True
+    ).update(
+        task_id=str(task_id),
+        dispatch_published_at=timezone.now(),
+        dispatch_error="",
+    )
+    return True
 
 
 def _loc_kit_dispatch_task(phase: str):
@@ -2611,6 +2731,21 @@ def drain_loc_kit_dispatches() -> None:
 
 
 @app.task(trail=False)
+def drain_producer_run_dispatches() -> None:
+    """Re-publish every committed producer-run intent missing its broker mark."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.judge import ProducerRun
+
+    run_ids = ProducerRun.objects.filter(
+        status=ProducerRun.Status.QUEUED,
+        dispatch_task_id__isnull=False,
+        dispatch_published_at__isnull=True,
+    ).values_list("pk", flat=True)
+    for run_id in run_ids.iterator():
+        publish_producer_run_dispatch(run_id=run_id, skip_locked=True)
+
+
+@app.task(trail=False)
 def cleanup_component_spreadsheet_import_drafts() -> None:
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models import ComponentSpreadsheetImportDraft
@@ -2788,6 +2923,9 @@ def setup_periodic_tasks(sender, **kwargs) -> None:
     )
     sender.add_periodic_task(
         60, drain_loc_kit_dispatches.s(), name="drain-loc-kit-dispatches"
+    )
+    sender.add_periodic_task(
+        60, drain_producer_run_dispatches.s(), name="drain-producer-run-dispatches"
     )
     sender.add_periodic_task(
         900,

@@ -3674,10 +3674,13 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
     @action(detail=True, methods=["post"])
     def autotranslate(self, request: Request, **kwargs):
         translation = self.get_object()
+        if translation.component.locked:
+            raise LockedError(
+                code="component-locked",
+                detail=gettext("Component is locked."),
+            )
         if not request.user.has_perm("translation.auto", translation):
             self.permission_denied(request, "Can not auto translate")
-        if translation.component.locked:
-            self.permission_denied(request, "Component is locked")
 
         autoform = AutoForm(translation.component, request.user, request.data)
         if not autoform.is_valid():

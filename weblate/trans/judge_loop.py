@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from django.conf import settings
 from django.db import IntegrityError, connections, transaction
@@ -54,8 +55,11 @@ from weblate.trans.judge import (
     validate_judge_configuration,
 )
 from weblate.trans.machinery import fetch_machinery_matches
+from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     JudgeAdaptiveState,
+    JudgeApplication,
+    JudgeApplicationUndoError,
     JudgeCandidateError,
     JudgeCandidateMetadata,
     JudgeDeferral,
@@ -63,8 +67,10 @@ from weblate.trans.models.judge import (
     JudgeRunUnit,
     JudgeVerdict,
     ProducerRun,
+    candidate_round,
     collegium_verdict,
     compute_context_hash,
+    compute_decision_revision,
     compute_judge_request_identity,
     compute_target_hash,
     compute_target_storage_hash,
@@ -72,11 +78,13 @@ from weblate.trans.models.judge import (
     current_verdict,
     has_complete_current_evidence,
     state_for_verdict,
+    unit_clarification_answer,
 )
-from weblate.utils.state import STATE_FUZZY, STATE_TRANSLATED
+from weblate.trans.util import join_plural
+from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from weblate.auth.models import AuthenticatedHttpRequest, User
     from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
@@ -108,13 +116,18 @@ _DEFERRAL_MAX_ELAPSED_SECONDS = 240
 _TOKEN_PRECISION = Decimal("0.000001")
 
 
-def build_request(unit: Unit) -> JudgeRequest:
+def build_request(
+    unit: Unit, *, target_plurals: Sequence[str] | None = None
+) -> JudgeRequest:
     """Collect everything the judge is told about one unit."""
     translation = unit.translation
+    target_plurals = (
+        unit.get_target_plurals() if target_plurals is None else target_plurals
+    )
     return JudgeRequest(
         unit_key=unit.context,
         source=unit.source,
-        target=unit.target,
+        target=join_plural(target_plurals),
         source_language=translation.component.source_language.code,
         target_language=translation.language.code,
         project_id_snapshot=translation.component.project_id,
@@ -123,17 +136,11 @@ def build_request(unit: Unit) -> JudgeRequest:
         note=unit.source_unit.note,
         explanation=unit.source_unit.explanation,
         glossary_terms=get_matched_glossary_prompt_entries(unit),
-        # The judge's own projection is not evidence: a judge-* row is the
-        # previous round's opinion, and feeding it back lets a seat cite
-        # itself as proof ("the judge-flag check indicates ..."). repeat-drift
-        # is likewise opaque: it fires on every member of a same-source group,
-        # including the correct one, so telling a seat "code has proven this"
-        # would suppress a real finding it cannot see (llm.py drops the same
-        # check from the MT/repair prompt for the same reason).
+        clarification=unit_clarification_answer(unit),
         failing_checks=sorted(
             unit.all_checks_names - JUDGE_CHECKS - {REPEAT_DRIFT_CHECK_ID}
         ),
-        target_plurals=unit.get_target_plurals(),
+        target_plurals=target_plurals,
     )
 
 
@@ -303,6 +310,7 @@ def _write_verdict(
     profile,
     project_context: str,
     request_round: int = 0,
+    subject: str = JudgeVerdict.Subject.LIVE,
 ) -> None:
     target_hash = compute_target_hash(request.target_plurals or [request.target])
     context_hash = compute_context_hash(
@@ -310,6 +318,7 @@ def _write_verdict(
         note=request.note,
         explanation=request.explanation,
         glossary_terms=request.glossary_terms,
+        clarification=request.clarification,
     )
     project_context_hash = compute_target_hash([project_context])
     # Prefer the profile that actually served this result: after a
@@ -349,6 +358,10 @@ def _write_verdict(
         seat=seat,
         attempt=attempt,
         request_round=request_round,
+        subject=subject,
+        candidate_target_hash=(
+            target_hash if subject == JudgeVerdict.Subject.CANDIDATE else ""
+        ),
         target_hash=target_hash,
         target_storage_hash=storage_hash,
         context_hash=context_hash,
@@ -382,6 +395,22 @@ def _refresh_unit(unit: Unit) -> Unit:
     return type(unit).objects.filter(pk=unit.pk).prefetch().prefetch_source().get()
 
 
+def _run_cancel_requested(run: ProducerRun | None) -> bool:
+    """
+    Whether ``run`` currently carries a pending cancellation (G4).
+
+    Read fresh from the database on every call rather than from the
+    in-memory ``run`` object: the producer's cancel POST updates the row
+    directly, and the worker never refreshes its own local copy mid-batch.
+    A drain pass (or any other caller without a run) is never cancellable.
+    """
+    if run is None:
+        return False
+    return ProducerRun.objects.filter(
+        pk=run.pk, status=ProducerRun.Status.CANCEL_REQUESTED
+    ).exists()
+
+
 def _deterministic_checks(unit: Unit) -> set[str]:
     """Exclude judge projections from the no-regress check snapshot."""
     return {name for name in unit.all_checks_names if not name.startswith("judge-")}
@@ -404,6 +433,7 @@ def _request_identity(
             note=request.note,
             explanation=request.explanation,
             glossary_terms=request.glossary_terms,
+            clarification=request.clarification,
         ),
         project_context_hash=compute_target_hash([project_context]),
         source_language=request.source_language,
@@ -414,9 +444,14 @@ def _request_identity(
 
 
 def _cached_verdict(
-    unit: Unit, request: JudgeRequest, profiles: dict[int, object], project_context: str
+    unit: Unit,
+    request: JudgeRequest,
+    profiles: dict[int, object],
+    project_context: str,
+    *,
+    subject: str = JudgeVerdict.Subject.LIVE,
 ) -> JudgeVerdict | None:
-    """Reuse only complete current parsed evidence for an unchanged request."""
+    """Reuse only complete parsed evidence for the same request subject."""
     identities = {
         seat: _request_identity(unit, request, profile, project_context)
         for seat, profile in profiles.items()
@@ -427,6 +462,7 @@ def _cached_verdict(
             unit.judge_verdicts.filter(
                 request_identity=identity,
                 seat=seat,
+                subject=subject,
             )
             .order_by("-timestamp", "-pk")
             .first()
@@ -460,6 +496,10 @@ class _PreparedRound:
     before_state: int
 
 
+def _never_cancelled() -> bool:
+    return False
+
+
 @dataclass(frozen=True)
 class _SeatJob:
     seat: int
@@ -470,6 +510,10 @@ class _SeatJob:
     retry_budget: RetryBudget
     attempt: int
     retry_deadline: float | None
+    # G4: polled before every outbound batch in both seat threads; a run
+    # that is never cancellable (a drain pass with no run, or an older
+    # direct caller) keeps the previous no-op behaviour.
+    cancelled: Callable[[], bool] = _never_cancelled
 
 
 @dataclass
@@ -520,12 +564,14 @@ def _apply_repair(
                 note=locked.source_unit.note,
                 explanation=locked.source_unit.explanation,
                 glossary_terms=get_matched_glossary_prompt_entries(locked),
+                clarification=unit_clarification_answer(locked),
             )
             != compute_context_hash(
                 source=request.source,
                 note=request.note,
                 explanation=request.explanation,
                 glossary_terms=request.glossary_terms,
+                clarification=request.clarification,
             )
         ):
             return _RepairOutcome(None)
@@ -590,12 +636,14 @@ def _store_candidate(
                 note=locked.source_unit.note,
                 explanation=locked.source_unit.explanation,
                 glossary_terms=get_matched_glossary_prompt_entries(locked),
+                clarification=unit_clarification_answer(locked),
             )
             != compute_context_hash(
                 source=request.source,
                 note=request.note,
                 explanation=request.explanation,
                 glossary_terms=request.glossary_terms,
+                clarification=request.clarification,
             )
         ):
             return "drift"
@@ -610,6 +658,7 @@ def _store_candidate(
                 note=locked.source_unit.note,
                 explanation=locked.source_unit.explanation,
                 glossary_terms=get_matched_glossary_prompt_entries(locked),
+                clarification=unit_clarification_answer(locked),
             ),
             "engine": engine,
         }
@@ -705,6 +754,7 @@ def _deferral_values(
         note=request.note,
         explanation=request.explanation,
         glossary_terms=request.glossary_terms,
+        clarification=request.clarification,
     )
     project_context_hash = compute_target_hash([project_context])
     return {
@@ -1042,6 +1092,7 @@ def _persist_verdict_batches(
     project_context: str,
     on_batch: OnBatch | None,
     attempt_started_at: datetime | None = None,
+    subject: str = JudgeVerdict.Subject.LIVE,
 ) -> OnBatch:
     cursor = 0
 
@@ -1074,16 +1125,18 @@ def _persist_verdict_batches(
                     profile=profile,
                     project_context=project_context,
                     request_round=request_round,
+                    subject=subject,
                 )
-                _sync_deferral(
-                    unit,
-                    request,
-                    seat=seat,
-                    profile=profile,
-                    project_context=project_context,
-                    result=result,
-                    attempt_started_at=attempt_started_at,
-                )
+                if subject == JudgeVerdict.Subject.LIVE:
+                    _sync_deferral(
+                        unit,
+                        request,
+                        seat=seat,
+                        profile=profile,
+                        project_context=project_context,
+                        result=result,
+                        attempt_started_at=attempt_started_at,
+                    )
         if on_batch is not None:
             on_batch(batch_requests, batch_results)
 
@@ -1151,6 +1204,7 @@ def _run_seats(  # ruff: ignore[complex-structure]
                 adaptive=True,
                 attempt=job.attempt,
                 retry_deadline=job.retry_deadline,
+                cancelled=job.cancelled,
             )
         except BaseException as caught:
             error = caught
@@ -1275,6 +1329,8 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
     retry_deadline: float | None = None,
     candidate_severities: tuple[str, ...] = DEFAULT_CANDIDATE_SEVERITIES,
     mutating_repairs: bool = True,
+    candidate_targets: dict[int, list[str]] | None = None,
+    evidence_run_id: uuid.UUID | None = None,
 ) -> JudgeBatchResult:
     """
     Judge every unit with both seats; repair writable defects.
@@ -1330,14 +1386,23 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 project_context=project_context,
                 on_batch=on_batch,
                 attempt_started_at=started_at,
+                subject=(
+                    JudgeVerdict.Subject.CANDIDATE
+                    if candidate_targets is not None
+                    else JudgeVerdict.Subject.LIVE
+                ),
             ),
             run=run,
             retry_budget=retry_budget,
             attempt=repair_attempt,
             retry_deadline=retry_deadline,
+            cancelled=is_cancelled,
         )
 
-    run_id = run.id if run is not None else uuid.uuid4()
+    def is_cancelled() -> bool:
+        return _run_cancel_requested(run)
+
+    run_id = evidence_run_id or (run.id if run is not None else uuid.uuid4())
     project_slug = units[0].translation.component.project.slug
     project_context = judge_project_context(units[0].translation.component.project)
     pending = list(units)
@@ -1358,15 +1423,34 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
 
     attempt = 0
     while True:
+        if pending and is_cancelled():
+            break
         pending = [_refresh_unit(unit) for unit in pending]
         round_requests: dict[int, JudgeRequest] = {}
         cached_ids: set[int] = set()
         round_states = {unit.id: unit.state for unit in pending}
         for unit in pending:
-            request = build_request(unit)
+            request = build_request(
+                unit,
+                target_plurals=(
+                    candidate_targets[unit.id]
+                    if candidate_targets is not None
+                    else None
+                ),
+            )
             round_requests[unit.id] = request
             cached = (
-                _cached_verdict(unit, request, profiles, project_context)
+                _cached_verdict(
+                    unit,
+                    request,
+                    profiles,
+                    project_context,
+                    subject=(
+                        JudgeVerdict.Subject.CANDIDATE
+                        if candidate_targets is not None
+                        else JudgeVerdict.Subject.LIVE
+                    ),
+                )
                 if use_cache and set(selected_seats) == set(JUDGE_SEATS)
                 else None
             )
@@ -1415,7 +1499,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                     if len({row.seat for row in rows}) == len(selected_seats)
                     and all(row.unparsed for row in rows)
                 }
-                if not unparsed_ids:
+                if not unparsed_ids or is_cancelled():
                     break
                 retry_round += 1
                 last_request_round = _allocate_request_round(run_id, run)
@@ -1475,9 +1559,12 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 or (item.needs_candidate and item.unit.id not in reused_candidate_ids)
             )
         ]
+        # G4: a cancellation observed here stops the round from spending a
+        # repair MT call; the verdicts already computed above are kept.
+        cancelled_before_repair = bool(repairable_units) and is_cancelled()
         repairs = (
             repair_targets(repairable_units, user, run_id=run_id)
-            if repairable_units
+            if repairable_units and not cancelled_before_repair
             else {}
         )
         unsupported_language = (
@@ -1516,6 +1603,17 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 else:
                     verdicts.cached_unit_ids.discard(unit.id)
                 record_final_snapshot(item.unit)
+                continue
+            if cancelled_before_repair and wants_repair:
+                # The verdict itself is already durably cached
+                # (`_persist_verdict_batches` wrote it per completed
+                # batch), so dropping the unit from this round's result --
+                # instead of recording a false
+                # "no-candidate"/"no-engine-for-language" outcome -- lets a
+                # resume reuse the cached verdict and only retry repair,
+                # without a second paid judge call.
+                verdicts.pop(unit.id, None)
+                verdicts.cached_unit_ids.discard(unit.id)
                 continue
             new_target = repairs.get(unit.id) if wants_repair else None
             if new_target is None:
@@ -1562,6 +1660,25 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                     continue
                 verdicts.repair_status[unit.id] = "candidate-stored"
                 verdicts.cached_unit_ids.discard(unit.id)
+                candidate = active_judge_candidate(item.unit, item.verdict)
+                if candidate is None:
+                    verdicts.repair_status[unit.id] = "no-candidate"
+                    record_final_snapshot(item.unit)
+                    continue
+                run_judge_batch(
+                    [item.unit],
+                    writable_ids=set(),
+                    user=user,
+                    on_batch=on_batch,
+                    run=run,
+                    seats=selected_seats,
+                    use_cache=use_cache,
+                    retry_deadline=retry_deadline,
+                    candidate_severities=(),
+                    mutating_repairs=False,
+                    candidate_targets={item.unit.id: candidate.target_list},
+                    evidence_run_id=run_id,
+                )
                 record_final_snapshot(item.unit)
                 continue
             outcome = _apply_repair(
@@ -1715,9 +1832,14 @@ def _finalize_drain_run(
                         settings.JUDGE_MAY_APPROVE
                         and has_complete_current_evidence(locked, seats=JUDGE_SEATS)
                     ),
+                    current_state=locked.state,
                 )
-                if verdict.verdict == JudgeVerdict.Verdict.PASS and any(
-                    check.name == "max-length" for check in locked.active_checks
+                if (
+                    locked.state != STATE_APPROVED
+                    and verdict.verdict == JudgeVerdict.Verdict.PASS
+                    and any(
+                        check.name == "max-length" for check in locked.active_checks
+                    )
                 ):
                     # A repair-exhausted over-budget candidate must not
                     # ship just because the judge approved its content.
@@ -1732,6 +1854,7 @@ def _finalize_drain_run(
                     note=locked.source_unit.note,
                     explanation=locked.source_unit.explanation,
                     glossary_terms=get_matched_glossary_prompt_entries(locked),
+                    clarification=unit_clarification_answer(locked),
                 )
             )
             JudgeRunUnit.objects.update_or_create(
@@ -1997,6 +2120,7 @@ def _unit_context_hash(unit: Unit) -> str:
         note=unit.source_unit.note,
         explanation=unit.source_unit.explanation,
         glossary_terms=get_matched_glossary_prompt_entries(unit),
+        clarification=unit_clarification_answer(unit),
     )
 
 
@@ -2051,9 +2175,6 @@ def queue_judge_recheck(unit: Unit, actor: User) -> tuple[ProducerRun, bool]:
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models import Unit as UnitModel
 
-    # ruff: ignore[import-outside-top-level]
-    from weblate.trans.tasks import auto_translate
-
     query = recheck_query(unit.pk)
     translation = unit.translation
     with transaction.atomic():
@@ -2061,8 +2182,12 @@ def queue_judge_recheck(unit: Unit, actor: User) -> tuple[ProducerRun, bool]:
         existing = active_recheck_run(unit)
         if existing is not None:
             return existing, False
+        dispatch_task_id = uuid4()
         run = ProducerRun.objects.create(
             actor=actor,
+            dispatch_task_id=dispatch_task_id,
+            dispatch_phase="judge-recheck",
+            dispatch_requested_at=timezone.now(),
             scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(translation.pk),
             scope_label=str(translation),
@@ -2074,55 +2199,54 @@ def queue_judge_recheck(unit: Unit, actor: User) -> tuple[ProducerRun, bool]:
             configuration_snapshot=judge_configuration_snapshot(),
         )
 
-    def dispatch() -> None:
-        try:
-            task = auto_translate.delay(
-                user_id=actor.pk,
-                mode="judge",
-                q=query,
-                auto_source="mt",
-                source_component_id=None,
-                engines=[],
-                threshold=MACHINERY_DEFAULT_THRESHOLD,
-                translation_id=translation.pk,
-                unit_ids=[unit.pk],
-                producer_run_id=str(run.pk),
-                judge_pretranslate=False,
-                judge_mutating_repairs=False,
-                judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
-            )
-        except Exception:
-            LOGGER.exception("Failed to dispatch a judge re-check run")
-            ProducerRun.objects.filter(pk=run.pk).update(
-                status=ProducerRun.Status.FAILED,
-                finished=timezone.now(),
-                failure="The re-check could not be queued for execution.",
-            )
-            return
-        ProducerRun.objects.filter(pk=run.pk).update(task_id=task.id)
+    # Publish through the durable intent. A crash after this transaction
+    # commits cannot leave the re-check permanently QUEUED: the periodic
+    # drain reclaims the same reserved task UUID.
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.tasks import publish_producer_run_dispatch
 
-    transaction.on_commit(dispatch)
+    transaction.on_commit(
+        lambda: publish_producer_run_dispatch(run_id=run.pk, skip_locked=False)
+    )
     return run, True
 
 
 def accept_judge_candidate(
-    candidate: Suggestion, request: AuthenticatedHttpRequest
-) -> None:
+    candidate: Suggestion,
+    request: AuthenticatedHttpRequest,
+    *,
+    acknowledge: Mapping[str, bool] | None = None,
+) -> JudgeApplication:
     """
     Accept a stored judge repair candidate under every acceptance guard.
 
     Stronger than a plain ``suggestion.accept``: requires both unit.review
     and translation.auto (invariant 5). Locks Unit, Suggestion, then the
     representative JudgeVerdict, in that order (matching _store_candidate's
-    and queue_judge_recheck's lock order), and only proceeds while that
-    verdict is still the current unresolved REJECT/FLAG for this exact
-    target/context (invariant 2). Writes STATE_TRANSLATED with
-    ActionEvents.ACCEPT provenance and propagate=False (invariant 4),
-    consumes the candidate, and queues the one paid re-check that projects
-    the string's actual status afterwards (invariant 8): the string looks
-    finished immediately, and a failing re-check holds it again. Every
-    guard failure raises JudgeCandidateError with a producer-facing
-    message; callers translate it into their own response shape.
+    lock order), and only proceeds while that verdict is still the current
+    unresolved REJECT/FLAG for this exact target/context (invariant 2).
+    Writes STATE_TRANSLATED with ActionEvents.ACCEPT provenance and
+    propagate=False (invariant 4), consumes the candidate, and returns a
+    durable JudgeApplication receipt (Task 8) linking the Change it just
+    wrote to this exact candidate, so a producer can undo it later even
+    after the Suggestion is gone. Every guard failure raises
+    JudgeCandidateError with a producer-facing message; callers translate
+    it into their own response shape.
+
+    This is the sole write primitive (Task 6, G5): a normal apply-candidate
+    or bulk apply never re-checks by itself -- a paid re-check per applied
+    row would silently multiply cost across a batch. ``queue_judge_recheck``
+    is the caller's own explicit decision (the legacy verdict-card view
+    still makes it, to keep its existing one-click behaviour).
+
+    ``acknowledge`` gates two producer-visible side effects that a normal
+    bulk apply must never trigger silently (G6): losing an existing
+    ``approved`` state (``acknowledge["approval_loss"]``) and a verdict
+    that flags a terminology mismatch, any severity
+    (``acknowledge["terminology_conflict"]``). Both default to unacknowledged,
+    so the ordinary suggestion accept API and the classic suggestion list
+    -- neither of which ever passes ``acknowledge`` -- cannot bypass either
+    gate for a candidate that needs it.
     """
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models import Unit as UnitModel
@@ -2130,6 +2254,7 @@ def accept_judge_candidate(
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models.suggestion import Suggestion as SuggestionModel
 
+    acked = acknowledge or {}
     user = request.user
     unit = candidate.unit
     if not user.has_perm("unit.review", unit) or not user.has_perm(
@@ -2192,6 +2317,30 @@ def accept_judge_candidate(
                 gettext("The verdict is no longer current for this string.")
             )
 
+        candidate_evidence = candidate_round(locked_unit, locked_candidate.target_list)
+        if {row.seat for row in candidate_evidence} != set(JUDGE_SEATS) or any(
+            row.unparsed for row in candidate_evidence
+        ):
+            raise JudgeCandidateError(
+                gettext("This candidate has not been fully verified.")
+            )
+        if locked_unit.state == STATE_APPROVED and not acked.get("approval_loss"):
+            raise JudgeCandidateError(
+                gettext(
+                    "Applying this candidate will remove the string's approval; "
+                    "acknowledge to continue."
+                )
+            )
+        if any(
+            isinstance(error, dict) and error.get("category") == "terminology"
+            for error in verdict.errors
+        ) and not acked.get("terminology_conflict"):
+            raise JudgeCandidateError(
+                gettext(
+                    "This candidate touches a possible terminology mismatch; "
+                    "acknowledge to continue."
+                )
+            )
         locked_unit.translate(
             user,
             locked_candidate.target_list,
@@ -2203,9 +2352,127 @@ def accept_judge_candidate(
                 "judge_run_id": str(verdict.run_id),
             },
         )
+        apply_change = (
+            Change.objects.filter(unit=locked_unit, action=ActionEvents.ACCEPT)
+            .order_by("-pk")
+            .first()
+        )
+        application = JudgeApplication.objects.create(
+            unit=locked_unit,
+            change=apply_change,
+            run=ProducerRun.objects.filter(pk=verdict.run_id).first(),
+            run_unit=JudgeRunUnit.objects.filter(
+                run_id=verdict.run_id, unit_id_snapshot=locked_unit.pk
+            ).first(),
+            candidate_target_hash=compute_target_hash(locked_candidate.target_list),
+            applied_revision=compute_decision_revision(locked_unit),
+            actor=user,
+        )
+        JudgeVerdict.objects.filter(
+            unit=locked_unit,
+            subject=JudgeVerdict.Subject.CANDIDATE,
+            candidate_target_hash=compute_target_hash(locked_unit.get_target_plurals()),
+            context_hash=metadata.context_hash,
+        ).update(
+            subject=JudgeVerdict.Subject.LIVE,
+            candidate_target_hash="",
+        )
         locked_candidate.delete()
 
-    queue_judge_recheck(locked_unit, user)
+    return application
+
+
+def undo_judge_application(
+    application: JudgeApplication, request: AuthenticatedHttpRequest
+) -> JudgeApplication:
+    """
+    Undo one previously applied judge repair candidate (Task 8).
+
+    Idempotent: a second call on an already-undone application returns the
+    same receipt without touching the unit again -- a repeat must never add
+    a second Change. Fails closed under select_for_update if the unit has
+    changed since the application, including a same-text re-edit (which
+    still advances compute_decision_revision's own Change-pk component),
+    rather than silently overwriting whatever is there now; a caller turns
+    that into a client-visible 409 with the current state, not an
+    overwrite. Restoring approval (STATE_APPROVED) additionally requires
+    the actor to currently hold unit.review; every other restore only
+    needs the same translation.auto the original apply did. Restores
+    through Change.revert with propagate=False, so this never touches a
+    sibling unit sharing the same source string, never issues new judge
+    evidence for the restored text, and never queues a paid re-check.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import Unit as UnitModel
+
+    user = request.user
+    if not user.has_perm("translation.auto", application.unit.translation):
+        msg = "forbidden"
+        raise JudgeApplicationUndoError(
+            msg,
+            gettext("You do not have permission to undo this application."),
+        )
+
+    with transaction.atomic():
+        locked_application = JudgeApplication.objects.select_for_update().get(
+            pk=application.pk
+        )
+        if locked_application.undone_at is not None:
+            return locked_application
+        locked_unit = UnitModel.objects.select_for_update().get(
+            pk=locked_application.unit_id
+        )
+        if (
+            compute_decision_revision(locked_unit)
+            != locked_application.applied_revision
+        ):
+            msg = "stale"
+            raise JudgeApplicationUndoError(
+                msg,
+                gettext(
+                    "This string has changed since the fix was applied; "
+                    "reload and try again."
+                ),
+            )
+        change = Change.objects.select_for_update().get(pk=locked_application.change_id)
+        revert_state = change.get_revert_state()
+        if revert_state is None:
+            msg = "not-revertable"
+            raise JudgeApplicationUndoError(
+                msg,
+                gettext("This application can no longer be undone automatically."),
+            )
+        if revert_state == STATE_APPROVED and not user.has_perm(
+            "unit.review", locked_unit
+        ):
+            msg = "forbidden"
+            raise JudgeApplicationUndoError(
+                msg,
+                gettext("Restoring approval requires review permission."),
+            )
+        reverted = change.revert(
+            user,
+            change_action=ActionEvents.JUDGE_UNDO,
+            request=request,
+            change_details={"judge_application_id": locked_application.pk},
+            propagate=False,
+        )
+        if not reverted:
+            msg = "not-revertable"
+            raise JudgeApplicationUndoError(
+                msg,
+                gettext("This application can no longer be undone automatically."),
+            )
+        undo_change = (
+            Change.objects.filter(unit=locked_unit, action=ActionEvents.JUDGE_UNDO)
+            .order_by("-pk")
+            .first()
+        )
+        locked_application.undo_change = undo_change
+        locked_application.undone_at = timezone.now()
+        locked_application.undone_by = user
+        locked_application.save(update_fields=["undo_change", "undone_at", "undone_by"])
+    return locked_application
 
 
 def _generation_lock_key(unit_id: int, verdict_id: int) -> str:

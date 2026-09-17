@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import PermissionDenied
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.utils import translation
 from django.utils.translation import gettext
@@ -20,27 +20,37 @@ from weblate.auth.models import Group, Permission, Role, User, setup_project_gro
 from weblate.trans.actions import ActionEvents
 from weblate.trans.change_display import RenderJudgeResolution
 from weblate.trans.forms import JudgeResolutionForm
-from weblate.trans.judge import judge_request_upper_bound
-from weblate.trans.judge_loop import accept_judge_candidate, build_request
+from weblate.trans.judge import judge_configuration_snapshot, judge_request_upper_bound
+from weblate.trans.judge_loop import (
+    accept_judge_candidate,
+    build_request,
+    undo_judge_application,
+)
 from weblate.trans.models import ProducerRun, Suggestion
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     SEVERITY_RANK,
+    JudgeApplication,
+    JudgeApplicationUndoError,
     JudgeCandidateError,
     JudgeCandidateMetadata,
     JudgeResolutionError,
     JudgeVerdict,
     compute_context_hash,
+    compute_decision_revision,
     compute_target_hash,
     compute_target_storage_hash,
+    current_round,
     current_verdict,
     resolve_verdict,
     state_for_verdict,
     verdict_for_severity,
 )
 from weblate.trans.models.unit import Unit
+from weblate.trans.tasks import publish_producer_run_dispatch
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import RepoTestMixin, create_test_user
+from weblate.utils.celery import get_task_liveness
 from weblate.utils.state import (
     FUZZY_STATES,
     STATE_APPROVED,
@@ -135,6 +145,157 @@ class JudgeSeverityGateTest(SimpleTestCase):
         )
 
 
+class ProducerRunIdempotencyTest(ViewTestCase):
+    def test_same_idempotency_key_cannot_create_two_runs(self) -> None:
+        translation = self.get_translation()
+        values = {
+            "actor": self.user,
+            "scope_type": ProducerRun.ScopeType.TRANSLATION,
+            "scope_id": str(translation.pk),
+            "scope_label": str(translation),
+            "scope_path": translation.get_absolute_url(),
+            "requested_mode": "judge",
+            "cap": 1,
+            "idempotency_key": "request-1",
+        }
+        ProducerRun.objects.create(**values)
+        with self.assertRaises(IntegrityError):
+            ProducerRun.objects.create(**values)
+
+
+class ProducerRunDispatchTest(ViewTestCase):
+    def test_publishes_reserved_recheck_task_id_once(self) -> None:
+        translation = self.get_translation()
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-recheck",
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=f"id:{translation.unit_set.first().pk}",
+            requested_mode="recheck",
+            cap=1,
+        )
+
+        with patch(
+            "weblate.trans.tasks.auto_translate.apply_async", autospec=True
+        ) as publish:
+            self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+            self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+
+        self.assertEqual(publish.call_count, 1)
+        run.refresh_from_db()
+        self.assertEqual(run.task_id, str(run.dispatch_task_id))
+        self.assertIsNotNone(run.dispatch_published_at)
+
+    def test_dispatch_registers_a_liveness_record_before_publishing(self) -> None:
+        # /api/tasks/{id}/ (and the judge-run report) read this same
+        # liveness record; a producer run must be observable the same way
+        # any other LIVENESS_TASKS dispatch is (Task 5b).
+        translation = self.get_translation()
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-recheck",
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=f"id:{translation.unit_set.first().pk}",
+            requested_mode="recheck",
+            cap=1,
+        )
+        with patch("weblate.trans.tasks.auto_translate.apply_async", autospec=True):
+            self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+        self.assertEqual(
+            get_task_liveness(str(run.dispatch_task_id)),
+            "queued",
+        )
+
+    def test_dispatch_failure_clears_the_liveness_record(self) -> None:
+        translation = self.get_translation()
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-recheck",
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=f"id:{translation.unit_set.first().pk}",
+            requested_mode="recheck",
+            cap=1,
+        )
+        with patch(
+            "weblate.trans.tasks.auto_translate.apply_async",
+            side_effect=RuntimeError("broker down"),
+        ):
+            self.assertFalse(publish_producer_run_dispatch(run_id=run.pk))
+        self.assertIsNone(get_task_liveness(str(run.dispatch_task_id)))
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_publishes_and_adopts_a_project_scoped_judge_run_end_to_end(self) -> None:
+        # The project-phase dispatch kwargs must feed a real worker: no
+        # step here is mocked except the outbound judge provider call.
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        project = self.component.project
+        unit = self.get_unit()
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-project",
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(project.pk),
+            scope_label=str(project),
+            scope_path=project.get_absolute_url(),
+            requested_query="",
+            requested_mode="judge",
+            cap=10,
+            scope_snapshot=[unit.pk],
+            configuration_snapshot=judge_configuration_snapshot(),
+        )
+
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
+            out = {}
+            for judged in units:
+                request = build_request(judged)
+                out[judged.id] = JudgeVerdict.objects.create(
+                    unit=judged,
+                    max_severity="none",
+                    model_verdict=JudgeVerdict.Verdict.PASS,
+                    judge_model="vendor-a/model",
+                    seat=1,
+                    target_hash=compute_target_hash(request.target_plurals),
+                    context_hash=compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        explanation=request.explanation,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                )
+            return out
+
+        with patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ) as run_batch:
+            self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertIsNotNone(run.dispatch_published_at)
+        judged_units = run_batch.call_args.args[0]
+        self.assertEqual([judged.pk for judged in judged_units], [unit.pk])
+
+
 class JudgePrimaryErrorTest(SimpleTestCase):
     def test_primary_error_picks_max_severity(self) -> None:
         verdict = JudgeVerdict(
@@ -206,6 +367,32 @@ class JudgeHashTest(SimpleTestCase):
             base,
             compute_context_hash(
                 source="Door", note="hall", explanation="", glossary_terms=[]
+            ),
+        )
+
+    def test_context_hash_reacts_to_clarification(self) -> None:
+        base = compute_context_hash(
+            source="Door", note="", explanation="", glossary_terms=[]
+        )
+        self.assertEqual(
+            base,
+            compute_context_hash(
+                source="Door",
+                note="",
+                explanation="",
+                glossary_terms=[],
+                clarification="",
+            ),
+            "an absent clarification must not change the existing hash",
+        )
+        self.assertNotEqual(
+            base,
+            compute_context_hash(
+                source="Door",
+                note="",
+                explanation="",
+                glossary_terms=[],
+                clarification="It's an airlock door, not a house door.",
             ),
         )
         self.assertNotEqual(
@@ -293,6 +480,19 @@ class JudgeResolutionTest(ViewTestCase):
         kwargs.setdefault("judge_model", "vendor/model-a")
         kwargs.setdefault("seat", 1)
         return JudgeVerdict.objects.create(unit=unit, max_severity=severity, **kwargs)
+
+    def test_candidate_verdict_never_replaces_live_evidence(self) -> None:
+        unit = self.get_unit()
+        live = self.make_verdict(unit, "none")
+        self.make_verdict(
+            unit,
+            "critical",
+            subject="candidate",
+            candidate_target_hash=compute_target_hash(["Candidate"]),
+        )
+
+        self.assertEqual([row.pk for row in current_round(unit)], [live.pk])
+        self.assertEqual(current_verdict(unit).pk, live.pk)
 
     def test_permission_denied_without_review(self) -> None:
         unit = self.get_unit()
@@ -1058,9 +1258,23 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
             raise_exception=False,
             userdetails=metadata,
         )
+        candidate_hash = compute_target_hash(suggestion.target_list)
+        for seat in (1, 2):
+            JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity="none",
+                judge_model=f"vendor/model-{seat}",
+                seat=seat,
+                run_id=verdict.run_id,
+                request_round=1,
+                target_hash=candidate_hash,
+                candidate_target_hash=candidate_hash,
+                context_hash=metadata["context_hash"],
+                subject=JudgeVerdict.Subject.CANDIDATE,
+            )
         return suggestion
 
-    def accept_as(self, candidate, user=None) -> None:
+    def accept_as(self, candidate, user=None, acknowledge=None) -> None:
         request = self.get_request()
         request.user = user or self.user
         with (
@@ -1070,9 +1284,12 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            accept_judge_candidate(candidate, request)
+            accept_judge_candidate(candidate, request, acknowledge=acknowledge)
 
-    def test_accept_translates_consumes_candidate_and_queues_recheck(self) -> None:
+    def test_accept_translates_and_consumes_the_candidate(self) -> None:
+        # G5: the primitive itself no longer queues a paid recheck -- that
+        # decision moves to callers (the verdict-card view explicitly asks
+        # for one; a bulk apply must not pay for N rechecks per batch).
         self.enable_review()
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
@@ -1084,10 +1301,7 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
         self.assertEqual(refreshed.state, STATE_TRANSLATED)
         self.assertEqual(refreshed.target, "Better translation\n")
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
-        runs = ProducerRun.objects.filter(
-            requested_mode="recheck", scope_id=str(unit.translation_id)
-        )
-        self.assertEqual(runs.count(), 1)
+        self.assertFalse(ProducerRun.objects.filter(requested_mode="recheck").exists())
         change = (
             Change.objects.filter(unit=unit, action=ActionEvents.ACCEPT)
             .order_by("-pk")
@@ -1096,6 +1310,126 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
         self.assertIsNotNone(change)
         self.assertEqual(change.details.get("judge_verdict_id"), verdict.pk)
         self.assertEqual(change.details.get("judge_run_id"), str(verdict.run_id))
+
+    def test_accept_blocks_approval_loss_without_acknowledgement(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_APPROVED)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_applies_with_approval_loss_acknowledged(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+
+        self.accept_as(candidate, acknowledge={"approval_loss": True})
+
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_blocks_terminology_conflict_without_acknowledgement(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        before_state = unit.state
+        verdict = self.make_verdict(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "wrong term",
+                }
+            ],
+        )
+        candidate = self.make_candidate(unit, verdict)
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        self.assertEqual(self.get_unit().state, before_state)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_applies_with_terminology_conflict_acknowledged(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "minor",
+                    "description": "wrong term",
+                }
+            ],
+        )
+        candidate = self.make_candidate(unit, verdict)
+
+        self.accept_as(candidate, acknowledge={"terminology_conflict": True})
+
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_combined_case_needs_both_acknowledgements(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        verdict = self.make_verdict(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "wrong term",
+                }
+            ],
+        )
+        candidate = self.make_candidate(unit, verdict)
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate, acknowledge={"approval_loss": True})
+        self.assertEqual(self.get_unit().state, STATE_APPROVED)
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate, acknowledge={"terminology_conflict": True})
+        self.assertEqual(self.get_unit().state, STATE_APPROVED)
+
+        self.accept_as(
+            candidate,
+            acknowledge={"approval_loss": True, "terminology_conflict": True},
+        )
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_promotes_matching_candidate_evidence_to_live(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        candidate_evidence = JudgeVerdict.objects.get(
+            unit=unit,
+            subject=JudgeVerdict.Subject.CANDIDATE,
+            seat=1,
+        )
+
+        self.accept_as(candidate)
+
+        candidate_evidence.refresh_from_db()
+        self.assertEqual(candidate_evidence.subject, JudgeVerdict.Subject.LIVE)
 
     def test_accept_denied_without_unit_review(self) -> None:
         self.grant(["translation.auto"])
@@ -1215,6 +1549,262 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
 
         with self.assertRaises(JudgeCandidateError):
             self.accept_as(candidate)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeApplicationUndoTest(ViewTestCase):
+    """Direct tests for undo_judge_application (Task 8)."""
+
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant(self, codenames) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        role = Role.objects.create(name="Undo acceptance")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(name="Undo accepters")
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        metadata = {
+            "kind": "judge-repair",
+            "schema": 1,
+            "judge_verdict_id": verdict.pk,
+            "judge_run_id": str(verdict.run_id),
+            "target_hash": compute_target_hash(unit.get_target_plurals()),
+            "context_hash": judge_context_hash(unit),
+            "engine": "openrouter",
+        }
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=None,
+            vote=False,
+            raise_exception=False,
+            userdetails=metadata,
+        )
+        candidate_hash = compute_target_hash(suggestion.target_list)
+        for seat in (1, 2):
+            JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity="none",
+                judge_model=f"vendor/model-{seat}",
+                seat=seat,
+                run_id=verdict.run_id,
+                request_round=1,
+                target_hash=candidate_hash,
+                candidate_target_hash=candidate_hash,
+                context_hash=metadata["context_hash"],
+                subject=JudgeVerdict.Subject.CANDIDATE,
+            )
+        return suggestion
+
+    def accept_as(self, candidate, user=None, acknowledge=None) -> JudgeApplication:
+        request = self.get_request()
+        request.user = user or self.user
+        with (
+            patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            return accept_judge_candidate(candidate, request, acknowledge=acknowledge)
+
+    def undo_as(self, application, user=None) -> JudgeApplication:
+        request = self.get_request()
+        request.user = user or self.user
+        return undo_judge_application(application, request)
+
+    def test_accept_creates_a_durable_receipt(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+
+        application = self.accept_as(candidate)
+
+        self.assertIsNotNone(application)
+        self.assertEqual(application.unit_id, unit.pk)
+        self.assertIsNone(application.undone_at)
+        change = (
+            Change.objects.filter(unit=unit, action=ActionEvents.ACCEPT)
+            .order_by("-pk")
+            .first()
+        )
+        self.assertEqual(application.change_id, change.pk)
+        self.assertEqual(
+            application.applied_revision, compute_decision_revision(self.get_unit())
+        )
+
+    def test_undo_restores_previous_target_and_state(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        before_target = unit.target
+        before_state = unit.state
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        application = self.accept_as(candidate)
+
+        self.undo_as(application)
+
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.target, before_target)
+        self.assertEqual(refreshed.state, before_state)
+
+    def test_undo_restores_approval_with_review_permission(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        application = self.accept_as(candidate, acknowledge={"approval_loss": True})
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+
+        self.undo_as(application)
+
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_APPROVED)
+        self.assertEqual(refreshed.target, "Approved translation\n")
+
+    def test_undo_is_idempotent_and_does_not_add_a_second_change(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        application = self.accept_as(candidate)
+
+        self.undo_as(application)
+        change_count = Change.objects.filter(unit=unit).count()
+        second = self.undo_as(application)
+
+        self.assertEqual(Change.objects.filter(unit=unit).count(), change_count)
+        self.assertEqual(second.pk, application.pk)
+        self.assertIsNotNone(second.undone_at)
+
+    def test_undo_rejects_a_subsequent_edit(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        application = self.accept_as(candidate)
+        unit.translate(self.user, "Edited after the fix", STATE_TRANSLATED)
+
+        with self.assertRaises(JudgeApplicationUndoError):
+            self.undo_as(application)
+
+        self.assertEqual(self.get_unit().target, "Edited after the fix\n")
+
+    def test_undo_rejects_an_aba_edit_back_to_identical_text(self) -> None:
+        # An ABA edit still advances the revision (two fresh Changes):
+        # undo must not treat "back to the same text" as "nothing
+        # changed" -- a plain no-op re-translate with the exact current
+        # content does not even create a Change, so it proves nothing.
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        application = self.accept_as(candidate)
+        unit.translate(self.user, "Detour", STATE_TRANSLATED)
+        unit.translate(self.user, candidate.target_list, STATE_TRANSLATED)
+
+        with self.assertRaises(JudgeApplicationUndoError):
+            self.undo_as(application)
+
+    def test_undo_denied_without_translation_auto(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        application = self.accept_as(candidate)
+        self.grant(["unit.review"])
+
+        with self.assertRaises(JudgeApplicationUndoError):
+            self.undo_as(application)
+
+        self.assertIsNone(JudgeApplication.objects.get(pk=application.pk).undone_at)
+
+    def test_undo_denied_restoring_approval_without_review_permission(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, "Approved translation", STATE_APPROVED)
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        application = self.accept_as(candidate, acknowledge={"approval_loss": True})
+        self.grant(["translation.auto"])
+
+        with self.assertRaises(JudgeApplicationUndoError):
+            self.undo_as(application)
+
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+
+    def test_undo_never_issues_new_judge_evidence_or_paid_call(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        application = self.accept_as(candidate)
+        verdict_count = JudgeVerdict.objects.filter(unit=unit).count()
+
+        with patch("weblate.trans.tasks.auto_translate.delay") as delay:
+            self.undo_as(application)
+
+        self.assertEqual(JudgeVerdict.objects.filter(unit=unit).count(), verdict_count)
+        delay.assert_not_called()
+        self.assertFalse(ProducerRun.objects.filter(requested_mode="recheck").exists())
+
+
+class DecisionRevisionTest(ViewTestCase):
+    """compute_decision_revision: an opaque staleness token for a unit's decisions."""
+
+    def test_stable_without_any_change(self) -> None:
+        unit = self.get_unit()
+        self.assertEqual(
+            compute_decision_revision(unit),
+            compute_decision_revision(self.get_unit()),
+        )
+
+    def test_changes_when_the_target_is_edited(self) -> None:
+        unit = self.get_unit()
+        before = compute_decision_revision(unit)
+        unit.translate(self.user, "Something else", STATE_TRANSLATED)
+        after = compute_decision_revision(self.get_unit())
+        self.assertNotEqual(before, after)
+
+    def test_two_different_units_never_collide(self) -> None:
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        self.assertNotEqual(
+            compute_decision_revision(first), compute_decision_revision(second)
+        )
 
 
 class ProducerRunModelTest(TestCase):

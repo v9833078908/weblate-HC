@@ -20,6 +20,7 @@ from django.db.models import (
     Exists,
     F,
     IntegerField,
+    Max,
     OuterRef,
     Q,
     Subquery,
@@ -222,13 +223,22 @@ def compute_context_hash(
     note: str,
     explanation: str,
     glossary_terms: Iterable[Mapping[str, object]],
+    clarification: str = "",
 ) -> str:
     """
-    Hash source, note, explanation and every prompt-visible glossary-entry field.
+    Hash source, note, explanation, clarification and every glossary field.
 
     Neither mapping key order nor glossary order is context, so keys and
     serialized entries are both sorted: a reordered glossary must not
     invalidate a verdict. Entry content and multiplicity are context.
+    ``clarification`` (Task 7) defaults to "" for every caller that has
+    none to offer. Adding this parameter changes the digest for every
+    unit, including one with no clarification at all -- like any other
+    change to this hash's input shape, it deliberately invalidates
+    verdicts and back-translations cached under the previous formula
+    (see ``PROMPT_SCHEMA_REVISION`` for the same convention on the judge
+    request identity); a fresh clarification answer keeps invalidating
+    them the same way afterwards.
     """
     terms = sorted(
         json.dumps(
@@ -239,7 +249,23 @@ def compute_context_hash(
         )
         for entry in glossary_terms
     )
-    return _digest([source, note, explanation, *terms])
+    return _digest([source, note, explanation, clarification, *terms])
+
+
+def compute_decision_revision(unit: Unit) -> str:
+    """
+    Return an opaque, client-echoed staleness token for one unit's decisions.
+
+    Task 6: every decision-mutating endpoint (``apply-candidate``, the bulk
+    apply) requires the caller to echo back the exact ``revision`` it last
+    read. The client never parses or constructs this value; it is a hash of
+    ``(unit.pk, unit.last_updated, the row's own highest Change.pk)`` -- the
+    same triple named in the roadmap contract -- so any edit, state change,
+    or new audit entry on the unit invalidates every revision read before
+    it, without a dedicated column.
+    """
+    latest_change_pk = unit.change_set.aggregate(latest=Max("pk"))["latest"] or 0
+    return _digest([str(unit.pk), unit.last_updated.isoformat(), str(latest_change_pk)])
 
 
 def compute_judge_request_identity(
@@ -310,6 +336,9 @@ class ProducerRun(models.Model):
     class Status(models.TextChoices):
         QUEUED = "queued"
         RUNNING = "running"
+        CANCEL_REQUESTED = "cancel_requested"
+        PARTIAL = "partial"
+        CANCELLED = "cancelled"
         COMPLETED = "completed"
         FAILED = "failed"
 
@@ -322,6 +351,12 @@ class ProducerRun(models.Model):
         related_name="producer_runs",
     )
     task_id = models.CharField(max_length=255, blank=True)
+    dispatch_task_id = models.UUIDField(null=True, blank=True)
+    dispatch_phase = models.CharField(max_length=20, blank=True)
+    dispatch_requested_at = models.DateTimeField(null=True, blank=True)
+    dispatch_published_at = models.DateTimeField(null=True, blank=True)
+    dispatch_attempts = models.PositiveIntegerField(default=0)
+    dispatch_error = models.TextField(blank=True)
     created = models.DateTimeField(auto_now_add=True)
     started = models.DateTimeField(null=True, blank=True)
     finished = models.DateTimeField(null=True, blank=True)
@@ -340,6 +375,17 @@ class ProducerRun(models.Model):
     failure = models.TextField(blank=True)
     warnings = models.JSONField(default=list, blank=True)
     configuration_snapshot = models.JSONField(default=dict, blank=True)
+    idempotency_key = models.CharField(max_length=255, blank=True)
+    request_fingerprint = models.CharField(max_length=64, blank=True)
+    scope_hash = models.CharField(max_length=64, blank=True)
+    scope_snapshot = models.JSONField(default=list, blank=True)
+    resumed_from = models.ForeignKey(
+        "self",
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resumptions",
+    )
 
     class Meta:
         # State-only rename: the table still holds every judge run written
@@ -355,6 +401,20 @@ class ProducerRun(models.Model):
                 name="judge_run_scope_idx",
             ),
             models.Index(fields=["status", "-created"], name="judge_run_status_idx"),
+        ]
+        # ruff: ignore[mutable-class-default]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "actor",
+                    "scope_type",
+                    "scope_id",
+                    "requested_mode",
+                    "idempotency_key",
+                ],
+                condition=~models.Q(idempotency_key=""),
+                name="producer_run_idempotency_key",
+            )
         ]
 
     def __str__(self) -> str:
@@ -572,10 +632,66 @@ class JudgeDeferral(models.Model):
         return f"{self.unit_id} seat {self.seat}: {self.state}"
 
 
+class UnitClarification(models.Model):
+    """
+    A producer's own answer to a meaning-clarifying question, per target unit.
+
+    Task 7: distinct from Explanation/Character (``Unit.update_explanation``
+    propagates to every language unit and creates a ``PendingUnitChange``,
+    which a single-language clarification must never do) and from the
+    project-wide ``_producer`` profile answers
+    (``Project.machinery_settings["_producer"]``): this belongs to exactly
+    one target unit. A fresh answer invalidates that unit's own judge and
+    back-translation evidence through ``compute_context_hash``, and never
+    touches another language, the source string, or Explanation/Character.
+    """
+
+    unit = models.OneToOneField(
+        "trans.Unit",
+        on_delete=models.deletion.CASCADE,
+        related_name="clarification",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    question = models.TextField(blank=True)
+    answer = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = gettext_lazy("Unit clarification")
+        verbose_name_plural = gettext_lazy("Unit clarifications")
+
+    def __str__(self) -> str:
+        return f"{self.unit_id}: clarification"
+
+
+def unit_clarification_answer(unit: Unit) -> str:
+    """
+    Return the producer's current clarification answer for ``unit``, or "".
+
+    A blank answer -- never asked, or the producer said "I don't know" --
+    contributes nothing to context: it is contextually inert, exactly like
+    having no row at all (Task 7).
+    """
+    clarification = getattr(unit, "clarification", None)
+    if clarification is None:
+        try:
+            clarification = UnitClarification.objects.get(unit=unit)
+        except UnitClarification.DoesNotExist:
+            return ""
+    return clarification.answer
+
+
 class JudgeRunUnit(models.Model):
     """The immutable participation record for one unit in one producer run."""
 
     class Outcome(models.TextChoices):
+        PENDING = "pending"
         PASSED = "passed"
         MINOR = "minor"
         MAJOR = "major"
@@ -653,6 +769,9 @@ class JudgeRunUnit(models.Model):
     after_target = models.JSONField(default=list)
     cached = models.BooleanField(default=False)
     projection_succeeded = models.BooleanField(default=False)
+    candidate_target_hash = models.CharField(max_length=64, blank=True)
+    candidate_verdict_ids = models.JSONField(default=list, blank=True)
+    eligibility = models.CharField(max_length=32, blank=True)
 
     class Meta:
         verbose_name = gettext_lazy("Judge run unit")
@@ -701,6 +820,10 @@ class JudgeVerdict(models.Model):
         MAJOR = "major"
         CRITICAL = "critical"
 
+    class Subject(models.TextChoices):
+        LIVE = "live"
+        CANDIDATE = "candidate"
+
     class Resolution(models.TextChoices):
         ACCEPTED_AS_IS = "accepted_as_is"
         SENT_BACK = "sent_back"
@@ -746,6 +869,10 @@ class JudgeVerdict(models.Model):
     seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)
     request_round = models.PositiveSmallIntegerField(default=0)
+    subject = models.CharField(
+        max_length=10, choices=Subject, default=Subject.LIVE, db_index=True
+    )
+    candidate_target_hash = models.CharField(max_length=64, blank=True)
     target_hash = models.CharField(max_length=64)
     target_storage_hash = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
         max_length=32, null=True, db_index=True
@@ -892,7 +1019,11 @@ def verdict_for_severity(max_severity: str) -> str:
 
 
 def state_for_verdict(
-    verdict: str, *, enable_review: bool, may_approve: bool
+    verdict: str,
+    *,
+    enable_review: bool,
+    may_approve: bool,
+    current_state: StringState | None = None,
 ) -> StringState | None:
     """
     Target state for a verdict, or None when the state must not move.
@@ -912,6 +1043,10 @@ def state_for_verdict(
     """
     if verdict == JudgeVerdict.Verdict.UNPARSED:
         return None
+    if current_state == STATE_APPROVED:
+        # A probabilistic verdict remains advisory evidence. Only the
+        # explicit reviewed apply flow may revoke approval.
+        return STATE_APPROVED
     if verdict == JudgeVerdict.Verdict.REJECT:
         return STATE_FUZZY
     if verdict == JudgeVerdict.Verdict.PASS and enable_review and may_approve:
@@ -920,16 +1055,17 @@ def state_for_verdict(
 
 
 def latest_round(unit: Unit) -> list[JudgeVerdict]:
-    """
-    Return every seat of the newest round, stale or not.
-
-    For the card's 'previous version' note. Not for projection.
-    """
-    newest = unit.judge_verdicts.order_by("-timestamp", "-pk").first()
+    """Return every live seat of the newest round, stale or not."""
+    newest = (
+        unit.judge_verdicts.filter(subject=JudgeVerdict.Subject.LIVE)
+        .order_by("-timestamp", "-pk")
+        .first()
+    )
     if newest is None:
         return []
     return list(
         unit.judge_verdicts.filter(
+            subject=JudgeVerdict.Subject.LIVE,
             run_id=newest.run_id,
             attempt=newest.attempt,
             request_round=newest.request_round,
@@ -955,6 +1091,24 @@ def _glossary_prompt_entries(unit: Unit) -> list[GlossaryPromptEntry]:
     )
 
     return get_matched_glossary_prompt_entries(unit)
+
+
+def candidate_round(unit: Unit, candidate: Sequence[str]) -> list[JudgeVerdict]:
+    """Return each seat's freshest verdict for a proposed target."""
+    _, context_hash = _current_snapshot_hashes(unit)
+    candidate_hash = compute_target_hash(candidate)
+    base = unit.judge_verdicts.filter(
+        subject=JudgeVerdict.Subject.CANDIDATE,
+        candidate_target_hash=candidate_hash,
+        context_hash=context_hash,
+    )
+    rows: list[JudgeVerdict] = []
+    for seat in base.values_list("seat", flat=True).distinct():
+        row = base.filter(seat=seat).order_by("-timestamp", "-pk").first()
+        if row is not None:
+            rows.append(row)
+    rows.sort(key=lambda row: row.seat)
+    return rows
 
 
 def _current_snapshot_hashes(unit: Unit) -> tuple[str, str]:
@@ -987,15 +1141,13 @@ def _seat_round_rows(
     opinion visible across run boundaries while still never letting a
     transport failure erase a real verdict (D5).
 
-    ``prefer_parsed=True`` (the ``active_round`` read) drops a seat that
-    never parsed this snapshot: an unparsed row is not an opinion, so it
-    cannot project a check. ``prefer_parsed=False`` (``current_round``)
-    keeps it so orchestration sees the transport failure.
 
     ``context_hash=None`` keeps the historical target-only matching of
     ``active_round``: a glossary/note drift must not unproject a check.
     """
-    base = unit.judge_verdicts.filter(target_hash=target_hash)
+    base = unit.judge_verdicts.filter(
+        target_hash=target_hash, subject=JudgeVerdict.Subject.LIVE
+    )
     if context_hash is not None:
         base = base.filter(context_hash=context_hash)
     rows: list[JudgeVerdict] = []
@@ -1135,20 +1287,28 @@ def repair_evidence(
     if active is None or active.attempt == 0:
         return None
     original_seats = list(
-        unit.judge_verdicts.filter(run_id=active.run_id, attempt=0).order_by("seat")
+        unit.judge_verdicts.filter(
+            subject=JudgeVerdict.Subject.LIVE,
+            run_id=active.run_id,
+            attempt=0,
+        ).order_by("seat")
     )
     if not original_seats:
         return None
     previous_seats = list(
         unit.judge_verdicts.filter(
-            run_id=active.run_id, attempt=active.attempt - 1
+            subject=JudgeVerdict.Subject.LIVE,
+            run_id=active.run_id,
+            attempt=active.attempt - 1,
         ).order_by("timestamp")
     )
     if not previous_seats:
         return None
     current_seats = list(
         unit.judge_verdicts.filter(
-            run_id=active.run_id, attempt=active.attempt
+            subject=JudgeVerdict.Subject.LIVE,
+            run_id=active.run_id,
+            attempt=active.attempt,
         ).order_by("timestamp")
     )
     if not current_seats:
@@ -1177,6 +1337,7 @@ def judge_status_annotations() -> dict[str, models.Expression]:
             Q(unit_id=OuterRef("unit_id")),
             Q(target_storage_hash=OuterRef("target_storage_hash")),
             Q(seat=OuterRef("seat")),
+            Q(subject=JudgeVerdict.Subject.LIVE),
             Q(timestamp__gt=OuterRef("timestamp"))
             | Q(timestamp=OuterRef("timestamp"), pk__gt=OuterRef("pk")),
         ]
@@ -1193,6 +1354,7 @@ def judge_status_annotations() -> dict[str, models.Expression]:
         unit_id=OuterRef("pk"),
         target_storage_hash=MD5(OuterRef("target")),
         unparsed=False,
+        subject=JudgeVerdict.Subject.LIVE,
     ).exclude(_has_newer_sibling(newer_parsed=True))
     severity_rank = Case(
         *(
@@ -1203,13 +1365,12 @@ def judge_status_annotations() -> dict[str, models.Expression]:
     )
     round_severity: Case | F
     if settings.JUDGE_CONSENSUS_REJECT:
-        # SQL twin of collegium_severity: a critical disputed by another
-        # current parsed seat reads as major.
         disputed_critical = Exists(
             JudgeVerdict.objects.filter(
                 unit_id=OuterRef(OuterRef("pk")),
                 target_storage_hash=MD5(OuterRef(OuterRef("target"))),
                 unparsed=False,
+                subject=JudgeVerdict.Subject.LIVE,
             )
             .exclude(_has_newer_sibling(newer_parsed=True))
             .exclude(max_severity=JudgeVerdict.Severity.CRITICAL)
@@ -1223,17 +1384,13 @@ def judge_status_annotations() -> dict[str, models.Expression]:
             output_field=CharField(),
         )
     else:
-        # Old policy and old query cost: any critical remains critical.
         round_severity = F("max_severity")
-    # Some seat's freshest row (parsed or not) for the current text is a
-    # transport failure: the per-seat view of the former "latest round has
-    # no parsed row" signal.
     seat_fresh_unparsed = JudgeVerdict.objects.filter(
         unit_id=OuterRef("pk"),
         target_storage_hash=MD5(OuterRef("target")),
         unparsed=True,
+        subject=JudgeVerdict.Subject.LIVE,
     ).exclude(_has_newer_sibling(newer_parsed=False))
-
     return {
         "judge_active_severity": Subquery(
             current_parsed_round.annotate(
@@ -1250,7 +1407,11 @@ def judge_status_annotations() -> dict[str, models.Expression]:
             output_field=CharField(),
         ),
         "judge_has_parsed_history": Exists(
-            JudgeVerdict.objects.filter(unit_id=OuterRef("pk"), unparsed=False)
+            JudgeVerdict.objects.filter(
+                unit_id=OuterRef("pk"),
+                unparsed=False,
+                subject=JudgeVerdict.Subject.LIVE,
+            )
         ),
         "judge_latest_incomplete": Exists(seat_fresh_unparsed),
     }
@@ -1259,6 +1420,95 @@ def judge_status_annotations() -> dict[str, models.Expression]:
 def current_verdict(unit: Unit) -> JudgeVerdict | None:
     """Return only the verdict from the newest current-context round."""
     return collegium_verdict(current_round(unit))
+
+
+class JudgeApplication(models.Model):
+    """
+    A durable receipt for one applied judge repair candidate (Task 8).
+
+    A thin link on top of the existing audit trail -- ``(change, run,
+    run_unit, candidate_target_hash, applied_revision)`` -- that survives
+    the consumed ``Suggestion`` so a producer can find and undo one exact
+    application later. ``run``/``run_unit`` are best-effort observability:
+    ``JudgeVerdict.run_id`` is a bare UUID with no referential integrity
+    (a verdict can exist outside any formal ``ProducerRun``), so neither
+    field is required for undo itself, which works entirely off
+    ``change``/``applied_revision``. Read and undo are protected by the
+    same ``unit.review``/``translation.auto`` permissions
+    ``accept_judge_candidate`` itself requires.
+    """
+
+    unit = models.ForeignKey(
+        "trans.Unit",
+        on_delete=models.deletion.CASCADE,
+        related_name="judge_applications",
+    )
+    change = models.OneToOneField(
+        "trans.Change",
+        on_delete=models.deletion.PROTECT,
+        related_name="judge_application",
+    )
+    run = models.ForeignKey(
+        ProducerRun,
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    run_unit = models.ForeignKey(
+        JudgeRunUnit,
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    candidate_target_hash = models.CharField(max_length=64)
+    applied_revision = models.CharField(max_length=64)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    applied_at = models.DateTimeField(auto_now_add=True)
+
+    undo_change = models.OneToOneField(
+        "trans.Change",
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="undone_judge_application",
+    )
+    undone_at = models.DateTimeField(null=True, blank=True)
+    undone_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
+    class Meta:
+        verbose_name = gettext_lazy("Judge application")
+        verbose_name_plural = gettext_lazy("Judge applications")
+        # ruff: ignore[mutable-class-default]
+        indexes = [
+            models.Index(
+                fields=["unit", "-applied_at"], name="judge_application_unit_idx"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.unit_id}: application {self.pk}"
+
+
+class JudgeApplicationUndoError(Exception):
+    """A producer's undo of an applied judge candidate could not be applied."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(message)
 
 
 class JudgeResolutionError(Exception):

@@ -206,6 +206,9 @@ class JudgeRequest:
     project_id_snapshot: int | None = None
     component_id_snapshot: int | None = None
     component_slug: str = ""
+    #: The producer's own answer to a meaning-clarifying question for this
+    #: exact target unit (Task 7). "" for every request with none to offer.
+    clarification: str = ""
 
 
 @dataclass(frozen=True)
@@ -918,6 +921,13 @@ def _segment(index: int, req: JudgeRequest) -> dict:
         segment["note"] = note
     if explanation:
         segment["explanation"] = explanation
+    clarification = req.clarification.strip()
+    if clarification:
+        # The producer's own answer to a judge-raised ambiguity for this
+        # exact string (Task 7): a labeled field, never merged into
+        # `explanation`, so the model sees it is the producer's own word,
+        # not sourced glossary context.
+        segment["clarification"] = clarification
     if req.glossary_terms:
         segment["glossary"] = [dict(entry) for entry in req.glossary_terms]
     if req.failing_checks:
@@ -2027,7 +2037,7 @@ def _run_batch(  # ruff: ignore[complex-structure]
     ]
 
 
-def request_verdicts(
+def request_verdicts(  # ruff: ignore[too-many-arguments]
     requests: Sequence[JudgeRequest],
     *,
     model: str | None = None,
@@ -2041,12 +2051,16 @@ def request_verdicts(
     adaptive: bool = False,
     attempt: int = 0,
     retry_deadline: float | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> list[JudgeResult]:
     """
     Return one result per request without ever persisting prompt or response text.
 
     Pass ``seat`` from the judge loop to use a frozen per-seat profile. The
     no-seat form remains a database-free compatibility API for direct callers.
+    ``cancelled`` is polled before every batch (G4): once it reports a
+    cancellation, no further batch is dispatched, but a batch already sent
+    still completes and its result is kept and reported to ``on_batch``.
     """
     validate_request_settings()
     profile = (
@@ -2062,6 +2076,8 @@ def request_verdicts(
     results: list[JudgeResult] = []
     start = 0
     while start < len(requests):
+        if cancelled is not None and cancelled():
+            break
         # Re-read the budget per batch: a transport or deadline failure shrinks
         # it, and a run whose first batch is too large for the deadline must not
         # keep sending that size until the run ends.

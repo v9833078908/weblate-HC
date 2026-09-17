@@ -22,7 +22,7 @@ from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role
 from weblate.machinery.base import MachineTranslation
 from weblate.trans.actions import ActionEvents
-from weblate.trans.judge import JudgeError
+from weblate.trans.judge import JUDGE_SEATS, JudgeError
 from weblate.trans.judge_loop import (
     _generation_lock_key,
     build_request,
@@ -43,7 +43,11 @@ from weblate.trans.models.judge import (
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
-from weblate.trans.tasks import generate_judge_candidate
+from weblate.trans.tasks import (
+    PRODUCER_RUN_DISPATCH_MAX_ATTEMPTS,
+    generate_judge_candidate,
+    publish_producer_run_dispatch,
+)
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.views.basic import _judge_hand_off_blocked
 from weblate.trans.views.judge import recent_producer_runs
@@ -66,6 +70,33 @@ def judge_context_hash(unit) -> str:
         explanation=request.explanation,
         glossary_terms=request.glossary_terms,
     )
+
+
+def stamp_candidate_evidence(suggestion, *, context_hash: str) -> None:
+    """
+    Back a hand-crafted candidate fixture with completed verification evidence.
+
+    ``accept_judge_candidate`` only applies a candidate once every seat has
+    verified it (Task 3, B2); a fixture built directly through
+    ``Suggestion.objects.add`` has no such evidence unless it is added here.
+    """
+    candidate_hash = compute_target_hash(suggestion.target_list)
+    # A fresh run id: the live verdict's own (unit, run_id, attempt,
+    # request_round, seat) key is already taken by ``verdict`` itself.
+    candidate_run_id = uuid.uuid4()
+    for seat in JUDGE_SEATS:
+        JudgeVerdict.objects.create(
+            unit=suggestion.unit,
+            subject=JudgeVerdict.Subject.CANDIDATE,
+            candidate_target_hash=candidate_hash,
+            target_hash=candidate_hash,
+            context_hash=context_hash,
+            run_id=candidate_run_id,
+            seat=seat,
+            judge_model=f"vendor-{seat}/model",
+            model_verdict=JudgeVerdict.Verdict.PASS,
+            max_severity=JudgeVerdict.Severity.NONE,
+        )
 
 
 @override_settings(
@@ -2704,6 +2735,12 @@ class JudgeRunReportViewTest(ViewTestCase):
                     self.assertContains(response, "still in progress")
                 if status == ProducerRun.Status.FAILED:
                     self.assertContains(response, "failed")
+                if status == ProducerRun.Status.CANCEL_REQUESTED:
+                    self.assertContains(response, "Cancellation has been requested")
+                if status == ProducerRun.Status.CANCELLED:
+                    self.assertContains(response, "cancelled before any string")
+                if status == ProducerRun.Status.PARTIAL:
+                    self.assertContains(response, "results below are partial")
                 self.assertContains(response, "No strings in this outcome.")
 
     def test_unauthorized_private_scope_returns_404_with_no_count_leakage(
@@ -3144,9 +3181,9 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         url = reverse("judge-recheck", kwargs={"pk": unit.pk})
         with (
             mock.patch(
-                "weblate.trans.tasks.auto_translate.delay",
+                "weblate.trans.tasks.auto_translate.apply_async",
                 return_value=SimpleNamespace(id="task-1"),
-            ) as delay,
+            ) as apply_async,
             self.captureOnCommitCallbacks(execute=True),
         ):
             first = self.client.post(url, follow=True)
@@ -3157,8 +3194,11 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         self.assertEqual(run.status, ProducerRun.Status.QUEUED)
         self.assertEqual(run.requested_query, recheck_query(unit.pk))
         self.assertEqual(run.cap, 1)
-        self.assertEqual(run.task_id, "task-1")
-        self.assertEqual(delay.call_count, 1)
+        # The dispatch uses the run's own pre-reserved task id (durable
+        # ledger, Task 5a), not a broker-assigned one.
+        self.assertEqual(run.task_id, str(run.dispatch_task_id))
+        self.assertIsNotNone(run.dispatch_published_at)
+        self.assertEqual(apply_async.call_count, 1)
         self.assertContains(first, "re-check has been queued", status_code=200)
         self.assertContains(second, "already running", status_code=200)
 
@@ -3199,11 +3239,14 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         )
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
-    def test_broker_failure_marks_the_run_failed(self) -> None:
+    def test_single_broker_failure_keeps_the_run_queued_for_retry(self) -> None:
+        # A transient broker hiccup is not terminal: the durable ledger
+        # (Task 5a) leaves the run QUEUED for the periodic drain to retry,
+        # mirroring the loc-kit dispatch pattern.
         unit = self.get_unit()
         with (
             mock.patch(
-                "weblate.trans.tasks.auto_translate.delay",
+                "weblate.trans.tasks.auto_translate.apply_async",
                 side_effect=RuntimeError("broker down"),
             ),
             self.captureOnCommitCallbacks(execute=True),
@@ -3212,9 +3255,41 @@ class JudgeProducerTriageViewTest(ViewTestCase):
                 reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
             )
         run = ProducerRun.objects.get(requested_mode="recheck")
-        self.assertEqual(run.status, ProducerRun.Status.FAILED)
-        self.assertTrue(run.failure)
+        self.assertEqual(run.status, ProducerRun.Status.QUEUED)
+        self.assertEqual(run.dispatch_attempts, 1)
+        self.assertTrue(run.dispatch_error)
+        self.assertIsNone(run.dispatch_published_at)
         self.assertContains(response, "re-check has been queued", status_code=200)
+
+    def test_broker_failure_exhausted_after_max_attempts_fails_the_run(self) -> None:
+        # The periodic drain (`drain_producer_run_dispatches`) retries a
+        # QUEUED, unpublished intent; exhausting the bound fails the run
+        # outright instead of retrying it forever.
+        unit = self.get_unit()
+        translation = unit.translation
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-recheck",
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=f"id:{unit.pk}",
+            requested_mode="recheck",
+            cap=1,
+        )
+        with mock.patch(
+            "weblate.trans.tasks.auto_translate.apply_async",
+            side_effect=RuntimeError("broker down"),
+        ):
+            for _ in range(PRODUCER_RUN_DISPATCH_MAX_ATTEMPTS):
+                self.assertFalse(publish_producer_run_dispatch(run_id=run.pk))
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertEqual(run.dispatch_attempts, PRODUCER_RUN_DISPATCH_MAX_ATTEMPTS)
+        self.assertTrue(run.failure)
+        self.assertIsNotNone(run.finished)
 
     def test_recheck_get_is_rejected(self) -> None:
         unit = self.get_unit()
@@ -3472,6 +3547,7 @@ class JudgeProducerTriageViewTest(ViewTestCase):
     # -- candidate acceptance ----------------------------------------------
 
     def make_candidate(self, unit, verdict, target="Better translation"):
+        context_hash = judge_context_hash(unit)
         suggestion, _result = Suggestion.objects.add(
             unit,
             [target],
@@ -3484,10 +3560,11 @@ class JudgeProducerTriageViewTest(ViewTestCase):
                 "judge_verdict_id": verdict.pk,
                 "judge_run_id": str(verdict.run_id),
                 "target_hash": compute_target_hash(unit.get_target_plurals()),
-                "context_hash": judge_context_hash(unit),
+                "context_hash": context_hash,
                 "engine": "openrouter",
             },
         )
+        stamp_candidate_evidence(suggestion, context_hash=context_hash)
         return suggestion
 
     def test_accept_denied_without_permissions(self) -> None:
@@ -3541,28 +3618,24 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         )
         self.assertEqual(response.status_code, 405)
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
-    def test_accept_success_translates_queues_recheck_and_redirects(self) -> None:
+    def test_accept_success_translates_and_redirects_without_a_recheck(self) -> None:
+        # Task 10: the candidate was already verified by both judge seats
+        # before it was ever stored (Task 3), so accepting it must not
+        # queue a second paid re-check of text the judge already cleared.
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
         candidate = self.make_candidate(unit, verdict)
-        with (
-            mock.patch(
-                "weblate.trans.tasks.auto_translate.delay",
-                return_value=SimpleNamespace(id="task-1"),
-            ),
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            response = self.client.post(
-                reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
-                follow=True,
-            )
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
         self.assertContains(response, "suggested fix has been applied", status_code=200)
+        self.assertNotContains(response, "re-check has been queued")
         refreshed = self.get_unit()
         self.assertEqual(refreshed.state, STATE_TRANSLATED)
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
         self.assertEqual(
-            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 0
         )
 
     def test_unit_page_renders_the_candidate_row_in_server_html(self) -> None:
@@ -3616,7 +3689,7 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         self.make_candidate(third, third_verdict)
         with (
             mock.patch(
-                "weblate.trans.tasks.auto_translate.delay",
+                "weblate.trans.tasks.auto_translate.apply_async",
                 return_value=SimpleNamespace(id="task-recheck"),
             ),
             self.captureOnCommitCallbacks(execute=True),
@@ -3671,17 +3744,10 @@ class JudgeProducerTriageViewTest(ViewTestCase):
             [],
         )
 
-        with (
-            mock.patch(
-                "weblate.trans.tasks.auto_translate.delay",
-                return_value=SimpleNamespace(id="task-1"),
-            ),
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            accept_response = self.client.post(
-                reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
-                follow=True,
-            )
+        accept_response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
         self.assertContains(
             accept_response, "suggested fix has been applied", status_code=200
         )
@@ -4043,6 +4109,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         return verdict
 
     def make_candidate(self, unit, verdict, target="Better translation"):
+        context_hash = judge_context_hash(unit)
         suggestion, _result = Suggestion.objects.add(
             unit,
             [target],
@@ -4055,10 +4122,11 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
                 "judge_verdict_id": verdict.pk,
                 "judge_run_id": str(verdict.run_id),
                 "target_hash": compute_target_hash(unit.get_target_plurals()),
-                "context_hash": judge_context_hash(unit),
+                "context_hash": context_hash,
                 "engine": "openrouter",
             },
         )
+        stamp_candidate_evidence(suggestion, context_hash=context_hash)
         return suggestion
 
     def _completed_recheck(self, unit) -> ProducerRun:
@@ -4188,7 +4256,6 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         assert_free(tree, "Generate another")
         assert_free(tree, "Re-check this string")
         assert_free(tree, "Use suggested fix")
-        self.assertContains(response, "Accepting queues one judge re-check.")
 
     def test_shortcut_targets_present(self) -> None:
         """The three triage forms carry stable ids for the JS shortcuts."""
@@ -4593,6 +4660,7 @@ class JudgeCardLocalizationTest(ViewTestCase):
         return verdict
 
     def make_candidate(self, unit, verdict, target="Better translation"):
+        context_hash = judge_context_hash(unit)
         suggestion, _result = Suggestion.objects.add(
             unit,
             [target],
@@ -4605,10 +4673,11 @@ class JudgeCardLocalizationTest(ViewTestCase):
                 "judge_verdict_id": verdict.pk,
                 "judge_run_id": str(verdict.run_id),
                 "target_hash": compute_target_hash(unit.get_target_plurals()),
-                "context_hash": judge_context_hash(unit),
+                "context_hash": context_hash,
                 "engine": "openrouter",
             },
         )
+        stamp_candidate_evidence(suggestion, context_hash=context_hash)
         return suggestion
 
     def test_rejected_card_with_candidate_renders_in_russian(self) -> None:

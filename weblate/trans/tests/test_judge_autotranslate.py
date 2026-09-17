@@ -11,15 +11,15 @@ from django.db import IntegrityError
 from django.test import override_settings
 
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
-from weblate.trans.judge import JudgeError, JudgeResult
+from weblate.trans.judge import JudgeError, JudgeResult, judge_configuration_snapshot
 from weblate.trans.judge_loop import (
     build_request,
     recheck_query,
 )
 from weblate.trans.models.judge import (
-    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
+    ProducerRun,
     compute_context_hash,
     compute_target_hash,
     has_complete_current_evidence,
@@ -103,6 +103,92 @@ class JudgeAutoTranslateTest(ViewTestCase):
             auto.process_judge(engines=[], threshold=80)
         return auto
 
+    def test_redelivered_attempt_skips_already_completed_units_and_pays_only_for_the_rest(
+        self,
+    ) -> None:
+        # acks_late/reject_on_worker_lost may redeliver the whole task: a
+        # unit already durably recorded from an earlier delivery must not
+        # be re-judged (and re-paid for), while a unit that never reached
+        # that point must still be processed exactly once (Task 5a, B4).
+        translation = self.get_translation()
+        done_unit = self.get_unit()
+        pending_unit = self.get_unit(source="Thank you for using Weblate.")
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+        )
+        JudgeRunUnit.objects.create(
+            run=run,
+            unit=done_unit,
+            unit_id_snapshot=done_unit.id,
+            translation_id=done_unit.translation_id,
+            component_id=done_unit.translation.component_id,
+            project_id=done_unit.translation.component.project_id,
+            input_target=[],
+            input_target_hash=compute_target_hash([]),
+            context_hash="already-done",
+            outcome=JudgeRunUnit.Outcome.PASSED,
+        )
+        seen_unit_ids: list[set[int]] = []
+
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
+            seen_unit_ids.append({unit.id for unit in units})
+            # A PENDING placeholder must already be durably reserved for
+            # every unit about to be judged before any provider call.
+            self.assertEqual(
+                set(
+                    JudgeRunUnit.objects.filter(
+                        run_id=run.pk if run else None,
+                        outcome=JudgeRunUnit.Outcome.PENDING,
+                    ).values_list("unit_id_snapshot", flat=True)
+                ),
+                {unit.id for unit in units},
+            )
+            out = {}
+            for unit in units:
+                request = build_request(unit)
+                out[unit.id] = JudgeVerdict.objects.create(
+                    unit=unit,
+                    max_severity="none",
+                    model_verdict=JudgeVerdict.Verdict.PASS,
+                    judge_model="vendor-a/model",
+                    seat=1,
+                    target_hash=compute_target_hash(request.target_plurals),
+                    context_hash=compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        explanation=request.explanation,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                )
+            return out
+
+        auto = AutoTranslate(
+            translation=translation,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[done_unit.id, pending_unit.id],
+            producer_run=run,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        self.assertEqual(seen_unit_ids, [{pending_unit.id}])
+        done_row = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=done_unit.id)
+        self.assertEqual(done_row.outcome, JudgeRunUnit.Outcome.PASSED)
+        self.assertEqual(done_row.context_hash, "already-done")
+        pending_row = JudgeRunUnit.objects.get(
+            run=run, unit_id_snapshot=pending_unit.id
+        )
+        self.assertEqual(pending_row.outcome, JudgeRunUnit.Outcome.PASSED)
+
     def test_reject_lands_on_a_state_that_does_not_ship(self) -> None:
         unit = self.get_unit()
         unit.translate(self.user, ["some target"], STATE_TRANSLATED)
@@ -122,6 +208,40 @@ class JudgeAutoTranslateTest(ViewTestCase):
         before = self.get_unit().state
         self.perform(JudgeVerdict.Verdict.UNPARSED)
         self.assertEqual(self.get_unit().state, before)
+
+    def test_proposal_only_reject_preserves_live_target_and_state(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Human translation"], STATE_TRANSLATED)
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q="",
+            mode="judge",
+            judge_proposal_only=True,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch",
+            side_effect=lambda units, **_kwargs: {
+                candidate.id: JudgeVerdict.objects.create(
+                    unit=candidate,
+                    max_severity="critical",
+                    judge_model="vendor-a/model",
+                    seat=1,
+                    target_hash=compute_target_hash(candidate.get_target_plurals()),
+                    context_hash=compute_context_hash(
+                        source=candidate.source,
+                        note=candidate.source_unit.note,
+                        explanation=candidate.source_unit.explanation,
+                        glossary_terms=[],
+                    ),
+                )
+                for candidate in units
+            },
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.target.strip(), "Human translation")
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
 
     @override_settings(JUDGE_MAY_APPROVE=True)
     def test_unparsed_configured_seat_cannot_approve_a_pass(self) -> None:
@@ -318,8 +438,10 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertEqual(judged_units[0].target.strip(), "machine target")
 
     def test_major_candidate_passes_through_the_operator_path(self) -> None:
-        # A flagged operator round generates exactly one candidate and does
-        # not re-judge: the target stays untouched for the producer to accept.
+        # A flagged operator round generates exactly one candidate; the
+        # generated repair is itself re-judged before being stored as a
+        # preview (Task 3, B2), and the live target/state stay untouched
+        # for the producer to accept.
         self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
         self.component.project.save(update_fields=["machinery_settings"])
         unit = self.get_unit()
@@ -333,7 +455,8 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
         )
         major = JudgeResult("major", "flag", [], "")
-        results = iter([[major], [major]])
+        candidate_passes = JudgeResult("none", "pass", [], "")
+        results = iter([[major], [major], [candidate_passes], [candidate_passes]])
 
         def request(requests, *, on_batch, **kwargs):
             batch_results = next(results)
@@ -354,9 +477,14 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertEqual(stored.target.strip(), "existing translation")
         self.assertEqual(stored.state, STATE_TRANSLATED)
         self.assertEqual(
-            stored.judge_verdicts.latest("pk").verdict, JudgeVerdict.Verdict.FLAG
+            stored.judge_verdicts.filter(subject=JudgeVerdict.Subject.LIVE)
+            .latest("pk")
+            .verdict,
+            JudgeVerdict.Verdict.FLAG,
         )
-        self.assertEqual(client.call_count, 2)
+        # 2 seats for the operator round, then 2 more verifying the
+        # generated candidate before it is offered to the producer.
+        self.assertEqual(client.call_count, 4)
         self.assertEqual(
             stored.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
             "repaired translation",
@@ -1108,6 +1236,70 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertEqual(run.finished, first_finished)
         self.assertEqual(run.failure, "")
 
+    def test_finish_preserves_a_requested_cancellation(self) -> None:
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            enforce_permissions=False,
+        )
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+            status=ProducerRun.Status.CANCEL_REQUESTED,
+        )
+
+        batch._finish_producer_run(  # ruff: ignore[private-member-access]
+            run, ProducerRun.Status.COMPLETED
+        )
+
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.CANCELLED)
+
+    def test_finish_maps_a_requested_cancellation_to_partial_with_completed_rows(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            enforce_permissions=False,
+        )
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+            status=ProducerRun.Status.CANCEL_REQUESTED,
+        )
+        JudgeRunUnit.objects.create(
+            run=run,
+            unit=unit,
+            unit_id_snapshot=unit.id,
+            translation_id=unit.translation_id,
+            component_id=unit.translation.component_id,
+            project_id=unit.translation.component.project_id,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+        )
+
+        batch._finish_producer_run(  # ruff: ignore[private-member-access]
+            run, ProducerRun.Status.COMPLETED
+        )
+
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.PARTIAL)
+
     def test_record_skipped_judge_units_is_idempotent_on_retry(self) -> None:
         unit = self.get_unit()
         batch = BatchAutoTranslate(
@@ -1360,7 +1552,9 @@ class JudgeAutoTranslateTest(ViewTestCase):
             ) as repair,
         ):
             auto.process_judge(engines=[], threshold=80)
-        self.assertEqual(client.call_count, 2)
+        # 2 seats for the recheck round, then 2 more verifying the
+        # generated candidate before it is offered to the producer.
+        self.assertEqual(client.call_count, 4)
         self.assertEqual(repair.call_count, 1)
         refreshed = self.get_unit()
         self.assertEqual(refreshed.target.strip(), "Failing translation")
@@ -1445,7 +1639,9 @@ class JudgeAutoTranslateTest(ViewTestCase):
             ) as repair,
         ):
             auto.process_judge(engines=[], threshold=80)
-        self.assertEqual(client.call_count, 2)
+        # 2 seats for the recheck round, then 2 more verifying the
+        # generated candidate before it is offered to the producer.
+        self.assertEqual(client.call_count, 4)
         repair.assert_called_once()
         self.assertEqual(auto.judge_summary.major_not_fixed, 0)
         self.assertEqual(auto.judge_summary.critical_held, 1)
@@ -1482,7 +1678,50 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertIsNotNone(run.finished)
         # The batch received the adopted run, not a newly created one.
         self.assertEqual(run_batch.call_args.kwargs["run"].pk, run.pk)
-        self.assertEqual(ProducerRun.objects.filter(requested_mode="recheck").count(), 1)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
+        )
+
+    def test_worker_adopts_the_queued_project_judge_run(self) -> None:
+        project = self.component.project
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(project.pk),
+            scope_label=str(project),
+            scope_path=project.get_absolute_url(),
+            requested_query="",
+            requested_mode="judge",
+            cap=10,
+            status=ProducerRun.Status.QUEUED,
+            configuration_snapshot=judge_configuration_snapshot(),
+        )
+        batch = BatchAutoTranslate(
+            project,
+            user=self.user,
+            q="",
+            mode="judge",
+            enforce_permissions=False,
+            producer_run_id=str(run.pk),
+            judge_proposal_only=True,
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", return_value={}
+        ) as run_batch:
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        # The batch received the pre-created estimate row, not a new one.
+        self.assertEqual(ProducerRun.objects.count(), 1)
+        if run_batch.called:
+            self.assertEqual(run_batch.call_args.kwargs["run"].pk, run.pk)
 
     def test_worker_refuses_a_run_that_is_not_queued(self) -> None:
         unit = self.get_unit()

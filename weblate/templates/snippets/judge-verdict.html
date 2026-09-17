@@ -147,7 +147,6 @@
               <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
               <button type="submit" class="btn btn-success">{% translate "Use suggested fix" %}</button>
             </form>
-            <p class="list-group-item-text text-muted">{% translate "Accepting queues one judge re-check." %}</p>
           {% endif %}
         </div>
       {% elif judge_active_verdict and judge_generation_pending %}

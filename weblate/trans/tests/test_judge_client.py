@@ -195,6 +195,23 @@ class SegmentGlossaryTest(SimpleTestCase):
 
         self.assertNotIn("explanation", _segment(0, request))
 
+    def test_segment_carries_the_producer_clarification(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.judge import _segment
+
+        request = replace(REQ, clarification="It's an airlock door, not a house door.")
+
+        self.assertEqual(
+            _segment(0, request)["clarification"],
+            "It's an airlock door, not a house door.",
+        )
+
+    def test_segment_omits_empty_clarification(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.judge import _segment
+
+        self.assertNotIn("clarification", _segment(0, REQ))
+
     def test_prompt_defines_glossary_context_and_modes(self) -> None:
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.judge import _load_prompt
@@ -2183,6 +2200,72 @@ class JudgeOnBatchTest(SimpleTestCase):
         self.assertTrue(seen[0][1][0].unparsed)
 
 
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeCancellationTest(SimpleTestCase):
+    """G4: a cancellation predicate stops new batches; a sent one still lands."""
+
+    @override_settings(JUDGE_BATCH_SIZE=1)
+    @http_mock.activate
+    def test_stops_dispatching_once_cancelled_but_keeps_the_sent_batch(self) -> None:
+        requests = [replace(REQ, unit_key=str(index)) for index in range(3)]
+        for _ in requests:
+            http_mock.register(
+                "POST",
+                CHAT_URL,
+                json=_reply(
+                    [
+                        {
+                            "id": 0,
+                            "verdict": "pass",
+                            "errors": [],
+                            "back_translation": "",
+                        }
+                    ]
+                ),
+            )
+        seen: list[str] = []
+        checks: list[None] = []
+
+        def cancelled() -> bool:
+            # False on the first check (before the first batch), True from
+            # the second check onward: the first batch is already
+            # committed to by the time cancellation is observed.
+            checks.append(None)
+            return len(checks) > 1
+
+        results = request_verdicts(
+            requests,
+            model="vendor/model-a",
+            on_batch=lambda batch_requests, _results: seen.append(
+                batch_requests[0].unit_key
+            ),
+            cancelled=cancelled,
+        )
+
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(seen, ["0"])
+        self.assertEqual(len(results), 1)
+
+    @override_settings(JUDGE_BATCH_SIZE=1)
+    @http_mock.activate
+    def test_a_run_cancelled_before_the_first_batch_makes_no_call(self) -> None:
+        results = request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            on_batch=lambda *_args: (_ for _ in ()).throw(
+                AssertionError("on_batch must not fire")
+            ),
+            cancelled=lambda: True,
+        )
+
+        self.assertEqual(len(http_mock.calls), 0)
+        self.assertEqual(results, [])
+
+
 class JudgeUsageLogTest(TestCase):
     @override_settings(
         JUDGE_ENABLED=True,
@@ -2340,9 +2423,7 @@ class JudgeUsageLogTest(TestCase):
             run=run,
             persist_attempts=True,
         )
-        self.assertEqual(
-            LLMUsageLog.objects.get(model="vendor/model-a").run_id, run.pk
-        )
+        self.assertEqual(LLMUsageLog.objects.get(model="vendor/model-a").run_id, run.pk)
 
     @override_settings(
         JUDGE_ENABLED=True,

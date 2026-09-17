@@ -304,7 +304,9 @@ repository state, background tasks, outbound requests, and rendered UI.
        request only when :setting:`JUDGE_ENABLED`, the site-wide key, and
        both seat models are configured. Each batch carries the selected
        strings' source, target, developer note, producer-authored source
-       explanation, glossary terms, and failing check names to the provider
+       explanation, a producer's own answer to a meaning-clarifying
+       question about that exact target unit, glossary terms, and failing
+       check names to the provider
        host configured by :setting:`JUDGE_BASE_URL` under separate site-wide
        credentials, and once per batch to a second configured host and
        credential (:setting:`JUDGE_FALLBACK_BASE_URL`) only after the primary
@@ -390,13 +392,48 @@ Reachability preconditions:
   without the checkbox never rewrites an existing human translation, judges
   it instead, storing a previewable repair candidate rather than an
   automatic rewrite.
-  Applying a stored candidate is refused unless it is still the current
-  verdict's own suggestion for the unit's exact current target and context,
-  and requires unit-review and automatic-translation permission together; a
-  plain suggestion-accept permission alone cannot reach it, and the classic
-  suggestion list, vote autoaccept, and bulk-accept surfaces exclude a judge
-  candidate from their own accept paths for the same reason.
+  Applying a stored candidate is refused unless every configured judge
+  seat already verified that exact candidate text against the unit's
+  current target and context before it was ever stored - a
+  verified-before-write guarantee, not only a staleness check performed
+  at apply time - and requires unit-review and automatic-translation
+  permission together; a plain suggestion-accept permission alone cannot
+  reach it, and the classic suggestion list, vote autoaccept, and
+  bulk-accept surfaces exclude a judge candidate from their own accept
+  paths for the same reason. Applying to a currently approved string, or
+  to a verdict flagging a possible terminology mismatch, additionally
+  requires an explicit per-string acknowledgement; a bulk apply can never
+  supply one and reports that row as needing individual confirmation
+  instead of silently skipping the guard. A producer can undo one
+  specific application through its own durable receipt, restoring the
+  unit's exact prior target and state; undo is refused, not silently
+  overwritten, if the unit changed again since that exact application -
+  including an edit that returns identical text - and restoring an
+  approved state additionally requires the actor to currently hold
+  review permission at undo time. Neither apply nor undo issues a new
+  judge verdict or reaches a provider.
   *(documented)* (source: :ref:`llm-judge`, :doc:`/admin/config`)
+* The producer console API (see :ref:`api-producer`) is a
+  token-authenticated endpoint family that can reach a paid provider
+  without any interactive UI pacing a caller, unlike the web console's
+  own judge launch screen. Every run - including a cost estimate, which
+  is stored as a run in its own right - records the authenticated actor
+  that started it, and the judge estimate/start/resume endpoints carry
+  their own configurable rate limit
+  (:envvar:`WEBLATE_API_RATELIMIT_PRODUCER`) in addition to the general
+  per-user API rate limit, so a compromised or over-eager token cannot
+  multiply provider spend past a second, independent ceiling.
+  *(documented)* (source: :ref:`api-producer`, :doc:`/admin/config`)
+* Judge verdicts, producer runs (including cost estimates and applied
+  candidate receipts), and the durable per-application undo record are
+  retained without an automatic expiry; only high-volume transport
+  diagnostics - raw provider request/response records and closed retry
+  rows - are pruned automatically by ``cleanup_judge_observability`` on
+  the schedule an administrator configures. A deployment with sustained
+  producer traffic should size storage and its own housekeeping for
+  accumulating run and receipt history; this is a capacity planning
+  concern, not a data-integrity one, since none of these rows are
+  secrets. *(maintainer)*
 
 Environment assumptions
 -----------------------
@@ -476,7 +513,8 @@ Build-time and configuration variants
        generation assumptions. *(maintainer)*
      - Production deployments restrict this to instance hostnames. *(maintainer)*
    * - :envvar:`WEBLATE_API_RATELIMIT_ANON`,
-       :envvar:`WEBLATE_API_RATELIMIT_USER`, :setting:`RATELIMIT_ATTEMPTS`,
+       :envvar:`WEBLATE_API_RATELIMIT_USER`,
+       :envvar:`WEBLATE_API_RATELIMIT_PRODUCER`, :setting:`RATELIMIT_ATTEMPTS`,
        and ``RATELIMIT_GITHUB_SETUP_ATTEMPTS``
      - Rate limits are configurable. *(documented)* (source: :doc:`/api`,
        :doc:`/admin/config`)
@@ -1016,9 +1054,11 @@ Known misuse patterns
 * Enabling the LLM judge and running it over strings from a confidential or
   sensitive component without treating the configured provider as a data
   recipient. This is unsafe because every judged string's source, target,
-  developer note, producer-authored source explanation, and matching glossary
-  terms are transmitted to the two configured seat models. Keep the judge
-  disabled for components whose content must not leave the instance.
+  developer note, producer-authored source explanation, any producer
+  answer to a meaning-clarifying question on that unit, and matching
+  glossary terms are transmitted to the two configured seat models. Keep
+  the judge disabled for components whose content must not leave the
+  instance.
   *(documented)* (source: :ref:`llm-judge`, :doc:`/admin/config`)
 * Importing project backups from untrusted sources as an administrative
   convenience. This is unsafe because backups carry project metadata,
