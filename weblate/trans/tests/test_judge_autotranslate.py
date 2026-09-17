@@ -406,6 +406,63 @@ class JudgeAutoTranslateTest(ViewTestCase):
         run = ProducerRun.objects.get()
         self.assertEqual(run.warnings, [warning])
 
+    def test_standalone_mt_reports_failure_on_quota_refusal(self) -> None:
+        """A confirmed provider refusal fails the run, with a durable warning."""
+        from weblate.machinery.base import (  # noqa: PLC0415
+            MachineTranslationServiceError,
+        )
+        from weblate.trans.machinery import MachineryBatchOutcome  # noqa: PLC0415
+
+        refusal = MachineTranslationServiceError(
+            "quota exhausted",
+            reason_code=MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+            safe_message="The quota is exhausted.",
+        )
+        auto = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="translate",
+            unit_ids=[self.get_unit().id],
+            enforce_permissions=False,
+        )
+
+        def fake_fetch(
+            units,
+            *,
+            services,
+            on_failure=None,
+            **kwargs,
+        ):
+            if on_failure is not None:
+                on_failure(
+                    MachineryBatchOutcome(
+                        status="failed",
+                        service="OpenRouter",
+                        unit_ids=tuple(unit.id for unit in units),
+                        reason_code=refusal.reason_code,
+                        error=refusal.safe_message,
+                    )
+                )
+            return {}
+
+        with mock.patch(
+            "weblate.trans.autotranslate.fetch_machinery_matches",
+            side_effect=fake_fetch,
+        ):
+            message = auto.perform(
+                auto_source="mt",
+                engines=["openrouter"],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        self.assertIn("Automatic translation failed", message)
+        self.assertIn("quota", message)
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertTrue(any("quota" in warning for warning in run.warnings))
+
     def test_untranslated_unit_is_skipped_before_judging(self) -> None:
         unit = self.get_unit()
         initial_auto_changes = unit.change_set.filter(action=ActionEvents.AUTO).count()

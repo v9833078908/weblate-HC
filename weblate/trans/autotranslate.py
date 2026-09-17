@@ -1286,6 +1286,15 @@ class AutoTranslate(BaseAutoTranslate):
             self.add_warning(self.failure_message)
             return self.failure_message
 
+        if self.failure_message is not None:
+            # A confirmed refusal recorded by the dispatch (for instance a
+            # spent MT quota) is an operation failure even when earlier
+            # batches stored translations.
+            translation.log_error(
+                "failed automatic translation: %s", self.failure_message
+            )
+            return self.failure_message
+
         translation.log_info("completed automatic translation")
 
         return self.get_message()
