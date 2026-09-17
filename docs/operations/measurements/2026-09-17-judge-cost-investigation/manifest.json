@@ -1,0 +1,116 @@
+{
+  "date": "2026-09-17",
+  "files": [
+    {
+      "bytes": 7478,
+      "path": "README.md",
+      "sha256": "04a637c8b46d04298d838097a4957a3bf374ae10c0e14554b69ea6292407d84e"
+    },
+    {
+      "bytes": 250,
+      "path": "REUSE.toml",
+      "sha256": "57821538c1d273505ffe23bfe81ed584c6d5170b83a0ed2ebfef518c0cd65d76"
+    },
+    {
+      "bytes": 8103,
+      "path": "corrections.md",
+      "sha256": "aecedb13ebaf0a789757edb313ff055eb41fc4f97d96111c19d50999e583d98d"
+    },
+    {
+      "bytes": 5634,
+      "path": "evidence/methodology.md",
+      "sha256": "1b364959125e95b9ce555f0adcfe2c911afc6e8cbdd8977ec0080ef9b0055406"
+    },
+    {
+      "bytes": 410046,
+      "path": "evidence/overlap-payload.json.gz",
+      "sha256": "4348457445cf4eea81072c7b8ea6f499922c07eee508b26066556d3c65403ee7"
+    },
+    {
+      "bytes": 1065107,
+      "path": "evidence/production-usage.json.gz",
+      "sha256": "e265f4fe994e25f700a53784caef13ff693c94441dd269db5dbc641fc8da73b5"
+    },
+    {
+      "bytes": 6161,
+      "path": "evidence/proxy-rate-metadata.json",
+      "sha256": "af424172907632ecf673c1a756c809c92f1567e160a5aba46e73d23cebd875dd"
+    },
+    {
+      "bytes": 1907,
+      "path": "evidence/run-aggregates.json",
+      "sha256": "54bd8e244bc9c40f95855493378187d0845e781d77c85d86e6ded1d332c14a55"
+    },
+    {
+      "bytes": 5223,
+      "path": "evidence/verify.py",
+      "sha256": "14f71011f9fc086efe143e465506dd738db0fb6c47b887080a6d47a93fb0021d"
+    },
+    {
+      "bytes": 34115,
+      "path": "report.md",
+      "sha256": "9d9965ef0e2642450c36b5187d5d042c02f6bcca32036aa0ebe82d1316d24bb8"
+    },
+    {
+      "bytes": 19393,
+      "path": "subagents/JudgeBestPractices.json",
+      "sha256": "2ff3a1eb87ff982dfdbe9f4efa9f5847b0bf567857912decb23ebe758918c194"
+    },
+    {
+      "bytes": 23596,
+      "path": "subagents/JudgeBestPractices.md",
+      "sha256": "7e037cbe28a85bd61a9428499227b4143b1e863e06ae7741b561a54f6a4d6e43"
+    },
+    {
+      "bytes": 4677,
+      "path": "subagents/JudgeExecution-initial.json",
+      "sha256": "037f89fc873fc6e68517b7099343326107099eb3c8badd295a705fec255e753f"
+    },
+    {
+      "bytes": 1843,
+      "path": "subagents/JudgeExecution.json",
+      "sha256": "d0e762ebf4737a0c6329a507aeb3f691bb0edbc8c23f584f9414057d2fd00f70"
+    },
+    {
+      "bytes": 11387,
+      "path": "subagents/JudgeExecution.md",
+      "sha256": "77c0873ed9d00bcda45e2df3c1940517589e860d9bac6b26861cd783f3402233"
+    },
+    {
+      "bytes": 7301,
+      "path": "subagents/JudgePayload.json",
+      "sha256": "0d4f233739d7b741dfba79cfa534d15d460c1c1c328ba8865899c9ec60e16a8d"
+    },
+    {
+      "bytes": 14487,
+      "path": "subagents/JudgePayload.md",
+      "sha256": "1af3108f0bf522108532e1fae33fe646bdf62cfcd15dce001bf557d8bf3d5d0c"
+    },
+    {
+      "bytes": 9687,
+      "path": "subagents/JudgeQualityEvidence.json",
+      "sha256": "4fa0466e827370daa1425a03ccd9714ff8240401f4d7913603a64d73b7eab176"
+    },
+    {
+      "bytes": 18291,
+      "path": "subagents/JudgeQualityEvidence.md",
+      "sha256": "1fa6b26bfb6e1cd5d180ca14600c16af505fc91e6b25c9cb66962f28ea199111"
+    },
+    {
+      "bytes": 30655,
+      "path": "subagents/TMSBenchmark.json",
+      "sha256": "d0654ef060201d7e30a14d40947e6934acde2124485cc72bc9ad964dd925363f"
+    },
+    {
+      "bytes": 40097,
+      "path": "subagents/TMSBenchmark.md",
+      "sha256": "f104a038ac9d24ef83a54437b5482026d9f0e1a3690d42059be191fec1dd9dbf"
+    },
+    {
+      "bytes": 35906,
+      "path": "subagents/supplemental-messages.json",
+      "sha256": "bf3f2ad815a689a3827b0012958d41f0fcadef1db6564aeb293641d7d2cb94a8"
+    }
+  ],
+  "source_session": "01a0ae7e-199b-75c5-9ce9-eaaac04093d6"
+}

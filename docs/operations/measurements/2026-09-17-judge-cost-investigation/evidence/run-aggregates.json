@@ -1,0 +1,74 @@
+[
+  {
+    "run": "7567049b-0dae-4bed-8aa8-a0e68b1c208b",
+    "project": "Anvil Saga",
+    "usage": {
+      "requests": 2997,
+      "prompt_tokens": 6999063,
+      "completion_tokens": 1668743,
+      "total_tokens": 8667806,
+      "reasoning_tokens": 1378195,
+      "cached_tokens": 5440256,
+      "batch_size": 3983,
+      "priced": 0,
+      "known_usd": "0"
+    },
+    "estimate_known_models": "5.3825",
+    "estimate_unknown_requests": 0,
+    "attempts": 3031
+  },
+  {
+    "run": "71ee489d-43cf-404a-bebd-3f8e442eb771",
+    "project": "Victory Banner",
+    "usage": {
+      "requests": 3029,
+      "prompt_tokens": 8295163,
+      "completion_tokens": 836660,
+      "total_tokens": 9131823,
+      "reasoning_tokens": 660023,
+      "cached_tokens": 5850764,
+      "batch_size": 4147,
+      "priced": 32,
+      "known_usd": "0.245826461520000000"
+    },
+    "estimate_known_models": "5.3225",
+    "estimate_unknown_requests": 32,
+    "attempts": 3028
+  },
+  {
+    "run": "a1d09bd2-0030-450c-9aaf-dba9727e03d3",
+    "project": "Victory Banner",
+    "usage": {
+      "requests": 3014,
+      "prompt_tokens": 8236463,
+      "completion_tokens": 793607,
+      "total_tokens": 9030070,
+      "reasoning_tokens": 612374,
+      "cached_tokens": 5897947,
+      "batch_size": 4079,
+      "priced": 23,
+      "known_usd": "0.102348830000000000"
+    },
+    "estimate_known_models": "5.3274",
+    "estimate_unknown_requests": 23,
+    "attempts": 3236
+  },
+  {
+    "run": "4736c44d-67e1-4e0d-8fb6-7f71c80050aa",
+    "project": "Anvil Saga",
+    "usage": {
+      "requests": 3000,
+      "prompt_tokens": 6979330,
+      "completion_tokens": 927148,
+      "total_tokens": 7906478,
+      "reasoning_tokens": 743755,
+      "cached_tokens": 5426176,
+      "batch_size": 3998,
+      "priced": 0,
+      "known_usd": "0"
+    },
+    "estimate_known_models": "4.2327",
+    "estimate_unknown_requests": 0,
+    "attempts": 3004
+  }
+]

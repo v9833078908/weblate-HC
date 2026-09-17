@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: HCGameLoc
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version = 1
+
+[[annotations]]
+path = ["**.json", "**.json.gz"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "HCGameLoc"
+SPDX-License-Identifier = "GPL-3.0-or-later"

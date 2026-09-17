@@ -1,0 +1,15 @@
+{
+  "summary": "Production overrides supersede the inherited-batch assumption: B1=2 and B2=1 make exactly 3,000 clean initial judge POSTs for 2,000 units (1,000 + 2,000). Current local scheduler uses coverage end_offset, not same batch-index barriers.",
+  "files": [
+    {
+      "path": "weblate/trans/judge_loop.py",
+      "description": "_run_seats coverage/end_offset acknowledgement barrier around lines 1160-1238."
+    },
+    {
+      "path": "weblate/trans/judge.py",
+      "description": "Per-seat batch override resolution around lines 450-550 and initial request count around lines 815-830."
+    }
+  ],
+  "architecture": "Seat 1 and seat 2 receive the same ordered request sequence, but each uses its own configured width. The coverage barrier releases an event only after every peer has persisted through that event's end offset; it is a bounded coverage barrier, not a strict equal batch-index barrier.",
+  "report": "With B1=2/B2=1, seat 1 emits [0,2], [2,4], ... while seat 2 emits [0,1], [1,2], [2,3], [3,4], ... . Seat 2's first event waits until seat 1 coverage reaches offset 1; once seat 1's [0,2] is persisted, seat 2 can advance through [1,2]. Seat 1's [0,2] is released only once seat 2 reaches offset 2. In general, a pending event waits for peer coverage >= its end_offset, so the narrower seat can issue multiple requests while the wider event is pending, but cannot pass the wider seat's current persisted coverage boundary. Fatal errors release pending/future events and abort workers. This explains 3,000 clean initial calls without retries or adaptive collapse. Equalizing widths would reduce fixed prompt/request overhead (B2=1 doubles seat-2 requests), but should be evaluated against model quality, latency, provider limits, and approval gates; no settings change is recommended from this investigation alone."
+}
