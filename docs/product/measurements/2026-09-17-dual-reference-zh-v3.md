@@ -2,9 +2,10 @@
 
 ## Current status
 
-The owner authorized an eight-record end-to-end smoke of all six conditions,
-followed by the frozen 120-record screening pilot only if the smoke succeeds.
-No confirmatory inference or production translation update is authorized here.
+The eight-record end-to-end smoke passed. The owner-authorized 120-record
+screening pilot was dispatched at 2026-09-17 11:30:31 UTC (14:30 Moscow).
+Its results are pending; G3–G5 remain open. No confirmatory inference or
+production translation update is authorized here.
 
 ## Registered changes before inference
 
@@ -56,3 +57,41 @@ these changed files.
 No claim about the superiority of EN or two references follows from passing
 the smoke. The corpus remains screening-only; human review provenance and
 independent Chinese LQA remain unestablished.
+
+## Smoke result and pilot dispatch
+
+The smoke exited successfully and provided every assigned output:
+
+| Artifact | Expected | Preserved and validated |
+| --- | ---: | ---: |
+| Translations A–F | 48 | 48 |
+| Reviewer records E/F, two seats | 32 | 32 |
+| Final proxy ratings, six conditions and two seats | 96 | 96 |
+| Completed request batches | 44 | 44 |
+
+Two first-attempt HTTP 504 responses from `atlas/qwen3.8-max` during review
+recovered on their registered second attempts. There were no terminal batch
+failures. Both errors, all successful responses and receipts survived in the
+journal. The local collector parsed the final JSON and journal, compared
+every batch with the final result, checked assigned IDs and verified the final
+artifact hash. `technical_gate_pass` and `journal_matches_artifact` are true.
+
+The returned model IDs matched the registered Gemini and two judge aliases.
+All 48 translations were considered usable by both proxy judges; this small
+technical sample does not establish equality or superiority of the methods.
+The 12 successful Gemini receipts report USD 0.03707175. The 32 successful
+LiteLLM receipts contain no cost field, so this is not total study cost.
+
+The pilot uses the same frozen runner SHA-256:
+`b397193fc38d09954e68ee357e30e6897f1dea4064a9197f228cff220992bff7`.
+It has 120 records, 720 target outputs, 480 reviewer records and 1440 final
+proxy ratings: 528 first-attempt requests, at most two attempts per request.
+No v1, v2 or smoke outcomes are pooled with it.
+
+Pilot artifacts are written to persistent research storage inside the existing
+container at `/app/data/research-runs/hc-dual-reference-v3-20260917/pilot/`.
+No translations or suggestions are written to Weblate. The local pilot folder
+contains `launch.json`, registration, frozen inputs, code identity and a
+read-only `collect-and-verify.py` command; its README explains how to collect
+the journal and final artifact into Downloads. An initial local snapshot is
+not the final pilot report.
