@@ -90,6 +90,7 @@ from django.utils import timezone
 from weblate.trans import judge
 from weblate.trans.judge_loop import build_request, run_judge_batch
 from weblate.trans.models.judge import (
+    JudgeAdaptiveState,
     JudgeRequestAttempt,
     JudgeVerdict,
 )
@@ -1307,6 +1308,23 @@ def run_block(
     verdict cache, no writable strings. Only audit-ledger rows are written,
     and only to the QA database.
     """
+    # Fresh QA state per slot (plan: "каждый повтор — свежий QA state").
+    # JudgeAdaptiveState persists per (endpoint, model, seat) across runs:
+    # without a reset, an earlier slot's budget leaks into the next arm and
+    # silently collapses the width this slot is supposed to measure (A5
+    # shrunk to width 1 by A0's leftover state is not a batch=5 result).
+    # Resetting only opens the slot at the arm's requested width; the
+    # adaptive policy itself keeps running unchanged inside the slot.
+    for profile in profiles:
+        JudgeAdaptiveState.objects.update_or_create(
+            endpoint_fingerprint=profile.endpoint_fingerprint,
+            model=profile.model,
+            seat=profile.seat,
+            defaults={
+                "batch_budget": profile.batch_size,
+                "clean_attempt_streak": 0,
+            },
+        )
     run_uuid = uuid_module.uuid4()
     block_id = slot["id"]
     expected_digests: dict[int, list[str]] = {}

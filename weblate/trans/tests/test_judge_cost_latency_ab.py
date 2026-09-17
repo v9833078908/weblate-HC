@@ -484,6 +484,30 @@ class RunnerEndToEndTest(TempDirMixin, RepoTestMixin, TransactionTestCase):
         self.assertEqual(seat_2[0].batch_size, 4)
 
     @http_mock.activate
+    def test_adaptive_state_does_not_leak_between_slots(self) -> None:
+        # JudgeAdaptiveState persists per (endpoint, model, seat) in the QA
+        # database: a width-1 slot leaves budget 1 behind, and without a
+        # per-slot reset the next arm's requested width collapses to it.
+        register_fake_provider({SEAT_1_MODEL: "ok", SEAT_2_MODEL: "ok"})
+        manifest_path = write_experiment(
+            self.tmp,
+            records_from_units(self.units),
+            arms={
+                "A0": {"title": "control", "overrides": {"seat_2_batch_size": 1}},
+                "A5": {"title": "wide", "overrides": {"seat_2_batch_size": 5}},
+            },
+        )
+        self.assertEqual(self.run_execute(manifest_path, "s001"), 0)
+        self.assertEqual(self.run_execute(manifest_path, "s002"), 0)
+        attempts = list(JudgeRequestAttempt.objects.all().order_by("pk"))
+        # s001: seat 1 two width-2 batches + seat 2 four width-1 batches.
+        # s002 with a fresh adaptive state: seat 1 two + seat 2 one width-4.
+        self.assertEqual(len(attempts), 9, [a.batch_size for a in attempts])
+        wide = [row for row in attempts if row.seat == 2 and row.batch_size > 1]
+        self.assertEqual(len(wide), 1)
+        self.assertEqual(wide[0].batch_size, 4)
+
+    @http_mock.activate
     def test_parser_failures_stay_in_the_denominator(self) -> None:
         register_fake_provider({SEAT_1_MODEL: "duplicate-id", SEAT_2_MODEL: "partial"})
         manifest_path = write_experiment(self.tmp, records_from_units(self.units))

@@ -427,6 +427,62 @@ Rollout не часть исполнения этого плана. Для не�
 
 Не выполнено (требует отдельного разрешения): `--execute` (платный), заполнение бюджета/цен в manifest, заполнение `est_tokens` из архива, заполнение `prices`, человеческая разметка (`max_unique_units` в `BUDGET` = 4 — это пример, не утверждённый корпус), проведение A/B с реальным корпусом, подтверждение на held-out, отчёт `docs/product/measurements/`. Эти шаги явно требуют отдельного численного разрешения (`max_http_attempts_per_slot`, `max_wall_clock_minutes_per_slot`, `money_cap_usd`) и не выполнены автоматически.
 
+## Статус Task 2: платный smoke A0/A2/A5 (2026-09-17, исполнено с разрешения владельца)
+
+Разрешение владельца: «реальный [корпус], максимум 5$, все три [плеча]» и
+«разрешаю заранее все по плану»; лимиты слота — 50 HTTP attempts, 10 минут
+wall clock, money cap `$5`, `acknowledge_residual_risk=true` (provider-side
+limit отсутствует). Корпус: 4 реальные строки `cs` из фикстуры `cs.po`
+(QA-БД dev-docker, порт 5434), все `state=20`, target синхронизирован с
+форматой хранения; 3 строки в dev, 1 в heldout. Это bounded smoke по плану
+(«Сначала bounded smoke, затем три повтора»), не основное сравнение.
+
+Конфигурация зеркалит контейнер: LiteLLM proxy
+`https://hcbifrost.herocraft.com/litellm/v1`, модели
+`deepseek-v4-pro` / `atlas/qwen3.8-max`, stream оба seat, reasoning seat 2
+`extra_body.enable_thinking=false`, fallback отключён (проверено), retry-политика
+продовая. Ключ judges только в окружении процесса, не в файлах и артефактах.
+
+Прогон 1 (`real-ab`) — **скомпрометирован и не считается**: персистентный
+`JudgeAdaptiveState` (по endpoint+model+seat) протёк между слотами. A0 оставил
+бюджет width 1, поэтому A2 фактически шла width 1 (все батчи `{1:3}`), A5 —
+width 2 (`{2:1, 1:1}`), хотя манифест запросил 2 и 5. Раннер честно записал
+фактические ширины (`effective_batch_distribution`), что и вскрыло конфаунд.
+
+Исправление раннера: сброс `JudgeAdaptiveState` в начало каждого слота
+(`batch_budget` = ширина плеча, streak 0) — «каждый повтор — свежий QA state»;
+политика adaptive внутри слота не меняется. Регрессионный тест
+`test_adaptive_state_does_not_leak_between_slots` (два слота в одной БД);
+suite 17/17 зелёных.
+
+Прогон 2 (`real-ab2`, после фикса) — механически валидный smoke:
+
+| Плечо | POST | Wall clock | Seat 2 фактическая ширина | Unparsed |
+|---|---:|---:|---|---:|
+| A0 (batch 1) | 5 | 22.60 с | `{1:3}` | 0 |
+| A2 (batch 2) | 4 | 45.12 с | `{2:1, 1:1}` | 0 |
+| A5 (batch 5) | 3 | 25.66 с | `{3:1}` | 0 |
+
+Гейты pass во всех плечах (critical misses 0, major recall без изменений,
+false flags без роста, unparsed 0), approved/translated состояния строк не
+изменились, MT/candidates/fallback не создавались. Провайдер не отчитывает
+стоимость (`cost_reported_usd 0.0000`), оценка по манифестным ценам — доли
+цента за все шесть слотов, далеко ниже потолка.
+
+Интерпретация по плану — **inconclusive как основание для adopt**: 3 строки,
+один язык, один повтор и синтетическая разметка не дают мощности ни для
+quality, ни для wall-clock (45 с A2 против 22.6 с A0 — один p95-выброс,
+не сигнал). Подтверждено только: HTTP-арифметика сходится (5/4/3 POST),
+ширины плеч реально исполняются, кэш и reasoning токены журналируются
+(prompt 9.3k/7.6k/5.9k, cached 4k/2k/2k, reasoning 491/1619/772),
+runner и гварды работают в платном режиме. Основное сравнение Task 2
+(≥3 повтора, human labels, en/fr/ja/ko/zh_Hans/zh_Hant, held-out) не проводилось.
+
+Артефакты обоих прогонов — `analysis/data/judge-cost-latency-ab/real-ab*/`
+(gitignored, закрытое хранилище); summary пересчитывается офлайн:
+`uv run python analysis/probes/judge-cost-latency-ab.py --summarize --manifest
+analysis/data/judge-cost-latency-ab/real-ab2/manifest.json`.
+
 ## Готовность к исполнению и открытые решения
 
 Порядок: регистрация/offline runner → A → B → независимое подтверждение →
