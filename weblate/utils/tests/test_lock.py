@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 from django.test import SimpleTestCase
 from filelock import FileLock
 
+from weblate.trans.tasks import JudgeExecutionGuardError, producer_execution_guard
 from weblate.utils.lock import WeblateLock
 from weblate.vcs.base import Repository, RepositoryLock, get_repository_lock_key
 
@@ -24,6 +25,13 @@ def hold_file_lock(lock_path: str, ready) -> None:
     with FileLock(lock_path):
         ready.set()
         time.sleep(30)
+
+
+def hold_producer_execution_guard(task_id: str, ready) -> None:
+    with producer_execution_guard(producer_run_id=None, task_id=task_id):
+        ready.set()
+        time.sleep(30)
+
 
 class RepositoryLockTest(SimpleTestCase):
     def test_default_redis_lock_uses_scope_and_key(self) -> None:
@@ -85,6 +93,37 @@ class RepositoryLockTest(SimpleTestCase):
                 process.join(timeout=5)
                 self.assertFalse(process.is_alive())
                 with FileLock(Path(lock_path, "judge.lock"), timeout=1):
+                    pass
+            finally:
+                if process.is_alive():
+                    process.terminate()
+                    process.join(timeout=5)
+
+    def test_producer_guard_excludes_duplicate_process_delivery(self) -> None:
+
+        with TemporaryDirectory() as lock_path, self.settings(DATA_DIR=lock_path):
+            context = multiprocessing.get_context("fork")
+            ready = context.Event()
+            process = context.Process(
+                target=hold_producer_execution_guard,
+                args=("duplicate-delivery", ready),
+            )
+            process.start()
+            try:
+                self.assertTrue(ready.wait(timeout=5))
+                with (
+                    self.assertRaises(JudgeExecutionGuardError),
+                    producer_execution_guard(
+                        producer_run_id=None, task_id="duplicate-delivery"
+                    ),
+                ):
+                    pass
+                process.terminate()
+                process.join(timeout=5)
+                self.assertFalse(process.is_alive())
+                with producer_execution_guard(
+                    producer_run_id=None, task_id="duplicate-delivery"
+                ):
                     pass
             finally:
                 if process.is_alive():
