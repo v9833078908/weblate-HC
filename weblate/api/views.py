@@ -3760,11 +3760,7 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
                     preparation_scope = batch.build_preparation_scope()
                 except PermissionDenied as error:
                     raise PermissionDenied(str(error)) from error
-                blockers = [
-                    warning
-                    for warning in batch.get_warnings()
-                    if "cannot be prepared" in warning or "configured" in warning
-                ]
+                blockers = list(batch.preparation_blockers)
                 if blockers:
                     raise ValidationError({"auto_source": " ".join(blockers)})
             else:

@@ -1596,6 +1596,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.judge_candidate_severities = judge_candidate_severities
         self.judge_proposal_only = judge_proposal_only
         self.judge_scope = obj
+        # Preparation blockers reported by ``build_preparation_scope`` in the
+        # language they will be shown in. The estimate, the preview and the
+        # pre-flight refusal read this list instead of matching the localized
+        # warning text, which only ever worked in English.
+        self.preparation_blockers: list[str] = []
         # Attempt-local counter for the user-facing `done/total`; created in
         # _perform so every delivery attempt (including a redelivered one)
         # starts from a fresh snapshot of the remaining units.
@@ -1855,13 +1860,12 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     # No engine can fill this language; the preparation
                     # barrier blocks the judge phase with this warning, and
                     # estimate reports the blocker before any paid call.
-                    self.add_warning(
-                        gettext(
-                            "No machine translation engine is configured for "
-                            "%(language)s; missing strings cannot be prepared."
-                        )
-                        % {"language": language_code}
-                    )
+                    blocker = gettext(
+                        "No machine translation engine is configured for "
+                        "%(language)s; missing strings cannot be prepared."
+                    ) % {"language": language_code}
+                    self.preparation_blockers.append(blocker)
+                    self.add_warning(blocker)
                 else:
                     engines.add(engine)
         if len(engines) > 1:
