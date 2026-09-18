@@ -111,6 +111,11 @@ revision, nullable общий массив target forms, происхожден�
 
 Группа detection может включать строки вне правил. До явного правила или
 решения они остаются кандидатами, не получают автоматический sharing.
+Группа очереди ограничена target language правила: `repeat_units` чека
+(`weblate/trans/models/unit.py:2675`) строит группу project-wide по всем
+целевым языкам, поэтому чек может подсвечивать участников в других языках —
+это advisory-поведение чека; в карточке очереди показываются участники
+только языка правила.
 Глоссарные строки и запрещённые существующей политикой propagation строки
 не включаются автоматически; исключения видны в preview.
 
@@ -156,6 +161,12 @@ Undo восстанавливает только записи, всё ещё р�
 
 Новый модуль `weblate/trans/repeat_recommendations.py` использует ограниченный
 транспортный seam `weblate/trans/judge.py`, но собственные prompt/schema/parser.
+Seam — сырые HTTP-функции `_post_batch`/`_post_response`/`_read_sse`/
+`_decode_non_stream` (`judge.py:1396,1341,1202,1305`); `request_verdicts` и
+`_run_batch` (`judge.py:2044,1769`) запрещены: они вшивают judge
+prompt/schema/parser и резолвят fallback-профиль
+(`resolve_judge_fallback_seat_profile`, `judge.py:1784`) — второй платный
+endpoint, что нарушает «без автоматического перехода на иной платный профиль».
 `RepeatRecommendationRun` и `RepeatRecommendationResult` в новом model-модуле
 хранят scope snapshot, profile/prompt/schema fingerprints, лимит запросов,
 состояние запуска и результаты групп. Не использовать `JudgeVerdict` или
@@ -177,8 +188,10 @@ Undo восстанавливает только записи, всё ещё р�
 
 Запуск резервирует конечный request cap до каждого HTTP-запроса, включая retry
 и дробление batch. Кэш только при совпадении полного snapshot и профиля.
-Новая операция usage — `repeat_recommend` (помещается в существующий max_length
-20). Учёт фиксирует реальные запросы, токены, nullable cost и связь с run.
+Новая операция usage — новый член `LLMUsageLog.Operation` `repeat_recommend`
+(16 симв., влезает в существующий max_length 20; choices — Python-уровень,
+БД-миграция не требуется). Учёт фиксирует реальные запросы, токены, nullable
+cost и связь с run.
 
 Таймаут после отправки означает неопределённый результат платного запроса:
 не обещать exactly-once внешний HTTP без поддержки провайдера. Durable attempts
@@ -247,12 +260,24 @@ MT и отображается отдельным итогом. Без opt-in п
 точным отчётом; approved и конкурентные правки защищены.
 
 **Файлы:** `weblate/trans/repeats.py`, `weblate/trans/models/repeat.py`,
-`weblate/trans/models/unit.py`, `weblate/trans/models/change.py`;
+`weblate/trans/models/unit.py`, `weblate/trans/actions.py`;
 новый `weblate/trans/tests/test_repeat_apply.py`.
 
-- [ ] Реализовать §3.2, `unit.edit` и `unit.bulk_edit` на каждом получателе;
-  изменение правил — project edit, не доступ только к одной translation.
-- [ ] Сохранять provenance и событие для пакетного применения/исключений.
+- [ ] Реализовать §3.2: запись каждого получателя существующим примитивом
+  `Unit.translate(user, new_target, new_state, ..., propagate=False)`
+  (`weblate/trans/models/unit.py:2439`; параметр доходит до `save_backend`);
+  методов `unit.edit`/`unit.bulk_edit` на модели нет (`bulk_edit` — это view
+  `weblate/trans/views/search.py:260`, меняющий state/flags/labels, не target),
+  тонкий пакетный wrapper ввести в `repeats.py`, не на Unit. Изменение правил —
+  `project.edit`, не доступ только к одной translation.
+- [ ] После commit планировать recheck затронутой группы: метод
+  `schedule_repeat_drift_recheck` вызывается только при `not is_batch_update`
+  (`weblate/trans/models/unit.py:2555`), поэтому пакетное применение либо
+  пишет с `is_batch_update=False`, либо явно зовёт scoped recheck после commit.
+- [ ] Сохранять provenance и событие для пакетного применения/исключений:
+  новые члены `ActionEvents` (`weblate/trans/actions.py:21`) с включением в
+  `ACTIONS_LOG`/`ACTIONS_REVERTABLE`/`ACTIONS_SHOW_CONTENT`;
+  `models/change.py` — только details-рендер, не место перечисления.
 - [ ] Реализовать guarded undo и результаты по группам, включая partial.
 - [ ] Проверить отсутствие обходного native propagation за пределы snapshot.
 
@@ -271,11 +296,20 @@ lock и потеря прав между GET/POST не пишут; чужой п
 `weblate/templates/repeat_queue.html`, `weblate/templates/repeat_detail.html`;
 `weblate/urls.py`, `weblate/trans/forms.py`, `weblate/trans/views/edit.py`,
 `weblate/templates/snippets/translation.html`, `weblate/templates/check_list.html`,
-`weblate/trans/models/suggestion.py`, `weblate/trans/tasks.py`,
-`weblate/api/views.py`, `weblate/api/serializers.py`.
+`weblate/trans/models/suggestion.py`, `weblate/trans/views/bulk_suggestions.py`,
+`weblate/trans/tasks.py`, `weblate/api/views.py`, `weblate/api/serializers.py`.
 
 - [ ] Добавить переход от `repeat-drift` к проектно-языковой очереди;
   фильтры component, source labels, статус; конфликтующие approved сверху.
+  Очередь строится собственным detection и живёт независимо от состояния чека:
+  `RepeatDriftCheck.default_disabled = True`
+  (`weblate/checks/consistency.py:307`), поэтому вход через чек — только
+  дополнительная ссылка там, где чек включён, не единственный путь.
+- [ ] Очередь — собственный view с синхронным применением §3.2 и отчётом по
+  группам; НЕ наследовать `fix_check` (`weblate/trans/views/search.py:376`:
+  тот требует `unit.bulk_edit`+`unit.edit` и уходит в Celery
+  `fix_failing_checks`, частичный результат по группам некому показать).
+  Права: `unit.edit` на получателях, `project.edit` для правил.
 - [ ] В карточке показать варианты, ключи, contexts, Explanation, состояния,
   общий вариант, происхождение и исключения; раскрытие списка с пагинацией.
 - [ ] Выбор существующего/нового варианта, независимости и общего правила
@@ -283,10 +317,17 @@ lock и потеря прав между GET/POST не пишут; чужой п
 - [ ] Различать группы/вхождения, unresolved/approved conflict/stale/resolved,
   writable/protected; не объявлять весь пакет успешным после частичной записи.
 - [ ] Подключить диалог общего/независимого изменения к обычному editor, Zen
-  и принятию suggestion. REST получает явное поле решения; отсутствующий
-  выбор при изменении shared target возвращает 409 без записи.
+  и принятию suggestion. Zen сохраняется отдельным JSON POST `save_zen`
+  (`weblate/trans/views/edit.py:2296`) мимо `handle_translate` — решение там
+  входит в JSON-ответ, а не в HTML-диалог. REST получает явное поле решения;
+  отсутствующий выбор при изменении shared target возвращает 409 без записи:
+  проверка в `UnitViewSet.perform_update` (`weblate/api/views.py:3864`) после
+  блокировки юнита, НЕ в serializer.validate (гонка с записью); обычный PATCH
+  без shared-строк не затрагивается; 409 — новый публичный контракт core API.
 - [ ] Bulk suggestion acceptance также использует защиту: без явного решения
-  shared-строки пропускаются с причиной, не получают тихий propagation.
+  shared-строки пропускаются с причиной, не получают тихий propagation;
+  per-unit причины расширяют результат задачи `bulk_accept_user_suggestions`
+  (`weblate/trans/views/bulk_suggestions.py:44`, сейчас только агрегаты).
   Импорт не интерактивен: внешний отличающийся target делает связь stale,
   не распространяет его автоматически на группу.
 
@@ -312,13 +353,18 @@ stale во второй вкладке, reload, undo. Проверить labels,
 
 - [ ] Реализовать отдельную операцию §3.3, strict schema, bounded payloads,
   attempt ledger, liveness, cancellation, повторную проверку прав worker-ом.
+  Транспорт — только `_post_batch`/`_post_response`/`_read_sse`/
+  `_decode_non_stream`; не звать `request_verdicts`/`_run_batch` (fallback-риск
+  из §3.3).
 - [ ] Добавить бесплатный preview запуска, подтверждение known/unknown cost
   и конечного cap; изменение snapshot требует обновить preview.
 - [ ] Добавить команду «Подготовить рекомендации» для всей фильтрованной
   очереди, не только страницы; показать точный snapshot scope.
 - [ ] Хранить предложение отдельно, показать основания и stale; выбор пакета
   запускает новый preview применения задачи 2, а не автоaccept.
-- [ ] Расширить usage и историю runs без подмены judge-результатов.
+- [ ] Расширить usage и историю runs без подмены judge-результатов: новый
+  член `LLMUsageLog.Operation` `repeat_recommend`
+  (`weblate/trans/models/llm_usage.py:46-49`; без БД-миграции, см. §3.3).
 
 **Проверка:** HTTP mocks в новых suites через `./rundev.sh test`; чужой ID,
 неполный ответ, prompt injection в source, cap при retry, cancel, redelivery,
@@ -341,6 +387,10 @@ Unit/state/JudgeVerdict. Существующие `test_judge_client.py` и
 
 - [ ] Реализовать §3.4 до исходящих MT requests; durable group reservation
   защищает от двух параллельных запусков и разных кандидатов одной revision.
+  Точка отсечения: юниты с принятым общим target исключаются из списка units
+  при сборке батча в `weblate/trans/machinery.py`, ДО `_translate_sources`
+  (`weblate/machinery/base.py:1366` вызывает LLM для всего батча и лишь потом
+  сравнивает с `quality >= max_score` по `unit.machinery`).
 - [ ] Сохранять cap исходного scope; fan-out не расширяет набор Unit.
 - [ ] Проверять каждого получателя; несовместимый не меняется и виден в отчёте.
 - [ ] Добавить отдельный opt-in рекомендаций с лимитом; после MT создавать
@@ -371,9 +421,15 @@ approved, одновременную ручную правку, новые пу�
 - [ ] Check использует свежие explicit independent decisions для исключения
   сравнений, но сохраняет advisory-семантику и detection вне правил.
   Stale exception не скрывает новое расхождение. Конфликтующие shared approved
-  остаются видны; dismissal не создаёт policy.
+  остаются видны; dismissal не создаёт policy. Консультация с membership на
+  read-пути — prefetch через reverse-relation или денормализованный флаг,
+  не N+1 на участника; замерить время проверки.
 - [ ] Изменение policy/member/target планирует ограниченный recheck всей
   затронутой группы; никаких project-wide пересчётов на каждое чтение.
+  Владельцы: применение (§3.2, Задача 2) — recheck после commit; batch-пути
+  MT-reuse (Задача 5) и import (Задача 1) пишут с `is_batch_update=True`,
+  поэтому `schedule_repeat_drift_recheck` (`weblate/trans/models/unit.py:2555`)
+  сам не сработает — они явно планируют scoped recheck после commit.
 - [ ] Обновить пользовательскую документацию, threat model для новой платной
   операции/permission boundary и unreleased changelog по правилам репозитория.
 - [ ] Выполнить сквозной smoke ниже, убрать временные smoke-скрипты и fixtures,
