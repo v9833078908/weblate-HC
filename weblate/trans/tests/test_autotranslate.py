@@ -609,6 +609,19 @@ class PersistedProducerRunRecoveryTest(RepoTestMixin, TransactionTestCase):
         # One judgeable string is enough: the guard, not the batch size,
         # decides the terminal-replay behavior here.
         self._mark_judgeable("cs", "Hello, world!\n", "Ahoj, světe!")
+        # The delivery runs over the whole component, and the mandatory
+        # barrier refuses to judge an empty string that no engine can prepare,
+        # so every other string already carries text.
+        for scope_unit in Unit.objects.filter(
+            translation__component=self.component
+        ).select_related("translation"):
+            if scope_unit.translation.is_source:
+                continue
+            if not any(scope_unit.get_target_plurals()):
+                forms = (
+                    scope_unit.translation.plural.number if scope_unit.is_plural else 1
+                )
+                scope_unit.translate(self.user, ["Text"] * forms, STATE_TRANSLATED)
         task_id = "component-terminal-replay"
         self._run_component_delivery(task_id)
 
