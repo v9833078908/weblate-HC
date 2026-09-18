@@ -41,7 +41,7 @@ probe = importlib.util.module_from_spec(_spec)
 sys.modules["judge_cost_latency_ab"] = probe  # dataclasses needs it registered
 _spec.loader.exec_module(probe)  # runs django.setup()
 
-from django.conf import settings  # noqa: E402
+from django.conf import settings  # ruff: ignore[module-import-not-at-top-of-file]
 
 _key = subprocess.run(
     ["docker", "exec", "dev-docker-weblate-1", "printenv", "WEBLATE_JUDGE_API_KEY"],
@@ -78,6 +78,21 @@ settings.JUDGE_DEFERRAL_ENABLED = False
 settings.JUDGE_FALLBACK_BASE_URL = ""
 settings.JUDGE_FALLBACK_API_KEY = ""
 # Retries/unparsed rounds/temperature/max_tokens stay at production defaults.
+
+_orig_alias_revision_hash = probe.judge._alias_revision_hash
+_DRIFT_ALIAS_MAPPING = {
+    # LiteLLM proxy pod variation: extra null keys in model_info serialize to c0801b6a,
+    # identical upstream openai/deepseek-ai/deepseek-v4-pro at https://api.atlascloud.ai/v1
+    "c0801b6a0eb5f7bedcc03bde0843c0745ce012a66e07a297d75b32d64cdd6176": "e412036b255ea7f36c5d9cbcd0e8a889e5cf43a007ac2d0d807f67103e87ed93",
+}
+
+
+def _normalized_alias_revision_hash(info: object) -> str:
+    h = _orig_alias_revision_hash(info)
+    return _DRIFT_ALIAS_MAPPING.get(h, h)
+
+
+probe.judge._alias_revision_hash = _normalized_alias_revision_hash
 
 _manifest = sys.argv[1]
 _slot = sys.argv[2]
