@@ -57,6 +57,7 @@ from weblate.trans.models.judge import (
     has_complete_current_evidence,
     state_for_verdict,
 )
+from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.util import is_plural, split_plural
 from weblate.utils.celery import touch_task_liveness
 from weblate.utils.state import (
@@ -2419,6 +2420,61 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     "cap_remainder", summary["cap_remainder"]
                 ),
             )
+        if run.requested_mode == "translate":
+            # Aggregate LLM translation refusals so a run whose only signal
+            # of failure lives in LLMUsageLog still surfaces it: a single-
+            # string batch that was refused is terminal (the batch splitter
+            # cannot halve one string), and a run where every translation
+            # was refused is a partial outcome, not a clean COMPLETED.
+            translation_usage = (
+                LLMUsageLog.objects.filter(
+                    run=run,
+                    operation=LLMUsageLog.Operation.TRANSLATION,
+                )
+                .exclude(outcome="")
+                .exclude(outcome=LLMUsageLog.Outcome.APPLIED)
+            )
+            has_applied = LLMUsageLog.objects.filter(
+                run=run,
+                operation=LLMUsageLog.Operation.TRANSLATION,
+                outcome=LLMUsageLog.Outcome.APPLIED,
+            ).exists()
+            refusal_rows = (
+                translation_usage.values_list("outcome", "refusal_reason")
+                .order_by()
+                .annotate(count=Count("pk"))
+            )
+            has_refused = any(
+                row[0] == LLMUsageLog.Outcome.REFUSED for row in refusal_rows
+            )
+            for outcome, reason, count in refusal_rows:
+                if outcome == LLMUsageLog.Outcome.REFUSED:
+                    warning = ngettext(
+                        "LLM translation refused: %(reason)s (%(count)d request).",
+                        "LLM translation refused: %(reason)s (%(count)d requests).",
+                        count,
+                    ) % {"reason": reason, "count": count}
+                else:
+                    warning = ngettext(
+                        "LLM translation partially refused: %(reason)s (%(count)d request).",
+                        "LLM translation partially refused: %(reason)s (%(count)d requests).",
+                        count,
+                    ) % {"reason": reason, "count": count}
+                if warning not in self.warnings:
+                    self.warnings.append(warning)
+            if (
+                has_refused
+                and not has_applied
+                and run.status
+                not in {
+                    ProducerRun.Status.FAILED,
+                    ProducerRun.Status.CANCELLED,
+                    ProducerRun.Status.PARTIAL,
+                }
+                and status == ProducerRun.Status.COMPLETED
+            ):
+                status = ProducerRun.Status.PARTIAL
+                run.status = status
         summary["written"] = self.updated
         if run.preparation_snapshot:
             # C5/C6: the preparation outcome survives finalization as its

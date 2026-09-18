@@ -28083,7 +28083,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Translation'
+                $ref: '#/components/schemas/AutoTranslateResponse'
           description: Successful response.
           headers:
             X-RateLimit-Limit:
@@ -28096,23 +28096,8 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  details:
-                    type: string
-                  run_id:
-                    type: string
-                    format: uuid
-                  report_url:
-                    type: string
-                  status:
-                    type: string
-                required:
-                - details
-                - run_id
-                - report_url
-                - status
-          description: Automatic translation run queued asynchronously (judge mode).
+                $ref: '#/components/schemas/AutoTranslateAcceptedResponse'
+          description: The request was accepted for asynchronous processing.
   /api/translations/{component__project__slug}/{component__slug}/{language__code}/changes/:
     get:
       operationId: api_translations_changes_list
@@ -34477,6 +34462,38 @@ components:
           title: Component regular expression
           description: Regular expression which is used to match component slug.
           maxLength: 200
+    AutoTranslateAcceptedResponse:
+      type: object
+      properties:
+        details:
+          type: string
+        run_id:
+          type: string
+          format: uuid
+        report_url:
+          type: string
+          format: uri
+        status:
+          type: string
+      required:
+      - details
+      - report_url
+      - run_id
+      - status
+    AutoTranslateResponse:
+      type: object
+      properties:
+        details:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        report_url:
+          type: string
+          format: uri
+      required:
+      - details
     Backup:
       type: object
       properties:
@@ -41840,36 +41857,16 @@ components:
         * `-1` - Negative
     VcsEnum:
       enum:
-      - azure_devops
-      - bitbucketcloud
-      - bitbucketserver
-      - gerrit
       - git
       - git-force-push
-      - gitea
-      - github
       - github-app
-      - gitlab
       - local
-      - mercurial
-      - pagure
-      - subversion
       type: string
       description: |-
-        * `azure_devops` - Azure DevOps pull request
-        * `bitbucketcloud` - Bitbucket Cloud merge request
-        * `bitbucketserver` - Bitbucket Data Center pull request
-        * `gerrit` - Gerrit
         * `git` - Git
         * `git-force-push` - Git with force push
-        * `gitea` - Gitea pull request
-        * `github` - GitHub pull request
         * `github-app` - GitHub (via Weblate GitHub app)
-        * `gitlab` - GitLab merge request
         * `local` - No remote repository
-        * `mercurial` - Mercurial
-        * `pagure` - Pagure merge request
-        * `subversion` - Subversion
     ZenModeEnum:
       enum:
       - 0

@@ -9,7 +9,7 @@ import os.path
 from collections import Counter
 from collections.abc import Mapping
 from contextlib import suppress
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 from urllib.parse import unquote
 from uuid import uuid4
 
@@ -3682,11 +3682,24 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
         description="Trigger automatic translation.",
         methods=["post"],
         responses={
-            HTTP_200_OK: OpenApiResponse(
-                description="Automatic translation completed synchronously."
+            HTTP_200_OK: inline_serializer(
+                "AutoTranslateResponse",
+                fields={
+                    "details": serializers.CharField(),
+                    "warnings": serializers.ListField(
+                        child=serializers.CharField(), required=False
+                    ),
+                    "report_url": serializers.URLField(required=False),
+                },
             ),
-            HTTP_202_ACCEPTED: OpenApiResponse(
-                description="Automatic translation queued asynchronously (judge mode)."
+            HTTP_202_ACCEPTED: inline_serializer(
+                "AutoTranslateAcceptedResponse",
+                fields={
+                    "details": serializers.CharField(),
+                    "run_id": serializers.UUIDField(),
+                    "report_url": serializers.URLField(),
+                    "status": serializers.CharField(),
+                },
             ),
         },
     )
@@ -3836,8 +3849,16 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
             threshold=autoform.cleaned_data["threshold"],
         )
 
+        response_data: dict[str, Any] = {
+            "details": message,
+            "warnings": auto.get_warnings(),
+        }
+        if auto.active_producer_run is not None:
+            response_data["report_url"] = reverse(
+                "judge-run", kwargs={"pk": auto.active_producer_run.pk}, request=request
+            )
         return Response(
-            data={"details": message},
+            data=response_data,
             status=HTTP_200_OK,
         )
 
