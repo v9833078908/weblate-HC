@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -12,7 +13,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from weblate.trans.autotranslate import BatchAutoTranslate
-from weblate.trans.models.judge import ProducerRun
+from weblate.trans.models.judge import JudgeRunUnit, ProducerRun
 from weblate.trans.models.unit import Unit
 from weblate.trans.tasks import (
     StaleProducerTaskError,
@@ -135,9 +136,14 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
             execution_version=1,
             dispatch_published_at=None,
         )
-        with patch("weblate.trans.tasks.publish_producer_run_dispatch") as mock_publish:
+        with patch("weblate.trans.tasks.auto_translate.apply_async") as mock_apply:
             drain_producer_run_dispatches()
-            mock_publish.assert_called_once_with(run_id=run.pk, skip_locked=True)
+            mock_apply.assert_called_once()
+            self.assertEqual(
+                mock_apply.call_args.kwargs["task_id"], str(run.dispatch_task_id)
+            )
+        run.refresh_from_db()
+        self.assertIsNotNone(run.dispatch_published_at)
 
     def test_drain_finalizes_cancel_requested(self) -> None:
         run = self._make_run(
@@ -146,6 +152,25 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
         drain_producer_run_dispatches()
         run.refresh_from_db()
         self.assertEqual(run.status, ProducerRun.Status.CANCELLED)
+        self.assertIsNotNone(run.finished)
+
+    def test_drain_finalizes_cancel_requested_with_results_to_partial(self) -> None:
+
+        run = self._make_run(
+            status=ProducerRun.Status.CANCEL_REQUESTED,
+        )
+        JudgeRunUnit.objects.create(
+            run=run,
+            unit=self.units[0],
+            unit_id_snapshot=self.units[0].pk,
+            translation_id=self.translation.pk,
+            component_id=self.component.pk,
+            project_id=self.project.pk,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+        )
+        drain_producer_run_dispatches()
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.PARTIAL)
         self.assertIsNotNone(run.finished)
 
     def test_multi_chunk_run_progression(self) -> None:
@@ -284,3 +309,54 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
 
             run.refresh_from_db()
             self.assertEqual(run.status, ProducerRun.Status.RUNNING)
+
+    def test_provider_refusal_stops_chunk_loop_immediately(self) -> None:
+        task_id = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.QUEUED,
+            dispatch_task_id=task_id,
+            execution_version=1,
+        )
+
+        def fail_perform(*args, **kwargs):
+            batch._finish_translation(  # ruff: ignore[private-member-access]
+                auto_translate=SimpleNamespace(
+                    judge_units_processed=1,
+                    failure_message="Provider quota exceeded",
+                    updated=0,
+                    get_warnings=list,
+                    judge_summary=None,
+                ),
+                judge_remaining=None,
+            )
+
+        with (
+            patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.tasks.publish_producer_run_dispatch") as mock_pub,
+            patch(
+                "weblate.trans.autotranslate.AutoTranslate.perform",
+                side_effect=fail_perform,
+            ),
+        ):
+            mock_task.request.id = task_id
+            batch = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            msg = batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            self.assertEqual(msg, "Provider quota exceeded")
+            run.refresh_from_db()
+            self.assertEqual(run.status, ProducerRun.Status.FAILED)
+            self.assertEqual(run.failure, "Provider quota exceeded")
+            self.assertEqual(run.scope_cursor, 0)
+            mock_pub.assert_not_called()

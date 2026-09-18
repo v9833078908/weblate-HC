@@ -2925,6 +2925,16 @@ class BatchAutoTranslate(BaseAutoTranslate):
             )
             self._finish_translation(auto_translate, None)
             self.set_progress(pos)
+            if self.failure_message:
+                self._finish_producer_run(
+                    producer_run, ProducerRun.Status.FAILED, self.failure_message
+                )
+                return self.failure_message
+            if _run_cancel_requested(producer_run):
+                self._finish_producer_run(
+                    producer_run, ProducerRun.Status.CANCELLED, ""
+                )
+                return gettext("Automatic translation cancelled.")
 
         new_cursor = cursor + len(chunk_ids)
         has_more = new_cursor < len(snapshot)
@@ -2932,9 +2942,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
             with transaction.atomic():
                 locked = ProducerRun.objects.select_for_update().get(pk=producer_run.pk)
                 if locked.status == ProducerRun.Status.CANCEL_REQUESTED:
-                    locked.status = ProducerRun.Status.CANCELLED
-                    locked.finished = timezone.now()
-                    locked.save(update_fields=["status", "finished"])
+                    self._finish_producer_run(locked, ProducerRun.Status.CANCELLED, "")
                     return gettext("Automatic translation cancelled.")
                 if locked.status != ProducerRun.Status.RUNNING:
                     return gettext("Automatic translation stopped.")
