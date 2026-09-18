@@ -56,7 +56,7 @@ Fabriquer 5 boucliers.`
   - FR: `Attendez l'arrivée du hongreur. Jours restants`
   - « коновал » ici désigne un médecin/charlatan (péjoratif) soignant les gens, pas un « hongreur ». Proposer : « Attendez l'arrivée du charlatan » ou « du médecin ».
 - 🟠 **MAJOR** `mcmvOyUnmlUeacYG` (518190) — `accuracy/mistranslation`
-  - RU: `Купец заказал брошь для своей красавицы-дочери. Отец как раз привез с собой драгоценный камень для перстня барона. Может, я найду `
+  - RU: `Купец заказал брошь для своей красавицы-дочери. Отец как раз привез с собой драгоценный камень для перстня барона. Может, я найду`
   - FR: `Un marchand a commandé une broche pour sa ravissante fille. Mon père vient justement de rapporter une pierre précieuse pour la bag`
   - «Отец» renvoie au père de la fille du marchand, pas au père d'Arthur : traduire par « Le père a justement rapporté... » plutôt que « Mon père ».
 - 🟠 **MAJOR** `xpktNTBivIsIzVgP` (518239) — `accuracy/mistranslation`
@@ -149,11 +149,11 @@ Fabriquer 5 boucliers.`
   - Incohérence de nom : le RU dit « Жанне » mais toute la série utilise « Danna » ; ici le FR bascule sur « Jeanne ». Uniformiser : « Le bouclier n'a pas aidé Danna… »
 - 🟠 **MAJOR** `pluswood` (521444) — `game_engine/markup_damage`
   - RU: `<color=#25E94F>+{0}</color> к уровню работы с древесиной.`
-  - FR: `<color=#25E94F>+	{0}</color> au niveau de travail du bois.`
+  - FR: `<color=#25E94F>+    {0}</color> au niveau de travail du bois.`
   - Tabulation parasite insérée entre la balise <color> et le placeholder : '+\t{0}'. Corriger en '<color=#25E94F>+{0}</color>'.
 - 🟠 **MAJOR** `plussaw` (521445) — `game_engine/markup_damage`
   - RU: `<color=#25E94F>+{0}</color> к уровню обработки бревен.`
-  - FR: `<color=#25E94F>+	{0}</color> au niveau de découpe des bûches.`
+  - FR: `<color=#25E94F>+    {0}</color> au niveau de découpe des bûches.`
   - Tabulation parasite avant {0}. Corriger en '<color=#25E94F>+{0}</color>'.
 - 🟠 **MAJOR** `DudeAccept1` (521544) — `fluency/register_tone`
   - RU: `Хм, а звучит не так уж и плохо, экие вы затейники с друзьями! Сделаю.`
@@ -165,7 +165,7 @@ Fabriquer 5 boucliers.`
   - Bulle/UI courte : 19 → 43 car. (×2.26) — risque de troncature.
 - 🟠 **MAJOR** `ChapterTwoBaronSecond4` (522720) — `accuracy/mistranslation`
   - RU: `Эх, дурья башка! Меч, конечно. Делай гравировку. Текст как в прошлый раз, название страны поменять, надеюсь, сам догадаешься.`
-  - FR: `Ah, tête de linotte ! Une épée, bien sûr. Fais la gravure. Le texte comme la dernière fois, pour changer le nom du pays, j'espère `
+  - FR: `Ah, tête de linotte ! Une épée, bien sûr. Fais la gravure. Le texte comme la dernière fois, pour changer le nom du pays, j'espère`
   - Contresens : «название страны поменять, надеюсь, сам догадаешься» = «change le nom du pays, j'espère que tu devineras tout seul (lequel)». La traduction « pour changer le nom du pays, j'espère que tu y penseras tout seul » déforme l'instruction. Proposer : « L
 - 🟠 **MAJOR** `TugsRefuse4` (523000) — `fluency/register_tone`
   - RU: `Был я у вашего Жака, он еще хуже тебя. Прощай.`
@@ -413,7 +413,7 @@ Fabriquer 5 boucliers.`
   - Majuscule fautive dans la particule nobiliaire : « Le duc De La Cour » -> « le duc de La Cour » (cf. glossaire).
 - 🟡 **MINOR** `Fair2ArtFranceChurch` (524346) — `fluency/spelling_orthography`
   - RU: `Герцог де Ла Кур был рад выступать в роли хозяина ярмарки, и с радостью дегустировал свежее пиво аббата Абеларда - нового фаворита`
-  - FR: `Le duc De La Cour était ravi de faire office d'hôte de la foire et dégustait avec plaisir la bière fraîche de l'abbé Abélard - le `
+  - FR: `Le duc De La Cour était ravi de faire office d'hôte de la foire et dégustait avec plaisir la bière fraîche de l'abbé Abélard - le`
   - « Le duc De La Cour » -> « le duc de La Cour » (particule en minuscule, conforme au glossaire).
 - 🟡 **MINOR** `pluscarve` (524602) — `game_engine/markup_damage`
   - RU: `<color=#25E94F>+{0}</color> к уровню резьбы по дереву.`
@@ -501,6 +501,7 @@ Fabriquer 5 boucliers.`
 | `terminology/glossary_violation` | 1 |
 
 Повторяющиеся системные паттерны:
+
 - **`Коновал` → «Hongreur»** (517799, 517971, 518239): «коновал» здесь — знахарь/коновал-лекарь, а не «кастратор лошадей». Термин надо зафиксировать в глоссарии.
 - **Имя `Гобин`** переведено то «Gobin», то «Hobin» (520889, 520893, 523672 и др.).
 - **Имя `Валун`** — «Stone» против «le Roc» (519433).

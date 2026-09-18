@@ -147,42 +147,40 @@ Line numbers are from this plan's writing; re-read each region before editing.
 Add to `OpenAITranslationTest`:
 
 ```python
-    @http_mock.activate
-    def test_request_string_ids_are_unique_and_not_positional(self) -> None:
-        machine = self.get_machine()
-        observed: list[list[str]] = []
+@http_mock.activate
+def test_request_string_ids_are_unique_and_not_positional(self) -> None:
+    machine = self.get_machine()
+    observed: list[list[str]] = []
 
-        def request_callback(
-            _prompt: str,
-            content: str,
-            _previous_content: str,
-            _previous_response: str,
-        ) -> str:
-            strings = json.loads(content)["strings"]
-            observed.append([item["id"] for item in strings])
-            return json.dumps(
-                [
-                    {
-                        "id": item["id"],
-                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
-                    }
-                    for item in strings
-                ]
-            )
+    def request_callback(
+        _prompt: str,
+        content: str,
+        _previous_content: str,
+        _previous_response: str,
+    ) -> str:
+        strings = json.loads(content)["strings"]
+        observed.append([item["id"] for item in strings])
+        return json.dumps(
+            [
+                {
+                    "id": item["id"],
+                    "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                }
+                for item in strings
+            ]
+        )
 
-        with patch.object(
-            machine, "fetch_llm_translations", side_effect=request_callback
-        ):
-            machine.download_multiple_translations(
-                "en", "fr", [(text, None) for text in ("Alpha", "Beta", "Gamma")]
-            )
+    with patch.object(machine, "fetch_llm_translations", side_effect=request_callback):
+        machine.download_multiple_translations(
+            "en", "fr", [(text, None) for text in ("Alpha", "Beta", "Gamma")]
+        )
 
-        ids = observed[0]
-        self.assertEqual(len(set(ids)), 3)
-        # A model can emit 0..n-1 without reading the input, so a positional id
-        # would be indistinguishable from the alignment it has to verify.
-        self.assertNotEqual(ids, [str(index) for index in range(3)])
-        self.assertTrue(all(string_id.startswith("s") for string_id in ids))
+    ids = observed[0]
+    self.assertEqual(len(set(ids)), 3)
+    # A model can emit 0..n-1 without reading the input, so a positional id
+    # would be indistinguishable from the alignment it has to verify.
+    self.assertNotEqual(ids, [str(index) for index in range(3)])
+    self.assertTrue(all(string_id.startswith("s") for string_id in ids))
 ```
 
 **Step 2:** Run test to verify it fails
@@ -226,65 +224,65 @@ class LLMStringPayload(LLMStringContext):
 Add the generator immediately before `_build_string_payload`:
 
 ```python
-    @staticmethod
-    def _build_string_ids(count: int) -> list[str]:
-        """Opaque per-request ids the reply has to echo back."""
-        ids: list[str] = []
-        seen: set[str] = set()
-        while len(ids) < count:
-            candidate = f"{LLM_STRING_ID_PREFIX}{token_hex(LLM_STRING_ID_BYTES)}"
-            if candidate in seen:
-                continue
-            seen.add(candidate)
-            ids.append(candidate)
-        return ids
+@staticmethod
+def _build_string_ids(count: int) -> list[str]:
+    """Opaque per-request ids the reply has to echo back."""
+    ids: list[str] = []
+    seen: set[str] = set()
+    while len(ids) < count:
+        candidate = f"{LLM_STRING_ID_PREFIX}{token_hex(LLM_STRING_ID_BYTES)}"
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        ids.append(candidate)
+    return ids
 ```
 
 Take the id in `_build_string_payload`. Keyword-only and required, so a missed callsite is an
 error rather than a silent default:
 
 ```python
-    def _build_string_payload(
-        self,
-        source_text: str,
-        unit: Unit | None,
-        source_language: str | None = None,
-        source_occurrence: int = 0,
-        *,
-        string_id: str,
-    ) -> LLMStringPayload:
-        return {
-            "id": string_id,
-            "source": source_text,
-            "parts": self._get_string_parts(source_text, unit, source_occurrence),
-            **self._get_string_context(
-                source_text, unit, source_language, source_occurrence=source_occurrence
-            ),
-        }
+def _build_string_payload(
+    self,
+    source_text: str,
+    unit: Unit | None,
+    source_language: str | None = None,
+    source_occurrence: int = 0,
+    *,
+    string_id: str,
+) -> LLMStringPayload:
+    return {
+        "id": string_id,
+        "source": source_text,
+        "parts": self._get_string_parts(source_text, unit, source_occurrence),
+        **self._get_string_context(
+            source_text, unit, source_language, source_occurrence=source_occurrence
+        ),
+    }
 ```
 
 In `_get_message`, add the parameter and pass the id through:
 
 ```python
-    def _get_message(
-        self,
-        source_language: str,
-        target_language: str,
-        sources: list[tuple[str, Unit | None]],
-        source_occurrences: list[int] | None = None,
-        *,
-        string_ids: list[str],
-    ) -> str:
+def _get_message(
+    self,
+    source_language: str,
+    target_language: str,
+    sources: list[tuple[str, Unit | None]],
+    source_occurrences: list[int] | None = None,
+    *,
+    string_ids: list[str],
+) -> str: ...
 ```
 
 ```python
-            payload = self._build_string_payload(
-                text,
-                unit,
-                source_language,
-                source_occurrence,
-                string_id=string_ids[index],
-            )
+payload = self._build_string_payload(
+    text,
+    unit,
+    source_language,
+    source_occurrence,
+    string_id=string_ids[index],
+)
 ```
 
 In `_prepare_llm_translation`, accept the ids with a default. The default keeps
@@ -293,39 +291,37 @@ In `_prepare_llm_translation`, accept the ids with a default. The default keeps
 and only print the request:
 
 ```python
-    def _prepare_llm_translation(
-        self,
+def _prepare_llm_translation(
+    self,
+    source_language,
+    target_language,
+    sources: list[tuple[str, Unit | None]],
+    source_occurrences: list[int] | None,
+    string_ids: list[str] | None = None,
+) -> tuple[str, str, str, str]:
+    if string_ids is None:
+        string_ids = self._build_string_ids(len(sources))
+    prompt = self._get_prompt(target_language)
+    content = self._get_message(
         source_language,
         target_language,
-        sources: list[tuple[str, Unit | None]],
-        source_occurrences: list[int] | None,
-        string_ids: list[str] | None = None,
-    ) -> tuple[str, str, str, str]:
-        if string_ids is None:
-            string_ids = self._build_string_ids(len(sources))
-        prompt = self._get_prompt(target_language)
-        content = self._get_message(
-            source_language,
-            target_language,
-            sources,
-            source_occurrences,
-            string_ids=string_ids,
-        )
+        sources,
+        source_occurrences,
+        string_ids=string_ids,
+    )
 ```
 
 In `_fetch_llm_batch`, generate the ids in the caller so the same list reaches the parser:
 
 ```python
-        string_ids = self._build_string_ids(len(sources))
-        prompt, content, previous_content, previous_response = (
-            self._prepare_llm_translation(
-                source_language,
-                target_language,
-                sources,
-                source_occurrences,
-                string_ids,
-            )
-        )
+string_ids = self._build_string_ids(len(sources))
+prompt, content, previous_content, previous_response = self._prepare_llm_translation(
+    source_language,
+    target_language,
+    sources,
+    source_occurrences,
+    string_ids,
+)
 ```
 
 Leave `_parse_llm_translations` alone for now; it gets the ids in Task A4. Do the same in
@@ -362,44 +358,42 @@ ids, the model imitates that and every batch degrades. This task is not optional
 **Step 1:** Write the failing test
 
 ```python
-    @http_mock.activate
-    def test_previous_messages_demonstrate_the_id_contract(self) -> None:
-        machine = self.get_machine()
-        observed: list[tuple[list[str], list[str]]] = []
+@http_mock.activate
+def test_previous_messages_demonstrate_the_id_contract(self) -> None:
+    machine = self.get_machine()
+    observed: list[tuple[list[str], list[str]]] = []
 
-        def request_callback(
-            _prompt: str,
-            content: str,
-            previous_content: str,
-            previous_response: str,
-        ) -> str:
-            observed.append(
-                (
-                    [item["id"] for item in json.loads(previous_content)["strings"]],
-                    [item["id"] for item in json.loads(previous_response)],
-                )
+    def request_callback(
+        _prompt: str,
+        content: str,
+        previous_content: str,
+        previous_response: str,
+    ) -> str:
+        observed.append(
+            (
+                [item["id"] for item in json.loads(previous_content)["strings"]],
+                [item["id"] for item in json.loads(previous_response)],
             )
-            strings = json.loads(content)["strings"]
-            return json.dumps(
-                [
-                    {
-                        "id": item["id"],
-                        "parts": [{"type": "text", "text": "Ahoj"}],
-                    }
-                    for item in strings
-                ]
-            )
+        )
+        strings = json.loads(content)["strings"]
+        return json.dumps(
+            [
+                {
+                    "id": item["id"],
+                    "parts": [{"type": "text", "text": "Ahoj"}],
+                }
+                for item in strings
+            ]
+        )
 
-        with patch.object(
-            machine, "fetch_llm_translations", side_effect=request_callback
-        ):
-            machine.download_multiple_translations("en", "cs", [("Hello", None)])
+    with patch.object(machine, "fetch_llm_translations", side_effect=request_callback):
+        machine.download_multiple_translations("en", "cs", [("Hello", None)])
 
-        demo_request_ids, demo_reply_ids = observed[0]
-        self.assertTrue(demo_request_ids)
-        # The demonstrated answer pairs itself with the demonstrated request by
-        # id, which is exactly what the real reply has to do.
-        self.assertEqual(demo_reply_ids, demo_request_ids)
+    demo_request_ids, demo_reply_ids = observed[0]
+    self.assertTrue(demo_request_ids)
+    # The demonstrated answer pairs itself with the demonstrated request by
+    # id, which is exactly what the real reply has to do.
+    self.assertEqual(demo_reply_ids, demo_request_ids)
 ```
 
 **Step 2:** Run test to verify it fails
@@ -413,42 +407,42 @@ Expected: FAIL with `KeyError: 'id'`.
 **Step 3:** Write the implementation
 
 ```python
-    def _build_previous_messages_from_examples(
-        self,
-        source_language: str,
-        target_language: str,
-        examples: list[LLMPreviousExample],
-    ) -> tuple[str, str]:
-        example_ids = self._build_string_ids(len(examples))
-        return (
-            self._build_message(
-                source_language,
-                target_language,
-                [
-                    {
-                        "id": example_id,
-                        "source": example["source"],
-                        "parts": self._get_string_parts(example["source"], None),
-                    }
-                    for example_id, example in zip(example_ids, examples, strict=True)
-                ],
-                [],
-            ),
-            # The demonstration is the strongest signal in the prompt, so it
-            # answers in the structured form the rules ask for rather than the
-            # legacy flat array of strings, and echoes the id of every string so
-            # the model imitates the identity contract, not only the shape.
-            json.dumps(
-                [
-                    {
-                        "id": example_id,
-                        "parts": self._get_string_parts(example["target"], None),
-                    }
-                    for example_id, example in zip(example_ids, examples, strict=True)
-                ],
-                ensure_ascii=False,
-            ),
-        )
+def _build_previous_messages_from_examples(
+    self,
+    source_language: str,
+    target_language: str,
+    examples: list[LLMPreviousExample],
+) -> tuple[str, str]:
+    example_ids = self._build_string_ids(len(examples))
+    return (
+        self._build_message(
+            source_language,
+            target_language,
+            [
+                {
+                    "id": example_id,
+                    "source": example["source"],
+                    "parts": self._get_string_parts(example["source"], None),
+                }
+                for example_id, example in zip(example_ids, examples, strict=True)
+            ],
+            [],
+        ),
+        # The demonstration is the strongest signal in the prompt, so it
+        # answers in the structured form the rules ask for rather than the
+        # legacy flat array of strings, and echoes the id of every string so
+        # the model imitates the identity contract, not only the shape.
+        json.dumps(
+            [
+                {
+                    "id": example_id,
+                    "parts": self._get_string_parts(example["target"], None),
+                }
+                for example_id, example in zip(example_ids, examples, strict=True)
+            ],
+            ensure_ascii=False,
+        ),
+    )
 ```
 
 **Step 4:** Run test to verify it passes
@@ -474,13 +468,13 @@ git commit -m "feat(machinery): echo string ids in the LLM few-shot demonstratio
 **Step 1:** Write the failing test
 
 ```python
-    def test_prompt_examples_never_show_an_id_less_structured_item(self) -> None:
-        prompt = self.get_machine()._get_prompt("cs")
+def test_prompt_examples_never_show_an_id_less_structured_item(self) -> None:
+    prompt = self.get_machine()._get_prompt("cs")
 
-        # A single example answering without an id teaches the model to answer
-        # without one, which is the whole defect.
-        self.assertNotIn('{"parts"', prompt)
-        self.assertIn('"id"', prompt)
+    # A single example answering without an id teaches the model to answer
+    # without one, which is the whole defect.
+    self.assertNotIn('{"parts"', prompt)
+    self.assertIn('"id"', prompt)
 ```
 
 **Step 2:** Run test to verify it fails
@@ -588,156 +582,152 @@ Three tests: the production shape must be refused, a shuffled but correctly labe
 paired correctly, and an id-less batch reply must degrade instead of being accepted.
 
 ```python
-    @http_mock.activate
-    def test_translate_refuses_a_batch_reply_with_shifted_ids(self) -> None:
-        machine = self.get_machine()
-        sources = ["Alpha", "Beta", "Gamma"]
-        batch_sizes: list[int] = []
+@http_mock.activate
+def test_translate_refuses_a_batch_reply_with_shifted_ids(self) -> None:
+    machine = self.get_machine()
+    sources = ["Alpha", "Beta", "Gamma"]
+    batch_sizes: list[int] = []
 
-        def request_callback(
-            _prompt: str,
-            content: str,
-            _previous_content: str,
-            _previous_response: str,
-        ) -> str:
-            strings = json.loads(content)["strings"]
-            batch_sizes.append(len(strings))
-            if len(strings) == 1:
-                return json.dumps(
-                    [
-                        {
-                            "id": strings[0]["id"],
-                            "parts": [
-                                {
-                                    "type": "text",
-                                    "text": f"{strings[0]['source']} (fr)",
-                                }
-                            ],
-                        }
-                    ]
-                )
-            # A reply whose labels track what it actually translated: it
-            # skipped the first input, so that id is missing and one it was
-            # never given takes its place. The length still matches and there
-            # is no placeholder to catch it.
+    def request_callback(
+        _prompt: str,
+        content: str,
+        _previous_content: str,
+        _previous_response: str,
+    ) -> str:
+        strings = json.loads(content)["strings"]
+        batch_sizes.append(len(strings))
+        if len(strings) == 1:
             return json.dumps(
                 [
                     {
-                        "id": item["id"],
-                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
-                    }
-                    for item in strings[1:]
-                ]
-                + [
-                    {
-                        "id": "sffff",
-                        "parts": [{"type": "text", "text": "Epsilon (fr)"}],
-                    }
-                ]
-            )
-
-        with (
-            patch.object(
-                machine, "fetch_llm_translations", side_effect=request_callback
-            ),
-            patch.object(
-                machine, "log_handled_error", wraps=machine.log_handled_error
-            ) as handled,
-        ):
-            translations = machine.download_multiple_translations(
-                "en", "fr", [(text, None) for text in sources]
-            )
-
-        # Refused as a batch, then re-asked in halves down to single strings,
-        # where position is unambiguous, so nothing is lost and nothing is
-        # stored against the wrong source.
-        self.assertEqual(
-            {text: translations[text][0]["text"] for text in sources},
-            {text: f"{text} (fr)" for text in sources},
-        )
-        self.assertEqual(batch_sizes[0], 3)
-        self.assertGreater(len(batch_sizes), 1)
-        # The refusal is the degradation signal: a model that keeps ignoring
-        # the contract turns every batch into single-string requests, and this
-        # message is the only thing that makes that visible in the logs.
-        self.assertTrue(
-            any(
-                call.args[0].startswith("Mismatching assistant reply ids")
-                for call in handled.call_args_list
-            )
-        )
-
-    @http_mock.activate
-    def test_translate_pairs_a_shuffled_batch_reply_by_id(self) -> None:
-        machine = self.get_machine()
-        sources = ["Alpha", "Beta", "Gamma"]
-
-        def request_callback(
-            _prompt: str,
-            content: str,
-            _previous_content: str,
-            _previous_response: str,
-        ) -> str:
-            strings = json.loads(content)["strings"]
-            return json.dumps(
-                list(
-                    reversed(
-                        [
+                        "id": strings[0]["id"],
+                        "parts": [
                             {
-                                "id": item["id"],
-                                "parts": [
-                                    {
-                                        "type": "text",
-                                        "text": f"{item['source']} (fr)",
-                                    }
-                                ],
+                                "type": "text",
+                                "text": f"{strings[0]['source']} (fr)",
                             }
-                            for item in strings
-                        ]
-                    )
+                        ],
+                    }
+                ]
+            )
+        # A reply whose labels track what it actually translated: it
+        # skipped the first input, so that id is missing and one it was
+        # never given takes its place. The length still matches and there
+        # is no placeholder to catch it.
+        return json.dumps(
+            [
+                {
+                    "id": item["id"],
+                    "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                }
+                for item in strings[1:]
+            ]
+            + [
+                {
+                    "id": "sffff",
+                    "parts": [{"type": "text", "text": "Epsilon (fr)"}],
+                }
+            ]
+        )
+
+    with (
+        patch.object(machine, "fetch_llm_translations", side_effect=request_callback),
+        patch.object(
+            machine, "log_handled_error", wraps=machine.log_handled_error
+        ) as handled,
+    ):
+        translations = machine.download_multiple_translations(
+            "en", "fr", [(text, None) for text in sources]
+        )
+
+    # Refused as a batch, then re-asked in halves down to single strings,
+    # where position is unambiguous, so nothing is lost and nothing is
+    # stored against the wrong source.
+    self.assertEqual(
+        {text: translations[text][0]["text"] for text in sources},
+        {text: f"{text} (fr)" for text in sources},
+    )
+    self.assertEqual(batch_sizes[0], 3)
+    self.assertGreater(len(batch_sizes), 1)
+    # The refusal is the degradation signal: a model that keeps ignoring
+    # the contract turns every batch into single-string requests, and this
+    # message is the only thing that makes that visible in the logs.
+    self.assertTrue(
+        any(
+            call.args[0].startswith("Mismatching assistant reply ids")
+            for call in handled.call_args_list
+        )
+    )
+
+
+@http_mock.activate
+def test_translate_pairs_a_shuffled_batch_reply_by_id(self) -> None:
+    machine = self.get_machine()
+    sources = ["Alpha", "Beta", "Gamma"]
+
+    def request_callback(
+        _prompt: str,
+        content: str,
+        _previous_content: str,
+        _previous_response: str,
+    ) -> str:
+        strings = json.loads(content)["strings"]
+        return json.dumps(
+            list(
+                reversed(
+                    [
+                        {
+                            "id": item["id"],
+                            "parts": [
+                                {
+                                    "type": "text",
+                                    "text": f"{item['source']} (fr)",
+                                }
+                            ],
+                        }
+                        for item in strings
+                    ]
                 )
             )
-
-        with patch.object(
-            machine, "fetch_llm_translations", side_effect=request_callback
-        ):
-            translations = machine.download_multiple_translations(
-                "en", "fr", [(text, None) for text in sources]
-            )
-
-        self.assertEqual(
-            {text: translations[text][0]["text"] for text in sources},
-            {text: f"{text} (fr)" for text in sources},
         )
 
-    @http_mock.activate
-    def test_translate_refuses_an_id_less_batch_reply(self) -> None:
-        machine = self.get_machine()
-        batch_sizes: list[int] = []
+    with patch.object(machine, "fetch_llm_translations", side_effect=request_callback):
+        translations = machine.download_multiple_translations(
+            "en", "fr", [(text, None) for text in sources]
+        )
 
-        def request_callback(
-            _prompt: str,
-            content: str,
-            _previous_content: str,
-            _previous_response: str,
-        ) -> str:
-            strings = json.loads(content)["strings"]
-            batch_sizes.append(len(strings))
-            return json.dumps([f"{item['source']} (fr)" for item in strings])
+    self.assertEqual(
+        {text: translations[text][0]["text"] for text in sources},
+        {text: f"{text} (fr)" for text in sources},
+    )
 
-        with patch.object(
-            machine, "fetch_llm_translations", side_effect=request_callback
-        ):
-            translations = machine.download_multiple_translations(
-                "en", "fr", [("Alpha", None), ("Beta", None)]
-            )
 
-        # A legacy reply cannot carry an id, so the batch is halved until each
-        # request holds one string. Correctness costs requests here; storing an
-        # unverified alignment costs a wrong translation.
-        self.assertEqual(batch_sizes, [2, 1, 1])
-        self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
-        self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
+@http_mock.activate
+def test_translate_refuses_an_id_less_batch_reply(self) -> None:
+    machine = self.get_machine()
+    batch_sizes: list[int] = []
+
+    def request_callback(
+        _prompt: str,
+        content: str,
+        _previous_content: str,
+        _previous_response: str,
+    ) -> str:
+        strings = json.loads(content)["strings"]
+        batch_sizes.append(len(strings))
+        return json.dumps([f"{item['source']} (fr)" for item in strings])
+
+    with patch.object(machine, "fetch_llm_translations", side_effect=request_callback):
+        translations = machine.download_multiple_translations(
+            "en", "fr", [("Alpha", None), ("Beta", None)]
+        )
+
+    # A legacy reply cannot carry an id, so the batch is halved until each
+    # request holds one string. Correctness costs requests here; storing an
+    # unverified alignment costs a wrong translation.
+    self.assertEqual(batch_sizes, [2, 1, 1])
+    self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
+    self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
 ```
 
 **Step 2:** Run tests to verify they fail
@@ -756,31 +746,31 @@ Expected: all three FAIL. The first stores `Beta (fr)` under `Alpha`; the second
 Add the resolver next to `_normalize_translation_items`:
 
 ```python
-    @classmethod
-    def _resolve_reply_order(
-        cls, translations: list[JSONValue], string_ids: list[str]
-    ) -> list[JSONValue] | None:
-        """
-        Pair reply items with their source strings through the echoed id.
+@classmethod
+def _resolve_reply_order(
+    cls, translations: list[JSONValue], string_ids: list[str]
+) -> list[JSONValue] | None:
+    """
+    Pair reply items with their source strings through the echoed id.
 
-        A single-string request needs no id: there is only one pairing. For a
-        batch, an item without a known, unique id is refused, because a reply of
-        the right length says nothing about its order - the caller then re-asks
-        the batch in halves instead of storing an unverified alignment.
-        """
-        if len(string_ids) == 1:
-            return list(translations)
-        by_id: dict[str, JSONValue] = {}
-        for item in translations:
-            if not isinstance(item, dict):
-                return None
-            item_id = item.get("id")
-            if not isinstance(item_id, str) or item_id in by_id:
-                return None
-            by_id[item_id] = item
-        if by_id.keys() != set(string_ids):
+    A single-string request needs no id: there is only one pairing. For a
+    batch, an item without a known, unique id is refused, because a reply of
+    the right length says nothing about its order - the caller then re-asks
+    the batch in halves instead of storing an unverified alignment.
+    """
+    if len(string_ids) == 1:
+        return list(translations)
+    by_id: dict[str, JSONValue] = {}
+    for item in translations:
+        if not isinstance(item, dict):
             return None
-        return [by_id[string_id] for string_id in string_ids]
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or item_id in by_id:
+            return None
+        by_id[item_id] = item
+    if by_id.keys() != set(string_ids):
+        return None
+    return [by_id[string_id] for string_id in string_ids]
 ```
 
 Use it in `_validate_translations`, which gains a required keyword-only `string_ids`. The
@@ -789,28 +779,28 @@ so that the id failure carries its own error message: the generic mismatch and t
 are different operational events and must be distinguishable in the logs.
 
 ```python
-    @classmethod
-    def _validate_translations(
-        cls,
-        translations: JSONValue,
-        sources: list[tuple[str, Unit | None]],
-        source_occurrences: list[int] | None = None,
-        *,
-        string_ids: list[str],
-    ) -> list[str]:
-        translations = cls._normalize_translations(translations, len(sources))
-        if isinstance(translations, list) and len(translations) == len(sources):
-            ordered = cls._resolve_reply_order(translations, string_ids)
-            if ordered is None:
-                # Distinct from the generic mismatch below: this message is the
-                # signal that batches are degrading to halving. Keep it stable
-                # and greppable.
-                msg = "Mismatching assistant reply ids."
-                raise MachineTranslationError(msg)
-            translations = ordered
-        translation_list = cls._normalize_translation_items(
-            translations, sources, source_occurrences
-        )
+@classmethod
+def _validate_translations(
+    cls,
+    translations: JSONValue,
+    sources: list[tuple[str, Unit | None]],
+    source_occurrences: list[int] | None = None,
+    *,
+    string_ids: list[str],
+) -> list[str]:
+    translations = cls._normalize_translations(translations, len(sources))
+    if isinstance(translations, list) and len(translations) == len(sources):
+        ordered = cls._resolve_reply_order(translations, string_ids)
+        if ordered is None:
+            # Distinct from the generic mismatch below: this message is the
+            # signal that batches are degrading to halving. Keep it stable
+            # and greppable.
+            msg = "Mismatching assistant reply ids."
+            raise MachineTranslationError(msg)
+        translations = ordered
+    translation_list = cls._normalize_translation_items(
+        translations, sources, source_occurrences
+    )
 ```
 
 The rest of `_validate_translations` is unchanged. A reply that is not a list of the right length
@@ -820,20 +810,20 @@ Thread the ids through `_parse_llm_translations`, where the keyword is required 
 silently opt out of the check:
 
 ```python
-    def _parse_llm_translations(
-        self,
-        translations_string: str | None,
-        sources: list[tuple[str, Unit | None]],
-        source_occurrences: list[int] | None,
-        *,
-        string_ids: list[str],
-    ) -> DownloadMultipleTranslations:
+def _parse_llm_translations(
+    self,
+    translations_string: str | None,
+    sources: list[tuple[str, Unit | None]],
+    source_occurrences: list[int] | None,
+    *,
+    string_ids: list[str],
+) -> DownloadMultipleTranslations: ...
 ```
 
 ```python
-            translations = self._validate_translations(
-                translations, sources, source_occurrences, string_ids=string_ids
-            )
+translations = self._validate_translations(
+    translations, sources, source_occurrences, string_ids=string_ids
+)
 ```
 
 In the same `except MachineTranslationError` branch of `_parse_llm_translations`, where the prefix
@@ -842,24 +832,24 @@ rescue does not apply, the re-raise currently replaces the cause with a hardcode
 distinguishable in the log line `log_handled_error` writes:
 
 ```python
-            msg = str(error)
-            self.log_handled_error(msg, extra_log=translations_string)
-            raise MachineTranslationError(msg) from error
+msg = str(error)
+self.log_handled_error(msg, extra_log=translations_string)
+raise MachineTranslationError(msg) from error
 ```
 
 Leave the `_validate_translation_prefix` call inside `_parse_llm_translations` untouched here;
 Task A5 changes it. Update both fetch paths to pass the ids:
 
 ```python
-        return self._parse_llm_translations(
-            translations_string, sources, source_occurrences, string_ids=string_ids
-        )
+return self._parse_llm_translations(
+    translations_string, sources, source_occurrences, string_ids=string_ids
+)
 ```
 
 ```python
-        return await sync_to_async(self._parse_llm_translations)(
-            translations_string, sources, source_occurrences, string_ids=string_ids
-        )
+return await sync_to_async(self._parse_llm_translations)(
+    translations_string, sources, source_occurrences, string_ids=string_ids
+)
 ```
 
 The reply item now carries `id` next to `parts`. `_normalize_structured_translation`
@@ -906,96 +896,91 @@ must check ids too, otherwise it becomes the new hole.
 **Step 1:** Write the failing test
 
 ```python
-    @http_mock.activate
-    def test_translate_rescues_only_the_prefix_that_kept_its_ids(self) -> None:
-        machine = self.get_machine()
-        sources = ["Alpha", "Beta", "Gamma"]
+@http_mock.activate
+def test_translate_rescues_only_the_prefix_that_kept_its_ids(self) -> None:
+    machine = self.get_machine()
+    sources = ["Alpha", "Beta", "Gamma"]
 
-        def request_callback(
-            _prompt: str,
-            content: str,
-            _previous_content: str,
-            _previous_response: str,
-        ) -> str:
-            strings = json.loads(content)["strings"]
-            if len(strings) == 1:
-                answered = strings
-            else:
-                # Answers the first string correctly, then stops: the reply is
-                # short, not shifted, so its prefix is worth keeping.
-                answered = strings[:1]
-            return json.dumps(
-                [
-                    {
-                        "id": item["id"],
-                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
-                    }
-                    for item in answered
-                ]
-            )
-
-        with patch.object(
-            machine, "fetch_llm_translations", side_effect=request_callback
-        ):
-            translations = machine.download_multiple_translations(
-                "en", "fr", [(text, None) for text in sources]
-            )
-
-        self.assertEqual(
-            {text: translations[text][0]["text"] for text in sources},
-            {text: f"{text} (fr)" for text in sources},
+    def request_callback(
+        _prompt: str,
+        content: str,
+        _previous_content: str,
+        _previous_response: str,
+    ) -> str:
+        strings = json.loads(content)["strings"]
+        if len(strings) == 1:
+            answered = strings
+        else:
+            # Answers the first string correctly, then stops: the reply is
+            # short, not shifted, so its prefix is worth keeping.
+            answered = strings[:1]
+        return json.dumps(
+            [
+                {
+                    "id": item["id"],
+                    "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                }
+                for item in answered
+            ]
         )
 
-    @http_mock.activate
-    def test_translate_rescues_nothing_from_a_reply_with_wrong_ids(self) -> None:
-        machine = self.get_machine()
+    with patch.object(machine, "fetch_llm_translations", side_effect=request_callback):
+        translations = machine.download_multiple_translations(
+            "en", "fr", [(text, None) for text in sources]
+        )
 
-        def request_callback(
-            _prompt: str,
-            content: str,
-            _previous_content: str,
-            _previous_response: str,
-        ) -> str:
-            strings = json.loads(content)["strings"]
-            if len(strings) == 1:
-                return json.dumps(
-                    [
-                        {
-                            "id": strings[0]["id"],
-                            "parts": [
-                                {
-                                    "type": "text",
-                                    "text": f"{strings[0]['source']} (fr)",
-                                }
-                            ],
-                        }
-                    ]
-                )
-            # One item, labelled with the id of the string that comes after the
-            # one it answers. A prefix rescue must not keep it.
+    self.assertEqual(
+        {text: translations[text][0]["text"] for text in sources},
+        {text: f"{text} (fr)" for text in sources},
+    )
+
+
+@http_mock.activate
+def test_translate_rescues_nothing_from_a_reply_with_wrong_ids(self) -> None:
+    machine = self.get_machine()
+
+    def request_callback(
+        _prompt: str,
+        content: str,
+        _previous_content: str,
+        _previous_response: str,
+    ) -> str:
+        strings = json.loads(content)["strings"]
+        if len(strings) == 1:
             return json.dumps(
                 [
                     {
-                        "id": strings[1]["id"],
+                        "id": strings[0]["id"],
                         "parts": [
-                            {"type": "text", "text": f"{strings[0]['source']} (fr)"}
+                            {
+                                "type": "text",
+                                "text": f"{strings[0]['source']} (fr)",
+                            }
                         ],
                     }
                 ]
             )
+        # One item, labelled with the id of the string that comes after the
+        # one it answers. A prefix rescue must not keep it.
+        return json.dumps(
+            [
+                {
+                    "id": strings[1]["id"],
+                    "parts": [{"type": "text", "text": f"{strings[0]['source']} (fr)"}],
+                }
+            ]
+        )
 
-        with patch.object(
-            machine, "fetch_llm_translations", side_effect=request_callback
-        ):
-            translations = machine.download_multiple_translations(
-                "en", "fr", [("Alpha", None), ("Beta", None)]
-            )
+    with patch.object(machine, "fetch_llm_translations", side_effect=request_callback):
+        translations = machine.download_multiple_translations(
+            "en", "fr", [("Alpha", None), ("Beta", None)]
+        )
 
-        # Every string is answered by the single-string retries, and none of
-        # them carries the mislabelled text.
-        self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
-        self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
-        self.assertEqual(len(translations["Beta"]), 1)
+    # Every string is answered by the single-string retries, and none of
+    # them carries the mislabelled text.
+    self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
+    self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
+    self.assertEqual(len(translations["Beta"]), 1)
 ```
 
 **Step 2:** Run tests to verify they fail
@@ -1012,55 +997,55 @@ is rescued positionally and `Beta` ends up holding `Alpha (fr)`.
 **Step 3:** Write the implementation
 
 ```python
-    @staticmethod
-    def _reply_item_has_id(item: JSONValue, expected_id: str, batch_size: int) -> bool:
-        """Whether an item may be paired with the source at its own position."""
-        if batch_size == 1:
-            return True
-        return isinstance(item, dict) and item.get("id") == expected_id
+@staticmethod
+def _reply_item_has_id(item: JSONValue, expected_id: str, batch_size: int) -> bool:
+    """Whether an item may be paired with the source at its own position."""
+    if batch_size == 1:
+        return True
+    return isinstance(item, dict) and item.get("id") == expected_id
 ```
 
 ```python
-    @classmethod
-    def _validate_translation_prefix(
-        cls,
-        translations: JSONValue,
-        sources: list[tuple[str, Unit | None]],
-        source_occurrences: list[int] | None = None,
-        *,
-        string_ids: list[str],
-    ) -> list[str]:
-        """
-        Validate the leading replies, stopping at the first unusable one.
+@classmethod
+def _validate_translation_prefix(
+    cls,
+    translations: JSONValue,
+    sources: list[tuple[str, Unit | None]],
+    source_occurrences: list[int] | None = None,
+    *,
+    string_ids: list[str],
+) -> list[str]:
+    """
+    Validate the leading replies, stopping at the first unusable one.
 
-        Every item is checked exactly as in :meth:`_validate_translations`, so a
-        returned entry is as trustworthy as one from a complete reply.
-        """
-        if not isinstance(translations, list):
-            return []
+    Every item is checked exactly as in :meth:`_validate_translations`, so a
+    returned entry is as trustworthy as one from a complete reply.
+    """
+    if not isinstance(translations, list):
+        return []
 ```
 
 Add the id gate as the first check inside the loop, before the occurrence bookkeeping:
 
 ```python
-        for index, (source_text, unit) in enumerate(sources):
-            if index >= len(translations):
-                break
-            if not cls._reply_item_has_id(
-                translations[index], string_ids[index], len(string_ids)
-            ):
-                break
+for index, (source_text, unit) in enumerate(sources):
+    if index >= len(translations):
+        break
+    if not cls._reply_item_has_id(
+        translations[index], string_ids[index], len(string_ids)
+    ):
+        break
 ```
 
 Pass the ids at the call site in `_parse_llm_translations`:
 
 ```python
-            prefix = self._validate_translation_prefix(
-                self._normalize_translations(translations, len(sources)),
-                sources,
-                source_occurrences,
-                string_ids=string_ids,
-            )
+prefix = self._validate_translation_prefix(
+    self._normalize_translations(translations, len(sources)),
+    sources,
+    source_occurrences,
+    string_ids=string_ids,
+)
 ```
 
 **Step 4:** Run tests to verify they pass
@@ -1091,13 +1076,13 @@ Add to `OpenAITranslationTest`, near `mock_response` (line 3840). Patch the clas
 instance: `assert_translate` builds its own machine:
 
 ```python
-    def patch_string_ids(self):
-        """Deterministic request ids, so a static mocked reply can echo them."""
-        return patch.object(
-            self.MACHINE_CLS,
-            "_build_string_ids",
-            staticmethod(lambda count: [f"s{index}" for index in range(count)]),
-        )
+def patch_string_ids(self):
+    """Deterministic request ids, so a static mocked reply can echo them."""
+    return patch.object(
+        self.MACHINE_CLS,
+        "_build_string_ids",
+        staticmethod(lambda count: [f"s{index}" for index in range(count)]),
+    )
 ```
 
 **Step 2:** Find every failing test
@@ -1169,18 +1154,18 @@ nothing fails if it is forgotten.
 **Step 1:** Write the failing test
 
 ```python
-    def test_translation_cache_key_carries_the_batch_protocol_version(self) -> None:
-        machine = self.get_machine()
-        unit = make_unit(code="fr", source="Alpha")
-        arguments = (unit, "en", "fr", "Alpha", 75, [])
+def test_translation_cache_key_carries_the_batch_protocol_version(self) -> None:
+    machine = self.get_machine()
+    unit = make_unit(code="fr", source="Alpha")
+    arguments = (unit, "en", "fr", "Alpha", 75, [])
 
-        key = machine.get_translation_cache_key(*arguments)
-        with patch.object(llm, "LLM_BATCH_PROTOCOL_VERSION", 999):
-            bumped = machine.get_translation_cache_key(*arguments)
+    key = machine.get_translation_cache_key(*arguments)
+    with patch.object(llm, "LLM_BATCH_PROTOCOL_VERSION", 999):
+        bumped = machine.get_translation_cache_key(*arguments)
 
-        # A reply produced by the previous protocol was aligned by position, so
-        # its cached result must become unreachable rather than outlive the fix.
-        self.assertNotEqual(key, bumped)
+    # A reply produced by the previous protocol was aligned by position, so
+    # its cached result must become unreachable rather than outlive the fix.
+    self.assertNotEqual(key, bumped)
 ```
 
 `weblate/machinery/tests.py` already imports `make_unit`; import the module itself for the patch
@@ -1209,20 +1194,20 @@ LLM_BATCH_PROTOCOL_VERSION = 2
 Include it in the LLM cache parts, in `get_translation_cache_parts`:
 
 ```python
-        result = (
-            f"proto{LLM_BATCH_PROTOCOL_VERSION}",
-            self.get_glossary_cache_part(unit),
-            self.get_llm_glossary_cache_part(unit),
-            *super().get_translation_cache_parts(
-                unit,
-                source_language,
-                target_language,
-                text,
-                threshold,
-                replacements,
-                source_occurrence=source_occurrence,
-            ),
-        )
+result = (
+    f"proto{LLM_BATCH_PROTOCOL_VERSION}",
+    self.get_glossary_cache_part(unit),
+    self.get_llm_glossary_cache_part(unit),
+    *super().get_translation_cache_parts(
+        unit,
+        source_language,
+        target_language,
+        text,
+        threshold,
+        replacements,
+        source_occurrence=source_occurrence,
+    ),
+)
 ```
 
 The version is read as a module global on every call, so the test's `patch.object` takes effect.

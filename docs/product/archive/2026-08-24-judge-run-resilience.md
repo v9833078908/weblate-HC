@@ -244,7 +244,7 @@ def stream_validated_url(
     allow_private_targets: bool = False,
     private_allowlist: list[str] | tuple[str, ...] = (),
     **kwargs,
-) -> Generator[httpx2.Response, None, None]:
+) -> Generator[httpx2.Response, None, None]: ...
 ```
 
 It delegates to `_open_url()` with `RuntimeRedirectValidators`, mirroring how
@@ -279,7 +279,7 @@ deadline = monotonic() + settings.JUDGE_REQUEST_DEADLINE
 with stream_validated_url(
     "POST",
     OPENROUTER_CHAT_COMPLETIONS_URL,
-    headers={...},           # built inline, unchanged
+    headers={...},  # built inline, unchanged
     json=payload,
     timeout=JUDGE_REQUEST_TIMEOUT,
     follow_redirects=False,
@@ -395,8 +395,15 @@ callback that writes each batch in its own transaction:
 def persist(batch_requests, batch_results) -> None:
     with transaction.atomic():
         for request, result in zip(batch_requests, batch_results, strict=True):
-            _write_verdict(units_by_key[request.unit_key], request, seat,
-                           attempt, run_id, result, model)
+            _write_verdict(
+                units_by_key[request.unit_key],
+                request,
+                seat,
+                attempt,
+                run_id,
+                result,
+                model,
+            )
 ```
 
 `request_verdicts()` receives requests in the order of `request_units`

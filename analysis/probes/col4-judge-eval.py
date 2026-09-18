@@ -497,7 +497,7 @@ def post(payload: dict[str, Any], api_key: str, timeout: int) -> dict[str, Any]:
             "X-Title": "HCGameLoc judge calibration",
         },
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # ruff: ignore[suspicious-url-open-usage]
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode())
 
 
@@ -738,7 +738,6 @@ def bootstrap_projection(
     point = compute(sample)
     if point is None:
         return {"point": None, "low": None, "high": None}
-    # ruff: ignore[suspicious-non-cryptographic-random-usage]
     rng = random.Random(seed)
     values = []
     for _ in range(draws):

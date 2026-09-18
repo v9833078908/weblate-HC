@@ -26,9 +26,9 @@ from weblate.trans.models.judge import (
     JudgeAdaptiveState,
     JudgeDeferral,
     JudgeRequestAttempt,
-    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
+    ProducerRun,
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import STATE_FUZZY

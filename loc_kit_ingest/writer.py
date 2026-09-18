@@ -1,6 +1,9 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[assert]
+# - asserts narrow unit types after parse-time validation; stripped under -O
+#   by design, matching the parser's invariant style.
 
 from __future__ import annotations
 
@@ -159,9 +162,9 @@ def _render_tbx(
     Returns {target_code: path}. Source language file is never created.
     """
     source_lang = component.source_lang
-    source_col = next(l for l in component.languages if l.code == source_lang)
+    source_col = next(lang for lang in component.languages if lang.code == source_lang)
     target_cols = {
-        code: next(l for l in component.languages if l.code == code)
+        code: next(lang for lang in component.languages if lang.code == code)
         for code in component.initial_target_languages
     }
 

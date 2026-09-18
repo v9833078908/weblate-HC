@@ -47,9 +47,9 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.judge import (
     JudgeRequestAttempt,
-    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
+    ProducerRun,
     compute_context_hash,
     compute_target_hash,
 )

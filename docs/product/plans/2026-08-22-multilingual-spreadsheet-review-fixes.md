@@ -99,6 +99,7 @@ Expected: FAIL (dimension test: no ValidationError; malformed test: exception ot
 **Step 2: Implement bounds + error conversion**
 
 In `_parse_xlsx`:
+<!--- skip doccmd[all]: next --><!-- try/except edit fragment, not standalone code -->
 
 ```python
         workbook = load_workbook(BytesIO(content), data_only=False, read_only=True)
@@ -110,14 +111,12 @@ In `_parse_xlsx`:
 Catch `InvalidFileException` too (restructure the except tuple to include it; import at top of function with `load_workbook`). Then after `worksheet = workbook.worksheets[0]`:
 
 ```python
-    expected_columns = len(_schema(component, _component_units(component)[0]).headers)
-    if (
-        worksheet.max_column is not None and worksheet.max_column > expected_columns
-    ) or (
-        worksheet.max_row is not None
-        and worksheet.max_row > len(component.source_translation.unit_set.all()) + 1
-    ):
-        _error("XLSX dimensions exceed the component schema.")
+expected_columns = len(_schema(component, _component_units(component)[0]).headers)
+if (worksheet.max_column is not None and worksheet.max_column > expected_columns) or (
+    worksheet.max_row is not None
+    and worksheet.max_row > len(component.source_translation.unit_set.all()) + 1
+):
+    _error("XLSX dimensions exceed the component schema.")
 ```
 
 Note: `_parse_xlsx` currently receives only `content`; pass `component` (or expected bounds) in and adjust `parse_upload` accordingly. Iterate with explicit bounds: `worksheet.iter_rows(max_col=expected_columns)`.
@@ -143,13 +142,15 @@ Add `import weblate.trans.models.multilingual_spreadsheet` and change the field 
 
 ```python
 (
-    "uploaded",
-    models.FileField(
-        blank=True,
-        storage=weblate.trans.models.multilingual_spreadsheet.COMPONENT_SPREADSHEET_DRAFT_STORAGE,
-        upload_to="",
+    (
+        "uploaded",
+        models.FileField(
+            blank=True,
+            storage=weblate.trans.models.multilingual_spreadsheet.COMPONENT_SPREADSHEET_DRAFT_STORAGE,
+            upload_to="",
+        ),
     ),
-),
+)
 ```
 
 Migration is unreleased (this branch) so editing it in place is safe.
@@ -198,11 +199,10 @@ with transaction.atomic():
     component = Component.objects.select_for_update().get(pk=component.pk)
     if component.locked:
         raise ValidationError(gettext("The component is locked."))
-    draft = (
-        ComponentSpreadsheetImportDraft.objects.select_for_update()
-        .get(pk=draft.pk, state=ComponentSpreadsheetImportDraft.State.PREVIEW_READY)
+    draft = ComponentSpreadsheetImportDraft.objects.select_for_update().get(
+        pk=draft.pk, state=ComponentSpreadsheetImportDraft.State.PREVIEW_READY
     )
-    ...baseline compare including source units...
+    # ... baseline compare including source units ...
     parsed = parse_upload(component, draft.uploaded)
     build_preview(component, parsed)
     source_rows = resolve_source_units(component, parsed)

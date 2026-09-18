@@ -45,8 +45,7 @@ def scene_of(context: str) -> str:
 def load_dump(lang: str) -> dict[str, dict]:
     path = DUMPS / f"heart-abyss__hub-1__{lang}.json"
     return {
-        unit["context"]: unit
-        for unit in json.loads(path.read_text(encoding="utf-8"))
+        unit["context"]: unit for unit in json.loads(path.read_text(encoding="utf-8"))
     }
 
 
@@ -124,12 +123,12 @@ def cost_stats(payload: dict) -> dict:
 
 
 def texts_of(payload: dict) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for record in payload["records"]:
-        for context, text in (record.get("translations") or {}).items():
-            if text:
-                out[context] = text
-    return out
+    return {
+        context: text
+        for record in payload["records"]
+        for context, text in (record.get("translations") or {}).items()
+        if text
+    }
 
 
 def modal(values: list[str]) -> str:
@@ -156,8 +155,10 @@ def main() -> None:
     langs = args.langs.split(",")
     report: dict[str, object] = {}
 
-    print(f"{'scope':12} {'req':>4} {'t/o':>4} {'lost':>4} {'refus':>5} {'miss':>5} "
-          f"{'punct':>5} {'ptok/l':>7} {'ctok/l':>7} {'s/l':>6} {'stable3':>8}")
+    print(
+        f"{'scope':12} {'req':>4} {'t/o':>4} {'lost':>4} {'refus':>5} {'miss':>5} "
+        f"{'punct':>5} {'ptok/l':>7} {'ctok/l':>7} {'s/l':>6} {'stable3':>8}"
+    )
     for lang in langs:
         dump = load_dump(lang)
         for arm in ARMS:
@@ -173,7 +174,12 @@ def main() -> None:
                 for key, value in stats.items():
                     contract[key] += value
                 money = cost_stats(payload)
-                for key in ("lines", "prompt_tokens", "completion_tokens", "reasoning_tokens"):
+                for key in (
+                    "lines",
+                    "prompt_tokens",
+                    "completion_tokens",
+                    "reasoning_tokens",
+                ):
                     cost[key] += money[key]
                 seconds += money["seconds"]
                 per_repeat[repeat] = texts_of(payload)
@@ -257,9 +263,7 @@ def main() -> None:
                     },
                 }
             )
-            key_rows.append(
-                {"lang": lang, "context": context, "labels": mapping}
-            )
+            key_rows.append({"lang": lang, "context": context, "labels": mapping})
         report[f"{lang}-divergent-lines"] = divergent
         print(f"{lang}: {divergent} lines where arm modal renderings differ")
 

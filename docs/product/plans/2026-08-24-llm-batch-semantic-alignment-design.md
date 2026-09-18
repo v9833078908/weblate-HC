@@ -437,8 +437,7 @@ def evaluate_alignment(
     target_ids: Sequence[str],
     expected_sources: Mapping[str, str],
     cells: Sequence[AlignmentCell],
-) -> AlignmentDecision:
-    ...
+) -> AlignmentDecision: ...
 ```
 
 #### Step 2: Run the test and prove RED
@@ -552,8 +551,7 @@ def request_alignment(
     model: str,
     api_key: str,
     seed: str,
-) -> AlignmentVerification:
-    ...
+) -> AlignmentVerification: ...
 ```
 
 `semantic_validator_unparsed` remains an operational output in serialized

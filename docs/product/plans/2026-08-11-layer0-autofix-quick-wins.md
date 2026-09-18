@@ -222,102 +222,111 @@ production backfill и повторный dry-run завершены успеш�
 фиксируют поведение точки и обязаны продолжать проходить):
 
 ```python
-    def test_removes_added_exclamation_with_narrow_space(self) -> None:
-        # Prod shape (unit 178826): the model added the mark and
-        # AddFrenchPunctuationSpacing already put U+202F in front of it.
-        unit = make_unit(source="А давайте", code="fr")
-        self.assertEqual(
-            self.fix.fix_target(["Allons-y\u202f!"], unit), (["Allons-y"], True)
-        )
+def test_removes_added_exclamation_with_narrow_space(self) -> None:
+    # Prod shape (unit 178826): the model added the mark and
+    # AddFrenchPunctuationSpacing already put U+202F in front of it.
+    unit = make_unit(source="А давайте", code="fr")
+    self.assertEqual(
+        self.fix.fix_target(["Allons-y\u202f!"], unit), (["Allons-y"], True)
+    )
 
-    def test_removes_added_colon_with_nbsp(self) -> None:
-        # Prod shape (unit 179518).
-        unit = make_unit(source="Старик сделал небольшую паузу и продолжил", code="fr")
-        self.assertEqual(
-            self.fix.fix_target(["Le vieil homme fait une pause et reprend\u00a0:"], unit),
-            (["Le vieil homme fait une pause et reprend"], True),
-        )
 
-    def test_removes_added_question_with_plain_space(self) -> None:
-        unit = make_unit(source="Можно ли выпустить плесень", code="fr")
-        self.assertEqual(
-            self.fix.fix_target(["Peut-on libérer la moisissure ?"], unit),
-            (["Peut-on libérer la moisissure"], True),
-        )
+def test_removes_added_colon_with_nbsp(self) -> None:
+    # Prod shape (unit 179518).
+    unit = make_unit(source="Старик сделал небольшую паузу и продолжил", code="fr")
+    self.assertEqual(
+        self.fix.fix_target(["Le vieil homme fait une pause et reprend\u00a0:"], unit),
+        (["Le vieil homme fait une pause et reprend"], True),
+    )
 
-    def test_keeps_a_terminal_inside_a_closing_quote(self) -> None:
-        # Measured on prod: reaching behind the quote repaired 17 units and
-        # broke 13 of them. `…the inscription "armory."` is correct en_US
-        # typography, and the rule must not touch it.
-        unit = make_unit(source="Впереди двери с надписью \u00abоружейная\u00bb", code="en")
-        target = 'Ahead are large double doors with the inscription "armory."'
-        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
-    def test_keeps_a_terminal_inside_a_closing_guillemet(self) -> None:
-        unit = make_unit(source="Скорее, депеша", code="fr")
-        target = "\u00abVite, la d\u00e9p\u00eache\u202f!\u00bb"
-        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
+def test_removes_added_question_with_plain_space(self) -> None:
+    unit = make_unit(source="Можно ли выпустить плесень", code="fr")
+    self.assertEqual(
+        self.fix.fix_target(["Peut-on libérer la moisissure ?"], unit),
+        (["Peut-on libérer la moisissure"], True),
+    )
 
-    def test_keeps_terminal_when_the_quoted_source_has_it(self) -> None:
-        # Prod shape (unit 180448): the source mark hides behind a quote, so
-        # the target mark is correct even though end_exclamation fails. This is
-        # the one direction that IS unwrapped - the source side.
-        unit = make_unit(source='Старейшина бежит на вас с криком "Еретик!"', code="fr")
-        target = "L'Ancien se précipite sur toi en criant Hérétique\u202f!"  # codespell:ignore
-        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
-    def test_keeps_a_mark_wrapped_in_markup(self) -> None:
-        unit = make_unit(source="Скорее", code="fr")
-        self.assertEqual(
-            self.fix.fix_target(["<b>Vite\u202f!</b>"], unit),
-            (["<b>Vite\u202f!</b>"], False),
-        )
+def test_keeps_a_terminal_inside_a_closing_quote(self) -> None:
+    # Measured on prod: reaching behind the quote repaired 17 units and
+    # broke 13 of them. `…the inscription "armory."` is correct en_US
+    # typography, and the rule must not touch it.
+    unit = make_unit(source="Впереди двери с надписью \u00abоружейная\u00bb", code="en")
+    target = 'Ahead are large double doors with the inscription "armory."'
+    self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
-    def test_keeps_full_width_marks(self) -> None:
-        unit = make_unit(source="Скорее", code="ja")
-        self.assertEqual(self.fix.fix_target(["急いで！"], unit), (["急いで！"], False))
 
-    def test_keeps_repeated_marks(self) -> None:
-        unit = make_unit(source="Les pionniers rient", code="fr")
-        self.assertEqual(
-            self.fix.fix_target(["Les pionniers rient!!"], unit),
-            (["Les pionniers rient!!"], False),
-        )
+def test_keeps_a_terminal_inside_a_closing_guillemet(self) -> None:
+    unit = make_unit(source="Скорее, депеша", code="fr")
+    target = "\u00abVite, la d\u00e9p\u00eache\u202f!\u00bb"
+    self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
-    def test_keeps_interrobang(self) -> None:
-        unit = make_unit(source="Ты серьёзно", code="fr")
-        self.assertEqual(
-            self.fix.fix_target(["Tu es sérieux ?!"], unit), (["Tu es sérieux ?!"], False)
-        )
 
-    def test_refuses_to_empty_the_target(self) -> None:
-        unit = make_unit(source="Осторожно, ликвидаторы", code="fr")
-        self.assertEqual(self.fix.fix_target(["!"], unit), (["!"], False))
+def test_keeps_terminal_when_the_quoted_source_has_it(self) -> None:
+    # Prod shape (unit 180448): the source mark hides behind a quote, so
+    # the target mark is correct even though end_exclamation fails. This is
+    # the one direction that IS unwrapped - the source side.
+    unit = make_unit(source='Старейшина бежит на вас с криком "Еретик!"', code="fr")
+    target = (
+        "L'Ancien se précipite sur toi en criant Hérétique\u202f!"  # codespell:ignore
+    )
+    self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
-    def test_keeps_a_double_terminal_it_cannot_settle(self) -> None:
-        # Dropping the dot would expose a question mark the source lacks:
-        # the failing-check set changes instead of shrinking.
-        unit = make_unit(source="Les pionniers rient", code="fr")
-        self.assertEqual(
-            self.fix.fix_target(["Vraiment?."], unit), (["Vraiment?."], False)
-        )
 
-    def test_mark_specific_ignore_flag_disables_the_fix(self) -> None:
-        unit = make_unit(
-            source="А давайте", code="fr", flags="ignore-end-exclamation"
-        )
-        self.assertEqual(
-            self.fix.fix_target(["Allons-y\u202f!"], unit), (["Allons-y\u202f!"], False)
-        )
+def test_keeps_a_mark_wrapped_in_markup(self) -> None:
+    unit = make_unit(source="Скорее", code="fr")
+    self.assertEqual(
+        self.fix.fix_target(["<b>Vite\u202f!</b>"], unit),
+        (["<b>Vite\u202f!</b>"], False),
+    )
 
-    def test_fixes_every_plural_form(self) -> None:
-        unit = make_unit(
-            source=["Attends", "Attendez"], target=["", ""], code="fr"
-        )
-        self.assertEqual(
-            self.fix.fix_target(["Attends\u202f!", "Attendez\u202f!"], unit),
-            (["Attends", "Attendez"], True),
-        )
+
+def test_keeps_full_width_marks(self) -> None:
+    unit = make_unit(source="Скорее", code="ja")
+    self.assertEqual(self.fix.fix_target(["急いで！"], unit), (["急いで！"], False))
+
+
+def test_keeps_repeated_marks(self) -> None:
+    unit = make_unit(source="Les pionniers rient", code="fr")
+    self.assertEqual(
+        self.fix.fix_target(["Les pionniers rient!!"], unit),
+        (["Les pionniers rient!!"], False),
+    )
+
+
+def test_keeps_interrobang(self) -> None:
+    unit = make_unit(source="Ты серьёзно", code="fr")
+    self.assertEqual(
+        self.fix.fix_target(["Tu es sérieux ?!"], unit), (["Tu es sérieux ?!"], False)
+    )
+
+
+def test_refuses_to_empty_the_target(self) -> None:
+    unit = make_unit(source="Осторожно, ликвидаторы", code="fr")
+    self.assertEqual(self.fix.fix_target(["!"], unit), (["!"], False))
+
+
+def test_keeps_a_double_terminal_it_cannot_settle(self) -> None:
+    # Dropping the dot would expose a question mark the source lacks:
+    # the failing-check set changes instead of shrinking.
+    unit = make_unit(source="Les pionniers rient", code="fr")
+    self.assertEqual(self.fix.fix_target(["Vraiment?."], unit), (["Vraiment?."], False))
+
+
+def test_mark_specific_ignore_flag_disables_the_fix(self) -> None:
+    unit = make_unit(source="А давайте", code="fr", flags="ignore-end-exclamation")
+    self.assertEqual(
+        self.fix.fix_target(["Allons-y\u202f!"], unit), (["Allons-y\u202f!"], False)
+    )
+
+
+def test_fixes_every_plural_form(self) -> None:
+    unit = make_unit(source=["Attends", "Attendez"], target=["", ""], code="fr")
+    self.assertEqual(
+        self.fix.fix_target(["Attends\u202f!", "Attendez\u202f!"], unit),
+        (["Attends", "Attendez"], True),
+    )
 ```
 
 И новый класс в конце файла — порядок в `AUTOFIX_LIST` и идемпотентность:
@@ -638,9 +647,7 @@ class ReapplyAutofixesTest(ViewTestCase):
         self.unit.refresh_from_db()
         self.assertEqual(self.unit.target, "Merci")
         self.assertEqual(self.unit.state, STATE_TRANSLATED)
-        self.assertTrue(
-            self.unit.change_set.filter(action=ActionEvents.AUTO).exists()
-        )
+        self.assertTrue(self.unit.change_set.filter(action=ActionEvents.AUTO).exists())
 
     def test_clean_unit_is_never_written(self) -> None:
         other = self.get_unit("Hello, world!\n")
@@ -900,67 +907,69 @@ git commit -m "feat(trans): add reapply_autofixes dry-run reporting"
 Дописать в `ReapplyAutofixesTest`:
 
 ```python
-    def test_concurrent_edit_is_not_overwritten(self) -> None:
-        # The edit has to land between the scan and the row lock. Hooking
-        # Unit.translate would be too late: by then repair() has already read
-        # the row under select_for_update and recomputed, so even a correct
-        # implementation writes the scanned value and the test fails on good
-        # code. Command.get_user() runs once, after the scan and before
-        # apply_group takes any lock, which is exactly the window.
-        from weblate.trans.management.commands.reapply_autofixes import Command
+def test_concurrent_edit_is_not_overwritten(self) -> None:
+    # The edit has to land between the scan and the row lock. Hooking
+    # Unit.translate would be too late: by then repair() has already read
+    # the row under select_for_update and recomputed, so even a correct
+    # implementation writes the scanned value and the test fails on good
+    # code. Command.get_user() runs once, after the scan and before
+    # apply_group takes any lock, which is exactly the window.
+    from weblate.trans.management.commands.reapply_autofixes import Command
 
-        original_get_user = Command.get_user
+    original_get_user = Command.get_user
 
-        def edit_first(command):
-            Unit.objects.filter(pk=self.unit.pk).update(target="Merci beaucoup")
-            return original_get_user(command)
+    def edit_first(command):
+        Unit.objects.filter(pk=self.unit.pk).update(target="Merci beaucoup")
+        return original_get_user(command)
 
-        with patch.object(Command, "get_user", autospec=True, side_effect=edit_first):
-            self.run_command("--apply")
-        self.unit.refresh_from_db()
-        # Not merely "not Merci": the translator's text must survive intact.
-        self.assertEqual(self.unit.target, "Merci beaucoup")
-
-    def test_translate_receives_the_unfixed_target_and_fixes_it(self) -> None:
-        # repair() hands translate() the UNFIXED target on purpose: translate()
-        # runs fix_target internally (unit.py:2406) and that call is what
-        # records unit.fixups. Both halves are pinned here because each can
-        # break alone: pre-fixing in the command would lose the fixups, and a
-        # translate() that stopped applying autofixes would turn every repair
-        # into a no-op write with a Change attached.
-        captured: list[list[str]] = []
-        original_translate = Unit.translate
-
-        def spy(unit, user, new_target, *args, **kwargs):
-            captured.append(list(new_target))
-            return original_translate(unit, user, new_target, *args, **kwargs)
-
-        with patch.object(Unit, "translate", autospec=True, side_effect=spy):
-            self.run_command("--apply")
-        self.assertEqual(captured, [["Merci\u202f!"]])
-        self.unit.refresh_from_db()
-        self.assertEqual(self.unit.target, "Merci")
-
-    def test_apply_does_not_propagate_to_another_component(self) -> None:
-        second = Component.objects.create(
-            name="Test 2",
-            slug="test-2",
-            project=self.project,
-            repo=self.git_repo_path,
-            vcs="git",
-            filemask="po/*.po",
-            template="",
-            file_format="po",
-            new_base="",
-            allow_translation_propagation=True,
-        )
-        other = second.translation_set.get(language_code="cs").unit_set.get(
-            source=self.SOURCE
-        )
-        Unit.objects.filter(pk=other.pk).update(target="Merci\u202f!")
+    with patch.object(Command, "get_user", autospec=True, side_effect=edit_first):
         self.run_command("--apply")
-        other.refresh_from_db()
-        self.assertEqual(other.target, "Merci\u202f!")
+    self.unit.refresh_from_db()
+    # Not merely "not Merci": the translator's text must survive intact.
+    self.assertEqual(self.unit.target, "Merci beaucoup")
+
+
+def test_translate_receives_the_unfixed_target_and_fixes_it(self) -> None:
+    # repair() hands translate() the UNFIXED target on purpose: translate()
+    # runs fix_target internally (unit.py:2406) and that call is what
+    # records unit.fixups. Both halves are pinned here because each can
+    # break alone: pre-fixing in the command would lose the fixups, and a
+    # translate() that stopped applying autofixes would turn every repair
+    # into a no-op write with a Change attached.
+    captured: list[list[str]] = []
+    original_translate = Unit.translate
+
+    def spy(unit, user, new_target, *args, **kwargs):
+        captured.append(list(new_target))
+        return original_translate(unit, user, new_target, *args, **kwargs)
+
+    with patch.object(Unit, "translate", autospec=True, side_effect=spy):
+        self.run_command("--apply")
+    self.assertEqual(captured, [["Merci\u202f!"]])
+    self.unit.refresh_from_db()
+    self.assertEqual(self.unit.target, "Merci")
+
+
+def test_apply_does_not_propagate_to_another_component(self) -> None:
+    second = Component.objects.create(
+        name="Test 2",
+        slug="test-2",
+        project=self.project,
+        repo=self.git_repo_path,
+        vcs="git",
+        filemask="po/*.po",
+        template="",
+        file_format="po",
+        new_base="",
+        allow_translation_propagation=True,
+    )
+    other = second.translation_set.get(language_code="cs").unit_set.get(
+        source=self.SOURCE
+    )
+    Unit.objects.filter(pk=other.pk).update(target="Merci\u202f!")
+    self.run_command("--apply")
+    other.refresh_from_db()
+    self.assertEqual(other.target, "Merci\u202f!")
 ```
 
 Что тест различает: корректная реализация под локом перечитывает уже
@@ -990,51 +999,52 @@ from weblate.trans.actions import ActionEvents
 Добавить методы и подключить их в `handle`:
 
 ```python
-    def get_user(self) -> User:
-        return User.objects.get_or_create_bot(
-            scope="weblate", name="autofix", verbose="Autofix backfill"
+def get_user(self) -> User:
+    return User.objects.get_or_create_bot(
+        scope="weblate", name="autofix", verbose="Autofix backfill"
+    )
+
+
+def repair(self, unit_id: int, user: User) -> list[str] | None:
+    """
+    Repair one unit, or report that it no longer needs one.
+
+    The whole decision is retaken inside the row lock: the scan ran
+    without one, and a translator or an import may have changed the unit
+    since. ``translate`` receives the freshly read target, applies the
+    autofixes itself (unit.py:2404) and records the fixups.
+    """
+    with transaction.atomic():
+        unit = Unit.objects.select_for_update().prefetch().get(pk=unit_id)
+        if unit.state == STATE_READONLY or unit.translation.is_template:
+            return None
+        original = unit.get_target_plurals()
+        candidate, applied = apply_autofixes(list(original), unit)
+        if candidate == original:
+            return None
+        unit.translate(
+            user,
+            original,
+            unit.state,
+            change_action=ActionEvents.AUTO,
+            propagate=False,
+            select_for_update=False,
         )
-
-    def repair(self, unit_id: int, user: User) -> list[str] | None:
-        """
-        Repair one unit, or report that it no longer needs one.
-
-        The whole decision is retaken inside the row lock: the scan ran
-        without one, and a translator or an import may have changed the unit
-        since. ``translate`` receives the freshly read target, applies the
-        autofixes itself (unit.py:2404) and records the fixups.
-        """
-        with transaction.atomic():
-            unit = Unit.objects.select_for_update().prefetch().get(pk=unit_id)
-            if unit.state == STATE_READONLY or unit.translation.is_template:
-                return None
-            original = unit.get_target_plurals()
-            candidate, applied = apply_autofixes(list(original), unit)
-            if candidate == original:
-                return None
-            unit.translate(
-                user,
-                original,
-                unit.state,
-                change_action=ActionEvents.AUTO,
-                propagate=False,
-                select_for_update=False,
-            )
-            return applied
+        return applied
 ```
 
 В `handle` после отчёта, когда `options["apply"]`:
 
 ```python
-            written: list[int] = []
-            stale = 0
-            for component in group:
-                for unit_id in candidates[component.pk]:
-                    if self.repair(unit_id, user) is None:
-                        stale += 1
-                        continue
-                    written.append(unit_id)
-            self.stdout.write(f"{root}: {len(written)} written, {stale} stale")
+written: list[int] = []
+stale = 0
+for component in group:
+    for unit_id in candidates[component.pk]:
+        if self.repair(unit_id, user) is None:
+            stale += 1
+            continue
+        written.append(unit_id)
+self.stdout.write(f"{root}: {len(written)} written, {stale} stale")
 ```
 
 `candidates` — словарь `component.pk -> changed`, наполняемый на этапе
@@ -1105,18 +1115,19 @@ git commit -m "feat(trans): write autofix repairs under a row lock"
 ### Step 1: Тесты
 
 ```python
-    def test_apply_commits_the_repository_once(self) -> None:
-        with patch.object(Component, "commit_pending", return_value=True) as commit:
-            self.run_command("--apply")
-        self.assertEqual(commit.call_count, 1)
-        self.assertEqual(commit.call_args.kwargs["skip_push"], True)
+def test_apply_commits_the_repository_once(self) -> None:
+    with patch.object(Component, "commit_pending", return_value=True) as commit:
+        self.run_command("--apply")
+    self.assertEqual(commit.call_count, 1)
+    self.assertEqual(commit.call_args.kwargs["skip_push"], True)
 
-    def test_foreign_pending_changes_block_the_commit(self) -> None:
-        self.edit_unit("Hello, world!\n", "Ahoj svete!\n")
-        with patch.object(Component, "commit_pending") as commit:
-            with self.assertRaises(CommandError):
-                self.run_command("--apply")
-        commit.assert_not_called()
+
+def test_foreign_pending_changes_block_the_commit(self) -> None:
+    self.edit_unit("Hello, world!\n", "Ahoj svete!\n")
+    with patch.object(Component, "commit_pending") as commit:
+        with self.assertRaises(CommandError):
+            self.run_command("--apply")
+    commit.assert_not_called()
 ```
 
 ### Step 2: Прогнать
@@ -1130,55 +1141,56 @@ Expected: FAIL.
 from weblate.trans.models.pending import PendingUnitChange
 
 
-    @staticmethod
-    def foreign_pending(root: Component, written: list[int]) -> bool:
-        """Any pending change in this repository family that is not ours."""
-        return (
-            PendingUnitChange.objects.for_component(
-                root, apply_filters=False, include_linked=True
-            )
-            .exclude(unit_id__in=written)
-            .exists()
+@staticmethod
+def foreign_pending(root: Component, written: list[int]) -> bool:
+    """Any pending change in this repository family that is not ours."""
+    return (
+        PendingUnitChange.objects.for_component(
+            root, apply_filters=False, include_linked=True
         )
+        .exclude(unit_id__in=written)
+        .exists()
+    )
 
-    def apply_group(self, root: Component, group: list[Component], candidates) -> bool:
-        user = self.get_user()
-        with root.repository.lock:
-            if self.foreign_pending(root, []):
-                self.stderr.write(
-                    f"{root}: foreign pending changes, refusing to touch this repository"
-                )
-                return False
-            written: list[int] = []
-            stale = 0
-            for component in group:
-                for unit_id in candidates[component.pk]:
-                    if self.repair(unit_id, user) is None:
-                        stale += 1
-                        continue
-                    written.append(unit_id)
-            self.stdout.write(f"{root}: {len(written)} written, {stale} stale")
-            if not written:
-                return True
-            if self.foreign_pending(root, written):
-                self.stderr.write(
-                    f"{root}: foreign pending changes appeared during the run; "
-                    "repairs stay pending and are not committed"
-                )
-                return False
-            root.commit_pending("autofix backfill", user, skip_push=True)
-        return True
+
+def apply_group(self, root: Component, group: list[Component], candidates) -> bool:
+    user = self.get_user()
+    with root.repository.lock:
+        if self.foreign_pending(root, []):
+            self.stderr.write(
+                f"{root}: foreign pending changes, refusing to touch this repository"
+            )
+            return False
+        written: list[int] = []
+        stale = 0
+        for component in group:
+            for unit_id in candidates[component.pk]:
+                if self.repair(unit_id, user) is None:
+                    stale += 1
+                    continue
+                written.append(unit_id)
+        self.stdout.write(f"{root}: {len(written)} written, {stale} stale")
+        if not written:
+            return True
+        if self.foreign_pending(root, written):
+            self.stderr.write(
+                f"{root}: foreign pending changes appeared during the run; "
+                "repairs stay pending and are not committed"
+            )
+            return False
+        root.commit_pending("autofix backfill", user, skip_push=True)
+    return True
 ```
 
 В `handle` собрать результат и завершиться ошибкой при неудаче:
 
 ```python
-        failures = [root for root, ok in results if not ok]
-        if failures:
-            msg = "Some repositories were not committed: " + ", ".join(
-                str(root) for root in failures
-            )
-            raise CommandError(msg)
+failures = [root for root, ok in results if not ok]
+if failures:
+    msg = "Some repositories were not committed: " + ", ".join(
+        str(root) for root in failures
+    )
+    raise CommandError(msg)
 ```
 
 ### Step 4: Прогнать

@@ -22,9 +22,7 @@ class Migration(migrations.Migration):
         migrations.SeparateDatabaseAndState(
             state_operations=[
                 migrations.RenameModel(old_name="JudgeRun", new_name="ProducerRun"),
-                migrations.AlterModelTable(
-                    name="producerrun", table="trans_judgerun"
-                ),
+                migrations.AlterModelTable(name="producerrun", table="trans_judgerun"),
                 migrations.AlterModelOptions(
                     name="producerrun",
                     options={

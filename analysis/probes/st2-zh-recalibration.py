@@ -364,11 +364,11 @@ def system_prompt(arm: str) -> str:
             ST2_CONTEXT if arm == "H" else NEUTRAL_CONTEXT,
         )
     prompt = head + GLOSSARY_RULE
-    if arm in ("B", "C", "D", *MINIMAL_ARMS):
+    if arm in {"B", "C", "D", *MINIMAL_ARMS}:
         prompt += DESCRIPTION_RULE
-    if arm in ("C", "D", *MINIMAL_ARMS):
+    if arm in {"C", "D", *MINIMAL_ARMS}:
         prompt += RUBRIC_RULE
-    if arm in ("D", *MINIMAL_ARMS):
+    if arm in {"D", *MINIMAL_ARMS}:
         prompt += RENDER_RULE
     return prompt
 
@@ -676,7 +676,7 @@ def judge(
                 batch = futures[future]
                 verdicts, usage = future.result()
                 total.merge(usage)
-                for record, verdict in zip(batch, verdicts):
+                for record, verdict in zip(batch, verdicts, strict=False):
                     results[record.record_id] = verdict
                 done += 1
                 print(
@@ -687,7 +687,7 @@ def judge(
     for i, batch in enumerate(batches):
         verdicts, usage = judge_batch(model, batch, arm, api_key, timeout)
         total.merge(usage)
-        for record, verdict in zip(batch, verdicts):
+        for record, verdict in zip(batch, verdicts, strict=False):
             results[record.record_id] = verdict
         print(f"  batch {i + 1}/{len(batches)} done  ", end="\r", file=sys.stderr)
         if sleep and i + 1 < len(batches):
@@ -697,8 +697,6 @@ def judge(
 
 
 def attach_glossary(records: list[Record], terms: list[tuple[str, str]]) -> None:
-    import re
-
     for record in records:
         source = record.source.lower()
         record.glossary = [

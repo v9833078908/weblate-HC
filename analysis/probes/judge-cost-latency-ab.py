@@ -4,12 +4,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Every weblate import must follow django.setup(), so it cannot sit at the top.
-# ruff: file-ignore[module-import-not-at-top-of-file]
 #
 # The runner deliberately reaches the judge client's private seams: a
 # measurement is only valid when it builds, parses and posts exactly like
 # production, and the POST-boundary budget guard has no public hook.
-# ruff: file-ignore[private-member-access]
 
 r"""
 Measurement runner for the judge batching (Qwen width) and seat-latency A/B.
@@ -545,7 +543,7 @@ def build_split(
         by_stratum.setdefault(members[0].stratum, []).append(family)
     assignment: dict[str, str] = {}
     for stratum in sorted(by_stratum):
-        rng = random.Random(f"{seed}:{stratum}")  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+        rng = random.Random(f"{seed}:{stratum}")
         names = sorted(by_stratum[stratum])
         rng.shuffle(names)
         # Proportional allocation, not a modulo of the index: a stratum with
@@ -713,11 +711,11 @@ def _build_schedule(
 
 
 def _git_revision() -> str:
-    import subprocess  # ruff: ignore[import-outside-top-level, suspicious-subprocess-import]
+    import subprocess  # ruff: ignore[import-outside-top-level]
 
     try:
         return subprocess.run(
-            ["git", "rev-parse", "HEAD"],  # ruff: ignore[start-process-with-partial-path]
+            ["git", "rev-parse", "HEAD"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -1859,7 +1857,7 @@ def _bootstrap_delta(
     families = sorted(set(control) & set(candidate))
     if not families:
         return {}
-    rng = random.Random(seed)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+    rng = random.Random(seed)
     deltas = {"major_recall": [], "false_flags": []}
     for _ in range(BOOTSTRAP_ITERATIONS):
         sample = [families[rng.randrange(len(families))] for _ in families]

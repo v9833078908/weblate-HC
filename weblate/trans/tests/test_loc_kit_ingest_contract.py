@@ -3077,12 +3077,13 @@ class KitExplanationApplyServiceTest(ViewTestCase):
 
     def test_caller_without_source_evidence_is_never_gated(self) -> None:
         """
-        ``values={}`` means "no opinion", not "blank" - unlike an explicit
-        blank cell. ``Component.apply_loc_kit_explanations`` (the one-shot
-        apply right after a kit-derived component's translations first
-        load) only ever tracks key -> explanation and never populates
-        ``values``; it must keep applying explanations to freshly created
-        units whose real source it never even sees here.
+        ``values={}`` means "no opinion", not "blank" - unlike an explicit blank cell.
+
+        ``Component.apply_loc_kit_explanations`` (the one-shot apply right
+        after a kit-derived component's translations first load) only ever
+        tracks key -> explanation and never populates ``values``; it must
+        keep applying explanations to freshly created units whose real
+        source it never even sees here.
         """
         unit = StringUnit(
             key="greeting",
@@ -3102,8 +3103,9 @@ class KitExplanationApplyServiceTest(ViewTestCase):
 
     def test_source_changed_between_preview_and_apply_is_still_caught(self) -> None:
         """
-        ``classify_kit_explanations`` (preview) must never be trusted stale:
-        the real gate lives in ``apply_kit_explanations``'s own locked
+        ``classify_kit_explanations`` (preview) must never be trusted stale.
+
+        The real gate lives in ``apply_kit_explanations``'s own locked
         re-classification, so a source edited after preview is still caught.
         """
         unit = StringUnit(
@@ -3221,9 +3223,11 @@ class LocKitStringsUpdateServiceTest(ViewTestCase):
         self,
     ) -> None:
         """
-        ``find_changed_sources`` is the discrepancy table the plan requires:
-        key/old/new, distinct from what ``append_translation_strings``
-        itself decides (it never touches an existing key regardless).
+        ``find_changed_sources`` is the discrepancy table the plan requires.
+
+        It reports key/old/new, distinct from what
+        ``append_translation_strings`` itself decides (it never touches an
+        existing key regardless).
         """
         matching_row = self._row()  # values={"en": "Welcome!"}, matches exactly
         changed_row = self._row(
@@ -3834,9 +3838,9 @@ class LocKitStringsUpdatePendingCommitTest(ViewTestCase):
         self,
     ) -> None:
         """
-        A target's ``new_unit`` template lookup only succeeds once the
-        source/template translation's own file write has happened. This
-        must hold by explicit ordering, not incidentally because the
+        A target's ``new_unit`` template lookup only succeeds once the source/template translation's own file write has happened.
+
+        This must hold by explicit ordering, not incidentally because the
         source's pending row usually sorts first by creation timestamp.
         """
         result = loc_kit.append_translation_strings(
@@ -4009,9 +4013,9 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
     def test_preview_reports_and_confirm_preserves_a_changed_source(self) -> None:
         """
-        An existing key whose source the table disagrees with is reported
-        in its own preview section, its Explanation is skipped, and confirm
-        never touches the stored source - the plan's discrepancy table.
+        An existing key whose source the table disagrees with is reported in its own preview section, its Explanation is skipped, and confirm never touches the stored source.
+
+        The plan's discrepancy table.
         """
         kit = (
             "key,en,cs,Explanation\n"
@@ -4477,10 +4481,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False, CELERY_VISIBILITY_TIMEOUT=4)
     def test_apply_delivery_budget_reserves_one_fenced_continuation(self) -> None:
-        """
-        A delivery stops after a committed portion, hands ownership to one
-        fresh UUID, and does not finish the following portion itself.
-        """
+        """A delivery stops after a committed portion, hands ownership to one fresh UUID, and does not finish the following portion itself."""
         rows = "key,en\n" + "".join(f"chain{i},Value {i}\n" for i in range(26))
         start = self.client.post(
             reverse(
@@ -4531,9 +4532,10 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self,
     ) -> None:
         """
-        The cap never leaves this draft's already-written units pending only
-        in the database: its committed portion is flushed before reporting
-        the partial, terminal result.
+        The cap never leaves this draft's already-written units pending only in the database.
+
+        Its committed portion is flushed before reporting the partial,
+        terminal result.
         """
         rows = "key,en\n" + "".join(f"cap{i},Value {i}\n" for i in range(26))
         start = self.client.post(
@@ -4702,11 +4704,12 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
     def test_completed_result_is_discoverable_from_the_component_page(self) -> None:
         """
-        The plan's core UX requirement: closing the preview tab must not
-        strand the result. A fresh request for the component page -
-        without ever revisiting the preview URL - carries a link back to
-        it, bound to the same owner and session the draft was created
-        under (matching every other draft access check in this flow).
+        The plan's core UX requirement: closing the preview tab must not strand the result.
+
+        A fresh request for the component page - without ever revisiting the
+        preview URL - carries a link back to it, bound to the same owner and
+        session the draft was created under (matching every other draft
+        access check in this flow).
         """
         kit = "key,en\nnew_key,Hello\n"
         start = self.client.post(
@@ -4766,10 +4769,10 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self,
     ) -> None:
         """
-        A redelivered task resumes from the durable cursor, and the
-        COMPLETED summary reflects every portion applied across every
-        delivery - not only the last one, which resets its local counters
-        to zero on every fresh task invocation.
+        A redelivered task resumes from the durable cursor, and the COMPLETED summary reflects every portion applied across every delivery.
+
+        The summary must not reflect only the last delivery, which resets
+        its local counters to zero on every fresh task invocation.
         """
         rows = "key,en\n" + "".join(f"k{i},V{i}\n" for i in range(23))
         start = self.client.post(
@@ -4839,10 +4842,11 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_retry_view_resumes_from_cursor_and_merges_totals(self) -> None:
         """
-        The same cursor/totals durability as a raw redelivery, but through
-        the actual failed-state retry button: a new ``apply_task_id`` must
-        still resume from the durable ``next_row`` and add the prior
-        delivery's counters to its own, not start counting from zero.
+        The same cursor/totals durability as a raw redelivery, but through the actual failed-state retry button.
+
+        A new ``apply_task_id`` must still resume from the durable
+        ``next_row`` and add the prior delivery's counters to its own, not
+        start counting from zero.
         """
         rows = "key,en\n" + "".join(f"r{i},V{i}\n" for i in range(23))
         start = self.client.post(
@@ -4932,11 +4936,10 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
         self,
     ) -> None:
         """
-        Same as ``test_retry_view_resumes_from_cursor_and_merges_totals``
-        but with the real, unpatched ``LOC_KIT_STRING_UPDATE_PORTION_SIZE``
-        and two successful portions before the failure - the exact shape
-        observed in a live E2E run (75 rows, portions of 25, failure on
-        the third portion after two succeed).
+        Same as ``test_retry_view_resumes_from_cursor_and_merges_totals`` but with the real, unpatched ``LOC_KIT_STRING_UPDATE_PORTION_SIZE`` and two successful portions before the failure.
+
+        The exact shape observed in a live E2E run (75 rows, portions of 25,
+        failure on the third portion after two succeed).
         """
         row_count = 75
         rows = "key,en\n" + "".join(f"p{i},V{i}\n" for i in range(row_count))

@@ -108,13 +108,13 @@ Expected: FAIL — `target_component` ещё не является полем м
 После `category` добавить:
 
 ```python
-    target_component = models.ForeignKey(
-        "trans.Component",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="loc_kit_update_drafts",
-    )
+target_component = models.ForeignKey(
+    "trans.Component",
+    on_delete=models.CASCADE,
+    null=True,
+    blank=True,
+    related_name="loc_kit_update_drafts",
+)
 ```
 
 Creation draft оставляет поле `NULL`; update draft всегда задаёт существующий glossary.
@@ -168,15 +168,15 @@ Expected: FAIL — текущий mixin знает только component-creati
 До проверки `get_creatable_projects` добавить ветку update draft:
 
 ```python
-        if draft.target_component_id is not None:
-            component = draft.target_component
-            if (
-                not component.is_glossary
-                or component.locked
-                or not self.request.user.has_perm("upload.perform", component)
-            ):
-                raise Http404
-            return draft
+if draft.target_component_id is not None:
+    component = draft.target_component
+    if (
+        not component.is_glossary
+        or component.locked
+        or not self.request.user.has_perm("upload.perform", component)
+    ):
+        raise Http404
+    return draft
 ```
 
 Не требовать `translation.add` здесь: отсутствие этого права не лишает оператора возможности добавить данные в уже существующие языки.
@@ -249,11 +249,13 @@ class LocKitGlossaryUpdateForm(forms.Form):
 Добавить маршрут:
 
 ```python
-path(
-    "loc-kit/glossary/update/<object_path:path>/",
-    weblate.trans.views.create.LocKitGlossaryUpdateStartView.as_view(),
-    name="loc-kit-glossary-update",
-),
+(
+    path(
+        "loc-kit/glossary/update/<object_path:path>/",
+        weblate.trans.views.create.LocKitGlossaryUpdateStartView.as_view(),
+        name="loc-kit-glossary-update",
+    ),
+)
 ```
 
 **Step 5: добавить template и ссылку.**
@@ -314,7 +316,7 @@ Expected: FAIL — `all_terms` отсутствует.
 В `GlossaryPreview` добавить после `terms`:
 
 ```python
-    all_terms: tuple[GlossaryTerm, ...]
+all_terms: tuple[GlossaryTerm, ...]
 ```
 
 Импорт `GlossaryTerm` держать в `TYPE_CHECKING`; благодаря `from __future__ import annotations` runtime import не нужен. В `validate_glossary_profile` передать `tuple(glossary_terms)` в это поле. Оставить `terms` ограниченным, как сейчас.
@@ -402,9 +404,7 @@ class GlossaryAppendCollisionError(Exception):
 ```python
 with component.locked_for_update() as locked_component:
     existing_keys = set(
-        locked_component.source_translation.unit_set.values_list(
-            "context", "source"
-        )
+        locked_component.source_translation.unit_set.values_list("context", "source")
     )
     existing_sources = {source for _context, source in existing_keys}
     incoming_sources = set()
@@ -468,9 +468,7 @@ target_unit = translation.add_unit(
     explanation=new_term.target_explanations.get(code, ""),
 )
 assert target_unit is not None
-target_unit.source_unit.update_explanation(
-    new_term.source_explanation, request.user
-)
+target_unit.source_unit.update_explanation(new_term.source_explanation, request.user)
 ```
 
 Для остальных непустых targets того же `new_term` вызвать тот же `add_unit` с соответствующим `target explanation`; source explanation второй раз не вызывать. Эти методы создают штатные `NEW_UNIT` и `EXPLANATION` changes, pending changes и VCS-совместимое состояние. Не использовать `QuerySet.update`, `bulk_create`, собственный SQL или `Translation.handle_upload`.

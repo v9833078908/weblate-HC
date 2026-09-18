@@ -49,6 +49,7 @@ Excluded:
 ### Task 1: Lock down transport bounds
 
 **Files:**
+
 - Modify: `weblate/trans/judge.py`
 - Modify: `weblate/settings_docker.py`
 - Test: `weblate/trans/tests/test_judge_client.py`
@@ -66,6 +67,7 @@ Excluded:
 ### Task 2: Introduce explicit request-round coordinates
 
 **Files:**
+
 - Modify: `weblate/trans/models/judge.py`
 - Create: `weblate/trans/migrations/0110_judge_request_round.py`
 - Modify: `weblate/trans/judge_loop.py`
@@ -86,6 +88,7 @@ Excluded:
 ### Task 3: Make current evidence and approval complete
 
 **Files:**
+
 - Modify: `weblate/trans/models/judge.py`
 - Modify: `weblate/trans/judge_loop.py`
 - Modify: `weblate/trans/autotranslate.py`
@@ -105,6 +108,7 @@ Excluded:
 ### Task 4: Make deferred retry ownership and pacing durable
 
 **Files:**
+
 - Modify: `weblate/trans/models/judge.py`
 - Create: `weblate/trans/migrations/0111_judge_deferral_claims.py`
 - Modify: `weblate/trans/judge_loop.py`
@@ -130,6 +134,7 @@ Excluded:
 ### Task 5: Integrate drain audit and projection safely
 
 **Files:**
+
 - Modify: `weblate/trans/judge_loop.py`
 - Modify: `weblate/trans/tasks.py`
 - Modify: `weblate/trans/models/judge.py`

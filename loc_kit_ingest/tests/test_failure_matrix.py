@@ -63,7 +63,7 @@ def test_fatal_diagnostics_go_to_stderr_not_stdout(tmp_path, mutated_kit, capsys
     # stderr has the diagnostic
     assert "po.duplicate_key" in captured.err or "duplicate" in captured.err.lower()
     # stdout is empty on failure
-    assert captured.out.strip() == ""
+    assert not captured.out.strip()
 
 
 def test_no_report_file_on_failure(tmp_path, mutated_kit):

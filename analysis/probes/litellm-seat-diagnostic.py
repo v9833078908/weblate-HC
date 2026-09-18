@@ -6,7 +6,6 @@
 # The probe deliberately reuses the judge's own private helpers: a measurement
 # of production parsing is only valid if it builds and parses exactly like
 # production.
-# ruff: file-ignore[private-member-access]
 
 """
 Diagnose one judge seat's request contract against the live LiteLLM proxy.

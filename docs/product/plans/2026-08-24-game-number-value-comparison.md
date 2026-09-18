@@ -221,7 +221,12 @@ def test_scale_values_match_the_measured_matrix(self) -> None:
         (source_10k, "奖励一万文!", "zh_Hans", False),
         (source_10k, "獎勵一萬文!", "zh_Hant", False),
         (source_10k, "報酬は10万文!", "ja", True),
-        (source_100k, "Lern zählen - es sind 100 Tausend Mon!", "de", False),  # codespell:ignore
+        (
+            source_100k,
+            "Lern zählen - es sind 100 Tausend Mon!",
+            "de",
+            False,
+        ),  # codespell:ignore
         (source_100k, "Learn to count, ya dumbass - it's 100,000 mon", "en", False),
         (source_100k, "¡Aprende a contar, son 100 000 mon!", "es", False),
         (source_100k, "Apprends à compter, c'est 100 000 mons", "fr", False),
@@ -314,7 +319,9 @@ tables beside the existing number regexes, keeping the file's habit of explainin
 # uses as a source are listed: a target whose spelling is not here keeps its
 # literal digits and therefore behaves exactly as before.
 WORD_SCALES: dict[str, dict[str, int]] = {
-    "ru": dict.fromkeys(("тыс", "тысяча", "тысячи", "тысяч", "тысячу", "тысячах"), 1_000)
+    "ru": dict.fromkeys(
+        ("тыс", "тысяча", "тысячи", "тысяч", "тысячу", "тысячах"), 1_000
+    )
     | dict.fromkeys(("млн", "миллион", "миллиона", "миллионов"), 1_000_000)
     | dict.fromkeys(("млрд", "миллиард", "миллиарда", "миллиардов"), 1_000_000_000),
     "en": dict.fromkeys(("thousand", "thousands"), 1_000)
@@ -420,7 +427,9 @@ def _cjk_value(run: str) -> Decimal | None:
             # Never write `current or Decimal(1)`: that turns "0万" into 10000.
             if not group_seen or scale >= last_big:
                 return None
-            total += (section + (current if current is not None else Decimal(0))) * scale
+            total += (
+                section + (current if current is not None else Decimal(0))
+            ) * scale
             section, current, group_seen = Decimal(0), None, False
             last_section, last_big, scale_seen = Decimal("Infinity"), scale, True
         else:
@@ -459,7 +468,9 @@ the prepared body, and a span list is always in text order.
 The two sides then differ in exactly one place:
 
 ```python
-def _quantities(text: str, language: str | None, *, drop_ordinals: bool) -> list[Quantity]:
+def _quantities(
+    text: str, language: str | None, *, drop_ordinals: bool
+) -> list[Quantity]:
     """Every quantity the text states, each with its literal fallback."""
     # closed and open spans become Quantity(value, fallback);
     # every NUMBER token outside both becomes Quantity(value, ()).
@@ -521,13 +532,13 @@ key without inserting it, and every decrement follows a non-zero check.
 Delete `_numbers` and reduce the check to:
 
 ```python
-    def check_single(self, source: str, target: str, unit) -> bool:
-        return game_number_fails(
-            source,
-            target,
-            source_language=unit.translation.component.source_language.base_code,
-            target_language=unit.translation.language.base_code,
-        )
+def check_single(self, source: str, target: str, unit) -> bool:
+    return game_number_fails(
+        source,
+        target,
+        source_language=unit.translation.component.source_language.base_code,
+        target_language=unit.translation.language.base_code,
+    )
 ```
 
 Reading the source language off the unit inside a check follows
@@ -595,6 +606,7 @@ if game_number_fails(
     source_language=SOURCE,
     target_language=language,
 ):
+    ...
 ```
 
 Correct the usage comment in the header. The module needs Django settings, so the invocation is

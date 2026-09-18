@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from weblate.checks.models import Check
 from weblate.trans.models import Component, Project, Translation, Unit
 
 project = Project.objects.get(slug="col4")
@@ -58,8 +59,6 @@ units = id_translation.unit_set
 total = units.count()
 translated = units.filter(state__gte=20).count()
 print(f"col4/data/id: total={total} translated={translated}")
-
-from weblate.checks.models import Check
 
 check_counts: Counter = Counter(
     Check.objects.filter(unit__translation=id_translation)

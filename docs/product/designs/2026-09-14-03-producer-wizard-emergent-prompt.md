@@ -24,11 +24,11 @@
 
 ---
 
-# Follow-up: build the «Сделать локализацию» wizard (replaces the «Мастер в разработке» stub)
+## Follow-up: build the «Сделать локализацию» wizard (replaces the «Мастер в разработке» stub)
 
 Everything in the first prompt stays binding: tokens, typography, Russian-only UI, «проект» / «лок-кит» terminology, no sign-in screen, the closed API list (extended below, §5), no numeric quality score, no check codes. The sidebar behaviour you built for an empty project (items disabled with the tooltip «Появится после первой локализации») is correct — keep it. This message replaces **screen 4** of the first prompt with a complete specification and asks you to **draw every screen and every state** of the wizard.
 
-## 0. Why the wizard looks like this
+### 0. Why the wizard looks like this
 
 Until now the studio ran the same setup through four expert checklists (agent "skills") operated by a specialist: prepare the kit for import, optionally split it into several components, build a glossary, write the LLM prompt fields. Each checklist is an *interview* — a short list of decisions only the producer can make — followed by deterministic work and a verification gate. The wizard is those interviews turned into screens. The producer answers; the backend does the work and shows its evidence. Three principles from the checklists are binding for the UI:
 
@@ -36,7 +36,7 @@ Until now the studio ran the same setup through four expert checklists (agent "s
 2. **Bring measurements to every question.** Each question is accompanied by what the backend found in the file: counts, samples, the exact rows concerned. A question without evidence is a bad screen.
 3. **Readiness is proven by the gate, not by "the file opened".** The backend runs the real import gate after every answer that changes the file; the wizard shows the gate's own verdict lines and counts (`imported`, `quarantined`, `0 skipped`, source language, resolved languages). Any error = «не готово», with the row.
 
-## 1. Amendments to the binding product rules of the first prompt
+### 1. Amendments to the binding product rules of the first prompt
 
 - **Rule 7 (languages)** becomes: languages are configured once, in the wizard, from *(a)* the language columns found in the kit, pre-selected, plus *(b)* the studio preset chips. Every later upload is translated into all project languages.
 - **Rule 8 (source language)** becomes: the source language is the **producer's explicit choice between `ru` and `en`**, asked once with both options' consequences; it is never derived from column order, fill, file name or text quality. The backend places the chosen language as the first language column when it writes the import file. If the kit contradicts the choice (the chosen column is absent or sparse), the wizard stops with the evidence and asks again. After «Сделать локализацию» the source language is immutable — the wizard says so on the question and on the summary.
@@ -44,7 +44,7 @@ Until now the studio ran the same setup through four expert checklists (agent "s
 - **New rule 14 (Character vs Explanation).** A kit may carry two kinds of context: `Character` — the speaker's name, one word — and `Explanation` — usage context a translator cannot see in the string. They reach different destinations in the backend; the wizard shows them as two distinct columns and never merges them. Both columns exist in the import file even when empty.
 - **New rule 15 (profile answers are judge ground truth).** Register, profanity policy and CJK politeness answers feed the prompts read by both the translator model and the LLM judge. Changing them later invalidates the judge's cached verdicts (a re-check costs money). The settings screen says so before the producer edits them.
 
-## 2. Wizard shell
+### 2. Wizard shell
 
 Route `/projects/{slug}/localize`, opened only from the empty-project screen («Загрузить лок-кит»). Full page inside the project shell; breadcrumb `Проекты / {проект} / Сделать локализацию`. Left progress rail with 8 steps; a step becomes clickable once reached; steps 5 and 7 show «пропущено» when skipped. «Назад» / «Далее» at the bottom of every step; «Отмена» (tertiary) returns to the empty-project screen and deletes the draft upload. Draft state persists server-side (`uploads/{id}`), so a reload returns to the current step. Every step has: default, loading («Анализируем…» with the sub-steps listed), a *stop-and-ask* state where applicable, an error state, and an «изменение позже» note when the decision is irreversible.
 
@@ -59,15 +59,16 @@ Steps:
 7. Глоссарий *(recommended, skippable)*
 8. Проверка и запуск
 
-## 3. Steps — questions, evidence, states
+### 3. Steps — questions, evidence, states
 
-### Step 1 «Лок-кит»
+#### Step 1 «Лок-кит»
 
 Drop zone (XLSX / CSV / TSV / TXT — «расширение не важно, формат определим по содержимому»). Link «Скачать шаблон лок-кита» (downloads a 13-row semicolon CSV with header `key;Character;ru;en;Explanation`; the two-sentence rule under the link: «`Character` — имя говорящего и ничего больше. `Explanation` — всё, чего переводчик не увидит в самой строке.»).
 
 **Loading:** the drop zone morphs into an analysis card listing sub-steps as they complete: «Кодировка и формат» → «Колонки» → «Языки» → «Ключи и дубликаты» → «Проверка импортом». 2–6 s in mock.
 
 **Result card «Что мы нашли»** (read-only summary; decisions come on the next steps):
+
 - Формат: «XLSX, лист "Strings", 3 864 строки» / «TSV UTF-16LE с BOM» / «CSV, разделитель ";"».
 - Колонки: chips in file order with the detected role under each: ключ · говорящий · служебная · язык `ru` · язык `en` · … · пояснение.
 - Языки: found language columns with fill %: «ru 100 % · en 97 % · de 96 % · Portugal 96 % (уточним вариант) · tr 2 % (уточним, язык ли это)».
@@ -75,12 +76,13 @@ Drop zone (XLSX / CSV / TSV / TXT — «расширение не важно, ф
 - Заголовки, которые переписали: «Russian → ru, English → en» (old → new mapping; the producer's own vocabulary).
 
 **Stop states (no «Далее» until resolved):**
+
 - Файл не читается (unknown encoding, encrypted, binary): «Не удалось прочитать файл. Пришлите экспорт в CSV/TSV/XLSX или опишите формат.» Never a partial parse.
 - Книга с несколькими листами строк: «В книге N листов. Одна загрузка создаёт один компонент — выберите лист» (sheet radio list with row counts; the other sheets can become components in step 5).
 - Нет колонки ключа: «Не нашли колонку ключа. Укажите её» (column picker).
 - Нет ни одной языковой колонки: stop with the header row shown and the hint that headers must be codes (`ru`, `zh-Hans`) or «Название(код)».
 
-### Step 2 «Исходный язык»
+#### Step 2 «Исходный язык»
 
 Verbatim question, then the two options as two equal cards (no pre-selection, no «recommended»):
 
@@ -97,25 +99,28 @@ Secondary question on the same screen, below a divider: «**Язык поясн�
 
 **Stop state — kit contradicts the choice:** when the chosen language's column is absent or filled under the threshold: alert-warning «Вы выбрали английский как исходный, но колонка `en` заполнена на 41 % (1 584 из 3 864 строк) — как оригинал она не годится. Показать пустые строки». Buttons: «Выбрать русский» / «Загрузить другой кит». The wizard never proceeds with an inferred source.
 
-### Step 3 «Языки»
+#### Step 3 «Языки»
 
 «**На какие языки делаем переводы?**» — a language picker:
+
 - Section «Есть в ките» — chips for every language column found, pre-selected, each with fill %: «en 97 %», «de 96 %». Cannot remove the source.
 - Section «Пресет студии» — the remaining preset languages (`en, de, fr, es, pt_BR, tr, ja, ko, zh_Hans`, minus those already present), unselected; «Добавить все».
 - Search «Другой язык…» over the platform's language list (codes + Russian names).
 
 Resolution sub-cards appear only when the file needs a decision (verbatim rules from the checklist):
+
 - **Неоднозначный заголовок.** «Колонка `Portugal`: это португальский Португалии (`pt`) или Бразилии (`pt_BR`)?» / «Колонка `Chinese`: упрощённый (`zh_Hans`) или традиционный (`zh_Hant`)?» Radio with a note: «Смешанная лексика внутри колонки — признак неровного перевода, а не варианта; мы не угадываем по словарю.» No default is applied silently; «Далее» is disabled until answered.
 - **Редкая колонка.** «Колонка `tr` заполнена в 2 % строк (77 из 3 864). Это язык или остатки вставки?» Options: «Язык — импортировать как есть» / «Не язык — не импортировать». Explain: «Колонки, заполненные меньше чем на 5 %, по умолчанию не импортируются.»
 - **`Id` как язык.** «Колонка `Id`: это индонезийский язык или служебный идентификатор?» Options: «Индонезийский (`id`)» / «Служебная колонка» (then handled in step 4).
 
 Footer line: «Каждая загрузка в этот проект будет переводиться на выбранные языки; добавить язык позже можно в настройках.»
 
-### Step 4 «Структура кита»
+#### Step 4 «Структура кита»
 
 Table of the kit's non-language columns, one row each: header (as in file) → role select → what happens with it. Roles: «Ключ» (exactly one, required), «Говорящий (Character)», «Пояснение (Explanation)», «Комментарий для переводчика» (Comment/Context/Note → developer note), «Служебная колонка». For a service column, a second select: «Оставить значения» / «Оставить пустой» / «Не импортировать»; a language-shaped header (`Id`) is renamed automatically to a descriptive name («Unity legacy ID») and the rename is shown. A column literally named `flags` / `weblate-flags` / `флаги` shows alert-warning «Колонка с таким именем не импортируется как флаги — переименуйте её или оставьте служебной».
 
 Below, the identity audit as a read-only card with counts per reason and «Показать» (side sheet of the rows):
+
 - «Точные дубликаты: 9 — оставим первую копию, остальные в карантин»
 - «Один ключ, разные тексты: 3 — в карантин до уточнения от разработчиков»
 - «Пустой ключ: 5 — в карантин»
@@ -126,7 +131,7 @@ One question, with the checklist's recommendation pre-selected: «**Как по�
 
 Gate result card at the bottom, re-run after every change on this step: «Проверка импортом: готово · 3 830 строк · 0 пропущено · исходный ru · языки en, de, fr, pt_BR, tr, ja, ko, zh_Hans · пояснения: 412 строк» or «не готово» with the offending row and reason. Warnings that are *content questions*, not defects, are listed as questions for step 7: «`Dead Shell` одинаков во всех языках — это название, которое не переводится?» (they become glossary exception proposals).
 
-### Step 5 «Компоненты» (optional)
+#### Step 5 «Компоненты» (optional)
 
 Question: «**Один компонент или разделить лок-кит на несколько?**» Two cards: «Один компонент (по умолчанию)» / «Разделить — например UI, Диалоги, Обучение». Choosing «Разделить» opens the split editor:
 
@@ -138,7 +143,7 @@ Question: «**Один компонент или разделить лок-ки�
 
 Note under the step: «Все компоненты получают одинаковые колонки и один исходный язык.»
 
-### Step 6 «Профиль проекта»
+#### Step 6 «Профиль проекта»
 
 This step yields the three prompt fields (`persona`, `style`, `language_instructions`) on the backend. The producer never sees the prompts here; they see their answers and a human summary. Layout: left column — questions; right column — evidence card **«Что мы измерили в ките»** (from the backend's text analysis): «3 864 строки · 61 % короткие подписи (≤ 20 символов) · 744 реплики диалогов · разметка: `<color>` 212, `<b>` 40, `<sprite>` 8 · плейсхолдеры `{0}` 590, `%KEY%` 33 · разделитель `$` 1 102 · буквальный `\n` 0 · строк с `.`/`!`/`?` на конце 38 % · пояснения заполнены в 11 %» plus 3 sample rows each of UI label / tooltip with placeholder / dialogue line. A muted footer: «Профиль составляется только из этих измерений и ваших ответов — ничего не выдумываем.»
 
@@ -155,7 +160,7 @@ Answered → «Далее» shows the **summary card «Профиль проек
 
 **States:** БДХК search loading / no results / card without B or C blocks («В карточке нет блоков "бриф" и "голос и стиль" — ответьте на вопросы ниже»); evidence card loading skeleton; «Пропустить» on questions 2–5 is *not* offered — these are the judge's ground truth; the questionnaire in Q1 keeps «Пропустить» (studio default profile).
 
-### Step 7 «Глоссарий» (recommended, skippable)
+#### Step 7 «Глоссарий» (recommended, skippable)
 
 Alert-info at top: «Глоссарий заметно повышает качество перевода — рекомендуем заполнить. Термины уезжают в модель вместе с каждым запросом.» «Пропустить» is a visible secondary button on every sub-screen; skipping keeps every candidate available later on the «Глоссарий» page.
 
@@ -164,6 +169,7 @@ Alert-info at top: «Глоссарий заметно повышает каче
 7b. **Что считаем термином?** Verbatim: «Включаем названия предметов, персонажей и мест, а также повторяющиеся игровые понятия? Обычные кнопки и целые реплики не включаем.» Checkboxes, first four on: «Предметы и ресурсы» / «Персонажи» / «Места и локации» / «Повторяющиеся игровые понятия (валюты, режимы, фракции)» / off: «Названия кнопок и меню» / «Целые реплики». Note: «Количество терминов увидите после извлечения — заранее не обещаем.»
 
 7c. **Кандидаты из лок-кита** (backend extraction; shows a loading state «Извлекаем термины…»). Table: term (source) · где встречается («в 42 строках», 3 sample keys on hover) · переводы из кита (per selected language, from existing columns; empty stays empty — «мы не переводим пустые ячейки») · пояснение (one Russian line proposed by the backend, editable) · «Добавить». Header: «Добавить все (N)», filter by category, search. Sub-sections:
+
 - **Спорные** — one source term with divergent translations across the kit («`Крепость`: en `Keep` (38 строк) / `Fortress` (6 строк)») — radio to pick the one that goes into the flat glossary; cannot be added until decided.
 - **Вопросы из проверки** — from the step-4 warnings: «`Dead Shell` одинаков во всех языках. Это название, которое не переводится?» → «Да, не переводить» (creates an exception proposal, 7d) / «Нет, обычный термин» / «Не термин».
 
@@ -183,21 +189,21 @@ Prototype contract addition: extraction starts through `POST projects/{slug}/glo
 
 **Summary** of the step: «Глоссарий: 84 термина · 9 языков · особых правил: 3 одобрено, 1 отклонено · будет создан как компонент "Глоссарий"». Terms are added only; existing terms are never overwritten.
 
-### Step 8 «Проверка и запуск»
+#### Step 8 «Проверка и запуск»
 
 One summary card per step with «Изменить»: Лок-кит (file, rows imported/quarantined, gate verdict) · Исходный язык (with the lock icon and «не изменится после запуска») · Языки (chips) · Структура (roles, service columns, duplicates policy) · Компоненты (one, or the rule + counts identity) · Профиль (the human summary) · Глоссарий (counts, or «пропущен — заполните позже на странице Глоссарий»). Estimate card: «Перевод ≈ 3 830 строк × 8 языков · ≈ $12 · ≈ 20 мин» (translation estimate; the judge is not part of this run). Primary «Сделать локализацию». States: submitting (button spinner, whole page inert), server validation error per step (link to the step), success → run card of run #1 (stages: Импорт → Языки → Глоссарий → Перевод → Проверки).
 
-## 4. After the wizard
+### 4. After the wizard
 
 - **Настройки проекта → Профиль проекта** shows the step-6 answers with «Изменить»; saving shows a confirmation dialog: «Изменение профиля обновит промпты переводчика и судьи и обнулит кэш вердиктов судьи — следующая проверка качества будет платной для всех строк. Продолжить?».
 - **Глоссарий page** gains the same 7c/7d cards (candidates list and exception review), so a skipped step is completed later without the wizard.
 - **Загрузить → Лок-кит** (repeat uploads) reuses step 1 + step 4's audit card and the diff card from prompt 1; source language and column roles are shown read-only («настроено при первой локализации»); a new language column in the kit triggers the step-3 resolution sub-cards inline.
 
-## 5. API — additions to the closed list
+### 5. API — additions to the closed list
 
 Same rules as before: `src/api/client.ts` is the only module that knows URLs; mock fixtures; no other routes.
 
-```
+```text
 POST   projects/{slug}/uploads/                 (as before) → UploadAnalysis
 GET    uploads/{id}/                             → UploadAnalysis
 PATCH  uploads/{id}/                             {source_language?, explanation_language?, languages?: [{code, include: bool, resolved_as?: code}],
@@ -224,7 +230,7 @@ PATCH  projects/{slug}/profile/                  {answers} → {answers, summary
 
 `UploadAnalysis` = `{id, format: {kind, encoding, delimiter?, sheet?, sheets?}, columns: [{header, role, language?, fill, renamed_to?, ambiguous?: [codes], low_fill?: bool}], header_map: [{from, to}], rows: {total, importable, quarantined_by_reason: {}, empty_targets}, source_language?, source_conflict?: {chosen, fill, rows}, gate: {ready, imported, skipped, source, languages[], explanations, errors: [{row, reason}], questions: [{term, kind}]}, split?: {components: [{name, rows, gate}], quarantine, identity: "3864 = 3453 + 274 + 120 + 17"}}`.
 
-## 6. Fixtures to add
+### 6. Fixtures to add
 
 - **«Новый проект» + `pirate-ships.xlsx`** (the happy path with every decision reachable): 3 864 rows; headers `key;Id;Character;Russian;English;de;Portugal;tr;ja;ko;Chinese;Explanation` → mapping `Russian→ru`, `English→en`; `Portugal` ambiguous, `Chinese` ambiguous, `Id` language-shaped service column, `tr` at 2 % fill; quarantine 17 empty-all + 12 duplicates (9 exact, 3 conflicting) + 5 empty key; key families `dialog_text_` 388, `dialog_character_` 96, `tutorial_` 120, `mission_` 1 045, residue UI; substring trap 93; ambiguity family `mission_descr_complete_tutorial` (14); text evidence as in step 6; glossary candidates 84 with 2 disputed (`Крепость`, `Осколок`), 3 questions (`Dead Shell`, `xray m2`, `+50% HP`); exception proposals 4.
 - **`utf16-engine-export.txt`** — a UTF-16LE TSV with BOM whose extension lies; analysis succeeds and says so.
@@ -234,7 +240,7 @@ PATCH  projects/{slug}/profile/                  {answers} → {answers, summary
 - **`glossary-en-first.csv`** — glossary table with `en` first while the project source is `ru` → step-7a stop state.
 - Existing project fixtures («Pirate Ships» localized) gain `profile` answers and a settings screen state with the judge-cache warning.
 
-## 7. What to deliver in this iteration
+### 7. What to deliver in this iteration
 
 1. Replace the «Мастер в разработке» stub with the full 8-step wizard, every step in every state listed above (default, loading, stop-and-ask, error, irreversible note), reachable from the fixtures in §6 without editing code.
 2. Add every new state to `/dev/states`, grouped by step.

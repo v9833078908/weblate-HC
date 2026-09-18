@@ -72,10 +72,8 @@ def get(url: str, api: str) -> dict | list:
     if not url.startswith(api):
         msg = f"refusing to fetch outside {api}: {url}"
         raise ValueError(msg)
-    request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage] - host checked above
-        url, headers={"Authorization": f"Token {TOKEN}"}
-    )
-    with urllib.request.urlopen(request, timeout=120) as response:  # ruff: ignore[suspicious-url-open-usage]
+    request = urllib.request.Request(url, headers={"Authorization": f"Token {TOKEN}"})
+    with urllib.request.urlopen(request, timeout=120) as response:
         return json.loads(response.read().decode())
 
 

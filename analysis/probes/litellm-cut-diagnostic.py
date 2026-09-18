@@ -4,11 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Every weblate import must follow django.setup(), so it cannot sit at the top.
-# ruff: file-ignore[module-import-not-at-top-of-file]
 #
 # The probe rebuilds the judge's exact payload from its own helpers, because a
 # diagnosis of production failures is only valid on the production payload.
-# ruff: file-ignore[private-member-access]
 
 """
 Name the failure that ends judge requests without an HTTP status.

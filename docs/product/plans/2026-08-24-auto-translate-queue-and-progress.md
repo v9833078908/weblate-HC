@@ -145,6 +145,7 @@ Contract, asserted by tests in Tasks 1 and 3:
 Runs first: it settles the mechanism dispute from evidence instead of inference, and it is the cheapest task here. `judge_loop.py` contains **zero** log statements; `judge.py` has one `LOGGER.exception` at `:294`. A 120 s timeout logs nothing, which is why 26 minutes of production silence looked identical to a hang.
 
 **Files:**
+
 - Modify: `weblate/trans/judge.py`
 - Modify: `weblate/trans/judge_loop.py`
 - Test: `weblate/trans/tests/test_judge_client.py`, `weblate/trans/tests/test_judge_loop.py`
@@ -192,21 +193,29 @@ Expected: `AssertionError: no logs of level INFO or higher triggered`.
 In `weblate/trans/judge.py`, wrap the `_post_batch` call site in the retry loop (`:492`) so every attempt records model, batch position, status and wall-clock duration:
 
 ```python
-            started = monotonic()
-            response = _post_batch(payload, model)
-            elapsed_ms = int((monotonic() - started) * 1000)
-            if response.payload is None or (
-                response.status_code is not None and response.status_code >= 400
-            ):
-                LOGGER.warning(
-                    "judge batch %d/%d failed: model=%s status=%s elapsed=%dms",
-                    position + 1, len(batches), model, response.status_code, elapsed_ms,
-                )
-            else:
-                LOGGER.info(
-                    "judge batch %d/%d ok: model=%s strings=%d elapsed=%dms",
-                    position + 1, len(batches), model, len(batch), elapsed_ms,
-                )
+started = monotonic()
+response = _post_batch(payload, model)
+elapsed_ms = int((monotonic() - started) * 1000)
+if response.payload is None or (
+    response.status_code is not None and response.status_code >= 400
+):
+    LOGGER.warning(
+        "judge batch %d/%d failed: model=%s status=%s elapsed=%dms",
+        position + 1,
+        len(batches),
+        model,
+        response.status_code,
+        elapsed_ms,
+    )
+else:
+    LOGGER.info(
+        "judge batch %d/%d ok: model=%s strings=%d elapsed=%dms",
+        position + 1,
+        len(batches),
+        model,
+        len(batch),
+        elapsed_ms,
+    )
 ```
 
 Add `from time import monotonic` and a module `LOGGER = logging.getLogger(__name__)` if absent.
@@ -218,17 +227,23 @@ This is the measurement that resolves the dispute: under the timeouts reading, p
 In `weblate/trans/judge_loop.py`, add a module logger and three statements - run start (after `run_id` is assigned at `:344`), seat completion (in the seat loop), and each repair attempt:
 
 ```python
-    LOGGER.info(
-        "judge run %s: %d strings, %d writable, %d cached",
-        run_id, len(units), len(writable_ids), len(cached_ids),
-    )
+LOGGER.info(
+    "judge run %s: %d strings, %d writable, %d cached",
+    run_id,
+    len(units),
+    len(writable_ids),
+    len(cached_ids),
+)
 ```
 
 ```python
-            LOGGER.info(
-                "judge run %s: seat %d done, %d strings judged with %s",
-                run_id, seat, len(request_units), model,
-            )
+LOGGER.info(
+    "judge run %s: seat %d done, %d strings judged with %s",
+    run_id,
+    seat,
+    len(request_units),
+    model,
+)
 ```
 
 These are operational messages, not user-facing strings, so they are not wrapped in `gettext` - consistent with the audit/add-on log convention in `AGENTS.md`.
@@ -246,6 +261,7 @@ git commit -m "feat(judge): log every batch request outcome, model and duration"
 ## Task 2: Bound one judge batch request by a total deadline
 
 **Files:**
+
 - Modify: `weblate/utils/requests.py`, `weblate/utils/tests/test_requests.py`
 - Modify: `weblate/trans/defaults.py`, `weblate/settings_docker.py`, `weblate/settings_example.py`
 - Modify: `weblate/trans/judge.py`, `weblate/trans/tests/test_judge_client.py`
@@ -284,7 +300,7 @@ def stream_validated_url(
     allow_private_targets: bool = False,
     private_allowlist: list[str] | tuple[str, ...] = (),
     **kwargs,
-) -> Generator[httpx2.Response, None, None]:
+) -> Generator[httpx2.Response, None, None]: ...
 ```
 
 It delegates to `_open_url()` with `RuntimeRedirectValidators`, mirroring how `fetch_validated_url()` builds validators. It never calls `raise_for_status()`: the judge inspects `status_code` itself. Do not change `fetch_validated_url()`; other callers keep the buffered path.
@@ -316,7 +332,7 @@ deadline = monotonic() + settings.JUDGE_REQUEST_DEADLINE
 with stream_validated_url(
     "POST",
     OPENROUTER_CHAT_COMPLETIONS_URL,
-    headers={...},           # built inline, unchanged
+    headers={...},  # built inline, unchanged
     json=payload,
     timeout=JUDGE_REQUEST_TIMEOUT,
     follow_redirects=False,
@@ -347,6 +363,7 @@ git commit -m "feat(judge): bound a batch request by a total wall-clock deadline
 This creates the seam. `run_judge_batch()` calls `request_verdicts()` for a whole seat (`judge_loop.py:387`) and writes only afterwards (`judge_loop.py:393-397`), so killing the task discards every completed batch of the seat in flight. In the incident that was 47 batches, ~235 paid answers, $0.018 - at the 2000-string cap it is a whole seat.
 
 **Files:**
+
 - Modify: `weblate/trans/judge.py` (add `on_batch` to `request_verdicts`)
 - Modify: `weblate/trans/judge_loop.py` (write per batch)
 - Test: `weblate/trans/tests/test_judge_client.py`, `weblate/trans/tests/test_judge_loop.py`
@@ -405,29 +422,29 @@ Call it after the batch's results are appended at `judge.py:505` and before the 
 Add the same `on_batch` parameter to `run_judge_batch`. Replace the post-loop `transaction.atomic()` block at `judge_loop.py:393-397` with a per-batch writer that relies on the documented input-order guarantee:
 
 ```python
-            cursor = 0
+cursor = 0
 
-            def persist(batch_requests, batch_results) -> None:
-                nonlocal cursor
-                batch_units = request_units[cursor : cursor + len(batch_requests)]
-                cursor += len(batch_requests)
-                with transaction.atomic():
-                    for unit, request, result in zip(
-                        batch_units, batch_requests, batch_results, strict=True
-                    ):
-                        _write_verdict(
-                            unit, request, seat, attempt, run_id, result, model
-                        )
-                if on_batch is not None:
-                    on_batch(batch_requests, batch_results)
 
-            results = request_verdicts(
-                requests,
-                model=model,
-                project_slug=project_slug,
-                project_context=project_context,
-                on_batch=persist,
-            )
+def persist(batch_requests, batch_results) -> None:
+    nonlocal cursor
+    batch_units = request_units[cursor : cursor + len(batch_requests)]
+    cursor += len(batch_requests)
+    with transaction.atomic():
+        for unit, request, result in zip(
+            batch_units, batch_requests, batch_results, strict=True
+        ):
+            _write_verdict(unit, request, seat, attempt, run_id, result, model)
+    if on_batch is not None:
+        on_batch(batch_requests, batch_results)
+
+
+results = request_verdicts(
+    requests,
+    model=model,
+    project_slug=project_slug,
+    project_context=project_context,
+    on_batch=persist,
+)
 ```
 
 `persist` is called synchronously inside the iteration, so capturing `seat`, `model` and `attempt` from the enclosing loop is correct. Delete the old post-loop write; leaving both double-writes every verdict.
@@ -476,6 +493,7 @@ low + (high - low) * current // progress_steps
 The bar collapses from 100% to 0% and crawls up again - worse for the producer than today's freeze. A test that watches only judge-phase ticks sees `5, 10, 15, ...`, which is sorted, and passes against the bug.
 
 **Files:**
+
 - Modify: `weblate/trans/autotranslate.py` (`process_judge`)
 - Test: `weblate/trans/tests/test_judge_autotranslate.py`
 
@@ -526,13 +544,13 @@ Also assert the slice boundary directly, matching Plan 02 Task 6's convention: s
 In `process_judge`, compute the split once before phase 1, give phase 1 the first tenth, and restore the original range at the end:
 
 ```python
-        # set_progress has no clamp; monotonicity comes from non-overlapping
-        # ranges (autotranslate.py:290-292). Phase 2 restarts its counter, so
-        # sharing one range would send the bar backwards. The judge phase is
-        # two LLM calls per string against MT's one batch fetch, so it takes
-        # nine tenths of the bar.
-        base_low, base_high = self.progress_range
-        split = base_low + (base_high - base_low) // 10
+# set_progress has no clamp; monotonicity comes from non-overlapping
+# ranges (autotranslate.py:290-292). Phase 2 restarts its counter, so
+# sharing one range would send the bar backwards. The judge phase is
+# two LLM calls per string against MT's one batch fetch, so it takes
+# nine tenths of the bar.
+base_low, base_high = self.progress_range
+split = base_low + (base_high - base_low) // 10
 ```
 
 Phase 1 (`:764-771`) runs with `self.progress_range = (base_low, split)`, restored in the existing `finally` alongside `unit_ids` and `target_state`.
@@ -540,22 +558,24 @@ Phase 1 (`:764-771`) runs with `self.progress_range = (base_low, split)`, restor
 Phase 2 runs with `(split, base_high)`:
 
 ```python
-        judged = 0
+judged = 0
 
-        def tick(_requests, _results) -> None:
-            nonlocal judged
-            judged += len(_results)
-            # Repair attempts re-judge units, so ticks can exceed the estimate.
-            self.set_progress(min(judged, self.progress_steps))
 
-        self.progress_range = (split, base_high)
-        self.progress_steps = len(units) * len(JUDGE_SEATS)
-        try:
-            verdicts = run_judge_batch(
-                units, writable_ids=writable_ids, user=self.user, on_batch=tick
-            )
-        finally:
-            self.progress_range = (base_low, base_high)
+def tick(_requests, _results) -> None:
+    nonlocal judged
+    judged += len(_results)
+    # Repair attempts re-judge units, so ticks can exceed the estimate.
+    self.set_progress(min(judged, self.progress_steps))
+
+
+self.progress_range = (split, base_high)
+self.progress_steps = len(units) * len(JUDGE_SEATS)
+try:
+    verdicts = run_judge_batch(
+        units, writable_ids=writable_ids, user=self.user, on_batch=tick
+    )
+finally:
+    self.progress_range = (base_low, base_high)
 ```
 
 Define `JUDGE_SEATS = (1, 2)` next to the other module constants in `weblate/trans/judge.py` and import it in `judge_loop.py` (which already imports from `judge`) and in `autotranslate.py` (which already imports `JudgeError` from `judge` at `:24`), rather than hardcoding `2` in two files. Do **not** define it in `judge_loop.py`: nothing in `judge.py` may import from `judge_loop` (the dependency direction is `judge_loop -> judge`), so a constant living in `judge_loop` could never be shared without an import cycle. The seat loop in `run_judge_batch` iterates `JUDGE_SEATS` instead of its literal. The `min(...)` clamp is required: a repair attempt re-judges units, and without it `judged` can exceed `progress_steps` and push the reported percentage past `base_high`. Cached units skip a seat (`judge_loop.py:384-385`) so the total can also undershoot; the bar then stops short of `base_high`, which is monotonic and acceptable.
@@ -582,6 +602,7 @@ git commit -m "feat(judge): report progress during the judge phase"
 Per HTML5 parsing a nested `<form>` start tag is ignored but its `</form>` closes the outer form, orphaning the Apply button. Production POSTs demonstrably succeed, so **do not assume the bug is real.** Measure first; if the test passes, delete it and skip Task 6.
 
 **Files:**
+
 - Test: `weblate/trans/tests/test_autotranslate.py` (append)
 
 ### Step 1: Write the test
@@ -642,6 +663,7 @@ git commit -m "test(trans): assert the automatic translation form is not nested"
 **Files:** Modify `weblate/trans/forms.py:1352`
 
 ### Step 1: Apply the fix
+<!--- skip doccmd[all]: next --><!-- FormHelper excerpt fragment, not standalone code -->
 
 ```python
         self.helper = FormHelper(self)
@@ -689,8 +711,13 @@ class AutoTranslateQueueMessageTest(ViewTestCase):
                     "auto_translation",
                     kwargs={"path": self.translation.get_url_path()},
                 ),
-                {"mode": "translate", "q": "state:empty", "auto_source": "mt",
-                 "engines": ["weblate"], "threshold": 80},
+                {
+                    "mode": "translate",
+                    "q": "state:empty",
+                    "auto_source": "mt",
+                    "engines": ["weblate"],
+                    "threshold": 80,
+                },
                 follow=True,
             )
         messages = [str(m) for m in response.context["messages"]]
@@ -713,17 +740,16 @@ from weblate.utils.celery import get_queue_length
 ```
 
 ```python
-        queued_ahead = get_queue_length("translate")
-        if queued_ahead > 1:
-            message = ngettext(
-                "Automatic translation queued: %d run is ahead of it. "
-                "You can close this page.",
-                "Automatic translation queued: %d runs are ahead of it. "
-                "You can close this page.",
-                queued_ahead - 1,
-            ) % (queued_ahead - 1)
-        else:
-            message = gettext("Automatic translation in progress")
+queued_ahead = get_queue_length("translate")
+if queued_ahead > 1:
+    message = ngettext(
+        "Automatic translation queued: %d run is ahead of it. You can close this page.",
+        "Automatic translation queued: %d runs are ahead of it. "
+        "You can close this page.",
+        queued_ahead - 1,
+    ) % (queued_ahead - 1)
+else:
+    message = gettext("Automatic translation in progress")
 ```
 
 `get_queue_length` counts messages waiting, so the run just enqueued is included - hence `queued_ahead - 1`. It does not count the task a worker already holds, so this under-reports by one while a run executes; still strictly more honest than the current text. Ensure `ngettext` is imported.
@@ -791,14 +817,13 @@ class AutoTranslateDurabilityTest(SimpleTestCase):
 
         options = settings.CELERY_BROKER_TRANSPORT_OPTIONS
         self.assertGreaterEqual(options.get("visibility_timeout", 0), 4 * 3600)
-        self.assertEqual(
-            settings.CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS, options
-        )
+        self.assertEqual(settings.CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS, options)
 ```
 
 ### Step 2: Prove RED, then add the flags
 
 At `weblate/trans/tasks.py:965`, and identically at `:1066`:
+<!--- skip doccmd[all]: next --><!-- decorator stub only, no function body in excerpt -->
 
 ```python
 @app.task(

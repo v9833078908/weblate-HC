@@ -64,6 +64,9 @@ class ComponentSpreadsheetImportDraft(models.Model):
         app_label = "trans"
         ordering = ("-created_at",)
 
+    def __str__(self) -> str:
+        return f"{self.component}: {self.owner} ({str(self.token)[:8]})"
+
     def save(self, *args, **kwargs) -> None:
         if not self.expires_at:
             self.expires_at = timezone.now() + timedelta(

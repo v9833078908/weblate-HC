@@ -407,7 +407,15 @@ dictionary = "scripts/codespell.txt,-"
 # clitic literals in the COL4 mutation generator; sanity-check is used
 # across this codebase; nothink is the reasoning-off model suffix in the
 # LiteLLM judge smoke probe
-ignore-words-list = "assertIn,Vai,master,bloc,mis,nd,ons,te,sanity-check,nothink"
+# The bulk below is German/French/Spanish/Turkish/Portuguese/Indonesian
+# translation strings and in-game dialogue quoted in docs/probes/data
+# (lowercase entries cover all cases); ain't/wanna/gonna/outta are informal
+# contractions in quoted dialogue; ore/singed/stings/retuned/slave are real
+# English words codespell mis-flags; ans is an "answers" variable in mock
+# frontend code; recal is the st2-zh-recal abbreviation; resourse is part of
+# a quoted translation key; pre-selected/whitelist are correct terms used
+# across this codebase
+ignore-words-list = "assertIn,Vai,master,bloc,mis,nd,ons,te,sanity-check,nothink,absolument,affaires,ain't,alle,als,ans,apparence,archiv,attribue,attribut,avare,bu,bulle,clases,cliente,commun,deines,diable,egal,elemen,elemente,entends,espace,espaces,exemple,fille,filles,fils,gonna,groupe,ist,juge,lern,momento,modul,moteur,nomes,objet,objets,oder,ore,outta,pase,ponctuation,pre-selected,recal,resourse,reste,retuned,sais,sie,singed,slave,stings,tage,toi,vas,vor,wanna,whitelist"
 skip = '*.po,*.pot,*.json,*.jsonl,*.tmx,*.tbx,*.csv,*.tsv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/product/measurements/2026-08-12-col4-judge-annotation.md,docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md'
 
 [tool.coverage.paths]
@@ -694,7 +702,31 @@ max-complexity = 16  # TODO: should be lower
 
 [tool.ruff.lint.per-file-ignores]
 # One-off operator scripts piped into `weblate shell`, not importable modules
-"analysis/probes/*.py" = ["C901", "INP001", "PLR0914", "T201"]
+"analysis/probes/*.py" = [
+  # The remaining rules are suppressed because fixing them would change the
+  # probes' runtime behavior: they fetch from known hosts via urllib, poke
+  # private weblate internals, assert sanity on live data, use deterministic
+  # RNGs, must import after django.setup(), write throwaway /tmp artifacts,
+  # or are deliberately loose about structure and types.
+  "ambiguous-variable-name",
+  "any-type",
+  "assert",
+  "C901",
+  "hardcoded-temp-file",
+  "INP001",
+  "missing-copyright-notice",
+  "module-import-not-at-top-of-file",
+  "PLR0914",
+  "private-member-access",
+  "start-process-with-partial-path",
+  "suspicious-non-cryptographic-random-usage",
+  "suspicious-subprocess-import",
+  "suspicious-url-open-usage",
+  "T201",
+  "too-many-positional-arguments",
+  "too-many-statements-in-try-clause",
+  "try-except-pass"
+]
 "ci/migrate-scripts/*.py" = ["INP001", "S101"]
 "docs/_ext/*.py" = ["INP001"]
 "docs/_ext/test_*.py" = ["S101"]
@@ -735,6 +767,24 @@ disable = [
 ]
 
 [tool.rumdl.per-file-ignores]
+# Translation measurement data: generated markdown dumps, inline HTML prompts
+"analysis/data/*" = ["MD024", "MD033"]
+# *Do*/*Don't* emphasis headings in the fork's console design doc
+"DESIGN.md" = ["MD036"]
+# MD036 (*Step N:* emphasis used as a heading) is a deliberate convention in
+# the fork's internal session plan/design/measurement docs, scoped out per
+# docs/product/plans/2026-08-23-prek-full-pass-remaining-hooks.md Task 5
+"docs/operations/audits/*" = ["MD036"]
+"docs/operations/plans/*" = ["MD036"]
+"docs/operations/reports/*" = ["MD036"]
+"docs/product/archive/*" = ["MD036"]
+"docs/product/designs/*" = ["MD036"]
+"docs/product/measurements/*" = ["MD036"]
+"docs/product/plans/*" = ["MD036"]
+"docs/product/research/*" = ["MD036"]
+"docs/product/reviews/*" = ["MD036"]
+# Generated wizard test-result dump
+"frontend-wizard/test_result.md" = ["MD024"]
 "fuzzing/corpus/markup/seed.md" = ["MD033"]
 "README.md" = [
   # Allow HTML
@@ -806,22 +856,84 @@ TranslatedStringNotificaton = "TranslatedStringNotificaton"
 Vai = "Vai"  # Language name
 
 [tool.typos.default.extend-words]
+absolument = "absolument"  # French "absolutely"
+affaires = "affaires"  # French "business/affairs"
+AIMD = "AIMD"  # Additive Increase Multiplicative Decrease rate control
+alle = "alle"  # German "all"
+als = "als"  # German "as"
+apparence = "apparence"  # French "appearance"
+attribue = "attribue"  # French verb "attributes"
+attribut = "attribut"  # French noun "attribute"
 # Name
 Automattic = "Automattic"
+avare = "avare"  # French "greedy"
 # ISO 639-1 language codes that read as misspellings
 ba = "ba"  # Bashkir
 billling = "billing"
+certains = "certains"  # French "some"
 Certifi = "Certifi"
+clase = "clase"  # Spanish "class"
+clases = "clases"  # Spanish "classes"
+cliente = "cliente"  # Spanish "client"
+commandes = "commandes"  # French "commands"
 # Used in settings, but could be fixed
 COMMITER = "COMMITER"  # codespell:ignore
+commun = "commun"  # French "common"
+Compagnons = "Compagnons"  # French "companions"
+cose = "cose"  # Italian phrase in an LQA example
+criticals = "criticals"  # plural noun for judge verdict severity
+deines = "deines"  # German "yours"
+diable = "diable"  # French "devil"
+ein = "ein"  # German article
+elemen = "elemen"  # Indonesian "element"
+Elemente = "Elemente"  # German "elements"
+entends = "entends"  # French "hear"
+Espace = "Espace"  # French "space"
+exemple = "exemple"  # French "example"
+fille = "fille"  # French "girl"
+filles = "filles"  # French "girls"
+fils = "fils"  # French "son"
+futur = "futur"  # French "future"
+groupe = "groupe"  # French "group"
 hasttr = "hasattr"
-# English prefix, as in "mis-inflected"
-mis = "mis"
+impropre = "impropre"  # French "unfit"
+ist = "ist"  # German "is"
+iz = "iz"  # camelCase fragment of quoted translation-unit IDs
+juge = "juge"  # French "judge"
+legendaris = "legendaris"  # Indonesian "legendary"
+lern = "lern"  # German "learn" in quoted translation data
+maintenant = "maintenant"  # French "now"
+mis = "mis"  # English prefix, as in "mis-inflected"
+Modifikation = "Modifikation"  # German "modification"
+Modul = "Modul"  # German "module"
+momento = "momento"  # Spanish "moment"
+moteur = "moteur"  # French "engine"
+nd = "nd"  # ordinal-suffix branch of \b\d+(?:st|nd|rd|th)\b in checks.py
+objet = "objet"  # French "object"
+objets = "objets"  # French "objects"
+oder = "oder"  # German "or"
 # Open Document Format acronym
 ODF = "ODF"
+pase = "pase"  # Spanish "pass"
+pn = "pn"  # camelCase fragment of quoted translation-unit IDs
+ponctuation = "ponctuation"  # French "punctuation"
+Proceder = "Proceder"  # Spanish "to proceed"
+recal = "recal"  # st2-zh-recal output-dir abbreviation
+resourse = "resourse"  # part of quoted translation key description_resourse_*
+reste = "reste"  # French "remains"
+sais = "sais"  # French "know"
+seconde = "seconde"  # French in-game duration string
+Sie = "Sie"  # German pronoun
+sur = "sur"  # French "on"
+Tage = "Tage"  # German "days"
+tak = "tak"  # Polish "yes!" / Indonesian negation in quoted targets
+toi = "toi"  # French "you"
+vas = "vas"  # French "go"
+vor = "vor"  # German "before"
 # Often misspelled Weblate variants
 webalte = "Weblate"  # codespell:ignore
-webplate = "Weblate"
+# LiteLLM API key `localizer-webplate` deliberately uses this spelling
+webplate = "webplate"
 welbate = "Weblate"
 
 [tool.typos.files]
@@ -829,15 +941,16 @@ extend-exclude = [
   "**.map",
   "**.po",
   "**.pot",
-  "analysis/data/autofix-backfill-*.json",
-  "analysis/data/col4-*.json",
-  "analysis/data/col4-*.jsonl",
-  "analysis/data/glossary-drift-interaction-*",
-  "analysis/data/hub1-remediation-2026-08-25/glossary",
+  # Translation measurement data is not product (AGENTS.md)
+  "analysis/data/**",
+  # One-off analysis probes quoting translated strings
+  "analysis/probes/**",
   "docs/changes/contributors",
   "docs/product/measurements/2026-08-12-col4-judge-annotation.md",
   "docs/product/measurements/2026-09-04-glossary-morphology-vs-repeat-drift.md",
   "docs/specs",
+  # Mock translation fixtures for the frontend wizard
+  "frontend-wizard/src/api/mock/fixtures/**",
   "scripts/codespell.txt",
   "scripts/spdx-license-list",
   "weblate/static/js/vendor",

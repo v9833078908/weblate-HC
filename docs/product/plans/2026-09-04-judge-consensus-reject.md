@@ -157,76 +157,72 @@ of the file (after `active_verdict`) and `override_settings` from
 `django.test`:
 
 ```python
-    def test_a_disputed_critical_is_only_a_flag(self) -> None:
-        # Consensus REJECT: one seat's critical against the other seat's
-        # lower grade holds nothing. The row is still the critical seat's
-        # (its errors are the evidence), but the round reads as major.
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "none", seat=1, run_id=run)
-        strict = self.make(unit, "critical", seat=2, run_id=run)
-        verdict = active_verdict(unit)
-        assert verdict is not None
-        self.assertEqual(verdict.pk, strict.pk)
-        self.assertEqual(verdict.max_severity, "critical")
-        self.assertEqual(verdict.effective_severity, "major")
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+def test_a_disputed_critical_is_only_a_flag(self) -> None:
+    # Consensus REJECT: one seat's critical against the other seat's
+    # lower grade holds nothing. The row is still the critical seat's
+    # (its errors are the evidence), but the round reads as major.
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "none", seat=1, run_id=run)
+    strict = self.make(unit, "critical", seat=2, run_id=run)
+    verdict = active_verdict(unit)
+    assert verdict is not None
+    self.assertEqual(verdict.pk, strict.pk)
+    self.assertEqual(verdict.max_severity, "critical")
+    self.assertEqual(verdict.effective_severity, "major")
+    self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
 
-    def test_two_critical_seats_still_reject(self) -> None:
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "critical", seat=1, run_id=run)
-        self.make(unit, "critical", seat=2, run_id=run)
-        verdict = active_verdict(unit)
-        assert verdict is not None
-        self.assertEqual(verdict.effective_severity, "critical")
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
-    def test_a_lone_parsed_critical_seat_rejects(self) -> None:
-        # One voice and nobody disagreeing: not a disputed critical.
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "critical", seat=1, run_id=run)
-        verdict = active_verdict(unit)
-        assert verdict is not None
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+def test_two_critical_seats_still_reject(self) -> None:
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "critical", seat=1, run_id=run)
+    self.make(unit, "critical", seat=2, run_id=run)
+    verdict = active_verdict(unit)
+    assert verdict is not None
+    self.assertEqual(verdict.effective_severity, "critical")
+    self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
-    def test_collegium_severity_is_pure(self) -> None:
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        rows = [
-            self.make(unit, "major", seat=1, run_id=run),
-            self.make(unit, "critical", seat=2, run_id=run),
-        ]
-        self.assertEqual(
-            collegium_severity(rows, consensus_reject=True), "major"
-        )
-        self.assertEqual(
-            collegium_severity(rows, consensus_reject=False), "critical"
-        )
-        self.assertEqual(
-            collegium_severity([rows[1]], consensus_reject=True), "critical"
-        )
-        self.assertEqual(
-            collegium_severity([rows[0]], consensus_reject=True), "major"
-        )
-        self.assertIsNone(collegium_severity([], consensus_reject=True))
 
-    def test_a_row_read_outside_the_collegium_keeps_its_own_severity(self) -> None:
-        # The transient stamp is the whole footgun of this design: a row
-        # re-fetched from the database stands only for itself. Pin both
-        # halves on the same disputed round, so a regression in either
-        # direction fails here (resolve_verdict depends on this, Task 3).
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "minor", seat=1, run_id=run)
-        strict = self.make(unit, "critical", seat=2, run_id=run)
-        round_read = active_verdict(unit)
-        assert round_read is not None
-        self.assertEqual(round_read.verdict, JudgeVerdict.Verdict.FLAG)
-        row = JudgeVerdict.objects.get(pk=strict.pk)
-        self.assertEqual(row.effective_severity, "critical")
-        self.assertEqual(row.verdict, JudgeVerdict.Verdict.REJECT)
+def test_a_lone_parsed_critical_seat_rejects(self) -> None:
+    # One voice and nobody disagreeing: not a disputed critical.
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "critical", seat=1, run_id=run)
+    verdict = active_verdict(unit)
+    assert verdict is not None
+    self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+
+
+def test_collegium_severity_is_pure(self) -> None:
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    rows = [
+        self.make(unit, "major", seat=1, run_id=run),
+        self.make(unit, "critical", seat=2, run_id=run),
+    ]
+    self.assertEqual(collegium_severity(rows, consensus_reject=True), "major")
+    self.assertEqual(collegium_severity(rows, consensus_reject=False), "critical")
+    self.assertEqual(collegium_severity([rows[1]], consensus_reject=True), "critical")
+    self.assertEqual(collegium_severity([rows[0]], consensus_reject=True), "major")
+    self.assertIsNone(collegium_severity([], consensus_reject=True))
+
+
+def test_a_row_read_outside_the_collegium_keeps_its_own_severity(self) -> None:
+    # The transient stamp is the whole footgun of this design: a row
+    # re-fetched from the database stands only for itself. Pin both
+    # halves on the same disputed round, so a regression in either
+    # direction fails here (resolve_verdict depends on this, Task 3).
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "minor", seat=1, run_id=run)
+    strict = self.make(unit, "critical", seat=2, run_id=run)
+    round_read = active_verdict(unit)
+    assert round_read is not None
+    self.assertEqual(round_read.verdict, JudgeVerdict.Verdict.FLAG)
+    row = JudgeVerdict.objects.get(pk=strict.pk)
+    self.assertEqual(row.effective_severity, "critical")
+    self.assertEqual(row.verdict, JudgeVerdict.Verdict.REJECT)
 ```
 
 Add one paired rollback test for the first case:
@@ -249,16 +245,16 @@ Then change the existing `test_collegium_takes_the_strictest_seat` (line 204)
 so it no longer asserts the old rule:
 
 ```python
-    def test_collegium_takes_the_strictest_seat(self) -> None:
-        # Below critical the strictest seat is the round: major beats minor.
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "minor", seat=1, run_id=run)
-        self.make(unit, "major", seat=2, run_id=run)
-        verdict = active_verdict(unit)
-        assert verdict is not None
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
-        self.assertEqual(verdict.seat, 2)
+def test_collegium_takes_the_strictest_seat(self) -> None:
+    # Below critical the strictest seat is the round: major beats minor.
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "minor", seat=1, run_id=run)
+    self.make(unit, "major", seat=2, run_id=run)
+    verdict = active_verdict(unit)
+    assert verdict is not None
+    self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+    self.assertEqual(verdict.seat, 2)
 ```
 
 **Step 2: Run the tests to verify they fail**
@@ -295,30 +291,31 @@ In `weblate/trans/models/judge.py`, replace the `verdict` property
 (lines 803-813) with:
 
 ```python
-    @property
-    def effective_severity(self) -> str:
-        """
-        The severity this row stands for where it was read.
+@property
+def effective_severity(self) -> str:
+    """
+    The severity this row stands for where it was read.
 
-        A row returned by ``collegium_verdict`` carries the round's
-        severity (consensus rule, ``collegium_severity``), which may be
-        lower than the row's own ``max_severity`` when this seat's
-        ``critical`` is disputed by the other parsed seat. A row read
-        directly from the database stands only for itself.
-        """
-        return getattr(self, "_round_severity", None) or self.max_severity
+    A row returned by ``collegium_verdict`` carries the round's
+    severity (consensus rule, ``collegium_severity``), which may be
+    lower than the row's own ``max_severity`` when this seat's
+    ``critical`` is disputed by the other parsed seat. A row read
+    directly from the database stands only for itself.
+    """
+    return getattr(self, "_round_severity", None) or self.max_severity
 
-    @property
-    def verdict(self) -> str:
-        """
-        Derive the verdict, never stored.
 
-        The severity->verdict mapping is reopened by R3 and must change
-        without a data migration (D4).
-        """
-        if self.unparsed:
-            return self.Verdict.UNPARSED
-        return verdict_for_severity(self.effective_severity)
+@property
+def verdict(self) -> str:
+    """
+    Derive the verdict, never stored.
+
+    The severity->verdict mapping is reopened by R3 and must change
+    without a data migration (D4).
+    """
+    if self.unparsed:
+        return self.Verdict.UNPARSED
+    return verdict_for_severity(self.effective_severity)
 ```
 
 Replace `collegium_verdict` (lines 984-997) with:
@@ -344,8 +341,10 @@ def collegium_severity(
         return None
     strictest = max(SEVERITY_RANK[row.max_severity] for row in parsed)
     severity = JudgeVerdict.Severity.values[strictest]
-    if consensus_reject and severity == JudgeVerdict.Severity.CRITICAL and any(
-        row.max_severity != JudgeVerdict.Severity.CRITICAL for row in parsed
+    if (
+        consensus_reject
+        and severity == JudgeVerdict.Severity.CRITICAL
+        and any(row.max_severity != JudgeVerdict.Severity.CRITICAL for row in parsed)
     ):
         return JudgeVerdict.Severity.MAJOR
     return severity
@@ -380,8 +379,8 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
 Change the comment on the `seat` field (line 714) to:
 
 ```python
-    # Place in the collegium, not seniority: below critical, seat 2 may not
-    # lower seat 1; policy decides whether a critical needs both seats.
+# Place in the collegium, not seniority: below critical, seat 2 may not
+# lower seat 1; policy decides whether a critical needs both seats.
 ```
 
 The Boolean is an explicit keyword argument so `collegium_severity` remains
@@ -433,44 +432,48 @@ over `judge_active_severity`). They must agree with Task 1.
 Replace `test_status_annotations_reduce_the_fresh_round` (line 75-80) with:
 
 ```python
-    def test_status_annotations_reduce_the_fresh_round(self) -> None:
-        # Below critical: strictest seat, as in Python.
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "minor", seat=1, run_id=run)
-        self.make(unit, "major", seat=2, run_id=run)
-        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
+def test_status_annotations_reduce_the_fresh_round(self) -> None:
+    # Below critical: strictest seat, as in Python.
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "minor", seat=1, run_id=run)
+    self.make(unit, "major", seat=2, run_id=run)
+    self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
 
-    def test_status_annotations_demote_a_disputed_critical(self) -> None:
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "minor", seat=1, run_id=run)
-        self.make(unit, "critical", seat=2, run_id=run)
-        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
-        self.assertEqual(active_verdict(unit).effective_severity, "major")
 
-    def test_status_annotations_keep_a_unanimous_critical(self) -> None:
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "critical", seat=1, run_id=run)
-        self.make(unit, "critical", seat=2, run_id=run)
-        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+def test_status_annotations_demote_a_disputed_critical(self) -> None:
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "minor", seat=1, run_id=run)
+    self.make(unit, "critical", seat=2, run_id=run)
+    self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
+    self.assertEqual(active_verdict(unit).effective_severity, "major")
 
-    def test_status_annotations_keep_a_lone_parsed_critical(self) -> None:
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "critical", seat=1, run_id=run)
-        self.make(unit, "none", seat=2, run_id=run, unparsed=True)
-        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
 
-    def test_search_filters_follow_the_consensus_rule(self) -> None:
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "none", seat=1, run_id=run)
-        self.make(unit, "critical", seat=2, run_id=run)
-        translation = unit.translation
-        self.assertEqual(list(translation.unit_set.search("judge:reject")), [])
-        self.assertEqual(list(translation.unit_set.search("judge:flag")), [unit])
+def test_status_annotations_keep_a_unanimous_critical(self) -> None:
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "critical", seat=1, run_id=run)
+    self.make(unit, "critical", seat=2, run_id=run)
+    self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+
+
+def test_status_annotations_keep_a_lone_parsed_critical(self) -> None:
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "critical", seat=1, run_id=run)
+    self.make(unit, "none", seat=2, run_id=run, unparsed=True)
+    self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+
+
+def test_search_filters_follow_the_consensus_rule(self) -> None:
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "none", seat=1, run_id=run)
+    self.make(unit, "critical", seat=2, run_id=run)
+    translation = unit.translation
+    self.assertEqual(list(translation.unit_set.search("judge:reject")), [])
+    self.assertEqual(list(translation.unit_set.search("judge:flag")), [unit])
 ```
 
 Add
@@ -496,15 +499,15 @@ is still the representative, which is what that test is about); only the
 annotation changes. Replace its last four lines (402-405) with:
 
 ```python
-        active = active_verdict(unit)
-        assert active is not None
-        # The retry cannot hide seat 1's critical: it is still the
-        # representative row and its evidence is intact. It can dispute
-        # it, though - a fresh parsed pass from the other seat makes the
-        # round a major (consensus REJECT), in Python and in SQL alike.
-        self.assertEqual(active.max_severity, "critical")
-        self.assertEqual(active.effective_severity, "major")
-        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
+active = active_verdict(unit)
+assert active is not None
+# The retry cannot hide seat 1's critical: it is still the
+# representative row and its evidence is intact. It can dispute
+# it, though - a fresh parsed pass from the other seat makes the
+# round a major (consensus REJECT), in Python and in SQL alike.
+self.assertEqual(active.max_severity, "critical")
+self.assertEqual(active.effective_severity, "major")
+self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
 ```
 
 **Step 2: Run to verify they fail**
@@ -525,34 +528,34 @@ In `judge_status_annotations()` (`weblate/trans/models/judge.py`), after
 `seat_fresh_unparsed`, branch while constructing the expression:
 
 ```python
-    if settings.JUDGE_CONSENSUS_REJECT:
-        # SQL twin of collegium_severity: a critical disputed by another
-        # current parsed seat reads as major.
-        disputed_critical = Exists(
-            JudgeVerdict.objects.filter(
-                unit_id=OuterRef(OuterRef("pk")),
-                target_storage_hash=MD5(OuterRef(OuterRef("target"))),
-                unparsed=False,
-            )
-            .exclude(_has_newer_sibling(newer_parsed=True))
-            .exclude(max_severity=JudgeVerdict.Severity.CRITICAL)
+if settings.JUDGE_CONSENSUS_REJECT:
+    # SQL twin of collegium_severity: a critical disputed by another
+    # current parsed seat reads as major.
+    disputed_critical = Exists(
+        JudgeVerdict.objects.filter(
+            unit_id=OuterRef(OuterRef("pk")),
+            target_storage_hash=MD5(OuterRef(OuterRef("target"))),
+            unparsed=False,
         )
-        round_severity = Case(
-            When(
-                Q(max_severity=JudgeVerdict.Severity.CRITICAL)
-                & disputed_critical,
-                then=Value(JudgeVerdict.Severity.MAJOR.value),
-            ),
-            default=F("max_severity"),
-            output_field=CharField(),
-        )
-    else:
-        # Old policy and old query cost: any critical remains critical.
-        round_severity = F("max_severity")
+        .exclude(_has_newer_sibling(newer_parsed=True))
+        .exclude(max_severity=JudgeVerdict.Severity.CRITICAL)
+    )
+    round_severity = Case(
+        When(
+            Q(max_severity=JudgeVerdict.Severity.CRITICAL) & disputed_critical,
+            then=Value(JudgeVerdict.Severity.MAJOR.value),
+        ),
+        default=F("max_severity"),
+        output_field=CharField(),
+    )
+else:
+    # Old policy and old query cost: any critical remains critical.
+    round_severity = F("max_severity")
 ```
 
 and change the `judge_active_severity` subquery from
 `.values("max_severity")[:1]` to:
+<!--- skip doccmd[all]: next --><!-- dict-entry fragment, not standalone code -->
 
 ```python
         "judge_active_severity": Subquery(
@@ -636,26 +639,27 @@ Note which layer does what, because it decides where each test can live:
 `test_verdict_takes_the_higher_severity` (line 973-975) with:
 
 ```python
-    def test_a_disputed_critical_is_a_flag(self) -> None:
-        # Consensus REJECT: seat 1 major, seat 2 critical -> the round is a
-        # flag and projects judge-flag. State is not asserted here:
-        # run_judge_batch never writes it (see the note above); the
-        # ship-or-hold assertions live in test_judge_autotranslate.py and
-        # test_judge_deferrals.py.
-        _unit, verdict, _client = self.run_batch([MAJOR, CRITICAL], repair=None)
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
-        self.assertEqual(verdict.effective_severity, "major")
-        self.assertEqual(verdict.max_severity, "critical")
-        self.assertEqual(verdict.seat, 2)
-        fresh = self.get_unit()
-        self.assertIn("judge-flag", fresh.all_checks_names)
-        self.assertNotIn("judge-reject", fresh.all_checks_names)
+def test_a_disputed_critical_is_a_flag(self) -> None:
+    # Consensus REJECT: seat 1 major, seat 2 critical -> the round is a
+    # flag and projects judge-flag. State is not asserted here:
+    # run_judge_batch never writes it (see the note above); the
+    # ship-or-hold assertions live in test_judge_autotranslate.py and
+    # test_judge_deferrals.py.
+    _unit, verdict, _client = self.run_batch([MAJOR, CRITICAL], repair=None)
+    self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+    self.assertEqual(verdict.effective_severity, "major")
+    self.assertEqual(verdict.max_severity, "critical")
+    self.assertEqual(verdict.seat, 2)
+    fresh = self.get_unit()
+    self.assertIn("judge-flag", fresh.all_checks_names)
+    self.assertNotIn("judge-reject", fresh.all_checks_names)
 
-    def test_a_unanimous_critical_still_rejects(self) -> None:
-        _unit, verdict, _client = self.run_batch([CRITICAL, CRITICAL], repair=None)
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
-        self.assertEqual(verdict.effective_severity, "critical")
-        self.assertIn("judge-reject", self.get_unit().all_checks_names)
+
+def test_a_unanimous_critical_still_rejects(self) -> None:
+    _unit, verdict, _client = self.run_batch([CRITICAL, CRITICAL], repair=None)
+    self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+    self.assertEqual(verdict.effective_severity, "critical")
+    self.assertIn("judge-reject", self.get_unit().all_checks_names)
 ```
 
 Add
@@ -670,15 +674,15 @@ and `judge-flag` absent.
 `seat=1`):
 
 ```python
-    def test_a_disputed_critical_projects_judge_flag(self) -> None:
-        unit = self.get_unit()
-        run = uuid.uuid4()
-        self.make(unit, "none", seat=1, run_id=run)
-        self.make(unit, "critical", seat=2, run_id=run)
-        unit.run_checks()
-        unit.clear_checks_cache()
-        self.assertIn("judge-flag", unit.all_checks_names)
-        self.assertNotIn("judge-reject", unit.all_checks_names)
+def test_a_disputed_critical_projects_judge_flag(self) -> None:
+    unit = self.get_unit()
+    run = uuid.uuid4()
+    self.make(unit, "none", seat=1, run_id=run)
+    self.make(unit, "critical", seat=2, run_id=run)
+    unit.run_checks()
+    unit.clear_checks_cache()
+    self.assertIn("judge-flag", unit.all_checks_names)
+    self.assertNotIn("judge-reject", unit.all_checks_names)
 ```
 
 Add `import uuid` to that file if it is not already imported.
@@ -691,52 +695,55 @@ single-seat rounds and cannot express a disputed one. Add `current_verdict` to
 the `weblate.trans.models.judge` imports:
 
 ```python
-    def test_a_disputed_critical_ships_flagged(self) -> None:
-        # The state gate runs in process_judge: one seat's critical against
-        # the other seat's lower grade must leave the string shipping.
-        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
-        self.component.project.save(update_fields=["machinery_settings"])
-        unit = self.get_unit()
-        unit.translate(self.user, ["existing translation"], STATE_TRANSLATED)
-        auto = AutoTranslate(
-            translation=self.get_translation(),
-            user=self.user,
-            q="",
-            mode="judge",
-            overwrite_existing=True,
-            unit_ids=[unit.id],
-        )
-        # Which seat returns which grade does not matter to the rule.
-        results = iter(
-            [[JudgeResult("major", "flag", [], "")], [JudgeResult("critical", "reject", [], "")]]
-        )
+def test_a_disputed_critical_ships_flagged(self) -> None:
+    # The state gate runs in process_judge: one seat's critical against
+    # the other seat's lower grade must leave the string shipping.
+    self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+    self.component.project.save(update_fields=["machinery_settings"])
+    unit = self.get_unit()
+    unit.translate(self.user, ["existing translation"], STATE_TRANSLATED)
+    auto = AutoTranslate(
+        translation=self.get_translation(),
+        user=self.user,
+        q="",
+        mode="judge",
+        overwrite_existing=True,
+        unit_ids=[unit.id],
+    )
+    # Which seat returns which grade does not matter to the rule.
+    results = iter(
+        [
+            [JudgeResult("major", "flag", [], "")],
+            [JudgeResult("critical", "reject", [], "")],
+        ]
+    )
 
-        def request(requests, *, on_batch, **kwargs):
-            batch_results = next(results)
-            on_batch(requests, batch_results)
-            return batch_results
+    def request(requests, *, on_batch, **kwargs):
+        batch_results = next(results)
+        on_batch(requests, batch_results)
+        return batch_results
 
-        with (
-            mock.patch.object(auto, "process_mt"),
-            mock.patch(
-                "weblate.trans.judge_loop.request_verdicts",
-                mock.Mock(side_effect=request),
-            ),
-            mock.patch(
-                "weblate.trans.judge_loop.repair_targets",
-                return_value={unit.id: ["repaired translation"]},
-            ),
-        ):
-            auto.process_judge(engines=[], threshold=80)
-        stored = self.get_unit()
-        self.assertEqual(stored.state, STATE_TRANSLATED)
-        self.assertNotIn(stored.state, FUZZY_STATES)
-        self.assertEqual(auto.judge_summary.major_not_fixed, 1)
-        self.assertEqual(auto.judge_summary.critical_held, 0)
-        round_read = current_verdict(stored)
-        assert round_read is not None
-        self.assertEqual(round_read.max_severity, "critical")
-        self.assertEqual(round_read.verdict, JudgeVerdict.Verdict.FLAG)
+    with (
+        mock.patch.object(auto, "process_mt"),
+        mock.patch(
+            "weblate.trans.judge_loop.request_verdicts",
+            mock.Mock(side_effect=request),
+        ),
+        mock.patch(
+            "weblate.trans.judge_loop.repair_targets",
+            return_value={unit.id: ["repaired translation"]},
+        ),
+    ):
+        auto.process_judge(engines=[], threshold=80)
+    stored = self.get_unit()
+    self.assertEqual(stored.state, STATE_TRANSLATED)
+    self.assertNotIn(stored.state, FUZZY_STATES)
+    self.assertEqual(auto.judge_summary.major_not_fixed, 1)
+    self.assertEqual(auto.judge_summary.critical_held, 0)
+    round_read = current_verdict(stored)
+    assert round_read is not None
+    self.assertEqual(round_read.max_severity, "critical")
+    self.assertEqual(round_read.verdict, JudgeVerdict.Verdict.FLAG)
 ```
 
 Add
@@ -755,25 +762,25 @@ critical still rejects, so it must stay green.
 `test_resolution_applies_to_the_collegium_representative` (line 674):
 
 ```python
-    def test_escalating_a_disputed_critical_queues_it_as_a_major(self) -> None:
-        # The card offers the major transitions for a disputed critical
-        # (views/edit.py reads the collegium instance); the resolver must
-        # agree, so escalation sends the string to the needs-checking
-        # queue instead of forcing a fuzzy hold.
-        self.enable_review()
-        unit = self.get_unit()
-        run = self.make_verdict(unit, "minor", seat=1).run_id
-        representative = self.make_verdict(unit, "critical", seat=2, run_id=run)
-        resolve_verdict(
-            unit=unit,
-            expected_verdict_id=representative.pk,
-            actor=self.user,
-            resolution=JudgeVerdict.Resolution.ESCALATED,
-            reason="one seat only",
-        )
-        representative.refresh_from_db()
-        self.assertEqual(representative.resolution, JudgeVerdict.Resolution.ESCALATED)
-        self.assertEqual(self.get_unit().state, STATE_NEEDS_CHECKING)
+def test_escalating_a_disputed_critical_queues_it_as_a_major(self) -> None:
+    # The card offers the major transitions for a disputed critical
+    # (views/edit.py reads the collegium instance); the resolver must
+    # agree, so escalation sends the string to the needs-checking
+    # queue instead of forcing a fuzzy hold.
+    self.enable_review()
+    unit = self.get_unit()
+    run = self.make_verdict(unit, "minor", seat=1).run_id
+    representative = self.make_verdict(unit, "critical", seat=2, run_id=run)
+    resolve_verdict(
+        unit=unit,
+        expected_verdict_id=representative.pk,
+        actor=self.user,
+        resolution=JudgeVerdict.Resolution.ESCALATED,
+        reason="one seat only",
+    )
+    representative.refresh_from_db()
+    self.assertEqual(representative.resolution, JudgeVerdict.Resolution.ESCALATED)
+    self.assertEqual(self.get_unit().state, STATE_NEEDS_CHECKING)
 ```
 
 Import `STATE_NEEDS_CHECKING` from `weblate.utils.state` in that file if it is
@@ -788,59 +795,61 @@ this rule, which is not what that test is about. Change the pre-seed to a
 critical so the recovered round is unanimous and the hold it asserts is real:
 
 ```python
-        result=JudgeResult(
-            "critical",
-            "reject",
-            [{"span": "x", "category": "terminology", "severity": "critical"}],
-            "",
-        ),
+result = (
+    JudgeResult(
+        "critical",
+        "reject",
+        [{"span": "x", "category": "terminology", "severity": "critical"}],
+        "",
+    ),
+)
 ```
 
 Then add the disputed sibling right after it (add `STATE_TRANSLATED` to the
 `weblate.utils.state` import of that file):
 
 ```python
-    def test_drain_run_projects_a_disputed_critical_as_a_major(self) -> None:
-        # The other seat already parsed a pass for this text, so the
-        # recovered critical is disputed: the run reports major and the
-        # string is not held.
-        unit = self.change_unit("Ahoj svete!")
-        before_target = unit.get_target_plurals()
-        _write_verdict(
-            unit,
-            build_request(unit),
-            seat=2,
-            attempt=0,
-            run_id=uuid.uuid4(),
-            result=JudgeResult("none", "pass", [], ""),
-            profile=resolve_judge_seat_profile(2),
-            project_context="",
-        )
-        self.defer(unit)
-        JudgeDeferral.objects.filter(unit=unit).update(
-            next_attempt_at=timezone.now() - timedelta(seconds=1)
-        )
-        critical = JudgeResult(
-            "critical",
-            "reject",
-            [{"span": "x", "category": "terminology", "severity": "critical"}],
-            "",
-        )
-        with mock.patch(
-            "weblate.trans.judge_loop.request_verdicts",
-            mock.Mock(side_effect=mock_request_verdicts([critical])),
-        ):
-            processed = drain_judge_deferrals()
+def test_drain_run_projects_a_disputed_critical_as_a_major(self) -> None:
+    # The other seat already parsed a pass for this text, so the
+    # recovered critical is disputed: the run reports major and the
+    # string is not held.
+    unit = self.change_unit("Ahoj svete!")
+    before_target = unit.get_target_plurals()
+    _write_verdict(
+        unit,
+        build_request(unit),
+        seat=2,
+        attempt=0,
+        run_id=uuid.uuid4(),
+        result=JudgeResult("none", "pass", [], ""),
+        profile=resolve_judge_seat_profile(2),
+        project_context="",
+    )
+    self.defer(unit)
+    JudgeDeferral.objects.filter(unit=unit).update(
+        next_attempt_at=timezone.now() - timedelta(seconds=1)
+    )
+    critical = JudgeResult(
+        "critical",
+        "reject",
+        [{"span": "x", "category": "terminology", "severity": "critical"}],
+        "",
+    )
+    with mock.patch(
+        "weblate.trans.judge_loop.request_verdicts",
+        mock.Mock(side_effect=mock_request_verdicts([critical])),
+    ):
+        processed = drain_judge_deferrals()
 
-        self.assertEqual(processed, 1)
-        run_unit = JudgeRunUnit.objects.get(
-            run=JudgeRun.objects.get(), unit_id_snapshot=unit.pk
-        )
-        self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.MAJOR)
-        self.assertEqual(run_unit.final_severity, "major")
-        unit.refresh_from_db()
-        self.assertEqual(unit.state, STATE_TRANSLATED)
-        self.assertEqual(unit.get_target_plurals(), before_target)
+    self.assertEqual(processed, 1)
+    run_unit = JudgeRunUnit.objects.get(
+        run=JudgeRun.objects.get(), unit_id_snapshot=unit.pk
+    )
+    self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.MAJOR)
+    self.assertEqual(run_unit.final_severity, "major")
+    unit.refresh_from_db()
+    self.assertEqual(unit.state, STATE_TRANSLATED)
+    self.assertEqual(unit.get_target_plurals(), before_target)
 ```
 
 **Step 2: Run to verify they fail**
@@ -864,7 +873,7 @@ tests drive the new one.
 `weblate/checks/judge.py:64`:
 
 ```python
-        return verdict is not None and verdict.effective_severity == self.judge_severity
+return verdict is not None and verdict.effective_severity == self.judge_severity
 ```
 
 `weblate/trans/judge_loop.py`:
@@ -872,6 +881,7 @@ tests drive the new one.
 - line 1493: `verdicts.initial_severity.setdefault(unit.id, item.verdict.effective_severity)`
 - line 1694: `outcome = _DRAIN_SEVERITY_OUTCOMES[verdict.effective_severity]`
 - lines 1734-1735:
+<!--- skip doccmd[all]: next --><!-- dict-entry fragment, not standalone code -->
 
 ```python
                     "initial_severity": verdict.effective_severity if verdict else "",
@@ -884,6 +894,7 @@ tests drive the new one.
   `verdict.effective_severity` (three occurrences).
 - line 930: `else severity_outcomes[verdict.effective_severity]`
 - lines 952 and 954:
+<!--- skip doccmd[all]: next --><!-- dict-entry fragment, not standalone code -->
 
 ```python
                         "initial_severity": initial_severity.get(
@@ -900,19 +911,17 @@ Carry the stamp across the re-read (the pk was verified on the line above, so
 it is the same round):
 
 ```python
-        if representative.pk != expected_verdict_id:
-            msg = "stale"
-            raise JudgeResolutionError(msg, stale_message)
-        # The locked re-read refreshes this row's own fields for the race
-        # window (a concurrent resolution); the round severity is not one
-        # of them, so it travels from the collegium read above.
-        round_severity = getattr(representative, "_round_severity", None)
-        representative = JudgeVerdict.objects.select_for_update().get(
-            pk=representative.pk
-        )
-        representative._round_severity = round_severity  # ruff: ignore[private-member-access]
-        old_resolution = representative.resolution
-        verdict = representative.verdict
+if representative.pk != expected_verdict_id:
+    msg = "stale"
+    raise JudgeResolutionError(msg, stale_message)
+# The locked re-read refreshes this row's own fields for the race
+# window (a concurrent resolution); the round severity is not one
+# of them, so it travels from the collegium read above.
+round_severity = getattr(representative, "_round_severity", None)
+representative = JudgeVerdict.objects.select_for_update().get(pk=representative.pk)
+representative._round_severity = round_severity  # ruff: ignore[private-member-access]
+old_resolution = representative.resolution
+verdict = representative.verdict
 ```
 
 Verify with grep that nothing else gates on the seat's own severity:
@@ -988,9 +997,9 @@ outside `__init__` (in `collegium_verdict` and in `resolve_verdict`); if mypy
 reports it, declare it on the class:
 
 ```python
-    # Set only by collegium_verdict, and carried across resolve_verdict's
-    # locked re-read; never stored (effective_severity).
-    _round_severity: str | None
+# Set only by collegium_verdict, and carried across resolve_verdict's
+# locked re-read; never stored (effective_severity).
+_round_severity: str | None
 ```
 
 directly under the field declarations of `JudgeVerdict`, and keep the
@@ -1117,6 +1126,7 @@ In `./rundev.sh shell` (dev only, never production):
 from django.test import override_settings
 from weblate.trans.models import Unit
 from weblate.trans.models.judge import active_round, active_verdict
+
 seen = 0
 for unit in Unit.objects.filter(judge_verdicts__isnull=False).distinct()[:500]:
     rows = [row for row in active_round(unit) if not row.unparsed]
@@ -1159,11 +1169,16 @@ import time
 from django.test import override_settings
 from weblate.trans.models import Translation
 from weblate.trans.models.judge import judge_status_annotations
+
 t = Translation.objects.order_by("-stats__all")[0]
 for consensus_reject in (True, False):
     with override_settings(JUDGE_CONSENSUS_REJECT=consensus_reject):
         start = time.monotonic()
-        list(t.unit_set.annotate(**judge_status_annotations()).values_list("judge_active_severity", flat=True))
+        list(
+            t.unit_set.annotate(**judge_status_annotations()).values_list(
+                "judge_active_severity", flat=True
+            )
+        )
         elapsed = round(time.monotonic() - start, 3)
     print(consensus_reject, t, t.unit_set.count(), elapsed)
 ```

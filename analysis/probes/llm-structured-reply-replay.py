@@ -91,7 +91,7 @@ def replay_unit(machine, unit: Unit) -> str:
 
     # Measurement deliberately reuses the parser's own private helper to show
     # exactly what was asked; see the module docstring.
-    asked_parts = machine._get_string_parts(cleaned_source, unit)  # ruff: ignore[private-member-access]
+    asked_parts = machine._get_string_parts(cleaned_source, unit)
     print(f"  asked parts: {asked_parts}")
 
     raw_reply: list[str | None] = [None]

@@ -1,6 +1,5 @@
 # Prod Weblate machinery settings (l10n.herocraft.com, pulled 2026-09-04; heart-abyss persona Motoki/Hazuo lines updated on prod 2026-09-10)
 
-
 ## PROJECT: col4
 
 ### persona
@@ -65,7 +64,7 @@ into the same target string.
 
 Strings contain engine markup and substitutions, for example:
 
- ```
+ ```text
 
   <size=60>Authors</size>
   <color=[] #FF0000>...</color>
@@ -94,9 +93,6 @@ they render in fixed-width controls on a phone, and overflow is a shipped bug. P
 wording that keeps the meaning.
 
 ### language_instructions
-
-
-
 
 ## PROJECT: heart-abyss
 
@@ -135,7 +131,7 @@ Obscenity fidelity works in both directions. If the Russian swears, the target
 swears with equal force. If the Russian does not swear, the target must not
 invent profanity: capital letters mark shouting and emphasis, not obscenity.
 
-Register severity: a register mismatch is minor unless it changes what the player understands. Softening the source's own  profanity to a weaker word is major. Demanding profanity or crudeness for a source line that has none is not an error at all — do not report it. A neutral Russian line correctly rendered as a neutral English line is pass, whatever the speaker's usual voice.
+Register severity: a register mismatch is minor unless it changes what the player understands. Softening the source's own profanity to a weaker word is major. Demanding profanity or crudeness for a source line that has none is not an error at all — do not report it. A neutral Russian line correctly rendered as a neutral English line is pass, whatever the speaker's usual voice.
 
 ### style
 
@@ -189,21 +185,13 @@ Português europeu, não brasileiro. A coluna existente está quase toda em pt-B
 
 繁體中文，台灣用語習慣，非香港用語。「氣」用於 Ци，種族名沿用術語表中的中文寫法（忍狐、犬神、河童、妖怪）。標點使用全形，，。！？。俄語髒話按同等強度翻譯，不要淡化。介面文字不得長於俄語原文，同一技能名在所有位置保持一致。注意：現有譯文中有約十分之一的行與簡體欄完全相同，代表當時並未真正轉換；請重新從俄語原文翻譯，不要沿用簡體結果。
 
-
 ## PROJECT: korotkij-test
 
 ### persona
 
-
-
 ### style
 
-
-
 ### language_instructions
-
-
-
 
 ## PROJECT: need-for-greed
 
@@ -278,7 +266,7 @@ finished string. Never leave Cyrillic characters in a language that does not use
 
 Strings contain Unity rich-text markup and engine substitutions, for example:
 
-```
+```text
 {value}  {hours}  {0}  %KEY%
 <color=#E3BA59>...</color>  <b>...</b>  <size=120%>  <sprite name="fire">
 {value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}
@@ -302,7 +290,7 @@ only. Source `{value:cond:>99999?{value:amount()}|}` -> `{value:cond:>99999?{val
 
 Inside such an expression, only the visible literal is translatable: in `{hours}h. `, the `h.` is the hour abbreviation and
 takes the target language's standard form, keeping its full stop and its trailing space, while `{hours:cond:>0?` and the
-closing `|}` stay byte-identical. Source `{hours}h. ` -> Polish `{hours} godz. `, never `{hours}g. `.
+closing `|}` stay byte-identical. Source `{hours}h.` -> Polish `{hours} godz. `, never `{hours}g. `.
 
 Where the source's own markup or nesting is malformed, copy it as it is. Do not repair it.
 
@@ -340,9 +328,6 @@ shortest natural wording that keeps the meaning. Store-description strings are t
 they must be translated in full - never left empty.
 
 ### language_instructions
-
-
-
 
 ## PROJECT: pirate-ships
 
@@ -431,7 +416,6 @@ Decimal separator in this language is a comma, not a dot. Never copy the dot not
 
 Numbers use Arabic digits with a dot decimal separator ("1.5秒"). Use the simplified-Chinese glossary terms verbatim; do not mix in traditional variants or English words. Keep UI labels to the source's length; prefer 4-8 character labels for buttons and stats. No full-width sentence-final punctuation the source lacks.
 
-
 ## PROJECT: space-arena
 
 ### persona
@@ -506,7 +490,6 @@ Brazilian Portuguese, informal (você). Casual, energetic.
 
 Simplified Chinese, concise; no spaces around Latin tokens or placeholders.
 
-
 ## PROJECT: strategy-and-tactics-2
 
 ### persona
@@ -545,7 +528,7 @@ Never leave Cyrillic characters in a target language that does not use Cyrillic.
 
 Strings contain engine substitutions and Unity rich-text markup, for example:
 
-```
+```text
 {0} {1} {2}
 {[PARAM0]} {[NAME]}
 __omp_magic("", "KEY%")
@@ -587,7 +570,6 @@ Division experience ranks are a noun ladder: 新兵 / 熟练兵 / 老兵. Two to
 Military vocabulary follows mainland conventions: 步兵, 装甲, 炮兵, 空军, 舰队, 海军陆战队, 增援, 外交点数, 科学点数, 雷区.
 
 Chinese renders far more compactly than Russian. Spend that headroom on clarity and grammatical completeness, never on padding.
-
 
 ## PROJECT: victory-banner
 

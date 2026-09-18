@@ -30,9 +30,8 @@ def collegium_round(seats: dict[int, dict]) -> str:
     if not parsed:
         return "unparsed"
     strictest = max(RANK[row["max_severity"]] for row in parsed)
-    if (
-        strictest == RANK["critical"]
-        and any(row["max_severity"] != "critical" for row in parsed)
+    if strictest == RANK["critical"] and any(
+        row["max_severity"] != "critical" for row in parsed
     ):
         return "major"
     return ["none", "minor", "major", "critical"][strictest]
@@ -47,7 +46,9 @@ def conservative_round(seats: dict[int, dict]) -> str:
     )
 
 
-def metrics(observations: list[dict], labels: dict[int, str], severities: dict[int, str]) -> dict:
+def metrics(
+    observations: list[dict], labels: dict[int, str], severities: dict[int, str]
+) -> dict:
     """One observation = (unit, round severity) under one aggregation."""
     recall_hits = recall_total = 0
     critical_misses = 0
@@ -57,7 +58,8 @@ def metrics(observations: list[dict], labels: dict[int, str], severities: dict[i
     for obs in observations:
         unit_id, severity, language = obs["unit"], obs["severity"], obs["language"]
         bucket = per_language.setdefault(
-            language, {"defects": 0, "recalled": 0, "clean": 0, "flagged": 0, "unparsed": 0}
+            language,
+            {"defects": 0, "recalled": 0, "clean": 0, "flagged": 0, "unparsed": 0},
         )
         rank = 0 if severity == "unparsed" else RANK.get(severity, 0)
         if severity == "unparsed":
@@ -160,6 +162,8 @@ def main() -> int:
             "conservative_latest_repeat": metrics(latest_obs_c, labels, severities),
             "collegium_latest_repeat": metrics(latest_obs_k, labels, severities),
         }
+    # The JSON dump is this script's output contract: the runner reads stdout.
+    # ruff: ignore[print]
     print(json.dumps(out, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 

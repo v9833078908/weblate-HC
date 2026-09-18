@@ -11,21 +11,104 @@
     "spend_month": "41.20",
     "month_label": "сентябре",
     "languages": [
-      { "code": "en", "name": "Английский", "strings": 1255, "status": "ready", "decisions": 0, "in_kit": true },
-      { "code": "de", "name": "Немецкий", "strings": 1255, "status": "ready", "decisions": 0, "in_kit": false },
-      { "code": "fr", "name": "Французский", "strings": 1255, "status": "decisions", "decisions": 8, "in_kit": false },
-      { "code": "es", "name": "Испанский", "strings": 1255, "status": "ready", "decisions": 0, "in_kit": false },
-      { "code": "pt_BR", "name": "Португальский (Бразилия)", "strings": 1255, "status": "ready", "decisions": 0, "in_kit": false },
-      { "code": "tr", "name": "Турецкий", "strings": 1255, "status": "ready", "decisions": 0, "in_kit": false },
-      { "code": "ja", "name": "Японский", "strings": 1255, "status": "decisions", "decisions": 6, "in_kit": false },
-      { "code": "ko", "name": "Корейский", "strings": 1255, "status": "ready", "decisions": 0, "in_kit": false },
-      { "code": "zh_Hans", "name": "Китайский (упр.)", "strings": 1255, "status": "ready", "decisions": 0, "in_kit": false }
+      {
+        "code": "en",
+        "name": "Английский",
+        "strings": 1255,
+        "status": "ready",
+        "decisions": 0,
+        "in_kit": true
+      },
+      {
+        "code": "de",
+        "name": "Немецкий",
+        "strings": 1255,
+        "status": "ready",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "fr",
+        "name": "Французский",
+        "strings": 1255,
+        "status": "decisions",
+        "decisions": 8,
+        "in_kit": false
+      },
+      {
+        "code": "es",
+        "name": "Испанский",
+        "strings": 1255,
+        "status": "ready",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "pt_BR",
+        "name": "Португальский (Бразилия)",
+        "strings": 1255,
+        "status": "ready",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "tr",
+        "name": "Турецкий",
+        "strings": 1255,
+        "status": "ready",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "ja",
+        "name": "Японский",
+        "strings": 1255,
+        "status": "decisions",
+        "decisions": 6,
+        "in_kit": false
+      },
+      {
+        "code": "ko",
+        "name": "Корейский",
+        "strings": 1255,
+        "status": "ready",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "zh_Hans",
+        "name": "Китайский (упр.)",
+        "strings": 1255,
+        "status": "ready",
+        "decisions": 0,
+        "in_kit": false
+      }
     ],
     "contents": [
-      { "id": "loc-kit", "type": "loc-kit", "label": "Лок-кит v3", "keys": 1255 },
-      { "id": "glossary", "type": "glossary", "label": "Глоссарий", "terms": 84 },
-      { "id": "store-steam", "type": "store", "store": "steam", "label": "Steam — тексты стора" },
-      { "id": "store-gp", "type": "store", "store": "google_play", "label": "Google Play — тексты стора" }
+      {
+        "id": "loc-kit",
+        "type": "loc-kit",
+        "label": "Лок-кит v3",
+        "keys": 1255
+      },
+      {
+        "id": "glossary",
+        "type": "glossary",
+        "label": "Глоссарий",
+        "terms": 84
+      },
+      {
+        "id": "store-steam",
+        "type": "store",
+        "store": "steam",
+        "label": "Steam — тексты стора"
+      },
+      {
+        "id": "store-gp",
+        "type": "store",
+        "store": "google_play",
+        "label": "Google Play — тексты стора"
+      }
     ]
   },
   "heart-of-the-abyss": {
@@ -40,15 +123,62 @@
     "spend_month": "3.10",
     "month_label": "сентябре",
     "languages": [
-      { "code": "en", "name": "Английский", "strings": 320, "status": "translating", "decisions": 0, "in_kit": true },
-      { "code": "de", "name": "Немецкий", "strings": 320, "status": "translating", "decisions": 0, "in_kit": false },
-      { "code": "fr", "name": "Французский", "strings": 320, "status": "translating", "decisions": 0, "in_kit": false },
-      { "code": "es", "name": "Испанский", "strings": 320, "status": "translating", "decisions": 0, "in_kit": false },
-      { "code": "ja", "name": "Японский", "strings": 320, "status": "translating", "decisions": 0, "in_kit": false },
-      { "code": "zh_Hans", "name": "Китайский (упр.)", "strings": 320, "status": "translating", "decisions": 0, "in_kit": false }
+      {
+        "code": "en",
+        "name": "Английский",
+        "strings": 320,
+        "status": "translating",
+        "decisions": 0,
+        "in_kit": true
+      },
+      {
+        "code": "de",
+        "name": "Немецкий",
+        "strings": 320,
+        "status": "translating",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "fr",
+        "name": "Французский",
+        "strings": 320,
+        "status": "translating",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "es",
+        "name": "Испанский",
+        "strings": 320,
+        "status": "translating",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "ja",
+        "name": "Японский",
+        "strings": 320,
+        "status": "translating",
+        "decisions": 0,
+        "in_kit": false
+      },
+      {
+        "code": "zh_Hans",
+        "name": "Китайский (упр.)",
+        "strings": 320,
+        "status": "translating",
+        "decisions": 0,
+        "in_kit": false
+      }
     ],
     "contents": [
-      { "id": "loc-kit", "type": "loc-kit", "label": "Лок-кит v1", "keys": 320 }
+      {
+        "id": "loc-kit",
+        "type": "loc-kit",
+        "label": "Лок-кит v1",
+        "keys": 320
+      }
     ]
   },
   "novyy-proekt": {

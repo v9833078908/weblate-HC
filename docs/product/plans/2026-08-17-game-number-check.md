@@ -179,9 +179,7 @@ After `PLACEHOLDER_PATTERN` (line 25), insert:
 ```python
 # Tags and placeholders together: `_tokens` compares them, `_numbers` removes
 # them so that `<size=14>` and `{0}` are never read as quantities.
-MARKUP = regex.compile(
-    rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.pattern})"
-)
+MARKUP = regex.compile(rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.pattern})")
 ```
 
 **Do not add `regex.IGNORECASE` to this constant.** `TAG_PATTERN` carries the

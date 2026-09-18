@@ -397,9 +397,7 @@ def can_invite_users(
 @login_required
 def invite_user(request: AuthenticatedHttpRequest, project):
     """Invite user to a project."""
-    form_class = (
-        BulkInviteForm if "emails" in request.POST else InviteEmailForm
-    )
+    form_class = BulkInviteForm if "emails" in request.POST else InviteEmailForm
     obj, form = check_user_form(
         request, project, form_class=form_class, pass_project=True
     )

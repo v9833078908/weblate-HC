@@ -49,6 +49,7 @@ import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from operator import itemgetter
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings_test")
 os.environ.setdefault("CI_DB_HOST", "127.0.0.1")
@@ -56,14 +57,14 @@ os.environ.setdefault("CI_DB_PORT", "5432")
 os.environ.setdefault("CI_DB_USER", "weblate")
 os.environ.setdefault("CI_DB_PASSWORD", "weblate")
 
-import django  # noqa: E402
+import django
 
 django.setup()
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "weblate_customization" / "src"))
 
-from weblate_customization.machinery import (  # noqa: E402
+from weblate_customization.machinery import (
     RoutedLiteLLMTranslation,
 )
 
@@ -125,10 +126,10 @@ def litellm_key() -> str:
 
 
 def api_get(url: str) -> dict:
-    request = urllib.request.Request(  # noqa: S310 - fixed https/http prod host
+    request = urllib.request.Request(
         url, headers={"Authorization": f"Token {prod_token()}"}
     )
-    with urllib.request.urlopen(request, timeout=120) as response:  # noqa: S310
+    with urllib.request.urlopen(request, timeout=120) as response:
         return json.loads(response.read())
 
 
@@ -142,7 +143,7 @@ def fetch_glossary(lang: str, cache: pathlib.Path) -> list[dict]:
     the API (source, target, source explanation, flags).
     """
     if cache.exists():
-        return json.loads(cache.read_text())
+        return json.loads(cache.read_text(encoding="utf-8"))
 
     def units(code: str) -> list[dict]:
         out: list[dict] = []
@@ -192,7 +193,9 @@ def fetch_glossary(lang: str, cache: pathlib.Path) -> list[dict]:
         seen.add(key)
         entries.append(entry)
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps(entries, ensure_ascii=False, indent=1))
+    cache.write_text(
+        json.dumps(entries, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
     return entries
 
 
@@ -248,9 +251,9 @@ class ProbeLiteLLM(RoutedLiteLLMTranslation):
             "prompt_tokens": (usage or {}).get("prompt_tokens"),
             "completion_tokens": (usage or {}).get("completion_tokens"),
             "total_tokens": (usage or {}).get("total_tokens"),
-            "reasoning_tokens": ((usage or {}).get("completion_tokens_details") or {}).get(
-                "reasoning_tokens"
-            ),
+            "reasoning_tokens": (
+                (usage or {}).get("completion_tokens_details") or {}
+            ).get("reasoning_tokens"),
             "cost": str((usage or {}).get("cost")) if usage else None,
         }
 
@@ -289,15 +292,19 @@ def batches_for_arm(
         # M3 measures model noise and not order noise.
         shuffled = list(units)
         random.Random(f"scene-context-{lang}").shuffle(shuffled)
-        return [shuffled[index : index + size] for index in range(0, len(shuffled), size)]
+        return [
+            shuffled[index : index + size] for index in range(0, len(shuffled), size)
+        ]
 
     grouped: dict[str, list[dict]] = {}
     for unit in units:
         grouped.setdefault(scene_of(unit["context"]), []).append(unit)
     result: list[list[dict]] = []
     for scene in sorted(grouped):
-        lines = sorted(grouped[scene], key=lambda unit: unit["position"])
-        result.extend(lines[index : index + size] for index in range(0, len(lines), size))
+        lines = sorted(grouped[scene], key=itemgetter("position"))
+        result.extend(
+            lines[index : index + size] for index in range(0, len(lines), size)
+        )
     return result
 
 
@@ -308,10 +315,8 @@ def scene_block(
     answered: dict[str, str],
     cap: int,
 ) -> dict:
-    lines = [
-        unit for unit in units if scene_of(unit["context"]) == scene_key
-    ]
-    lines.sort(key=lambda unit: unit["position"])
+    lines = [unit for unit in units if scene_of(unit["context"]) == scene_key]
+    lines.sort(key=itemgetter("position"))
     if len(lines) > cap:
         indexes = [
             index
@@ -348,14 +353,14 @@ def build_request(
     answered: dict[str, str],
     cap: int,
 ) -> tuple[str, str, list[str]]:
-    string_ids = machine._build_string_ids(len(batch))  # noqa: SLF001
+    string_ids = machine._build_string_ids(len(batch))
     payloads = []
     for unit, string_id in zip(batch, string_ids, strict=True):
         text = unit["source"][0]
         payload: dict[str, object] = {
             "id": string_id,
             "source": text,
-            "parts": machine._get_string_parts(text, None),  # noqa: SLF001
+            "parts": machine._get_string_parts(text, None),
             # po-mono component: production puts the context into "key"
             "key": unit["context"],
         }
@@ -363,8 +368,8 @@ def build_request(
             payload["note"] = unit["note"]
         payloads.append(payload)
 
-    content = machine._build_message("ru", lang, payloads, glossary)  # noqa: SLF001
-    prompt = machine._get_prompt(lang)  # noqa: SLF001
+    content = machine._build_message("ru", lang, payloads, glossary)
+    prompt = machine._get_prompt(lang)
 
     if arm == "S":
         scene_keys = {scene_of(unit["context"]) for unit in batch}
@@ -460,7 +465,7 @@ def run_batch(
         started = time.monotonic()
         try:
             raw = machine.fetch_llm_translations(prompt, content, "", "")
-        except Exception as error:  # noqa: BLE001 - transport metric
+        except Exception as error:
             elapsed = round(time.monotonic() - started, 2)
             attempts.append(
                 {
@@ -491,12 +496,12 @@ def run_batch(
             for unit, string_id in zip(batch, string_ids, strict=True)
         }
         try:
-            parsed = machine._parse_llm_translations(  # noqa: SLF001
+            parsed = machine._parse_llm_translations(
                 raw, sources, None, string_ids=string_ids
             )
             record["contract"] = "ok"
             record["parsed_strings"] = len(parsed)
-        except Exception as error:  # noqa: BLE001 - contract metric
+        except Exception as error:
             record["contract"] = f"{type(error).__name__}: {error}"
             record["parsed_strings"] = 0
         return record
@@ -524,7 +529,9 @@ def run_arm(
         # different scenes stay independent and run together.
         by_scene: dict[str, list[tuple[int, list[dict]]]] = {}
         for index, batch in enumerate(batches):
-            by_scene.setdefault(scene_of(batch[0]["context"]), []).append((index, batch))
+            by_scene.setdefault(scene_of(batch[0]["context"]), []).append(
+                (index, batch)
+            )
 
         def run_scene(items: list[tuple[int, list[dict]]]) -> list[dict]:
             answered: dict[str, str] = {}
@@ -561,7 +568,7 @@ def run_arm(
         with ThreadPoolExecutor(max_workers=min(workers, len(by_scene))) as pool:
             for chunk in pool.map(run_scene, by_scene.values()):
                 records.extend(chunk)
-        return sorted(records, key=lambda item: item["batch"])
+        return sorted(records, key=itemgetter("batch"))
 
     def run_one(item: tuple[int, list[dict]]) -> dict:
         index, batch = item
@@ -621,8 +628,10 @@ def main() -> None:
                     machine, lang, arm, batches[0], units, glossary, {}, cap
                 )
                 print(f"=== {lang} {arm}: {len(batches)} batches ===")
-                print(f"prompt {len(prompt.encode())} bytes, "
-                      f"content {len(content.encode())} bytes")
+                print(
+                    f"prompt {len(prompt.encode())} bytes, "
+                    f"content {len(content.encode())} bytes"
+                )
                 envelope = json.loads(content)
                 preview = {
                     key: value for key, value in envelope.items() if key != "glossary"
@@ -633,8 +642,10 @@ def main() -> None:
                 if "scene" in preview:
                     preview["scene"] = {
                         "key": preview["scene"]["key"],
-                        "lines": preview["scene"]["lines"][:3]
-                        + [f"<{len(preview['scene']['lines'])} lines total>"],
+                        "lines": [
+                            *preview["scene"]["lines"][:3],
+                            f"<{len(preview['scene']['lines'])} lines total>",
+                        ],
                     }
                 print(json.dumps(preview, ensure_ascii=False, indent=1))
                 if arm == "S":

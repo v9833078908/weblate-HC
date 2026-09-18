@@ -11,7 +11,7 @@ import pytest
 from translate.storage.pypo import pofile
 from translate.storage.tbx import tbxfile
 
-from loc_kit_ingest.model import GlossaryTerm, StringUnit
+from loc_kit_ingest.model import GlossaryTerm, ParseResult, StringUnit
 from loc_kit_ingest.profile import load_profile
 from loc_kit_ingest.writer import render_component, validate_rendered_component
 
@@ -22,13 +22,11 @@ from loc_kit_ingest.writer import render_component, validate_rendered_component
 
 @pytest.fixture
 def po_component(tmp_path):
-    """A ComponentProfile + ParseResult-like units for a PO component."""
+    """Build a ComponentProfile + ParseResult-like units for a PO component."""
     profile_path = Path(__file__).parent / "fixtures" / "temple.loc-ingest.json"
     profile = load_profile(profile_path)
     comp = profile.components[0]
     # We return (component, units) - the writer receives a ParseResult
-    from loc_kit_ingest.model import ParseResult
-
     units = (
         StringUnit(
             key="sample_key",
@@ -55,12 +53,10 @@ def po_component(tmp_path):
 
 @pytest.fixture
 def tbx_component(tmp_path):
-    """A ComponentProfile + units for a TBX component."""
+    """Build a ComponentProfile + units for a TBX component."""
     profile_path = Path(__file__).parent / "fixtures" / "terms.loc-ingest.json"
     profile = load_profile(profile_path)
     comp = profile.components[0]
-    from loc_kit_ingest.model import ParseResult
-
     units = (
         GlossaryTerm(
             context='["Characters","Герой"]',
@@ -165,7 +161,7 @@ def test_tbx_uses_profile_xml_lang_tags(tmp_path, tbx_component):
     paths = render_component(comp, result, tmp_path)
     en_xml = paths["en"].read_text(encoding="utf-8")
     # en lang column has xml_lang="en"
-    en_col = next(l for l in comp.languages if l.code == "en")
+    en_col = next(lang for lang in comp.languages if lang.code == "en")
     assert f'xml:lang="{en_col.xml_lang}"' in en_xml
 
 
@@ -223,7 +219,7 @@ def test_tbx_parse_back_checks_explanations(tmp_path, tbx_component):
     paths = render_component(comp, result, tmp_path)
     parsed = tbxfile.parsestring(paths["en"].read_bytes())
     for unit in parsed.units:
-        assert unit.getid() in ('["Characters","Герой"]', '["Weapons","Меч"]')
+        assert unit.getid() in {'["Characters","Герой"]', '["Weapons","Меч"]'}
         assert unit.source  # source term exists
         assert unit.target  # target term exists
         # definition note = source explanation

@@ -90,4 +90,4 @@
  * @property {string} [error]
  */
 
-export {}
+export {};

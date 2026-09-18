@@ -23,8 +23,23 @@ KIT = BASE / "kit-work/need-for-greed"
 OUT = BASE / "kit-ru-source"
 
 LANGS = [
-    "bg", "cs", "de", "es", "fil", "fr", "hu", "id", "it",
-    "lt", "lv", "nl", "pl", "pt", "ro", "ru", "tr",
+    "bg",
+    "cs",
+    "de",
+    "es",
+    "fil",
+    "fr",
+    "hu",
+    "id",
+    "it",
+    "lt",
+    "lv",
+    "nl",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "tr",
 ]
 
 # homonym groups (phase0.json): under ru source, identity is
@@ -43,6 +58,7 @@ HOMONYM_SECTIONS = {
 }
 
 report: dict = {"po": {}, "glossary": {}, "conflicts": []}
+
 
 def parse_po(path: Path) -> pofile:
     with path.open("rb") as handle:
@@ -115,8 +131,8 @@ def fix_ui_homoglyphs() -> None:
     store = parse_po(path)
     fixed = []
     for key, old, new in [
-        ("dailyRewardClaimDescription", "\u04252", "X2"),  # Х2 -> X2
-        ("terrainProgressInfoSlide2", "ADOR\u0415", "ADORE"),  # Е -> E
+        ("dailyRewardClaimDescription", "\u04252", "X2"),  # \u0425 2 -> X2
+        ("terrainProgressInfoSlide2", "ADOR\u0415", "ADORE"),  # ADOR\u0415 -> ADORE
     ]:
         unit = find_unit(store, key)
         assert unit is not None, key
@@ -155,9 +171,7 @@ def prepare_glossary() -> None:
             ctx = json.dumps([section, ru_term], ensure_ascii=False)
             unit = store.addsourceunit(ru_term)
             unit.setid(ctx)
-            unit.target = (
-                en_term if lang == "en" else rows[term["context"]]["target"]
-            )
+            unit.target = en_term if lang == "en" else rows[term["context"]]["target"]
             if term["explanation"]:
                 unit.addnote(term["explanation"], origin="definition")
             target_expl = (
@@ -215,7 +229,15 @@ def prepare_glossary() -> None:
 # ---------------------------------------------------------------- Phase 2.5
 def make_zips() -> None:
     OUT.mkdir(exist_ok=True)
-    for comp in ["buyers", "characterdialogue", "loot", "orders", "survey", "tutorial", "ui"]:
+    for comp in [
+        "buyers",
+        "characterdialogue",
+        "loot",
+        "orders",
+        "survey",
+        "tutorial",
+        "ui",
+    ]:
         zpath = OUT / f"{comp}.zip"
         with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
             for lang in ["en", *LANGS]:
@@ -231,8 +253,13 @@ def make_zips() -> None:
 def verify_untouched() -> None:
     """All po files must still parse and keep unit counts (except orders +9)."""
     expected = {
-        "buyers": 10, "characterdialogue": 25, "loot": 154, "orders": 102,
-        "survey": 34, "tutorial": 102, "ui": 466,
+        "buyers": 10,
+        "characterdialogue": 25,
+        "loot": 154,
+        "orders": 102,
+        "survey": 34,
+        "tutorial": 102,
+        "ui": 466,
     }
     for comp, n in expected.items():
         for lang in ["en", *LANGS]:

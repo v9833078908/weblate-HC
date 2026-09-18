@@ -10,6 +10,7 @@
 # stubs everything that would touch the network or a real VPS, and drives
 # `deploy_stack` through its argument parser and preflight decision:
 #
+# shellcheck disable=SC2016  # single-quoted scenario snippets are source code for the fixture, not to be expanded here
 #   - an unknown flag exits 2 with usage and never reaches `git push`;
 #   - an active auto_translate* task blocks without --force;
 #   - a queue-only report (no active task) never blocks;

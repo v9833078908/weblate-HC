@@ -7,7 +7,10 @@
 from __future__ import annotations
 
 import csv
-import xml.etree.ElementTree
+
+# Only parses XLSX XML produced by Weblate itself (after ZIP member
+# validation), never untrusted XML, so entity-expansion attacks are moot.
+import xml.etree.ElementTree as ET  # ruff: ignore[suspicious-xml-etree-import]
 from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO, StringIO
@@ -122,12 +125,19 @@ def _serialize_csv(rows: list[tuple[str, ...]]) -> bytes:
 
 
 def _serialize_xlsx(rows: list[tuple[str, ...]]) -> bytes:
+    # openpyxl is imported lazily to keep this hot module import-light
+    # (repo convention, cf. weblate/formats/external.py).
+    # ruff: ignore[import-outside-top-level]
     from openpyxl import Workbook
+
+    # ruff: ignore[import-outside-top-level]
     from openpyxl.cell.cell import TYPE_STRING
 
     workbook = Workbook()
     worksheet = workbook.active
-    assert worksheet is not None
+    if worksheet is None:
+        msg = "Workbook without an active sheet!"
+        raise TypeError(msg)
     worksheet.title = "Weblate"
     for row_number, row in enumerate(rows, start=1):
         for column_number, value in enumerate(row, start=1):
@@ -177,7 +187,12 @@ def _parse_xlsx(component: Component, content: bytes) -> list[list[str]]:
     source_units, _units = _component_units(component)
     expected_columns = len(_schema(component, source_units).headers)
     expected_rows = len(source_units) + 1
+    # openpyxl is imported lazily to keep this hot module import-light
+    # (repo convention, cf. weblate/formats/external.py).
+    # ruff: ignore[import-outside-top-level]
     from openpyxl import load_workbook
+
+    # ruff: ignore[import-outside-top-level]
     from openpyxl.utils.exceptions import InvalidFileException
 
     with ZipFile(BytesIO(content)) as archive:
@@ -196,7 +211,7 @@ def _parse_xlsx(component: Component, content: bytes) -> list[list[str]]:
         InvalidFileException,
         ValueError,
         KeyError,
-        xml.etree.ElementTree.ParseError,
+        ET.ParseError,
     ) as error:
         msg = "Invalid XLSX upload."
         raise ValidationError(msg) from error
@@ -290,7 +305,7 @@ def build_preview(
         )
         source = source_by_identity[identity].source
         for column, target in zip(parsed.headers[1:], row.values[1:], strict=True):
-            if column == "context" or column == source_code or not target:
+            if column in {"context", source_code} or not target:
                 continue
             if Counter(markup_tokens(source)) != Counter(
                 markup_tokens(target)

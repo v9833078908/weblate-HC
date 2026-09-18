@@ -37,10 +37,12 @@ import random
 import subprocess
 import sys
 import time
+from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import django
+from translate.storage.po import pofile
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -48,17 +50,17 @@ if TYPE_CHECKING:
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings_docker")
 django.setup()
 
-from django.conf import settings  # ruff: ignore[module-import-not-at-top-of-file]
-from django.utils import timezone  # ruff: ignore[module-import-not-at-top-of-file]
+from django.conf import settings
+from django.utils import timezone
 
-from weblate.auth.models import User  # ruff: ignore[module-import-not-at-top-of-file]
+from weblate.auth.models import User
 from weblate.lang.models import (
     Language,
 )
 from weblate.trans.autotranslate import (
     AutoTranslate,
 )
-from weblate.trans.models import (  # ruff: ignore[module-import-not-at-top-of-file]
+from weblate.trans.models import (
     Change,
     Component,
     LLMUsageLog,
@@ -106,8 +108,6 @@ def load_corpus() -> list[dict[str, Any]]:
 
 def write_po(path: Path, rows: Iterable[dict[str, Any]], *, language: str, key: str):
     """Write a monolingual PO: msgid is the key, msgstr is the text."""
-    from translate.storage.po import pofile
-
     store = pofile()
     store.updateheader(
         add=True,
@@ -438,7 +438,7 @@ def repair_pairs(run: dict[str, Any]) -> list[dict[str, Any]]:
                 "final_state": run["after"][str(unit_id)]["state"],
             }
         )
-    return sorted(pairs, key=lambda pair: pair["key"])
+    return sorted(pairs, key=itemgetter("key"))
 
 
 def stage_pairs(*, run_name: str = "run.json") -> None:

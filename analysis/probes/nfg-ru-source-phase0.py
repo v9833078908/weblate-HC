@@ -76,10 +76,8 @@ def is_template_note(explanation: str) -> bool:
 
 
 def get(url: str) -> dict | list:
-    request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage] - fixed https host above
-        url, headers={"Authorization": f"Token {TOKEN}"}
-    )
-    with urllib.request.urlopen(request, timeout=120) as response:  # ruff: ignore[suspicious-url-open-usage]
+    request = urllib.request.Request(url, headers={"Authorization": f"Token {TOKEN}"})
+    with urllib.request.urlopen(request, timeout=120) as response:
         return json.loads(response.read().decode())
 
 

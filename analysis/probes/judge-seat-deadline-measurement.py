@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# ruff: file-ignore[private-member-access]
 
 """Measure one production judge seat without persisting application rows."""
 

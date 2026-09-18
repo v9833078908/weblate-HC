@@ -188,7 +188,7 @@ Add the rule as one public predicate and use it in `get_glossary_terms`:
 ```python
 def glossary_selection_is_cached(
     unit: Unit, *, full: bool = False, include_variants: bool = True
-) -> bool:
+) -> bool: ...
 ```
 
 It returns `False` when the slot is empty, `True` when there is no stamp, and

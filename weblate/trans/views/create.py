@@ -2064,12 +2064,12 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
             # PendingUnitChange rows once any portion has actually written
             # units. The task's own terminal transitions are the only path
             # out of APPLYING and out of a FAILED apply/finalize retry.
-            cannot_cancel = draft.state in (
+            cannot_cancel = draft.state in {
                 LocKitImportDraft.State.APPLYING,
                 LocKitImportDraft.State.COMPLETED,
-            ) or (
+            } or (
                 draft.state == LocKitImportDraft.State.FAILED
-                and draft.retry_phase in ("apply", "finalize")
+                and draft.retry_phase in {"apply", "finalize"}
             )
             if cannot_cancel:
                 raise Http404
@@ -2084,10 +2084,10 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
         if action != "confirm":
             raise Http404
 
-        if draft.state in (
+        if draft.state in {
             LocKitImportDraft.State.APPLYING,
             LocKitImportDraft.State.COMPLETED,
-        ):
+        }:
             # Idempotent: a duplicate submit (double-click, retried POST)
             # returns to the same status page instead of starting a second
             # background task.
@@ -2175,7 +2175,7 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
             text = gettext("Preparing loc-kit table “%s”") % draft.source_filename
             expected_state = LocKitImportDraft.State.FAILED
             expected_retry_phase = draft.retry_phase
-        elif draft.retry_phase in ("apply", "finalize"):
+        elif draft.retry_phase in {"apply", "finalize"}:
             task_id = uuid.uuid4()
             phase = LocKitImportDraft.DispatchPhase.APPLY
             reset_fields = {

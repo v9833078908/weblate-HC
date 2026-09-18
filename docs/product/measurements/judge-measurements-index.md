@@ -219,7 +219,6 @@ critical        1     1      5     28
 ```
 
 > `severity-recalibration-measurements.md:118-121`: "**Ложные critical: 25 наблюдений на чистых строках** (из 415 чистых наблюдений) плюс 11 на minor — судья регулярно ставит `critical` на корректный перевод."
-
 > `severity-recalibration-measurements.md:122-123`: "**Заниженные critical: 7 из 35** наблюдений настоящего critical получили ниже critical."
 
 ### 1.17 Severity Recalibration — Baseline Metrics (zh_Hans, collegium, n=5)

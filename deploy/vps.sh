@@ -151,7 +151,6 @@ run_root_python_script() {
     ssh_retry "echo '$VPS_PASSWORD' | sudo -S -v 2>/dev/null; echo $payload | base64 -d | sudo python3"
 }
 
-
 # Runs a local script on the VPS as $VPS_USER, detached, logging to $REMOTE_LOG.
 # Detached because an image build outlives the tunnel's re-key interval.
 start_remote_script() {

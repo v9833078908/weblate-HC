@@ -70,7 +70,7 @@ for unit in units:
             continue
         # miss: record the surfaces of the source match for context only;
         # the variant the translator used must be eyeballed from samples.
-        for surface in stem_spans(term.source, unit.source):
+        for _surface in stem_spans(term.source, unit.source):
             pass
 
 # Print only terms with >= 3 distinct surfaces across the whole corpus OR
@@ -106,7 +106,7 @@ for term_source in watch:
 
 print()
 print("=== GIGAKHRUSHCH / SWAKIT concordance: distinct renderings ===")
-for term_source, canonical in (("ГИГАХРУЩ", None), ("САМОСБОР", None)):
+for term_source, _canonical in (("ГИГАХРУЩ", None), ("САМОСБОР", None)):
     forms: Counter = Counter()
     for unit in units:
         if not any(t.source == term_source for t in matched[unit.pk]):

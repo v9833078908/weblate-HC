@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Every weblate import must follow django.setup(), so it cannot sit at the top.
-# ruff: file-ignore[module-import-not-at-top-of-file]
 
 """
 Drive the real judge against the LiteLLM proxy, varying retry and reasoning.

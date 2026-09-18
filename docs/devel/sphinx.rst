@@ -57,8 +57,6 @@ discover all others.
    .. code-block:: python
 
       gettext_compact = "docs"
-
-
 You can find several documentation projects being translated using this approach:
 
 * `Weblate documentation <https://docs.weblate.org/>`_ (you are reading that now)

@@ -1,6 +1,9 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[assert, complex-structure, too-many-locals, too-many-statements]
+# - asserts guard profile invariants (stripped under -O by design); the large
+#   grammar parsers are intentionally structured and covered by the test suite.
 
 from __future__ import annotations
 
@@ -42,7 +45,7 @@ SOURCE_MARKUP_SUPPRESSED_CODE = "source.markup_diagnostics_suppressed"
 
 def _is_blank(value: str) -> bool:
     """Structural blank check only - never used to store trimmed text."""
-    return value.strip() == ""
+    return not value.strip()
 
 
 def _cell(rows: list[list[str]], row_idx: int, col_idx: int) -> str:
@@ -153,7 +156,9 @@ def _parse_keyed(
 
     skip_set = set(grammar.skip_rows)  # 0-based
     source_lang = component.source_lang
-    source_col = next(l.column for l in component.languages if l.code == source_lang)
+    source_col = next(
+        lang.column for lang in component.languages if lang.code == source_lang
+    )
 
     units: list[StringUnit] = []
     diagnostics: list[Diagnostic] = []
@@ -163,7 +168,7 @@ def _parse_keyed(
     markup_suppressed = 0
 
     # Build column maps
-    lang_columns = {l.code: l.column for l in component.languages}
+    lang_columns = {lang.code: lang.column for lang in component.languages}
     comment_cols = component.comments
     reference_cols = component.references
     explanation_col = component.explanation
@@ -225,20 +230,21 @@ def _parse_keyed(
             ]
             + list(lang_columns.values())
         )
-        if len(row) <= max_col and len(row) < max_col + 1:
+        if len(row) <= max_col and (
+            len(row) <= component.key.column or len(row) <= source_col
+        ):
             # Row doesn't have enough columns for the key and source
-            if len(row) <= component.key.column or len(row) <= source_col:
-                diagnostics.append(
-                    Diagnostic(
-                        Severity.ERROR,
-                        "po.short_row",
-                        component.component,
-                        component.sheet,
-                        row_1based,
-                        f"row has {len(row)} columns, needs at least {max_col + 1}",
-                    )
+            diagnostics.append(
+                Diagnostic(
+                    Severity.ERROR,
+                    "po.short_row",
+                    component.component,
+                    component.sheet,
+                    row_1based,
+                    f"row has {len(row)} columns, needs at least {max_col + 1}",
                 )
-                continue
+            )
+            continue
 
         # Missing source. A key whose source cell is empty still carries the
         # translations the kit has for it, so it is imported and the source
@@ -483,7 +489,7 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
     skip_set = set(grammar.skip_rows)  # 0-based
 
     source_lang = component.source_lang
-    lang_columns = {l.code: l.column for l in component.languages}
+    lang_columns = {lang.code: lang.column for lang in component.languages}
     target_langs = component.initial_target_languages
 
     # Build the set of all covered data rows (0-based).
@@ -558,7 +564,7 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
 
             # TBX drops outer whitespace on write, so keeping it would break
             # parse-back. Trim and say so, exactly as for an explanation.
-            for code, col in lang_columns.items():
+            for code in lang_columns:
                 val = term_values[code]
                 if not _is_blank(val) and _has_outer_whitespace(val):
                     diagnostics.append(
@@ -589,18 +595,18 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
                 )
 
             # All initial_target_languages require a non-empty term.
-            for tlang in target_langs:
-                if _is_blank(term_values.get(tlang, "")):
-                    diagnostics.append(
-                        Diagnostic(
-                            Severity.ERROR,
-                            "tbx.missing_target_term",
-                            component.component,
-                            component.sheet,
-                            term_1based,
-                            f"target term in language {tlang!r} is empty",
-                        )
-                    )
+            diagnostics.extend(
+                Diagnostic(
+                    Severity.ERROR,
+                    "tbx.missing_target_term",
+                    component.component,
+                    component.sheet,
+                    term_1based,
+                    f"target term in language {tlang!r} is empty",
+                )
+                for tlang in target_langs
+                if _is_blank(term_values.get(tlang, ""))
+            )
 
             # Extract explanation values per language.
             desc_values: dict[str, str] = {}
@@ -610,7 +616,7 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
             # TBX strips outer whitespace from descrip/note on write, so
             # keeping the raw value would break parse-back. Trim it here and
             # say so: the only loss is whitespace around an explanation.
-            for code, col in lang_columns.items():
+            for code in lang_columns:
                 val = desc_values[code]
                 if not _is_blank(val) and _has_outer_whitespace(val):
                     diagnostics.append(
@@ -727,7 +733,7 @@ def _parse_record_map(
     ignored_columns = {ignored.column for ignored in grammar.ignored_columns}
 
     source_lang = component.source_lang
-    lang_columns = {l.code: l.column for l in component.languages}
+    lang_columns = {lang.code: lang.column for lang in component.languages}
     target_langs = component.initial_target_languages
     source_notes = [n for n in grammar.notes if n.scope == "source"]
     target_notes: dict[str, list] = {code: [] for code in target_langs}
@@ -865,7 +871,12 @@ def _parse_record_map(
             # Notes, in declaration order.
             note_rows: list[int] = []
 
-            def collect(notes: list) -> list[str]:
+            def collect(
+                notes: list,
+                base_row: int = base_row,
+                consumed: set[tuple[int, int]] = consumed,
+                note_rows: list[int] = note_rows,
+            ) -> list[str]:
                 values: list[str] = []
                 for note in notes:
                     row_idx = base_row + note.row_offset

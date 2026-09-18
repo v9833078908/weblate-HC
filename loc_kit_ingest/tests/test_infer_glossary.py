@@ -7,14 +7,17 @@ from __future__ import annotations
 import pytest
 
 from loc_kit_ingest.infer import (
-    _MAX_REGIONS,
-    _MAX_SKIPPED_ROWS,
+    _MAX_REGIONS,  # ruff: ignore[import-private-name] - tests probe the guard limit
+    _MAX_SKIPPED_ROWS,  # ruff: ignore[import-private-name] - tests probe the guard limit
     InferenceError,
     infer_glossary_profile,
 )
 from loc_kit_ingest.langcode import language_code
+from loc_kit_ingest.model import Severity
+from loc_kit_ingest.parser import parse_component
 from loc_kit_ingest.profile import parse_profile
-from loc_kit_ingest.reader import read_sheets
+from loc_kit_ingest.reader import read_sheets, validate_sheet_headers
+from loc_kit_ingest.writer import render_component, validate_rendered_component
 
 # Standard language-only kit: header codes, a caption row with language
 # names, a section row (imported as an ordinary term), a blank row, a
@@ -177,8 +180,12 @@ def test_too_many_skipped_rows_is_refused() -> None:
     """Every skipped row emits a note, so the count must be bounded."""
     rows = [["ru", "en"]]
     for index in range(_MAX_SKIPPED_ROWS + 5):
-        rows.append([f"термин{index}", f"term{index}"])
-        rows.append(["", f"stray{index}"])  # no source term -> skipped
+        rows.extend(
+            [
+                [f"термин{index}", f"term{index}"],
+                ["", f"stray{index}"],  # no source term -> skipped
+            ]
+        )
 
     with pytest.raises(InferenceError, match="fragmented"):
         infer_glossary_profile("S", rows, component="s")
@@ -193,8 +200,12 @@ def test_too_many_regions_is_refused() -> None:
     """
     rows = [["ru", "en"]]
     for index in range(_MAX_REGIONS + 5):
-        rows.append([f"термин{index}", f"term{index}"])
-        rows.append([])  # blank row: splits the region, is not "skipped"
+        rows.extend(
+            [
+                [f"термин{index}", f"term{index}"],
+                [],  # blank row: splits the region, is not "skipped"
+            ]
+        )
 
     with pytest.raises(InferenceError, match="fragmented"):
         infer_glossary_profile("S", rows, component="s")
@@ -467,15 +478,19 @@ PAIRS_WITH_NOTE = [
     ["Персонажи", "Characters", ""],
     ["Партия", "Party", "Мужской род во французском."],
     [
-        "Правящая политическая партия страны, а не партия товара; "
-        "не обозначает набор одинаковых предметов.",
+        (
+            "Правящая политическая партия страны, а не партия товара; "
+            "не обозначает набор одинаковых предметов."
+        ),
         "The ruling party of the country, not a batch of goods.",
         "",
     ],
     ["Самосбор", "Samosbor", "Транслитерируется."],
     [
-        "Аномальное явление, разрушающее материю вокруг себя и меняющее "
-        "поведение персонажей поблизости.",
+        (
+            "Аномальное явление, разрушающее материю вокруг себя и меняющее "
+            "поведение персонажей поблизости."
+        ),
         "An anomaly that dissolves the matter around it.",
         "",
     ],
@@ -544,11 +559,6 @@ def test_ignored_columns_absent_when_every_column_maps() -> None:
 
 
 def _render_round_trip(document, rows, tmp_path):
-    from loc_kit_ingest.model import Severity
-    from loc_kit_ingest.parser import parse_component
-    from loc_kit_ingest.reader import validate_sheet_headers
-    from loc_kit_ingest.writer import render_component, validate_rendered_component
-
     component = parse_profile(document).components[0]
     diagnostics = list(validate_sheet_headers(component, rows))
     result = parse_component(component, rows)
@@ -579,10 +589,12 @@ def _infer_csv(tmp_path, name: str, body: str):
         ),
         (
             "Terms.csv",
-            "id,ru,en,ja,zh-TC,notes\n"
-            "char_leon,Леон,Leon,レオン,,главный герой\n"
-            "char_aki,Аки,Aki,,阿姬,\n"
-            "char_joe,Джо,Joe,,,паук\n",
+            (
+                "id,ru,en,ja,zh-TC,notes\n"
+                "char_leon,Леон,Leon,レオン,,главный герой\n"
+                "char_aki,Аки,Aki,,阿姬,\n"
+                "char_joe,Джо,Joe,,,паук\n"
+            ),
             ["en", "ja", "zh_Hant"],
             [{"column": 1, "header": "id"}],
             ("Джо", "zh_Hant"),
@@ -617,4 +629,4 @@ def test_real_kit_csv_shapes_survive_infer_and_render(
     if blank_target is not None:
         source, language = blank_target
         blank = next(unit for unit in result.units if unit.values["ru"] == source)
-        assert blank.values[language] == ""
+        assert not blank.values[language]

@@ -556,8 +556,8 @@ def _validate_envelope(envelope: object) -> None:
     """
     if not isinstance(envelope, dict):
         raise _EnvelopeValidationError
-    for field in ("status", "profile", "assumptions", "reason"):
-        if field not in envelope:
+    for key in ("status", "profile", "assumptions", "reason"):
+        if key not in envelope:
             raise _EnvelopeValidationError
     status = envelope["status"]
     profile = envelope["profile"]
@@ -984,6 +984,8 @@ def count_judge_stale_after_explanations(
     """
     # ruff: ignore[import-outside-top-level]
     from weblate.glossary.models import get_matched_glossary_prompt_entries
+
+    # ruff: ignore[import-outside-top-level]
     from weblate.trans.models.judge import compute_context_hash, compute_target_hash
 
     _check_explanation_apply_eligibility(component)

@@ -20,6 +20,9 @@ from __future__ import annotations
 import importlib.util
 import os
 import pathlib
+
+# The wrapper reads the API key from the dev-docker container via subprocess.
+# ruff: ignore[suspicious-subprocess-import]
 import subprocess
 import sys
 from argparse import Namespace
@@ -43,6 +46,8 @@ _spec.loader.exec_module(probe)  # runs django.setup()
 
 from django.conf import settings  # ruff: ignore[module-import-not-at-top-of-file]
 
+# docker is on PATH in the host environment this wrapper is written for.
+# ruff: ignore[start-process-with-partial-path]
 _key = subprocess.run(
     ["docker", "exec", "dev-docker-weblate-1", "printenv", "WEBLATE_JUDGE_API_KEY"],
     capture_output=True,
@@ -79,6 +84,9 @@ settings.JUDGE_FALLBACK_BASE_URL = ""
 settings.JUDGE_FALLBACK_API_KEY = ""
 # Retries/unparsed rounds/temperature/max_tokens stay at production defaults.
 
+# The wrapper deliberately patches the probe module's private alias-cache hook:
+# the manifest slot must run against the exact alias_revision prod resolved.
+# ruff: ignore[private-member-access]
 _orig_alias_revision_hash = probe.judge._alias_revision_hash
 _DRIFT_ALIAS_MAPPING = {
     # LiteLLM proxy pod variation: extra null keys in model_info serialize to c0801b6a,
@@ -92,6 +100,8 @@ def _normalized_alias_revision_hash(info: object) -> str:
     return _DRIFT_ALIAS_MAPPING.get(h, h)
 
 
+# Restore the same private hook with the drift mapping applied.
+# ruff: ignore[private-member-access]
 probe.judge._alias_revision_hash = _normalized_alias_revision_hash
 
 _manifest = sys.argv[1]
@@ -100,7 +110,9 @@ _resume = "--resume" in sys.argv[3:]
 
 if _slot == "preflight":
     probe.judge.validate_request_settings()
+    # Preflight mode's contract: resolve the seat profiles and print them once.
     for profile in probe.judge.judge_seat_profiles():
+        # ruff: ignore[print]
         print(probe.json.dumps(probe.profile_snapshot(profile), sort_keys=True))
     sys.exit(0)
 

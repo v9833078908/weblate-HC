@@ -85,13 +85,13 @@ def degenerate(run: dict) -> bool:
 
 
 def metrics(lab, gt, true_crit, true_majorplus, true_none):
-    return dict(
-        missed_crit=sum(1 for i in true_crit if lab[i] != "critical"),
-        false_crit=sum(1 for i in true_none if lab[i] == "critical"),
-        real14=sum(1 for i in ANCHOR14 if RANK[lab[i]] >= 2),
-        real24=sum(1 for i in true_majorplus if RANK[lab[i]] >= 2),
-        fp=sum(1 for i in true_none if RANK[lab[i]] >= 2),
-    )
+    return {
+        "missed_crit": sum(1 for i in true_crit if lab[i] != "critical"),
+        "false_crit": sum(1 for i in true_none if lab[i] == "critical"),
+        "real14": sum(1 for i in ANCHOR14 if RANK[lab[i]] >= 2),
+        "real24": sum(1 for i in true_majorplus if RANK[lab[i]] >= 2),
+        "fp": sum(1 for i in true_none if RANK[lab[i]] >= 2),
+    }
 
 
 def load_revision(fn: str) -> dict[str, int]:
@@ -138,10 +138,9 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    gt = {
-        i: v["severity"]
-        for i, v in json.load(open(args.truth, encoding="utf-8"))["labels"].items()
-    }
+    with open(args.truth, encoding="utf-8") as fh:
+        labels = json.load(fh)["labels"]
+    gt = {i: v["severity"] for i, v in labels.items()}
     true_crit = {i for i, s in gt.items() if s == "critical"}
     true_majorplus = {i for i, s in gt.items() if RANK[s] >= 2}
     true_none = {i for i, s in gt.items() if s == "none"}
@@ -190,7 +189,7 @@ def main() -> None:
             )
         for name, labs in configs:
 
-            def med(key):
+            def med(key, labs=labs):
                 return st.median(
                     metrics(l, gt, true_crit, true_majorplus, true_none)[key]
                     for l in labs

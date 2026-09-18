@@ -34,9 +34,9 @@ from weblate.trans.models.judge import (
     JudgeAdaptiveState,
     JudgeDeferral,
     JudgeRequestAttempt,
-    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
+    ProducerRun,
 )
 from weblate.trans.models.label import Label
 from weblate.trans.models.llm_usage import LLMUsageLog
@@ -76,13 +76,13 @@ __all__ = [
     "JudgeAdaptiveState",
     "JudgeDeferral",
     "JudgeRequestAttempt",
-    "ProducerRun",
     "JudgeRunUnit",
     "JudgeVerdict",
     "LLMUsageLog",
     "Label",
     "LocKitImportDraft",
     "PendingUnitChange",
+    "ProducerRun",
     "Project",
     "Report",
     "Suggestion",

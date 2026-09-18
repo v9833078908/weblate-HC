@@ -244,13 +244,13 @@ explanation попадёт в записи промпта (`source_explanation` 
 **Где:** `weblate/machinery/llm.py:485-491`, `_get_payload`.
 
 ```python
-        result = {
-            "source_language": source_language,
-            "target_language": target_language,
-            "glossary": glossary,
-            "strings": texts,
-        }
-        return json.dumps(result, ensure_ascii=False)
+result = {
+    "source_language": source_language,
+    "target_language": target_language,
+    "glossary": glossary,
+    "strings": texts,
+}
+return json.dumps(result, ensure_ascii=False)
 ```
 
 **Почему:** сейчас модель получает не текст, а его ASCII-экранирование. Каждая
@@ -331,9 +331,8 @@ Note-column код уже на проде и ждёт данные; сейчас
 (`project.glossary_automaton`), после чего каждое проверяется на границы слова:
 
 ```python
-                    if not uses_whitespace or (
-                        (start - 1 in boundaries[i]) and (end in boundaries[i])
-                    ):
+if not uses_whitespace or ((start - 1 in boundaries[i]) and (end in boundaries[i])):
+    ...
 ```
 
 `boundaries` - позиции небуквенных символов, `NON_WORD_RE = re.compile(r"\W")`

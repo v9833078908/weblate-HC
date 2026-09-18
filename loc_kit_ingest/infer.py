@@ -1,6 +1,9 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[complex-structure, too-many-branches, too-many-locals, too-many-statements]
+# - infer_component/infer_glossary_profile are deliberate long sequential
+#   decision pipelines; refactoring them would obscure the profile logic.
 
 """
 Derive a strict profile document from a kit's own header row.
@@ -124,7 +127,7 @@ def _is_blank_row(row: list[str]) -> bool:
 
 
 def _is_numeric(values: list[str]) -> bool:
-    """True when every non-empty value is a plain number, like an engine id."""
+    """Return True when every non-empty value is a plain number, like an engine id."""
     present = [v.strip() for v in values if v.strip()]
     if not present:
         return False
@@ -154,7 +157,7 @@ def _find_header_row(rows: list[list[str]]) -> tuple[int, dict[int, str]]:
 
 
 def _is_caption_row(row: list[str], lang_cols: dict[int, str]) -> bool:
-    """True for a row that labels the columns instead of holding content."""
+    """Return True for a row that labels the columns instead of holding content."""
     if _cell(row, _KEY_COLUMN).strip().casefold() in _IGNORE_MARKERS:
         return True
     for col, code in lang_cols.items():

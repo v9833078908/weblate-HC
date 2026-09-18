@@ -32,6 +32,7 @@ import urllib.request
 from collections import Counter
 from dataclasses import dataclass, field
 from itertools import starmap
+from operator import itemgetter
 from typing import Any
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -400,7 +401,7 @@ def judge(
     for i, batch in enumerate(batches):
         batch_verdicts, batch_usage = judge_batch(model, batch, api_key, timeout)
         total.merge(batch_usage)
-        for record, verdict in zip(batch, batch_verdicts):
+        for record, verdict in zip(batch, batch_verdicts, strict=False):
             results[record.record_id] = verdict
         print(f"  batch {i + 1}/{len(batches)} done  ", end="\r", file=sys.stderr)
 
@@ -413,8 +414,7 @@ def max_severity_union(
     v2: dict[str, Verdict],
 ) -> dict[str, Verdict]:
     result: dict[str, Verdict] = {}
-    for rid in v1:
-        a = v1[rid]
+    for rid, a in v1.items():
         b = v2.get(rid, UNPARSED)
         if a.unparsed and b.unparsed:
             result[rid] = UNPARSED
@@ -634,7 +634,7 @@ def attach_family(records: list[Record], limit: int) -> None:
 
     def score(a: list[str], b: list[str]) -> int:
         shared = 0
-        for left, right in zip(a, b):
+        for left, right in zip(a, b, strict=False):
             if left != right:
                 break
             shared += 1
@@ -653,7 +653,7 @@ def attach_family(records: list[Record], limit: int) -> None:
                 if other.record_id != record.record_id
                 and score(mine, tokens[other.record_id]) >= 4
             ),
-            key=lambda item: (item[0], item[1]),
+            key=itemgetter(0, 1),
         )
         record.family = [
             (other.context.strip(), other.source, other.target)
@@ -706,12 +706,10 @@ def main() -> None:
 
     if args.merge:
         records = load_units(args.input)
-        v1 = verdicts_from_dict(
-            json.loads(open(args.merge[0], encoding="utf-8").read())
-        )
-        v2 = verdicts_from_dict(
-            json.loads(open(args.merge[1], encoding="utf-8").read())
-        )
+        with open(args.merge[0], encoding="utf-8") as f:
+            v1 = verdicts_from_dict(json.load(f))
+        with open(args.merge[1], encoding="utf-8") as f:
+            v2 = verdicts_from_dict(json.load(f))
         merge_and_report(records, v1, v2, args.merge[0], args.merge[1])
         return
 

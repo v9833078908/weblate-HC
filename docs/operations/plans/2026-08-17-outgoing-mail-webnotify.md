@@ -6,7 +6,6 @@
 > для `i.efimov@` и `ivan.belov@` подтверждены `AuditLog(sent-email)`
 > (10:37, 10:38 UTC). Все 7 пользователей с почтой и входом, `VerifiedEmail`
 > у ivanbelov появился сам. Откат — `.env.bak-2026-08-17` на сервере.
-
 > **Цель пользователя:** прод `l10n.herocraft.com` действительно отправляет
 > письма (инвайты, сброс пароля, подтверждение адреса, письма админам,
 > дайджесты) от `webnotify@herocraft.com`; существующие пользователи
@@ -240,7 +239,12 @@ curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}\n' \
 
   ```python
   from weblate.accounts.models import AuditLog
-  print(AuditLog.objects.filter(activity="sent-email").order_by("-timestamp")[:3].values("timestamp", "email"))
+
+  print(
+      AuditLog.objects.filter(activity="sent-email")
+      .order_by("-timestamp")[:3]
+      .values("timestamp", "email")
+  )
   ```
 
 - Лимит: `reset-request` блокируется при 10 запросах/сутки

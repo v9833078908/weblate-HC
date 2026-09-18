@@ -127,7 +127,7 @@ def kit_with_profile(tmp_path):
 
 @pytest.fixture
 def mutated_kit(kit_with_profile):
-    """Factory that creates a mutated kit+profile pair for a given mutation name."""
+    """Create a mutated kit+profile pair for a given mutation name."""
 
     def _create(mutation: str):
         kits, profile_path = kit_with_profile

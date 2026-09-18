@@ -11,7 +11,7 @@
 | Когда | Кто | Проект |
 |---|---|---|
 | 2026-09-03 20:12 | (скрипт) | need-for-greed |
-| 2026-09-04 11:13 | i.efimov@herocraft.com | heart-abyss |
+| 2026-09-04 11:13 | <i.efimov@herocraft.com> | heart-abyss |
 | 2026-09-04 11:15 | (скрипт) | col4, victory-banner, strategy-and-tactics-2 |
 
 То есть пять проектов уже несли флаг и посчитанные строки. Вывод «включён

@@ -1045,8 +1045,6 @@ have a correct sender address, please configure :setting:`SERVER_EMAIL` and
 
     SERVER_EMAIL = "admin@example.org"
     DEFAULT_FROM_EMAIL = "weblate@example.org"
-
-
 .. note::
 
    To disable sending e-mails by Weblate set :setting:`django:EMAIL_BACKEND`
@@ -1183,8 +1181,6 @@ following to :file:`settings.py` (the path is Debian-specific):
     import os
 
     os.environ["REQUESTS_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
-
-
 .. _server:
 
 Running server
