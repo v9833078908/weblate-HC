@@ -43,8 +43,8 @@
   {% for warning in run.warnings %}
     <div class="alert alert-warning">{{ warning }}</div>
   {% endfor %}
-  {% with prep=run.summary.mt_preparation %}
-    {% if prep %}
+  {% if "mt_preparation" in run.summary %}
+    {% with prep=run.summary.mt_preparation %}
       <div class="card mb-3" aria-labelledby="judge-preparation-heading">
         <div class="card-header">
           <h4 id="judge-preparation-heading" class="card-title">{% translate "Translation preparation" %}</h4>
@@ -83,8 +83,8 @@
           {% endif %}
         </div>
       </div>
-    {% endif %}
-  {% endwith %}
+    {% endwith %}
+  {% endif %}
   {% if coverage %}
     <div class="card mb-3" aria-labelledby="judge-coverage-heading">
       <div class="card-header">
