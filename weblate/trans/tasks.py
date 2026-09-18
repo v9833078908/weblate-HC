@@ -2893,16 +2893,28 @@ def drain_producer_run_dispatches() -> None:
     from weblate.trans.models.judge import ProducerRun
 
     cancelling_runs = ProducerRun.objects.filter(
-        status=ProducerRun.Status.CANCEL_REQUESTED
+        status=ProducerRun.Status.CANCEL_REQUESTED,
+        execution_version__gte=1,
     )
     for run in cancelling_runs.iterator():
         with transaction.atomic():
             locked = ProducerRun.objects.select_for_update().filter(pk=run.pk).first()
             if locked and locked.status == ProducerRun.Status.CANCEL_REQUESTED:
-                locked.status = ProducerRun.Status.CANCELLED
+                # ruff: ignore[import-outside-top-level]
+                from weblate.trans.models.judge import JudgeRunUnit
+
+                has_results = (
+                    JudgeRunUnit.objects.filter(run=locked)
+                    .exclude(outcome=JudgeRunUnit.Outcome.PENDING)
+                    .exists()
+                )
+                locked.status = (
+                    ProducerRun.Status.PARTIAL
+                    if has_results
+                    else ProducerRun.Status.CANCELLED
+                )
                 locked.finished = timezone.now()
                 locked.save(update_fields=["status", "finished"])
-
     queued_ids = ProducerRun.objects.filter(
         status=ProducerRun.Status.QUEUED,
         dispatch_task_id__isnull=False,

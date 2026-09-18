@@ -2404,17 +2404,52 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     count
                     for outcome, count in outcomes.items()
                     if outcome != JudgeRunUnit.Outcome.SKIPPED
+                )
+                + (
+                    self._chunk_prior_summary["evaluated"]
+                    if self._chunk_prior_summary
+                    else 0
                 ),
-                nothing_blocking=outcomes.get(JudgeRunUnit.Outcome.PASSED, 0),
-                minor_noted=outcomes.get(JudgeRunUnit.Outcome.MINOR, 0),
-                major_not_fixed=outcomes.get(JudgeRunUnit.Outcome.MAJOR, 0),
-                critical_held=outcomes.get(JudgeRunUnit.Outcome.CRITICAL, 0),
-                unparsed=outcomes.get(JudgeRunUnit.Outcome.UNPARSED, 0),
+                nothing_blocking=outcomes.get(JudgeRunUnit.Outcome.PASSED, 0)
+                + (
+                    self._chunk_prior_summary["nothing_blocking"]
+                    if self._chunk_prior_summary
+                    else 0
+                ),
+                minor_noted=outcomes.get(JudgeRunUnit.Outcome.MINOR, 0)
+                + (
+                    self._chunk_prior_summary["minor_noted"]
+                    if self._chunk_prior_summary
+                    else 0
+                ),
+                major_not_fixed=outcomes.get(JudgeRunUnit.Outcome.MAJOR, 0)
+                + (
+                    self._chunk_prior_summary["major_not_fixed"]
+                    if self._chunk_prior_summary
+                    else 0
+                ),
+                critical_held=outcomes.get(JudgeRunUnit.Outcome.CRITICAL, 0)
+                + (
+                    self._chunk_prior_summary["critical_held"]
+                    if self._chunk_prior_summary
+                    else 0
+                ),
+                unparsed=outcomes.get(JudgeRunUnit.Outcome.UNPARSED, 0)
+                + (
+                    self._chunk_prior_summary["unparsed"]
+                    if self._chunk_prior_summary
+                    else 0
+                ),
                 untranslated=JudgeRunUnit.objects.filter(
                     run=run,
                     outcome=JudgeRunUnit.Outcome.SKIPPED,
                     skip_reason=JudgeRunUnit.SkipReason.UNTRANSLATED,
-                ).count(),
+                ).count()
+                + (
+                    self._chunk_prior_summary["untranslated"]
+                    if self._chunk_prior_summary
+                    else 0
+                ),
                 cap_remainder=run.summary.get(
                     "cap_remainder", summary["cap_remainder"]
                 ),
@@ -2602,6 +2637,23 @@ class BatchAutoTranslate(BaseAutoTranslate):
         else:
             producer_run = None
         self.active_producer_run = producer_run
+        if producer_run is not None and producer_run.execution_version >= 1:
+            # Each continuation chunk is a fresh BatchAutoTranslate with a
+            # fresh judge_summary; accumulate the durable tally across chunk
+            # boundaries so the final COMPLETED summary reports the full run.
+            prior = producer_run.summary or {}
+            self._chunk_prior_summary = {
+                "evaluated": prior.get("evaluated", 0),
+                "nothing_blocking": prior.get("nothing_blocking", 0),
+                "minor_noted": prior.get("minor_noted", 0),
+                "major_not_fixed": prior.get("major_not_fixed", 0),
+                "critical_held": prior.get("critical_held", 0),
+                "unparsed": prior.get("unparsed", 0),
+                "repaired": prior.get("repaired", 0),
+                "untranslated": prior.get("untranslated", 0),
+            }
+        else:
+            self._chunk_prior_summary = None
         if producer_run is not None and producer_run.status in {
             ProducerRun.Status.COMPLETED,
             ProducerRun.Status.FAILED,
@@ -2609,8 +2661,6 @@ class BatchAutoTranslate(BaseAutoTranslate):
             ProducerRun.Status.PARTIAL,
         }:
             return gettext("Automatic translation completed.")
-        if judge_preview is not None:
-            self.judge_summary = JudgeSummary()
         judge_remaining = judge_preview.processed if judge_preview is not None else None
         selected_workspace_source_component_ids: dict[int, list[int]] | None = None
         if producer_run is not None and preparation_scope is not None:
@@ -2884,6 +2934,12 @@ class BatchAutoTranslate(BaseAutoTranslate):
             if trans_id is not None:
                 chunk_by_translation.setdefault(trans_id, []).append(unit_id)
 
+        # A cancellation requested before this continuation worker started must
+        # not pay for a full chunk: check before the first translation loop.
+        if _run_cancel_requested(producer_run):
+            self._finish_producer_run(producer_run, ProducerRun.Status.CANCELLED, "")
+            return gettext("Automatic translation cancelled.")
+
         for pos, translation in enumerate(self.translations, start=1):
             trans_chunk_ids = chunk_by_translation.get(translation.pk)
             if not trans_chunk_ids:
@@ -2925,6 +2981,16 @@ class BatchAutoTranslate(BaseAutoTranslate):
             )
             self._finish_translation(auto_translate, None)
             self.set_progress(pos)
+            if self.failure_message:
+                self._finish_producer_run(
+                    producer_run, ProducerRun.Status.FAILED, self.failure_message
+                )
+                return self.failure_message
+            if _run_cancel_requested(producer_run):
+                self._finish_producer_run(
+                    producer_run, ProducerRun.Status.CANCELLED, ""
+                )
+                return gettext("Automatic translation cancelled.")
 
         new_cursor = cursor + len(chunk_ids)
         has_more = new_cursor < len(snapshot)
@@ -2932,9 +2998,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
             with transaction.atomic():
                 locked = ProducerRun.objects.select_for_update().get(pk=producer_run.pk)
                 if locked.status == ProducerRun.Status.CANCEL_REQUESTED:
-                    locked.status = ProducerRun.Status.CANCELLED
-                    locked.finished = timezone.now()
-                    locked.save(update_fields=["status", "finished"])
+                    self._finish_producer_run(locked, ProducerRun.Status.CANCELLED, "")
                     return gettext("Automatic translation cancelled.")
                 if locked.status != ProducerRun.Status.RUNNING:
                     return gettext("Automatic translation stopped.")
