@@ -210,6 +210,10 @@ class JudgeRequest:
     #: The producer's own answer to a meaning-clarifying question for this
     #: exact target unit (Task 7). "" for every request with none to offer.
     clarification: str = ""
+    #: The unit this request judges. Never part of the wire payload or of the
+    #: cache identity; the producer's judge phase uses it to re-check the text
+    #: of the strings it is about to send (C3 scenario 7).
+    unit_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -2056,6 +2060,7 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
     attempt: int = 0,
     retry_deadline: float | None = None,
     cancelled: Callable[[], bool] | None = None,
+    scope_guard: Callable[[Sequence[JudgeRequest]], bool] | None = None,
 ) -> list[JudgeResult]:
     """
     Return one result per request without ever persisting prompt or response text.
@@ -2065,6 +2070,9 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
     ``cancelled`` is polled before every batch (G4): once it reports a
     cancellation, no further batch is dispatched, but a batch already sent
     still completes and its result is kept and reported to ``on_batch``.
+    ``scope_guard`` is polled with the batch about to be sent (C3 scenario 7):
+    a scope that changed after the barrier stops further dispatch, while an
+    already sent batch keeps its results.
     """
     validate_request_settings()
     profile = (
@@ -2087,6 +2095,8 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
         # keep sending that size until the run ends.
         batch_size = _adaptive_budget(profile, adaptive)
         batch = list(requests[start : start + batch_size])
+        if scope_guard is not None and scope_guard(batch):
+            break
         batch_results = _run_batch(
             batch,
             profile=profile,

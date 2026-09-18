@@ -75,6 +75,7 @@ if TYPE_CHECKING:
     from weblate.auth.models import User
     from weblate.auth.results import PermissionResult
     from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
+    from weblate.trans.judge import JudgeRequest
     from weblate.utils.state import StringState
 
 
@@ -1272,6 +1273,34 @@ class AutoTranslate(BaseAutoTranslate):
         self.progress_range = (split, base_high)
         self.progress_steps = preview.worst_case_calls
         input_targets = {unit.id: unit.get_target_plurals() for unit in units}
+        scope_changed = False
+
+        def keep_scope(batch_requests: Sequence[JudgeRequest]) -> bool:
+            """
+            Decide whether the batch about to be sent is still worth sending.
+
+            C3 scenario 7: the closed scope was ready at the barrier, but a
+            human edit or a deletion can empty a string before its batch
+            leaves. A batch whose strings no longer carry text is not sent;
+            batches already sent keep their results.
+            """
+            nonlocal scope_changed
+            batch_ids = [
+                request.unit_id
+                for request in batch_requests
+                if request.unit_id is not None
+            ]
+            if not batch_ids:
+                return False
+            still_has_text = {
+                unit.pk: any(unit.get_target_plurals())
+                for unit in Unit.objects.filter(pk__in=batch_ids)
+            }
+            if any(not has_text for has_text in still_has_text.values()):
+                scope_changed = True
+                return True
+            return False
+
         try:
             run_kwargs = {} if self.producer_run is None else {"run": self.producer_run}
             verdicts = run_judge_batch(
@@ -1282,12 +1311,23 @@ class AutoTranslate(BaseAutoTranslate):
                 candidate_severities=self.judge_candidate_severities,
                 mutating_repairs=self.judge_mutating_repairs
                 and not self.judge_proposal_only,
+                scope_guard=keep_scope,
                 **run_kwargs,
             )
             if completed_batches < self.progress_steps:
                 self.set_progress(self.progress_steps)
         finally:
             self.progress_range = (base_low, base_high)
+        if scope_changed:
+            # The plan's C3: a target that disappeared after the barrier stops
+            # new sends and fails the run with an explicit reason; the results
+            # already recorded stay, and unsent strings keep their PENDING
+            # reservation, so coverage stays honest.
+            self.failure_message = gettext(
+                "Judges were stopped: the scope changed while the run was "
+                "checking. Start a new run."
+            )
+            self.add_warning(self.failure_message)
         for language_code in sorted(
             getattr(verdicts, "unsupported_repair_languages", set())
         ):
@@ -1994,17 +2034,17 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 return None
 
         # Global barrier: re-read every missing id; only a fully ready scope
-        # opens the judge phase (C3). A scope with no usable engine is never
-        # "ready": the judge evaluates whatever text exists, and missing
-        # strings are honestly skipped per unit, so the leftover check does
-        # not block a run that could not have paid for preparation.
+        # opens the judge phase (C3). The check does not depend on an engine
+        # being configured: a scope with missing strings and no engine cannot
+        # be prepared, so it is a blocker with its own warning, never a
+        # "ready" scope that lets the judges run on empty text.
         leftover = [
             unit.pk
             for unit in Unit.objects.filter(pk__in=scope.missing_ids)
             if unit_missing_translation(unit)
         ]
         incomplete = self._find_incomplete_units(scope)
-        if (leftover or incomplete) and scope.mt_engine is not None:
+        if leftover or incomplete:
             return self._finalize_preparation_failure(
                 run,
                 scope,
@@ -2781,10 +2821,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
         # Global preparation barrier (C3): fill every missing string in the
         # closed scope before any judge request of any language. A confirmed
         # refusal or a remaining gap fails the whole run here. The mandatory
-        # preparation runs when this dispatch asked for machine translation
-        # (``auto_source="mt"``) and is not proposal-only; a proposal-only
-        # run judges the stored text as-is, and an overwrite request never
-        # uses the empty-only preparation.
+        # preparation runs whenever this dispatch asked for machine
+        # translation (``auto_source="mt"``). ``judge_proposal_only`` says the
+        # judge's own verdicts must not mutate state; it never turns the
+        # barrier off, and neither does ``judge_pretranslate=False`` -- a
+        # dispatched bulk judge run cannot opt out of preparing the closed
+        # scope. An overwrite request still never uses the empty-only
+        # preparation.
         # A single-unit re-check and the deferred-retry drain are durable
         # purposes judged on the stored text: they never widen into a paid
         # project-wide preparation (C3).
@@ -2795,7 +2838,6 @@ class BatchAutoTranslate(BaseAutoTranslate):
             auto_source == "mt"
             and producer_run is not None
             and preparation_scope is not None
-            and not self.judge_proposal_only
             and not self.overwrite_existing
             and not purpose_judges_stored_text
         )
@@ -2835,7 +2877,6 @@ class BatchAutoTranslate(BaseAutoTranslate):
             auto_source == "mt"
             and producer_run is not None
             and preparation_scope is not None
-            and not self.judge_proposal_only
             and not self.overwrite_existing
             and not purpose_judges_stored_text
         ):

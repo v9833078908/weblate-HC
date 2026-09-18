@@ -141,6 +141,7 @@ def build_request(
             unit.all_checks_names - JUDGE_CHECKS - {REPEAT_DRIFT_CHECK_ID}
         ),
         target_plurals=target_plurals,
+        unit_id=unit.id,
     )
 
 
@@ -514,6 +515,10 @@ class _SeatJob:
     # that is never cancellable (a drain pass with no run, or an older
     # direct caller) keeps the previous no-op behaviour.
     cancelled: Callable[[], bool] = _never_cancelled
+    # C3 scenario 7: polled with the batch about to be sent; a scope that
+    # changed after the barrier stops further dispatch without discarding the
+    # results of batches already sent.
+    scope_guard: Callable[[Sequence[JudgeRequest]], bool] | None = None
 
 
 @dataclass
@@ -1205,6 +1210,7 @@ def _run_seats(  # ruff: ignore[complex-structure]
                 attempt=job.attempt,
                 retry_deadline=job.retry_deadline,
                 cancelled=job.cancelled,
+                scope_guard=job.scope_guard,
             )
         except BaseException as caught:
             error = caught
@@ -1317,7 +1323,7 @@ class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builti
         self.unsupported_repair_languages: set[str] = set()
 
 
-def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements]
+def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-many-locals, too-many-statements]
     units: list[Unit],
     *,
     writable_ids: set[int],
@@ -1331,12 +1337,16 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
     mutating_repairs: bool = True,
     candidate_targets: dict[int, list[str]] | None = None,
     evidence_run_id: uuid.UUID | None = None,
+    scope_guard: Callable[[Sequence[JudgeRequest]], bool] | None = None,
 ) -> JudgeBatchResult:
     """
     Judge every unit with both seats; repair writable defects.
 
     ``JudgeVerdict.run_id`` remains a per-invocation model-call identity.
     ``run`` exists only to keep the producer-run boundary explicit to callers.
+    ``scope_guard`` is polled with each batch about to be sent (C3 scenario 7):
+    a scope that changed after the barrier stops further dispatch and keeps
+    the results of batches already sent.
     ``retry_deadline`` (monotonic seconds) bounds how long an in-run retry
     may sleep, so a drain pass can never sleep past its deferral lease.
     ``candidate_severities`` names the severities whose verdict stores a
@@ -1397,6 +1407,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
             attempt=repair_attempt,
             retry_deadline=retry_deadline,
             cancelled=is_cancelled,
+            scope_guard=scope_guard,
         )
 
     def is_cancelled() -> bool:

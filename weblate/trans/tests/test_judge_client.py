@@ -1610,6 +1610,33 @@ class JudgeClientTest(SimpleTestCase):
         )
         self.assertEqual(len(http_mock.calls), 1)
 
+    @override_settings(JUDGE_BATCH_SIZE=1)
+    @http_mock.activate
+    def test_scope_guard_stops_further_batches(self) -> None:
+        # C3 scenario 7: the batch about to be sent is checked first, and a
+        # changed scope stops dispatch without discarding what was already
+        # sent.
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        checked: list[list[int | None]] = []
+
+        def scope_guard(batch):
+            checked.append([request.unit_id for request in batch])
+            return len(checked) > 1
+
+        results = request_verdicts(
+            [REQ, REQ], model="vendor/model-a", scope_guard=scope_guard
+        )
+
+        self.assertEqual(checked, [[REQ.unit_id], [REQ.unit_id]])
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(len(results), 1)
+
     @http_mock.activate
     def test_sends_strict_schema_batch_and_requires_providers_to_honour_it(
         self,

@@ -2348,6 +2348,13 @@ class ProducerRunCreationTest(ViewTestCase):
 class ProducerRunRefusalAggregationTest(ViewTestCase):
     """Usage-log refusals must surface in the run they belong to."""
 
+    def setUp(self) -> None:
+        super().setUp()
+        # The end-to-end refusal test drives a real engine, so the site-wide
+        # configuration has to exist; without it ``fetch_mt`` finds no engine,
+        # never calls the provider and the run legitimately completes.
+        self.configure_mt()
+
     def _make_run(self, *, status: str = ProducerRun.Status.RUNNING) -> ProducerRun:
         return ProducerRun.objects.create(
             actor=self.user,
