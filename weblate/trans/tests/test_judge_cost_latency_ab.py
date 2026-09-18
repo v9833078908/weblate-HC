@@ -2,6 +2,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# The suite deliberately reaches the measurement runner's private seams: it
+# verifies the same builder, parser and scheduler production uses, and those
+# seams have no public hooks.
+# ruff: file-ignore[private-member-access]
+
 """
 Offline verification of the judge A/B measurement runner.
 
@@ -32,6 +37,7 @@ from django.conf import settings
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.utils.translation import activate
 
+from weblate.lang.models import Language
 from weblate.trans import judge
 from weblate.trans.models.judge import JudgeRequestAttempt, JudgeVerdict
 from weblate.trans.models.llm_usage import LLMUsageLog
@@ -61,11 +67,18 @@ _spec.loader.exec_module(probe)
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 SEAT_1_MODEL = "judge-ab-deepseek-test"
 SEAT_2_MODEL = "judge-ab-qwen-test"
+# Experiment B's screened DeepSeek-seat replacement in the fake-provider run.
+SEAT_1_CANDIDATE = "judge-ab-flash-candidate"
 BOUNDARY_RE = re.compile(
     r"<untrusted_translation_data_[0-9a-f]+>\n(.*)\n</untrusted", re.DOTALL
 )
 PRICES = {
     SEAT_1_MODEL: {
+        "input_cost_per_token": 6.19962e-07,
+        "cache_read_input_token_cost": 7.89815e-08,
+        "output_cost_per_token": 1.239924e-06,
+    },
+    SEAT_1_CANDIDATE: {
         "input_cost_per_token": 6.19962e-07,
         "cache_read_input_token_cost": 7.89815e-08,
         "output_cost_per_token": 1.239924e-06,
@@ -277,7 +290,9 @@ def execute_args(
 
 
 def journal_of(manifest_path: pathlib.Path) -> dict:
-    directory = pathlib.Path(json.loads(manifest_path.read_text())["artifact_dir"])
+    directory = pathlib.Path(
+        json.loads(manifest_path.read_text(encoding="utf-8"))["artifact_dir"]
+    )
     events = [
         json.loads(line)
         for line in (directory / "journal.jsonl").read_text().splitlines()
@@ -354,7 +369,7 @@ class RunnerManifestTest(TempDirMixin, SimpleTestCase):
         records = []
         for index in range(20):
             for variant in ("clean", "mut"):
-                records.append(
+                records.append(  # ruff: ignore[manual-list-comprehension]
                     {
                         "record_id": f"{variant}-{index}",
                         "family": f"fam-{index}",
@@ -469,6 +484,51 @@ class RunnerEndToEndTest(TempDirMixin, RepoTestMixin, TransactionTestCase):
             self.assertGreaterEqual(unit.state, STATE_TRANSLATED)
 
     @http_mock.activate
+    def test_slot_loads_only_its_own_language_group(self) -> None:
+        # A schedule slot is scoped to its language/component group. With a
+        # multi-group corpus the runner must judge only the slot's group,
+        # never the whole dev split: mixed-identity judge batches are
+        # refused by judge._batch_usage_scope and violate the registered
+        # protocol (one language and project context per request).
+        register_fake_provider({SEAT_1_MODEL: "ok", SEAT_2_MODEL: "ok"})
+        component = self._create_component(
+            "po",
+            "po-empty/*.po",
+            project=self.project,
+            name="po-empty",
+            new_base="po-empty/hello.pot",
+            new_lang="add",
+        )
+        component.create_path()
+        cs = component.add_new_language(Language.objects.get(code="cs"), None)
+        de = component.add_new_language(Language.objects.get(code="de"), None)
+        for index, unit in enumerate(cs.unit_set.order_by("pk")):
+            unit.translate(self.user, [f"cs test {index}"], STATE_TRANSLATED)
+        for index, unit in enumerate(de.unit_set.order_by("pk")):
+            unit.translate(self.user, [f"de test {index}"], STATE_TRANSLATED)
+        cs_units = list(cs.unit_set.order_by("pk"))
+        de_units = list(de.unit_set.order_by("pk"))
+        self.assertTrue(cs_units)
+        self.assertTrue(de_units)
+        manifest_path = write_experiment(
+            self.tmp, records_from_units(cs_units + de_units)
+        )
+        schedule = json.loads(manifest_path.read_text())["schedule"]["slots"]
+        # Sorted groups put the cs slot first.
+        self.assertTrue(schedule[0]["group"].startswith("cs/"))
+        self.assertEqual(self.run_execute(manifest_path, "s001"), 0)
+        block = json.loads((self.tmp / "results" / "block-s001.json").read_text())
+        self.assertEqual(set(block["unit_ids"]), {unit.id for unit in cs_units})
+        self.assertNotIn({unit.id for unit in de_units}, set(block["unit_ids"]))
+        # The slot judged one translation identity only.
+        run_verdicts = list(
+            JudgeVerdict.objects.filter(run_id=block["run_id"]).values_list(
+                "unit_id", flat=True
+            )
+        )
+        self.assertEqual(set(run_verdicts), {unit.id for unit in cs_units})
+
+    @http_mock.activate
     def test_width_five_makes_one_seat_two_post(self) -> None:
         register_fake_provider({SEAT_1_MODEL: "ok", SEAT_2_MODEL: "ok"})
         manifest_path = write_experiment(
@@ -506,6 +566,69 @@ class RunnerEndToEndTest(TempDirMixin, RepoTestMixin, TransactionTestCase):
         wide = [row for row in attempts if row.seat == 2 and row.batch_size > 1]
         self.assertEqual(len(wide), 1)
         self.assertEqual(wide[0].batch_size, 4)
+
+    @http_mock.activate
+    def test_seat_1_model_override_reaches_the_payload_and_profiles(self) -> None:
+        # Experiment B swaps the DeepSeek seat per arm. The fake provider
+        # dispatches on the payload's model, so flag-major answers under the
+        # candidate name prove the override reached the request, and the
+        # per-arm frozen profile must pin the same model.
+        candidate = SEAT_1_CANDIDATE
+        register_fake_provider(
+            {SEAT_1_MODEL: "ok", candidate: "flag-major", SEAT_2_MODEL: "ok"}
+        )
+        manifest_path = write_experiment(
+            self.tmp,
+            records_from_units(self.units),
+            arms={
+                "A0": {
+                    "title": "control",
+                    "overrides": {
+                        "seat_2_batch_size": 5,
+                        "seat_1_model": SEAT_1_MODEL,
+                    },
+                },
+                "B1": {
+                    "title": "flash seat 1",
+                    "overrides": {
+                        "seat_2_batch_size": 5,
+                        "seat_1_model": candidate,
+                        "seat_1_reasoning": "extra_body.enable_thinking=false",
+                    },
+                },
+            },
+        )
+        self.assertEqual(self.run_execute(manifest_path, "s001"), 0)
+        self.assertEqual(self.run_execute(manifest_path, "s002"), 0)
+        attempts = list(JudgeRequestAttempt.objects.all().order_by("pk"))
+        seat_1_models = {row.model for row in attempts if row.seat == 1}
+        self.assertIn(candidate, seat_1_models)
+        self.assertIn(SEAT_1_MODEL, seat_1_models)
+        control_seat_1 = [
+            row for row in attempts if row.seat == 1 and row.model == SEAT_1_MODEL
+        ]
+        candidate_seat_1 = [
+            row for row in attempts if row.seat == 1 and row.model == candidate
+        ]
+        self.assertEqual(len(control_seat_1), 2)
+        self.assertEqual(len(candidate_seat_1), 2)
+        frozen_b1 = json.loads((self.tmp / "frozen-profiles-B1.json").read_text())
+        seat_1_snapshot = next(seat for seat in frozen_b1["seats"] if seat["seat"] == 1)
+        self.assertEqual(seat_1_snapshot["model"], candidate)
+        self.assertEqual(
+            seat_1_snapshot["reasoning"], "extra_body.enable_thinking=false"
+        )
+        # Only the candidate arm flags major: the provider dispatch proves
+        # the payload carried the overridden model name.
+        run_ids = {
+            event["slot"]: event["run_id"]
+            for event in journal_of(manifest_path)["events"]
+            if event["event"] == "block_start"
+        }
+        control_verdicts = JudgeVerdict.objects.filter(run_id=run_ids["s001"], seat=1)
+        candidate_verdicts = JudgeVerdict.objects.filter(run_id=run_ids["s002"], seat=1)
+        self.assertTrue(all(row.max_severity == "none" for row in control_verdicts))
+        self.assertTrue(all(row.max_severity == "major" for row in candidate_verdicts))
 
     @http_mock.activate
     def test_parser_failures_stay_in_the_denominator(self) -> None:
@@ -680,6 +803,75 @@ class ApplyArmTest(SimpleTestCase):
         with mock.patch.object(settings, "JUDGE_BATCH_SIZE_SEAT_2", "inherit"):
             probe.apply_arm({"overrides": {"seat_2_batch_size": 5}})
             self.assertEqual(settings.JUDGE_BATCH_SIZE_SEAT_2, 5)
+
+    def test_apply_arm_sets_the_seat_1_model_and_reasoning(self) -> None:
+        # Experiment B swaps the DeepSeek seat per arm; the overrides must
+        # reach resolve_judge_seat_profile through the same settings path.
+        with (
+            mock.patch.object(settings, "JUDGE_MODEL_SEAT_1", "deepseek-v4-pro"),
+            mock.patch.object(settings, "JUDGE_REASONING_EFFORT_SEAT_1", ""),
+        ):
+            probe.apply_arm(
+                {
+                    "overrides": {
+                        "seat_1_model": "atlas/deepseek-v4-flash-0731",
+                        "seat_1_reasoning": "extra_body.enable_thinking=false",
+                    }
+                }
+            )
+            self.assertEqual(
+                settings.JUDGE_MODEL_SEAT_1, "atlas/deepseek-v4-flash-0731"
+            )
+            self.assertEqual(
+                settings.JUDGE_REASONING_EFFORT_SEAT_1,
+                "extra_body.enable_thinking=false",
+            )
+
+    def _manifest(self, overrides: dict) -> dict:
+        return {
+            "schema": probe.SCHEMA,
+            "experiment_id": "x",
+            "corpus": {"path": "p", "sha256": "h"},
+            "seat_models": {"seat_1": "a", "seat_2": "b"},
+            "seat_1_batch_size": 2,
+            "arms": {"A0": {"overrides": overrides}},
+            "repeats": 1,
+            "schedule": {
+                "slots": [
+                    {
+                        "id": "s001",
+                        "arm": "A0",
+                        "repeat": 1,
+                        "group": "g",
+                    }
+                ]
+            },
+            "prices": {"m": dict.fromkeys(probe.PRICE_KEYS, 1)},
+            "prices_source": "s",
+            "gates": {"control_arm": "A0"},
+        }
+
+    def test_validate_manifest_accepts_seat_1_model_and_reasoning(self) -> None:
+        # "" is a member of the closed value set: an explicit "send no
+        # reasoning control" arm, comparable against a thinking-off arm.
+        for reasoning in ("", "extra_body.enable_thinking=false"):
+            manifest = self._manifest(
+                {
+                    "seat_1_model": "atlas/deepseek-v4-flash-0731",
+                    "seat_1_reasoning": reasoning,
+                }
+            )
+            probe.validate_manifest(manifest, require_budget=False)
+
+    def test_validate_manifest_rejects_bad_seat_1_overrides(self) -> None:
+        for overrides in (
+            {"seat_1_model": ""},
+            {"seat_1_model": "   "},
+            {"seat_1_reasoning": "thinking=off"},
+            {"seat_1_reasoning": "disable"},
+        ):
+            with self.assertRaises(probe.ManifestError):
+                probe.validate_manifest(self._manifest(overrides), require_budget=False)
 
     def test_validate_manifest_rejects_unknown_overrides(self) -> None:
         with self.assertRaises(probe.ManifestError):

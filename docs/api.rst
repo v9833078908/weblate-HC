@@ -3646,9 +3646,9 @@ Only a judge run itself - :http:post:`/api/producer/projects/(string:slug)/runs/
 :http:post:`/api/producer/projects/(string:slug)/runs/`, and
 :http:post:`/api/producer/runs/(str:id)/resume/` - can reach a paid
 provider, and only up to the ``worst_case_calls`` ceiling the estimate
-already reported; exceeding the server's own configured maximum refuses
-the run outright rather than silently truncating it to the first strings
-matched. :http:post:`/api/producer/runs/(str:id)/cancel/` stops new calls
+already reported; the server caps the selected scope and records any
+unselected strings as skips, so a report can show incomplete coverage.
+:http:post:`/api/producer/runs/(str:id)/cancel/` stops new calls
 from being dispatched but does not refund or interrupt a request already
 in flight; its response already reflects any evidence that request
 returns. Applying a candidate, answering a clarification, and undoing an

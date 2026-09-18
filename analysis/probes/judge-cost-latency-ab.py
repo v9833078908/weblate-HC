@@ -58,6 +58,7 @@ git ignores; documents get aggregates and manifest hashes only.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import math
@@ -100,7 +101,7 @@ from weblate.trans.util import join_plural
 from weblate.utils.state import STATE_TRANSLATED
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterator, Sequence
     from datetime import datetime
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -113,8 +114,15 @@ SEVERITIES = ("minor", "major", "critical")
 STRATA = ("ui", "long", "terminology", "ambiguous", "glossary")
 # The A experiment touches only the Qwen seat; seat 1 stays at the frozen
 # baseline width and every other transport knob is inherited from settings.
-OVERRIDE_KEYS = frozenset({"seat_2_batch_size"})
-OVERRIDE_TO_SETTING = {"seat_2_batch_size": "JUDGE_BATCH_SIZE_SEAT_2"}
+# Experiment B replaces the seat-1 model (and its reasoning control) per
+# arm: the override must reach resolve_judge_seat_profile through settings,
+# exactly like the batch width, so the frozen-profile snapshot pins it.
+OVERRIDE_KEYS = frozenset({"seat_2_batch_size", "seat_1_model", "seat_1_reasoning"})
+OVERRIDE_TO_SETTING = {
+    "seat_2_batch_size": "JUDGE_BATCH_SIZE_SEAT_2",
+    "seat_1_model": "JUDGE_MODEL_SEAT_1",
+    "seat_1_reasoning": "JUDGE_REASONING_EFFORT_SEAT_1",
+}
 # The dev-docker stack runs background Celery workers: racing them would both
 # double-pay batches and let them mutate QA state mid-measurement.
 FORBIDDEN_SETTINGS_MODULES = frozenset(
@@ -157,7 +165,7 @@ class ManifestError(RunnerError):
     """The manifest is incomplete or internally inconsistent."""
 
 
-class BudgetExceeded(Exception):
+class BudgetExceededError(Exception):
     """The measurement guard tripped; no further POST may be sent."""
 
 
@@ -351,6 +359,26 @@ def validate_manifest(manifest: object, *, require_budget: bool) -> dict:
                 "positive integer"
             )
             raise ManifestError(msg)
+        seat_1_model = overrides.get("seat_1_model")
+        if seat_1_model is not None and (
+            not isinstance(seat_1_model, str) or not seat_1_model.strip()
+        ):
+            msg = (
+                f"manifest.arms.{arm_id}.overrides.seat_1_model must be a "
+                "non-empty model name"
+            )
+            raise ManifestError(msg)
+        seat_1_reasoning = overrides.get("seat_1_reasoning")
+        if seat_1_reasoning is not None and (
+            not isinstance(seat_1_reasoning, str)
+            or seat_1_reasoning not in judge._LITELLM_REASONING_VALUES
+        ):
+            msg = (
+                f"manifest.arms.{arm_id}.overrides.seat_1_reasoning must be one "
+                "of the closed LiteLLM reasoning values "
+                f"{sorted(judge._LITELLM_REASONING_VALUES)}"
+            )
+            raise ManifestError(msg)
     repeats = manifest.get("repeats")
     if not isinstance(repeats, int) or isinstance(repeats, bool) or repeats < 1:
         msg = "manifest.repeats must be a positive integer"
@@ -433,7 +461,6 @@ def load_manifest(path: pathlib.Path, *, require_budget: bool) -> dict:
 
 def _classify_record(raw: object) -> tuple[CorpusRecord | None, str | None]:
     """Return a clean record or an explicit exclusion reason, never a silent drop."""
-    record_id = raw.get("record_id") if isinstance(raw, dict) else None
     record = CorpusRecord.from_json(raw)
     if record is None or not record.record_id:
         return None, "malformed-record"
@@ -518,7 +545,7 @@ def build_split(
         by_stratum.setdefault(members[0].stratum, []).append(family)
     assignment: dict[str, str] = {}
     for stratum in sorted(by_stratum):
-        rng = random.Random(f"{seed}:{stratum}")
+        rng = random.Random(f"{seed}:{stratum}")  # ruff: ignore[suspicious-non-cryptographic-random-usage]
         names = sorted(by_stratum[stratum])
         rng.shuffle(names)
         # Proportional allocation, not a modulo of the index: a stratum with
@@ -612,10 +639,14 @@ def plan_scope(manifest: dict, records: Sequence[CorpusRecord]) -> dict:
         "arms": arms_plan,
         "caveats": [
             "attempt counts are HTTP arithmetic, not money or wall-clock savings",
-            "estimates use manifest.est_tokens and ignore retries and adaptive "
-            "width reductions",
-            "the cached scenario applies the observed cache share to the whole "
-            "prefix; a provider cache makes no promise",
+            (
+                "estimates use manifest.est_tokens and ignore retries and "
+                "adaptive width reductions"
+            ),
+            (
+                "the cached scenario applies the observed cache share to the "
+                "whole prefix; a provider cache makes no promise"
+            ),
             "unknown charges (timed-out or unmetered attempts) stay unknown",
         ],
     }
@@ -659,7 +690,7 @@ def check_split_reproducible(manifest: dict, records: Sequence[CorpusRecord]) ->
 
 
 # ---------------------------------------------------------------------------
-# Modes: prepare and dry-run
+# Prepare and dry-run modes
 # ---------------------------------------------------------------------------
 
 
@@ -682,11 +713,11 @@ def _build_schedule(
 
 
 def _git_revision() -> str:
-    import subprocess  # ruff: ignore[import-outside-top-level]
+    import subprocess  # ruff: ignore[import-outside-top-level, suspicious-subprocess-import]
 
     try:
         return subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            ["git", "rev-parse", "HEAD"],  # ruff: ignore[start-process-with-partial-path]
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -735,11 +766,13 @@ def cmd_prepare(args: argparse.Namespace) -> int:
             "arms": arms,
             "repeats": args.repeats,
             "schedule": {
-                "slots": [{"id": "s001", "arm": "A0", "repeat": 1, "group": "g"}]
+                "slots": [
+                    {"id": "s001", "arm": next(iter(arms)), "repeat": 1, "group": "g"}
+                ]
             },
             "prices": {"placeholder": dict.fromkeys(PRICE_KEYS, 0)},
             "prices_source": "placeholder",
-            "gates": {"control_arm": "A0"},
+            "gates": {"control_arm": next(iter(arms))},
         },
         require_budget=False,
     )
@@ -1017,17 +1050,17 @@ class PostGuard:
     def _reserve(self, payload: dict, profile: judge.JudgeSeatProfile) -> Decimal:
         with self._lock:
             if self.tripped is not None:
-                raise BudgetExceeded(self.tripped)
+                raise BudgetExceededError(self.tripped)
             if time.monotonic() > self.wall_deadline:
                 self.tripped = "wall-clock limit reached"
-                raise BudgetExceeded(self.tripped)
+                raise BudgetExceededError(self.tripped)
             if self.attempts + 1 > self.budget.max_http_attempts_per_slot:
                 self.tripped = "max_http_attempts_per_slot reached"
-                raise BudgetExceeded(self.tripped)
+                raise BudgetExceededError(self.tripped)
             worst = self._worst_case(payload, profile)
             if self.reserved + self.spent + worst > self.budget.money_cap_usd:
                 self.tripped = f"money cap ${self.budget.money_cap_usd} reached"
-                raise BudgetExceeded(self.tripped)
+                raise BudgetExceededError(self.tripped)
             self.attempts += 1
             self.reserved += worst
             return worst
@@ -1098,6 +1131,41 @@ def apply_arm(arm: dict) -> None:
         setattr(settings, OVERRIDE_TO_SETTING[key], value)
 
 
+class _MissingSetting:
+    """Sentinel: the setting did not exist before the arm touched it."""
+
+
+@contextlib.contextmanager
+def arm_overrides(arm: dict) -> Iterator[None]:
+    """
+    Apply one arm's seat overrides and always restore them afterwards.
+
+    apply_arm mutates the process-global settings in place; without a
+    restore, an arm that overrides JUDGE_MODEL_SEAT_1 leaks its candidate
+    into every later consumer of this process (in the test runner, the
+    alphabetically following test cases resolve the leaked model and refuse
+    with a manifest mismatch). The measurement process itself exits after
+    one slot, but the runner must not rely on that.
+    """
+    saved: dict[str, object] = {}
+    for key in arm["overrides"]:
+        name = OVERRIDE_TO_SETTING[key]
+        try:
+            saved[name] = getattr(settings, name)
+        except AttributeError:
+            saved[name] = _MissingSetting
+    apply_arm(arm)
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is _MissingSetting:
+                with contextlib.suppress(AttributeError):
+                    delattr(settings, name)
+            else:
+                setattr(settings, name, value)
+
+
 def freeze_or_check_profiles(
     frozen_path: pathlib.Path, profiles: Sequence[judge.JudgeSeatProfile]
 ) -> dict:
@@ -1124,10 +1192,18 @@ def freeze_or_check_profiles(
             "reasoning",
             "response_format",
         ):
-            if old.get(key) != new.get(key):
-                mismatches.append(
-                    f"seat {new['seat']}: {key} {old.get(key)!r} -> {new.get(key)!r}"
+            mismatches.extend(
+                f"seat {new['seat']}: {key} {old.get(key)!r} -> {new.get(key)!r}"
+                for key in (
+                    "profile_fingerprint",
+                    "alias_revision",
+                    "upstream_model",
+                    "batch_size",
+                    "reasoning",
+                    "response_format",
                 )
+                if old.get(key) != new.get(key)
+            )
     if mismatches:
         raise RunnerError(
             "resolved profiles drifted from the frozen snapshot; the block "
@@ -1138,15 +1214,22 @@ def freeze_or_check_profiles(
 
 
 def load_slot_units(
-    manifest: dict, records: Sequence[CorpusRecord], split: dict[str, str]
+    manifest: dict,
+    records: Sequence[CorpusRecord],
+    split: dict[str, str],
+    group: str,
 ) -> tuple[list[Unit], list[dict]]:
     """
-    Load the QA-database units for the dev split and verify frozen texts.
+    Load the QA-database units of one schedule slot's language group.
 
-    Every mismatch aborts the run before any POST: a frozen scope that no
-    longer matches the QA database is not the registered experiment. Empty
-    and incomplete translations are excluded with an explicit record, before
-    any LLM is involved.
+    A slot is scoped to its ``language/component`` group, never to the whole
+    dev split: the registered protocol forbids mixing languages or project
+    contexts inside one judge batch, and the product's own usage accounting
+    (``judge._batch_usage_scope``) refuses mixed-identity batches. Every
+    mismatch aborts the run before any POST: a frozen scope that no longer
+    matches the QA database is not the registered experiment. Empty and
+    incomplete translations are excluded with an explicit record, before any
+    LLM is involved.
     """
     problems: list[str] = []
     units: list[Unit] = []
@@ -1154,6 +1237,8 @@ def load_slot_units(
     cache: dict[tuple[str, str], dict[int, Unit]] = {}
     for record in records:
         if split.get(record.record_id) != "dev":
+            continue
+        if f"{record.language}/{record.component_slug}" != group:
             continue
         key = (record.project_slug, record.component_slug)
         if key not in cache:
@@ -1195,13 +1280,30 @@ def load_slot_units(
         )
     if not units:
         dev_records = [
-            record for record in records if split.get(record.record_id) == "dev"
+            record
+            for record in records
+            if split.get(record.record_id) == "dev"
+            and f"{record.language}/{record.component_slug}" == group
         ]
         msg = (
-            "no dev-split units resolved for this slot: "
+            f"no dev-split units resolved for slot group {group!r}: "
             f"{len(dev_records)} dev records, exclusions {excluded!r}, "
             f"split keys {sorted(split)[:5]!r}, "
             f"record ids {[record.record_id for record in records][:5]!r}"
+        )
+        raise RunnerError(msg)
+    identities = {
+        (
+            unit.translation.component.project.slug,
+            unit.translation.component.slug,
+            unit.translation.language.code,
+        )
+        for unit in units
+    }
+    if len(identities) != 1:
+        msg = (
+            f"slot group {group!r} resolved to {len(identities)} translation "
+            "identities; the protocol forbids mixed-identity judge batches"
         )
         raise RunnerError(msg)
     return units, excluded
@@ -1521,59 +1623,75 @@ def cmd_execute(args: argparse.Namespace) -> int:
     records, _excluded = load_corpus(manifest)
     check_split_reproducible(manifest, records)
     split = _read_split_for_scope(manifest)
-    units, excluded = load_slot_units(manifest, records, split)
-    apply_arm(manifest["arms"][slot["arm"]])
-    # Resolving profiles performs the alias capability GET on the LiteLLM
-    # host; execute mode is the explicit permission for that refresh.
-    profiles = judge.judge_seat_profiles()
-    # The resolved widths must be the manifest's widths: a QA setting that
-    # silently disagrees would measure a different experiment.
-    expected_widths = {
-        1: manifest["seat_1_batch_size"],
-        2: manifest["arms"][slot["arm"]]["overrides"].get(
-            "seat_2_batch_size", manifest["seat_1_batch_size"]
-        ),
-    }
-    for profile in profiles:
-        expected = expected_widths[profile.seat]
-        if profile.batch_size != expected:
-            msg = (
-                f"resolved seat {profile.seat} batch width {profile.batch_size} "
-                f"!= manifest width {expected}; align the QA settings "
-                "(JUDGE_BATCH_SIZE / JUDGE_BATCH_SIZE_SEAT_2) with the manifest"
-            )
-            raise RunnerError(msg)
-    frozen = freeze_or_check_profiles(
-        directory / f"frozen-profiles-{slot['arm']}.json", profiles
-    )
-    guard = PostGuard(
-        budget=budget,
-        prices=manifest["prices"],
-        wall_deadline=time.monotonic() + budget.max_wall_clock_minutes_per_slot * 60,
-    )
-    journal.append(
-        {
-            "event": "slot_start",
-            "slot": slot["id"],
-            "arm": slot["arm"],
-            "repeat": slot["repeat"],
-            "group": slot["group"],
-            "units": len(units),
-            "excluded_before_llm": excluded,
-            "resumed": bool(args.resume),
-            "frozen_profiles_at": frozen.get("frozen_at"),
+    units, excluded = load_slot_units(manifest, records, split, slot["group"])
+    arm = manifest["arms"][slot["arm"]]
+    overrides = arm["overrides"]
+    with arm_overrides(arm):
+        # Resolving profiles performs the alias capability GET on the LiteLLM
+        # host; execute mode is the explicit permission for that refresh.
+        profiles = judge.judge_seat_profiles()
+        # The resolved widths must be the manifest's widths: a QA setting that
+        # silently disagrees would measure a different experiment.
+        expected_widths = {
+            1: manifest["seat_1_batch_size"],
+            2: overrides.get("seat_2_batch_size", manifest["seat_1_batch_size"]),
         }
-    )
-    guard.install()
-    try:
-        result = run_block(manifest, slot, units, profiles, guard, journal)
-    except BudgetExceeded:
-        # In-flight POSTs completed and are journaled by run_block; no new
-        # POST may start after the guard tripped.
-        print(f"GUARD TRIPPED: {guard.tripped}")
-        return 3
-    finally:
-        guard.uninstall()
+        # Experiment B swaps the seat-1 model per arm; the resolved model must
+        # be exactly the one the arm asks for (baseline when not overridden).
+        expected_models = {
+            1: overrides.get("seat_1_model", manifest["seat_models"]["seat_1"]),
+            2: manifest["seat_models"]["seat_2"],
+        }
+        for profile in profiles:
+            expected = expected_widths[profile.seat]
+            if profile.batch_size != expected:
+                msg = (
+                    f"resolved seat {profile.seat} batch width "
+                    f"{profile.batch_size} != manifest width {expected}; align "
+                    "the QA settings (JUDGE_BATCH_SIZE / "
+                    "JUDGE_BATCH_SIZE_SEAT_2) with the manifest"
+                )
+                raise RunnerError(msg)
+            expected_model = expected_models[profile.seat]
+            if profile.model != expected_model:
+                msg = (
+                    f"resolved seat {profile.seat} model {profile.model!r} != "
+                    f"manifest model {expected_model!r}; align the QA settings "
+                    "(JUDGE_MODEL_SEAT_1 / JUDGE_MODEL_SEAT_2) with the manifest"
+                )
+                raise RunnerError(msg)
+        frozen = freeze_or_check_profiles(
+            directory / f"frozen-profiles-{slot['arm']}.json", profiles
+        )
+        guard = PostGuard(
+            budget=budget,
+            prices=manifest["prices"],
+            wall_deadline=time.monotonic()
+            + budget.max_wall_clock_minutes_per_slot * 60,
+        )
+        journal.append(
+            {
+                "event": "slot_start",
+                "slot": slot["id"],
+                "arm": slot["arm"],
+                "repeat": slot["repeat"],
+                "group": slot["group"],
+                "units": len(units),
+                "excluded_before_llm": excluded,
+                "resumed": bool(args.resume),
+                "frozen_profiles_at": frozen.get("frozen_at"),
+            }
+        )
+        guard.install()
+        try:
+            result = run_block(manifest, slot, units, profiles, guard, journal)
+        except BudgetExceededError:
+            # In-flight POSTs completed and are journaled by run_block; no new
+            # POST may start after the guard tripped.
+            print(f"GUARD TRIPPED: {guard.tripped}")
+            return 3
+        finally:
+            guard.uninstall()
     print(
         f"slot {slot['id']} complete: {result['guard']['posts_sent']} POSTs, "
         f"wall clock {result['wall_clock_seconds']}s, "
@@ -1592,7 +1710,7 @@ def cmd_execute(args: argparse.Namespace) -> int:
 
 
 def pair_severity(rows: Sequence[dict]) -> str:
-    """Current max-severity policy; an unparsed seat means no coverage."""
+    """Return the current max-severity policy; an unparsed seat means no coverage."""
     if any(row["unparsed"] for row in rows):
         return "unparsed"
     return max(
@@ -1741,7 +1859,7 @@ def _bootstrap_delta(
     families = sorted(set(control) & set(candidate))
     if not families:
         return {}
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
     deltas = {"major_recall": [], "false_flags": []}
     for _ in range(BOOTSTRAP_ITERATIONS):
         sample = [families[rng.randrange(len(families))] for _ in families]
@@ -1907,7 +2025,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except BudgetExceeded as error:
+    except BudgetExceededError as error:
         print(f"GUARD TRIPPED: {error}", file=sys.stderr)
         sys.exit(3)
     except (RunnerError, judge.JudgeError) as error:
