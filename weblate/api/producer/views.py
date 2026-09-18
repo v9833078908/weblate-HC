@@ -169,11 +169,7 @@ def _preparation_estimate_payload(
         blockers = [str(error)]
         preparation = None
     else:
-        blockers = [
-            warning
-            for warning in batch.get_warnings()
-            if "cannot be prepared" in warning or "configured" in warning
-        ]
+        blockers = list(batch.preparation_blockers)
     summary = {
         "missing": len(preparation.missing_ids) if preparation else 0,
         "per_language": (

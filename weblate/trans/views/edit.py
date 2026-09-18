@@ -1776,11 +1776,7 @@ def _judge_preparation_preview(batch: BatchAutoTranslate) -> dict[str, object]:
         "missing": len(prep_scope.missing_ids),
         "per_language": dict(sorted(prep_scope.per_language_missing.items())),
         "engine": prep_scope.mt_engine,
-        "blockers": [
-            warning
-            for warning in batch.get_warnings()
-            if "cannot be prepared" in warning or "configured" in warning
-        ],
+        "blockers": list(batch.preparation_blockers),
     }
 
 
@@ -1820,11 +1816,7 @@ def _start_judge_producer_run(
         except PermissionDenied as error:
             messages.error(request, str(error))
             return redirect(obj)
-        blockers = [
-            warning
-            for warning in batch.get_warnings()
-            if "cannot be prepared" in warning or "configured" in warning
-        ]
+        blockers = list(batch.preparation_blockers)
         if blockers:
             messages.error(request, " ".join(blockers))
             return redirect(obj)

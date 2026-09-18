@@ -266,9 +266,44 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
             sum(preparation["per_language"].values()), preparation["missing"]
         )
         self.assertEqual(preparation["engine"], None)
+        # Every language with missing strings is named as a blocker; the
+        # count must not depend on the language the warning is written in.
+        self.assertEqual(len(preparation["blockers"]), len(preparation["per_language"]))
+
+    def test_preparation_blockers_survive_a_translated_warning(self) -> None:
+        # The estimate, the preview and the pre-flight refusal read the
+        # batch's structured blocker list. Matching the localized warning
+        # text instead used to lose every blocker in a non-English
+        # interface: the preview showed none and the run was dispatched only
+        # to fail inside the worker.
+        real_gettext = translation.gettext
+
+        def translated_gettext(message: str) -> str:
+            if "missing strings cannot be prepared" in message:
+                return (
+                    "Для языка %(language)s не настроен движок машинного "
+                    "перевода: отсутствующие строки нельзя подготовить."
+                )
+            return real_gettext(message)
+
+        with mock.patch(
+            "weblate.trans.autotranslate.gettext", side_effect=translated_gettext
+        ):
+            response = self.client.get(
+                reverse("auto_translation_preview", kwargs=self.kw_translation),
+                {
+                    "mode": "judge",
+                    "q": "state:empty",
+                    "auto_source": "mt",
+                    "engines": ["weblate"],
+                    "threshold": 80,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
         self.assertTrue(
-            any("configured" in warning for warning in preparation["blockers"]),
-            preparation,
+            response.json()["preparation"]["blockers"],
+            "a translated warning must not hide the preparation blocker",
         )
 
     @override_settings(
