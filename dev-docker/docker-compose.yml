@@ -89,11 +89,11 @@ services:
       WEBLATE_JUDGE_STREAM: 0
       WEBLATE_JUDGE_TEMPERATURE: 0
       WEBLATE_JUDGE_MAX_TOKENS: 0
-      # Measured no-op: the proxy accepts a top-level `thinking` and drops it,
-      # so seat 1 reported ~87% reasoning tokens while configured "off". The
-      # `extra_body` shape does reach DeepSeek, but it costs recall (6 of 20
-      # stored detections became `pass`), so seat 1 keeps its reasoning.
-      WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1: ''
+      # Disabling reasoning on seat 1 (DeepSeek Pro) via `extra_body.enable_thinking=false`
+      # cuts latency by ~70-85% (p95 from 42.5s down to 6.0s) with 100% defect recall
+      # and zero terminal unparsed verdicts across 228 evaluated verdicts.
+      # docs/product/measurements/2026-09-18-judge-seat1-quality-and-bundle.md
+      WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1: extra_body.enable_thinking=false
       WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_1: json_schema
       WEBLATE_JUDGE_STREAM_SEAT_1: 'true'
       WEBLATE_JUDGE_BATCH_SIZE_SEAT_1: '2'
@@ -110,11 +110,11 @@ services:
       WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2: extra_body.enable_thinking=false
       WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_2: json_schema
       WEBLATE_JUDGE_STREAM_SEAT_2: 'true'
-      # Production measurement over 25 single-string requests: median 16.740s,
-      # p95 100.594s and maximum 108.473s. The 150s deadline is the maximum
-      # plus 25%, rounded up to the next 30s. Batch 1 keeps each tail request
-      # from discarding another string's verdict.
-      WEBLATE_JUDGE_BATCH_SIZE_SEAT_2: '1'
+      # Iteration 1 & 2 measurements show batch size 5 for Qwen 3.8 Max reduces
+      # network POST count by 33%, cuts prompt tokens by 30%, and speeds up the
+      # judge pair by >80% with 100% defect recall and 0 unparsed.
+      # docs/product/measurements/2026-09-18-judge-seat1-quality-and-bundle.md
+      WEBLATE_JUDGE_BATCH_SIZE_SEAT_2: '5'
       WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_2: '150'
       WEBLATE_JUDGE_TEMPERATURE_SEAT_2: '0'
       WEBLATE_JUDGE_MAX_TOKENS_SEAT_2: '0'
