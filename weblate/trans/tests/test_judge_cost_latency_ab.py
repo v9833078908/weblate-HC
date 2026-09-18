@@ -2,6 +2,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# The suite deliberately reaches the measurement runner's private seams: it
+# verifies the same builder, parser and scheduler production uses, and those
+# seams have no public hooks.
+# ruff: file-ignore[private-member-access]
+
 """
 Offline verification of the judge A/B measurement runner.
 
@@ -32,6 +37,7 @@ from django.conf import settings
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.utils.translation import activate
 
+from weblate.lang.models import Language
 from weblate.trans import judge
 from weblate.trans.models.judge import JudgeRequestAttempt, JudgeVerdict
 from weblate.trans.models.llm_usage import LLMUsageLog
@@ -284,7 +290,9 @@ def execute_args(
 
 
 def journal_of(manifest_path: pathlib.Path) -> dict:
-    directory = pathlib.Path(json.loads(manifest_path.read_text())["artifact_dir"])
+    directory = pathlib.Path(
+        json.loads(manifest_path.read_text(encoding="utf-8"))["artifact_dir"]
+    )
     events = [
         json.loads(line)
         for line in (directory / "journal.jsonl").read_text().splitlines()
@@ -361,7 +369,7 @@ class RunnerManifestTest(TempDirMixin, SimpleTestCase):
         records = []
         for index in range(20):
             for variant in ("clean", "mut"):
-                records.append(
+                records.append(  # ruff: ignore[manual-list-comprehension]
                     {
                         "record_id": f"{variant}-{index}",
                         "family": f"fam-{index}",
@@ -474,6 +482,51 @@ class RunnerEndToEndTest(TempDirMixin, RepoTestMixin, TransactionTestCase):
         for unit in self.units:
             unit.refresh_from_db()
             self.assertGreaterEqual(unit.state, STATE_TRANSLATED)
+
+    @http_mock.activate
+    def test_slot_loads_only_its_own_language_group(self) -> None:
+        # A schedule slot is scoped to its language/component group. With a
+        # multi-group corpus the runner must judge only the slot's group,
+        # never the whole dev split: mixed-identity judge batches are
+        # refused by judge._batch_usage_scope and violate the registered
+        # protocol (one language and project context per request).
+        register_fake_provider({SEAT_1_MODEL: "ok", SEAT_2_MODEL: "ok"})
+        component = self._create_component(
+            "po",
+            "po-empty/*.po",
+            project=self.project,
+            name="po-empty",
+            new_base="po-empty/hello.pot",
+            new_lang="add",
+        )
+        component.create_path()
+        cs = component.add_new_language(Language.objects.get(code="cs"), None)
+        de = component.add_new_language(Language.objects.get(code="de"), None)
+        for index, unit in enumerate(cs.unit_set.order_by("pk")):
+            unit.translate(self.user, [f"cs test {index}"], STATE_TRANSLATED)
+        for index, unit in enumerate(de.unit_set.order_by("pk")):
+            unit.translate(self.user, [f"de test {index}"], STATE_TRANSLATED)
+        cs_units = list(cs.unit_set.order_by("pk"))
+        de_units = list(de.unit_set.order_by("pk"))
+        self.assertTrue(cs_units)
+        self.assertTrue(de_units)
+        manifest_path = write_experiment(
+            self.tmp, records_from_units(cs_units + de_units)
+        )
+        schedule = json.loads(manifest_path.read_text())["schedule"]["slots"]
+        # Sorted groups put the cs slot first.
+        self.assertTrue(schedule[0]["group"].startswith("cs/"))
+        self.assertEqual(self.run_execute(manifest_path, "s001"), 0)
+        block = json.loads((self.tmp / "results" / "block-s001.json").read_text())
+        self.assertEqual(set(block["unit_ids"]), {unit.id for unit in cs_units})
+        self.assertNotIn({unit.id for unit in de_units}, set(block["unit_ids"]))
+        # The slot judged one translation identity only.
+        run_verdicts = list(
+            JudgeVerdict.objects.filter(run_id=block["run_id"]).values_list(
+                "unit_id", flat=True
+            )
+        )
+        self.assertEqual(set(run_verdicts), {unit.id for unit in cs_units})
 
     @http_mock.activate
     def test_width_five_makes_one_seat_two_post(self) -> None:

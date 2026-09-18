@@ -165,7 +165,7 @@ class ManifestError(RunnerError):
     """The manifest is incomplete or internally inconsistent."""
 
 
-class BudgetExceeded(Exception):
+class BudgetExceededError(Exception):
     """The measurement guard tripped; no further POST may be sent."""
 
 
@@ -461,7 +461,6 @@ def load_manifest(path: pathlib.Path, *, require_budget: bool) -> dict:
 
 def _classify_record(raw: object) -> tuple[CorpusRecord | None, str | None]:
     """Return a clean record or an explicit exclusion reason, never a silent drop."""
-    record_id = raw.get("record_id") if isinstance(raw, dict) else None
     record = CorpusRecord.from_json(raw)
     if record is None or not record.record_id:
         return None, "malformed-record"
@@ -546,7 +545,7 @@ def build_split(
         by_stratum.setdefault(members[0].stratum, []).append(family)
     assignment: dict[str, str] = {}
     for stratum in sorted(by_stratum):
-        rng = random.Random(f"{seed}:{stratum}")
+        rng = random.Random(f"{seed}:{stratum}")  # ruff: ignore[suspicious-non-cryptographic-random-usage]
         names = sorted(by_stratum[stratum])
         rng.shuffle(names)
         # Proportional allocation, not a modulo of the index: a stratum with
@@ -640,10 +639,14 @@ def plan_scope(manifest: dict, records: Sequence[CorpusRecord]) -> dict:
         "arms": arms_plan,
         "caveats": [
             "attempt counts are HTTP arithmetic, not money or wall-clock savings",
-            "estimates use manifest.est_tokens and ignore retries and adaptive "
-            "width reductions",
-            "the cached scenario applies the observed cache share to the whole "
-            "prefix; a provider cache makes no promise",
+            (
+                "estimates use manifest.est_tokens and ignore retries and "
+                "adaptive width reductions"
+            ),
+            (
+                "the cached scenario applies the observed cache share to the "
+                "whole prefix; a provider cache makes no promise"
+            ),
             "unknown charges (timed-out or unmetered attempts) stay unknown",
         ],
     }
@@ -687,7 +690,7 @@ def check_split_reproducible(manifest: dict, records: Sequence[CorpusRecord]) ->
 
 
 # ---------------------------------------------------------------------------
-# Modes: prepare and dry-run
+# Prepare and dry-run modes
 # ---------------------------------------------------------------------------
 
 
@@ -710,11 +713,11 @@ def _build_schedule(
 
 
 def _git_revision() -> str:
-    import subprocess  # ruff: ignore[import-outside-top-level]
+    import subprocess  # ruff: ignore[import-outside-top-level, suspicious-subprocess-import]
 
     try:
         return subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            ["git", "rev-parse", "HEAD"],  # ruff: ignore[start-process-with-partial-path]
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -1047,17 +1050,17 @@ class PostGuard:
     def _reserve(self, payload: dict, profile: judge.JudgeSeatProfile) -> Decimal:
         with self._lock:
             if self.tripped is not None:
-                raise BudgetExceeded(self.tripped)
+                raise BudgetExceededError(self.tripped)
             if time.monotonic() > self.wall_deadline:
                 self.tripped = "wall-clock limit reached"
-                raise BudgetExceeded(self.tripped)
+                raise BudgetExceededError(self.tripped)
             if self.attempts + 1 > self.budget.max_http_attempts_per_slot:
                 self.tripped = "max_http_attempts_per_slot reached"
-                raise BudgetExceeded(self.tripped)
+                raise BudgetExceededError(self.tripped)
             worst = self._worst_case(payload, profile)
             if self.reserved + self.spent + worst > self.budget.money_cap_usd:
                 self.tripped = f"money cap ${self.budget.money_cap_usd} reached"
-                raise BudgetExceeded(self.tripped)
+                raise BudgetExceededError(self.tripped)
             self.attempts += 1
             self.reserved += worst
             return worst
@@ -1189,10 +1192,18 @@ def freeze_or_check_profiles(
             "reasoning",
             "response_format",
         ):
-            if old.get(key) != new.get(key):
-                mismatches.append(
-                    f"seat {new['seat']}: {key} {old.get(key)!r} -> {new.get(key)!r}"
+            mismatches.extend(
+                f"seat {new['seat']}: {key} {old.get(key)!r} -> {new.get(key)!r}"
+                for key in (
+                    "profile_fingerprint",
+                    "alias_revision",
+                    "upstream_model",
+                    "batch_size",
+                    "reasoning",
+                    "response_format",
                 )
+                if old.get(key) != new.get(key)
+            )
     if mismatches:
         raise RunnerError(
             "resolved profiles drifted from the frozen snapshot; the block "
@@ -1203,15 +1214,22 @@ def freeze_or_check_profiles(
 
 
 def load_slot_units(
-    manifest: dict, records: Sequence[CorpusRecord], split: dict[str, str]
+    manifest: dict,
+    records: Sequence[CorpusRecord],
+    split: dict[str, str],
+    group: str,
 ) -> tuple[list[Unit], list[dict]]:
     """
-    Load the QA-database units for the dev split and verify frozen texts.
+    Load the QA-database units of one schedule slot's language group.
 
-    Every mismatch aborts the run before any POST: a frozen scope that no
-    longer matches the QA database is not the registered experiment. Empty
-    and incomplete translations are excluded with an explicit record, before
-    any LLM is involved.
+    A slot is scoped to its ``language/component`` group, never to the whole
+    dev split: the registered protocol forbids mixing languages or project
+    contexts inside one judge batch, and the product's own usage accounting
+    (``judge._batch_usage_scope``) refuses mixed-identity batches. Every
+    mismatch aborts the run before any POST: a frozen scope that no longer
+    matches the QA database is not the registered experiment. Empty and
+    incomplete translations are excluded with an explicit record, before any
+    LLM is involved.
     """
     problems: list[str] = []
     units: list[Unit] = []
@@ -1219,6 +1237,8 @@ def load_slot_units(
     cache: dict[tuple[str, str], dict[int, Unit]] = {}
     for record in records:
         if split.get(record.record_id) != "dev":
+            continue
+        if f"{record.language}/{record.component_slug}" != group:
             continue
         key = (record.project_slug, record.component_slug)
         if key not in cache:
@@ -1260,13 +1280,30 @@ def load_slot_units(
         )
     if not units:
         dev_records = [
-            record for record in records if split.get(record.record_id) == "dev"
+            record
+            for record in records
+            if split.get(record.record_id) == "dev"
+            and f"{record.language}/{record.component_slug}" == group
         ]
         msg = (
-            "no dev-split units resolved for this slot: "
+            f"no dev-split units resolved for slot group {group!r}: "
             f"{len(dev_records)} dev records, exclusions {excluded!r}, "
             f"split keys {sorted(split)[:5]!r}, "
             f"record ids {[record.record_id for record in records][:5]!r}"
+        )
+        raise RunnerError(msg)
+    identities = {
+        (
+            unit.translation.component.project.slug,
+            unit.translation.component.slug,
+            unit.translation.language.code,
+        )
+        for unit in units
+    }
+    if len(identities) != 1:
+        msg = (
+            f"slot group {group!r} resolved to {len(identities)} translation "
+            "identities; the protocol forbids mixed-identity judge batches"
         )
         raise RunnerError(msg)
     return units, excluded
@@ -1586,7 +1623,7 @@ def cmd_execute(args: argparse.Namespace) -> int:
     records, _excluded = load_corpus(manifest)
     check_split_reproducible(manifest, records)
     split = _read_split_for_scope(manifest)
-    units, excluded = load_slot_units(manifest, records, split)
+    units, excluded = load_slot_units(manifest, records, split, slot["group"])
     arm = manifest["arms"][slot["arm"]]
     overrides = arm["overrides"]
     with arm_overrides(arm):
@@ -1648,7 +1685,7 @@ def cmd_execute(args: argparse.Namespace) -> int:
         guard.install()
         try:
             result = run_block(manifest, slot, units, profiles, guard, journal)
-        except BudgetExceeded:
+        except BudgetExceededError:
             # In-flight POSTs completed and are journaled by run_block; no new
             # POST may start after the guard tripped.
             print(f"GUARD TRIPPED: {guard.tripped}")
@@ -1673,7 +1710,7 @@ def cmd_execute(args: argparse.Namespace) -> int:
 
 
 def pair_severity(rows: Sequence[dict]) -> str:
-    """Current max-severity policy; an unparsed seat means no coverage."""
+    """Return the current max-severity policy; an unparsed seat means no coverage."""
     if any(row["unparsed"] for row in rows):
         return "unparsed"
     return max(
@@ -1822,7 +1859,7 @@ def _bootstrap_delta(
     families = sorted(set(control) & set(candidate))
     if not families:
         return {}
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
     deltas = {"major_recall": [], "false_flags": []}
     for _ in range(BOOTSTRAP_ITERATIONS):
         sample = [families[rng.randrange(len(families))] for _ in families]
@@ -1988,7 +2025,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except BudgetExceeded as error:
+    except BudgetExceededError as error:
         print(f"GUARD TRIPPED: {error}", file=sys.stderr)
         sys.exit(3)
     except (RunnerError, judge.JudgeError) as error:
