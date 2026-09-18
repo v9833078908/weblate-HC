@@ -12178,7 +12178,10 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
         self.unit = self.translation.unit_set.get(source="Hello, world!\n")
         self.unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
 
-    def post_judge(self, *, q=None, superuser=True, code=200, **overrides):
+    def post_judge(self, *, q=None, superuser=True, code=202, **overrides):
+        # Judge mode reserves a durable run and answers 202 with its id; the
+        # dispatch is published on commit, and the worker runs the queue
+        # eagerly under the test settings, so the run is final on return.
         request = {
             "mode": "judge",
             "q": q if q is not None else f"id:{self.unit.pk}",
@@ -12226,7 +12229,7 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
     def test_judge_run_creates_linked_history(self) -> None:
         self.serve_pass()
         response = self.post_judge()
-        self.assertContains(response, "details")
+        self.assertContains(response, "details", status_code=202)
         run = ProducerRun.objects.get()
         self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
         self.assertEqual(run.actor_id, self.user.pk)
@@ -12279,21 +12282,22 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
         self.assertFalse(JudgeRequestAttempt.objects.filter(run__isnull=True).exists())
 
     @http_mock.activate
-    def test_judge_unexpected_exception_fails_run_not_hanging(self) -> None:
-        # A raw exception downstream of run creation (not a graceful HTTP
-        # refusal, already covered above) must still finalize the run
-        # instead of leaving it RUNNING forever.
-        with (
-            patch(
-                "weblate.trans.autotranslate.run_judge_batch",
-                side_effect=RuntimeError("simulated bug"),
-            ),
-            self.assertRaises(RuntimeError),
+    def test_judge_worker_exception_leaves_the_run_for_redelivery(self) -> None:
+        # A worker exception is crash-like, not a confirmed provider failure:
+        # the durable run stays RUNNING so the redelivery (or the drain) can
+        # finish it, and nothing is recorded as judged, so the retry cannot
+        # double-charge. A confirmed refusal, which does finalize the run, is
+        # covered by ``test_judge_provider_refusal_fails_run_without_orphan_verdicts``.
+        with patch(
+            "weblate.trans.autotranslate.run_judge_batch",
+            side_effect=RuntimeError("simulated bug"),
         ):
             self.post_judge()
         run = ProducerRun.objects.get()
-        self.assertNotEqual(run.status, ProducerRun.Status.RUNNING)
-        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertEqual(run.status, ProducerRun.Status.RUNNING)
+        self.assertEqual(run.scope_cursor, 0)
+        self.assertEqual(JudgeVerdict.objects.count(), 0)
+        self.assertEqual(JudgeRequestAttempt.objects.count(), 0)
 
     @http_mock.activate
     def test_judge_denies_actor_without_review_permission(self) -> None:
@@ -12329,11 +12333,17 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
 
     @override_settings(JUDGE_MAX_UNITS_PER_RUN=0)
     @http_mock.activate
-    def test_judge_zero_cap_skips_without_calls(self) -> None:
+    def test_judge_ignores_the_legacy_per_run_cap(self) -> None:
+        # A durable run judges its recorded scope: the historical per-run cap
+        # no longer truncates it, so nothing is skipped as CAP and the judge
+        # still runs (the plan's deliberate change from the capped contract).
+        self.serve_pass()
         self.post_judge()
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
         row = JudgeRunUnit.objects.get()
-        self.assertEqual(row.skip_reason, JudgeRunUnit.SkipReason.CAP)
-        self.assertEqual(len(http_mock.calls), 0)
+        self.assertNotEqual(row.skip_reason, JudgeRunUnit.SkipReason.CAP)
+        self.assertEqual(len(http_mock.calls), 2)
 
     @http_mock.activate
     def test_judge_keeps_approved_target_and_state(self) -> None:
@@ -12353,6 +12363,56 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
         self.unit.refresh_from_db()
         self.assertEqual(self.unit.target, before_target)
         self.assertEqual(self.unit.state, STATE_APPROVED)
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @http_mock.activate
+    def test_judge_mt_quota_refusal_fails_the_run_before_judging(self) -> None:
+        """A quota refusal in the mandatory preparation never reaches the judge."""
+        from weblate.machinery.base import (  # ruff: ignore[import-outside-top-level]
+            MachineTranslationServiceError,
+        )
+        from weblate.trans.machinery import (  # ruff: ignore[import-outside-top-level]
+            MachineryBatchOutcome,
+        )
+
+        self.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.project.save(update_fields=["machinery_settings"])
+        self.unit.translate(self.user, [""], STATE_EMPTY)
+
+        def refuse(units, *, services, on_failure=None, **kwargs):
+            if on_failure is not None:
+                on_failure(
+                    MachineryBatchOutcome(
+                        status="failed",
+                        service="OpenRouter",
+                        unit_ids=tuple(unit.id for unit in units),
+                        reason_code=(
+                            MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED
+                        ),
+                        error="The quota is exhausted.",
+                    )
+                )
+            return {}
+
+        with patch(
+            "weblate.trans.autotranslate.fetch_machinery_matches", side_effect=refuse
+        ):
+            self.post_judge(auto_source="mt", engines=["openrouter"])
+
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED, run.failure)
+        self.assertEqual(run.preparation_phase, "blocked")
+        self.assertIn("Judges were not started", run.failure)
+        self.assertIn("quota", run.failure.lower())
+        self.assertEqual(len(http_mock.calls), 0)
+        self.assertEqual(JudgeVerdict.objects.count(), 0)
+        row = JudgeRunUnit.objects.get(unit_id_snapshot=self.unit.pk)
+        self.assertEqual(row.skip_reason, JudgeRunUnit.SkipReason.MT_PREREQUISITE)
 
 
 class UnitAPITest(APIBaseTest):

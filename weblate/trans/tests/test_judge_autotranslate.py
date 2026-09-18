@@ -5,13 +5,18 @@
 from __future__ import annotations
 
 from unittest import mock
+from uuid import uuid4
 
 from django.conf import settings
 from django.db import IntegrityError
 from django.test import override_settings
 
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
+from weblate.trans.autotranslate import (
+    AutoTranslate,
+    BatchAutoTranslate,
+    PreparationScope,
+)
 from weblate.trans.judge import JudgeError, JudgeResult, judge_configuration_snapshot
 from weblate.trans.judge_loop import (
     build_request,
@@ -1479,6 +1484,10 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
     def test_finish_producer_run_does_not_overwrite_a_terminal_run(self) -> None:
         unit = self.get_unit()
+        # The mandatory barrier refuses to judge an empty string when no
+        # engine can prepare it; this test is about double finalization, so
+        # its scope starts fully translated.
+        unit.translate(self.user, ["Judgeable target"], STATE_TRANSLATED)
         batch = BatchAutoTranslate(
             self.component,
             user=self.user,
@@ -1970,6 +1979,23 @@ class JudgeAutoTranslateTest(ViewTestCase):
             status=ProducerRun.Status.QUEUED,
             configuration_snapshot=judge_configuration_snapshot(),
         )
+        # A dispatched bulk judge run prepares its closed scope before the
+        # judges start, and an empty string with no configured engine is a
+        # blocker. This test is about adopting the pre-created row, so every
+        # string in scope already has text.
+        scope_units = Unit.objects.filter(
+            translation__component__project=project
+        ).select_related("translation")
+        for scope_unit in scope_units:
+            if scope_unit.translation.is_source:
+                continue
+            if not any(scope_unit.get_target_plurals()):
+                forms = (
+                    scope_unit.translation.plural.number if scope_unit.is_plural else 1
+                )
+                scope_unit.translate(
+                    self.user, ["Judgeable target"] * forms, STATE_TRANSLATED
+                )
         batch = BatchAutoTranslate(
             project,
             user=self.user,
@@ -1991,7 +2017,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
                 source_component_ids=None,
             )
         run.refresh_from_db()
-        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED, run.failure)
         # The batch received the pre-created estimate row, not a new one.
         self.assertEqual(ProducerRun.objects.count(), 1)
         if run_batch.called:
@@ -2072,6 +2098,230 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertTrue(run_batch.called)
         run = ProducerRun.objects.get()
         self.assertEqual(run.preparation_phase, "ready")
+
+    def test_dispatched_bulk_judge_prepares_before_judging(self) -> None:
+        """
+        A producer-dispatched run fills missing strings before any judge call.
+
+        The dispatcher sets ``judge_proposal_only=True``, which only says the
+        judge's own verdicts must not mutate state; it must not turn the
+        mandatory machine-translation barrier off (C3).
+        """
+        from weblate.machinery.models import (  # ruff: ignore[import-outside-top-level]
+            MACHINERY,
+        )
+
+        self._enable_openrouter()
+        unit = self.get_unit()
+        unit.translate(self.user, [""], STATE_EMPTY)
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(self.project.pk),
+            scope_label=str(self.project),
+            scope_path=self.project.get_absolute_url(),
+            requested_query="",
+            requested_mode="judge",
+            cap=1,
+            status=ProducerRun.Status.QUEUED,
+            dispatch_phase="judge-project",
+            dispatch_task_id=uuid4(),
+            execution_version=1,
+            scope_cursor=0,
+            scope_snapshot=[unit.pk],
+            preparation_snapshot=PreparationScope(
+                unit_ids=(unit.pk,),
+                missing_ids=(unit.pk,),
+                per_language_missing={unit.translation.language.code: 1},
+                mt_engine="openrouter",
+            ).to_json(),
+            preparation_phase="pending",
+        )
+        engine = MACHINERY["openrouter"]({"key": "test"})
+
+        def fake_fetch(units, *, services, on_failure=None, **kwargs):
+            origin = services[0] if services else engine
+            for mt_unit in units:
+                mt_unit.machinery = {
+                    "translation": ["Pre-filled"],
+                    "quality": [90],
+                    "origin": [origin],
+                }
+            return {mt_unit.id: mt_unit.machinery for mt_unit in units}
+
+        batch = BatchAutoTranslate(
+            self.project,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.pk],
+            producer_run_id=str(run.pk),
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+            judge_proposal_only=True,
+            enforce_permissions=False,
+        )
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=fake_fetch,
+            ) as fetch,
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run_batch,
+        ):
+            batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        self.assertTrue(fetch.called, "the mandatory preparation never ran")
+        unit.refresh_from_db()
+        self.assertEqual(unit.target.strip(), "Pre-filled")
+        self.assertTrue(run_batch.called)
+        run.refresh_from_db()
+        self.assertEqual(run.preparation_phase, "ready")
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+
+    def test_missing_strings_without_an_engine_block_the_barrier(self) -> None:
+        """Missing strings and no engine must fail, not report a ready scope."""
+        unit = self.get_unit()
+        unit.translate(self.user, [""], STATE_EMPTY)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", return_value={}
+        ) as run_batch:
+            message = batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        run_batch.assert_not_called()
+        self.assertIn("Judges were not started", message)
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertEqual(run.preparation_phase, "blocked")
+        self.assertEqual(run.summary["mt_preparation"]["phase"], "blocked")
+        self.assertFalse(JudgeVerdict.objects.exists())
+
+    @override_settings(JUDGE_BATCH_SIZE=1)
+    def test_scope_changed_after_the_barrier_fails_the_run(self) -> None:
+        """
+        C3 scenario 7: a string emptied before its batch stops the run.
+
+        The per-batch polling itself is covered by
+        ``weblate/trans/tests/test_judge_client.py``; this asserts the batch
+        side: the guard trips, the reason reaches the run and no judge call is
+        sent for the emptied string.
+        """
+        first, second = self.get_translation().unit_set.order_by("position", "pk")[:2]
+        for unit in (first, second):
+            forms = unit.translation.plural.number if unit.is_plural else 1
+            unit.translate(self.user, ["Judgeable target"] * forms, STATE_TRANSLATED)
+        judged: list[int | None] = []
+
+        def fake_run_judge_batch(units, *, scope_guard=None, **kwargs):
+            # The barrier passed; the next string loses its text before its
+            # own HTTP batch is formed.
+            empty_forms = second.translation.plural.number if second.is_plural else 1
+            second.translate(self.user, [""] * empty_forms, STATE_EMPTY)
+            request = build_request(second)
+            self.assertTrue(
+                scope_guard([request]), "the guard missed the emptied string"
+            )
+            judged.append(request.unit_id)
+            return {}
+
+        batch = BatchAutoTranslate(
+            self.get_translation(),
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[first.pk, second.pk],
+            enforce_permissions=False,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch",
+            side_effect=fake_run_judge_batch,
+        ):
+            message = batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        self.assertIn("scope changed", message)
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED, run.failure)
+        self.assertIn("scope changed", run.failure)
+        self.assertTrue(any("scope changed" in warning for warning in run.warnings))
+        self.assertEqual(judged, [second.pk])
+
+    def test_preparation_covers_a_string_beyond_the_judge_cap(self) -> None:
+        """C1: the judge cap narrows the queue, never the prepared volume."""
+        from weblate.machinery.models import (  # ruff: ignore[import-outside-top-level]
+            MACHINERY,
+        )
+
+        self._enable_openrouter()
+        translations = list(
+            self.component.translation_set.exclude_source().order_by("pk")[:2]
+        )
+        if len(translations) < 2:
+            self.skipTest("fixture has only one target translation")
+        inside, beyond = (translation.unit_set.first() for translation in translations)
+        assert inside is not None
+        assert beyond is not None
+        inside.translate(self.user, ["Judgeable target"], STATE_TRANSLATED)
+        beyond.translate(self.user, [""], STATE_EMPTY)
+        engine = MACHINERY["openrouter"]({"key": "test"})
+        prepared: list[int] = []
+
+        def fake_fetch(units, *, services, on_failure=None, **kwargs):
+            origin = services[0] if services else engine
+            for mt_unit in units:
+                prepared.append(mt_unit.id)
+                mt_unit.machinery = {
+                    "translation": ["Pre-filled"],
+                    "quality": [90],
+                    "origin": [origin],
+                }
+            return {mt_unit.id: mt_unit.machinery for mt_unit in units}
+
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[inside.id, beyond.id],
+            enforce_permissions=False,
+        )
+        with (
+            override_settings(JUDGE_MAX_UNITS_PER_RUN=1),
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=fake_fetch,
+            ),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run_batch,
+        ):
+            batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        # The string past the judge cap is prepared even though it is never
+        # sent to the judge.
+        self.assertIn(beyond.id, prepared)
+        beyond.refresh_from_db()
+        self.assertEqual(beyond.target.strip(), "Pre-filled")
+        judged_ids = [
+            unit.id for call in run_batch.call_args_list for unit in call.args[0]
+        ]
+        self.assertNotIn(beyond.id, judged_ids)
 
     def test_quota_refusal_blocks_judge_globally(self) -> None:
         """A quota refusal on one language stops the judge phase everywhere."""
