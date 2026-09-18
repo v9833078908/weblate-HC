@@ -1309,7 +1309,7 @@ class AutoForm(forms.Form):
         self.obj = obj
         self.user = user
         self.project: Project | None = None
-        self.machinery_settings: dict = {}
+        machinery_settings: dict = {}
 
         if isinstance(obj, Component):
             self.components = obj.project.component_set.filter(
