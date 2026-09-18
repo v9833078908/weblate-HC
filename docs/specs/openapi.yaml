@@ -28092,6 +28092,27 @@ paths:
               $ref: '#/components/headers/X-RateLimit-Remaining'
             X-RateLimit-Reset:
               $ref: '#/components/headers/X-RateLimit-Reset'
+        '202':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  details:
+                    type: string
+                  run_id:
+                    type: string
+                    format: uuid
+                  report_url:
+                    type: string
+                  status:
+                    type: string
+                required:
+                - details
+                - run_id
+                - report_url
+                - status
+          description: Automatic translation run queued asynchronously (judge mode).
   /api/translations/{component__project__slug}/{component__slug}/{language__code}/changes/:
     get:
       operationId: api_translations_changes_list
@@ -39105,6 +39126,8 @@ components:
           type: integer
         worst_case_calls:
           type: integer
+        preparation:
+          $ref: '#/components/schemas/ProducerPreparationEstimate'
         basis:
           type: string
       required:
@@ -39112,6 +39135,7 @@ components:
       - estimate_id
       - excluded
       - initial_calls
+      - preparation
       - scope_hash
       - selected
       - strings
@@ -39149,6 +39173,39 @@ components:
       - full_name
       - is_superuser
       - username
+    ProducerPreparationEstimate:
+      type: object
+      description: |-
+        The mandatory pre-judge machine-translation volume and its blockers.
+
+        ``missing`` is the exact number of strings the run would machine
+        translate first; ``per_language`` breaks it down; ``blockers`` carries
+        human-readable reasons the judge could not start today; ``mt_cost`` is
+        deliberately absent when no cost basis exists - an absent estimate is
+        "unknown", never zero.
+      properties:
+        missing:
+          type: integer
+        per_language:
+          type: object
+          additionalProperties:
+            type: integer
+        engine:
+          type:
+          - string
+          - 'null'
+        blockers:
+          type: array
+          items:
+            type: string
+        mt_cost_known:
+          type: boolean
+      required:
+      - blockers
+      - engine
+      - missing
+      - mt_cost_known
+      - per_language
     ProducerProjectSummary:
       type: object
       description: One project the authenticated user may access.
@@ -39203,6 +39260,9 @@ components:
           readOnly: true
         warnings:
           readOnly: true
+        preparation_phase:
+          type: string
+          readOnly: true
         coverage:
           type: object
           additionalProperties: {}
@@ -39213,6 +39273,7 @@ components:
       - failure
       - finished
       - id
+      - preparation_phase
       - requested_mode
       - started
       - status

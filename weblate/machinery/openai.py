@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from decimal import Decimal
 from typing import Any, ClassVar
@@ -79,10 +80,34 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         error = self._get_upstream_error(response)
         if error is not None:
             message = str(error.get("message") or "Upstream error")
-            if self._get_upstream_error_status(error) in self.retry_statuses:
+            upstream_status = self._get_upstream_error_status(error)
+            if upstream_status in self.retry_statuses:
                 raise MachineryRateLimitError(message)
+            # A gateway answers 200 with the upstream refusal inside; classify
+            # it by that status, not by the HTTP 200 envelope. Without an
+            # upstream status, the response's own HTTP status applies.
+            if upstream_status is not None:
+                reason = self.get_service_failure_reason_for_status(
+                    response, upstream_status
+                )
+            else:
+                reason = self.get_service_failure_reason(response)
+            if reason:
+                self.raise_service_failure(
+                    response, reason, upstream_status=upstream_status
+                )
             raise MachineTranslationError(message)
+        if reason := self.get_service_failure_reason(response):
+            self.raise_service_failure(response, reason)
         super().check_failure(response)
+
+    def get_service_failure_reason_for_status(
+        self, response, status: int
+    ) -> str | None:
+        """Classify by an upstream status reported inside a 200 envelope."""
+        synthetic = copy.copy(response)
+        synthetic.status_code = status
+        return self.get_service_failure_reason(synthetic)
 
     def should_retry(self, response, attempt: int) -> bool:
         if super().should_retry(response, attempt):

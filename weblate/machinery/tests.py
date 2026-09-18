@@ -63,6 +63,7 @@ from weblate.machinery.base import (
     InternalMachineTranslation,
     MachineryRateLimitError,
     MachineTranslationError,
+    MachineTranslationServiceError,
     TranslationDownloadPlan,
 )
 from weblate.machinery.cyrtranslit import CyrTranslitTranslation
@@ -6729,6 +6730,120 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(requested, [4])
 
     @http_mock.activate
+    def test_check_failure_classifies_http_402_as_insufficient_credit(self) -> None:
+        machine = self.get_machine()
+        response = make_error_response(
+            "https://example.com/chat/completions",
+            402,
+            json_data={"error": {"message": "Payment required"}},
+        )
+
+        with self.assertRaises(MachineTranslationServiceError) as caught:
+            machine.check_failure(response)
+        self.assertEqual(
+            caught.exception.reason_code,
+            MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT,
+        )
+        self.assertNotIn("Payment required", str(caught.exception))
+
+    def test_check_failure_classifies_confirmed_monthly_limit_403(self) -> None:
+        machine = self.get_machine()
+        response = make_error_response(
+            "https://example.com/chat/completions",
+            403,
+            json_data={
+                "error": {
+                    "message": (
+                        "Key limit exceeded (monthly limit). "
+                        "Manage keys at https://provider.example/keys"
+                    )
+                }
+            },
+        )
+
+        with self.assertRaises(MachineTranslationServiceError) as caught:
+            machine.check_failure(response)
+        self.assertEqual(
+            caught.exception.reason_code,
+            MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+        )
+        # The provider's key-management URL must not leak into the message
+        # that batch fetching logs and stores durably.
+        self.assertNotIn("https://provider.example", str(caught.exception))
+        self.assertNotIn("https://provider.example", caught.exception.safe_message)
+
+    def test_check_failure_keeps_an_ordinary_403_a_plain_error(self) -> None:
+        machine = self.get_machine()
+        response = make_error_response(
+            "https://example.com/chat/completions",
+            403,
+            json_data={"error": {"message": "Model access denied for this key"}},
+        )
+
+        with self.assertRaises(Exception) as caught:
+            machine.check_failure(response)
+        self.assertNotIsInstance(caught.exception, MachineTranslationServiceError)
+
+    def test_check_failure_classifies_an_upstream_402_inside_http_200(self) -> None:
+        machine = self.get_machine()
+        response = make_error_response(
+            "https://example.com/chat/completions",
+            200,
+            json_data={
+                "choices": [
+                    {
+                        "finish_reason": "error",
+                        "error": {
+                            "code": 402,
+                            "message": "Insufficient credits",
+                        },
+                        "message": {"content": ""},
+                    }
+                ]
+            },
+        )
+
+        with self.assertRaises(MachineTranslationServiceError) as caught:
+            machine.check_failure(response)
+        self.assertEqual(
+            caught.exception.reason_code,
+            MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT,
+        )
+        self.assertFalse(machine.should_retry(response, 0))
+
+    @http_mock.activate
+    def test_translate_does_not_split_a_quota_refused_batch(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma", "Delta"]
+        requested: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            requested.append(len(json.loads(content)["strings"]))
+            msg = "quota exhausted"
+            raise MachineTranslationServiceError(
+                msg,
+                reason_code=MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+                safe_message="The quota is exhausted.",
+            )
+
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            self.assertRaises(MachineTranslationServiceError),
+        ):
+            machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        # Halving a refused batch would only send more refused requests.
+        self.assertEqual(requested, [4])
+
     def test_translate_keeps_half_when_other_half_keeps_failing(self) -> None:
         machine = self.get_machine()
         sources = ["Alpha", "Beta"]

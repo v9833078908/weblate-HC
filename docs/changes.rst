@@ -26,10 +26,9 @@ Weblate 2026.8.1
 * Mass-fixing now also offers two aggregate policies that decide a whole family of defects in one pass and can be applied to every eligible string in a scope without paging through the preview. :ref:`Terminal punctuation against the source <terminal-source-policy>` takes the mark the source ends with as the reference and adds a missing mark, replaces a differing one, or removes an added one, leaving ambiguous strings for per-string review; the :guilabel:`Fix` beside one terminal check's count opens that policy over exactly the strings the count reports. :ref:`Mechanical repair groups <mechanical-repair-groups>` group meaning-free defects - doubled spaces, edge whitespace, ellipses, zero-width spaces, whitespace hugging a line separator - by the repair they need rather than by the check that reports them. Every proposed edit is verified to leave placeholder and markup spans unchanged.
 * The header no longer contains a search input; string search opens with the ``/`` key or through the existing :guilabel:`Search` tab of the current project, component, or dashboard scope.
 * With :setting:`REDIRECT_SINGLE_PROJECT_USER` enabled, an authenticated user with exactly one accessible project lands directly on that project after sign in; the dashboard remains available at ``/dashboard/``.
-* Existing monolingual components can now add new strings, language targets,
-  and source explanations directly from a full CSV/TSV/XLSX loc-kit table
-  through a previewed, resumable :guilabel:`Update from a loc-kit table` flow;
-  existing source strings, translations, flags, and notes remain unchanged.
+* Existing monolingual components can now add new strings, language targets, and source explanations directly from a full CSV/TSV/XLSX loc-kit table through a previewed, resumable :guilabel:`Update from a loc-kit table` flow; existing source strings, translations, flags, and notes remain unchanged.
+* An LLM judge run now machine translates every empty string of its selected scope, in all its languages, before the first judge request; if that preparation cannot complete - no engine, missing permission, or a provider refusal - the judges do not start and the run reports why; see :ref:`llm-judge`.
+* An LLM judge run now processes its full confirmed scope in small durable chunks with automatic task continuation across worker deliveries and restarts, rather than truncating at a 2000-unit cap; the report displays cumulative progress, pending strings, and total scope, and the translation autotranslate REST endpoint now returns an asynchronous 202 response with the run ID and report URL in judge mode.
 
 .. rubric:: Improvements
 

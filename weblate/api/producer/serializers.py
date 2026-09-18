@@ -81,6 +81,7 @@ class ProducerRunSerializer(serializers.Serializer):
     summary = serializers.JSONField(read_only=True)
     failure = serializers.CharField(read_only=True)
     warnings = serializers.JSONField(read_only=True)
+    preparation_phase = serializers.CharField(read_only=True)
     coverage = serializers.SerializerMethodField(read_only=True)
 
     @extend_schema_field(OpenApiTypes.OBJECT)
@@ -115,6 +116,24 @@ class ProducerJudgeEstimateRequestSerializer(serializers.Serializer):
         return value
 
 
+class ProducerPreparationEstimateSerializer(serializers.Serializer):
+    """
+    The mandatory pre-judge machine-translation volume and its blockers.
+
+    ``missing`` is the exact number of strings the run would machine
+    translate first; ``per_language`` breaks it down; ``blockers`` carries
+    human-readable reasons the judge could not start today; ``mt_cost`` is
+    deliberately absent when no cost basis exists - an absent estimate is
+    "unknown", never zero.
+    """
+
+    missing = serializers.IntegerField()
+    per_language = serializers.DictField(child=serializers.IntegerField())
+    engine = serializers.CharField(allow_null=True)
+    blockers = serializers.ListField(child=serializers.CharField())
+    mt_cost_known = serializers.BooleanField()
+
+
 class ProducerJudgeEstimateSerializer(serializers.Serializer):
     """Upper bounds and exact selection counts for a judge scope."""
 
@@ -125,6 +144,7 @@ class ProducerJudgeEstimateSerializer(serializers.Serializer):
     excluded = serializers.IntegerField()
     initial_calls = serializers.IntegerField()
     worst_case_calls = serializers.IntegerField()
+    preparation = ProducerPreparationEstimateSerializer()
     basis = serializers.CharField()
 
 

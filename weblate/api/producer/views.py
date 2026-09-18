@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
@@ -49,9 +50,16 @@ from weblate.api.throttling import (
     ScopedRateThrottle,
     UserRateThrottle,
 )
-from weblate.trans.autotranslate import BatchAutoTranslate
+from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD
+from weblate.trans.autotranslate import BatchAutoTranslate, PreparationScope
+from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import judge_configuration_ready, judge_configuration_snapshot
-from weblate.trans.judge_loop import accept_judge_candidate, undo_judge_application
+from weblate.trans.judge_loop import (
+    DEFAULT_CANDIDATE_SEVERITIES,
+    accept_judge_candidate,
+    undo_judge_application,
+)
+from weblate.trans.models import Project
 from weblate.trans.models.judge import (
     JudgeApplication,
     JudgeApplicationUndoError,
@@ -73,7 +81,6 @@ if TYPE_CHECKING:
     from rest_framework.request import Request
 
     from weblate.auth.models import User
-    from weblate.trans.models import Project
 
     class AuthenticatedRequest(Request):
         """DRF request after Weblate's authentication middleware."""
@@ -131,6 +138,81 @@ class ProducerProjects(ListAPIView):
         return self.request.user.allowed_projects.order_by("id")
 
 
+def _preparation_estimate_payload(
+    project: Project, user: User, scope: dict
+) -> tuple[
+    BatchAutoTranslate, object, list[Unit], dict, list[int], PreparationScope | None
+]:
+    """
+    Build the shared estimate/start view of the run's two volumes (Task 3).
+
+    Returns the batch, the judge preview, its selected units, the
+    preparation summary and the payload's ``blockers``. A missing string
+    past the judge cap is still prepared, so the preparation scope is
+    deliberately built over the whole query, not the capped selection.
+    Permission problems surface here as blockers, before any dispatch.
+    """
+    batch = BatchAutoTranslate(
+        project,
+        user=user,
+        q=scope.get("query", ""),
+        unit_ids=scope.get("unit_ids"),
+        mode="judge",
+        judge_proposal_only=True,
+        judge_pretranslate=False,
+        judge_mutating_repairs=False,
+    )
+    preview, units = batch.preview_judge_scope_snapshot()
+    try:
+        preparation = batch.build_preparation_scope()
+    except PermissionDenied as error:
+        blockers = [str(error)]
+        preparation = None
+    else:
+        blockers = [
+            warning
+            for warning in batch.get_warnings()
+            if "cannot be prepared" in warning or "configured" in warning
+        ]
+    summary = {
+        "missing": len(preparation.missing_ids) if preparation else 0,
+        "per_language": (
+            dict(sorted(preparation.per_language_missing.items()))
+            if preparation
+            else {}
+        ),
+        "engine": preparation.mt_engine if preparation else None,
+        "blockers": blockers,
+        # A real cost basis needs LLMUsageLog history for this engine; the
+        # honest default is "unknown" until such a basis is measured.
+        "mt_cost_known": False,
+    }
+    return batch, preview, units, summary, blockers, preparation
+
+
+def _scope_hash_for(
+    project: Project,
+    scope: dict,
+    units: list[Unit],
+    preparation: dict,
+    execution_version: int = 1,
+) -> str:
+    """Bind the estimate to its exact selection, MT volume and execution version."""
+    return hashlib.sha256(
+        json.dumps(
+            {
+                "execution_version": execution_version,
+                "project": project.pk,
+                "scope": scope,
+                "unit_ids": [unit.pk for unit in units],
+                "preparation": preparation,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+
+
 class ProducerProjectJudgeEstimate(APIView):
     """Estimate the permission-filtered judge scope without contacting a provider."""
 
@@ -156,28 +238,12 @@ class ProducerProjectJudgeEstimate(APIView):
                 status=409,
             )
         scope = serializer.validated_data.get("scope", {})
-        batch = BatchAutoTranslate(
-            project,
-            user=self.request.user,
-            q=scope.get("query", ""),
-            unit_ids=scope.get("unit_ids"),
-            mode="judge",
-            judge_proposal_only=True,
-            judge_pretranslate=False,
-            judge_mutating_repairs=False,
+        _batch, preview, units, preparation, _blockers, _scope = (
+            _preparation_estimate_payload(project, self.request.user, scope)
         )
-        preview, units = batch.preview_judge_scope_snapshot()
-        scope_hash = hashlib.sha256(
-            json.dumps(
-                {
-                    "project": project.pk,
-                    "scope": scope,
-                    "unit_ids": [unit.pk for unit in units],
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
+        scope_hash = _scope_hash_for(
+            project, scope, units, preparation, execution_version=1
+        )
         estimate = ProducerRun.objects.create(
             actor=self.request.user,
             scope_type=ProducerRun.ScopeType.PROJECT,
@@ -186,7 +252,9 @@ class ProducerProjectJudgeEstimate(APIView):
             scope_path=project.get_absolute_url(),
             requested_query=scope.get("query", ""),
             requested_mode="judge-estimate",
-            cap=settings.JUDGE_MAX_UNITS_PER_RUN,
+            cap=len(units),
+            execution_version=1,
+            scope_cursor=0,
             scope_hash=scope_hash,
             scope_snapshot=[unit.pk for unit in units],
             configuration_snapshot=judge_configuration_snapshot(),
@@ -199,7 +267,10 @@ class ProducerProjectJudgeEstimate(APIView):
             "excluded": preview.matched - preview.processed,
             "initial_calls": preview.initial_calls,
             "worst_case_calls": preview.worst_case_calls,
-            "basis": "Worst case includes live-text judge rounds only.",
+            "preparation": preparation,
+            "basis": "Worst case includes live-text judge rounds only. "
+            "The preparation cost is reported separately and is not "
+            "included in the judge call counts.",
         }
         return Response(ProducerJudgeEstimateSerializer(payload).data)
 
@@ -232,6 +303,14 @@ class ProducerProjectRunStart(APIView):
             scope_id=str(project.pk),
             requested_mode="judge-estimate",
         )
+        if estimate.execution_version != 1:
+            return Response(
+                {
+                    "detail": "The estimate uses a legacy execution contract.",
+                    "code": "estimate-drift",
+                },
+                status=409,
+            )
         scope = serializer.validated_data.get("scope", {})
         if scope.get("query", "") != estimate.requested_query:
             return Response(
@@ -254,27 +333,12 @@ class ProducerProjectRunStart(APIView):
                 },
                 status=409,
             )
-        batch = BatchAutoTranslate(
-            project,
-            user=self.request.user,
-            q=estimate.requested_query,
-            mode="judge",
-            judge_proposal_only=True,
-            judge_pretranslate=False,
-            judge_mutating_repairs=False,
+        _batch, _preview, units, preparation, blockers, preparation_scope = (
+            _preparation_estimate_payload(project, self.request.user, scope)
         )
-        _preview, units = batch.preview_judge_scope_snapshot()
-        scope_hash = hashlib.sha256(
-            json.dumps(
-                {
-                    "project": project.pk,
-                    "scope": scope,
-                    "unit_ids": [unit.pk for unit in units],
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
+        scope_hash = _scope_hash_for(
+            project, scope, units, preparation, execution_version=1
+        )
         if scope_hash != estimate.scope_hash:
             return Response(
                 {
@@ -283,7 +347,29 @@ class ProducerProjectRunStart(APIView):
                 },
                 status=409,
             )
+        if blockers:
+            # A preparation blocker (permission, no engine) is a pre-flight
+            # refusal: the run never dispatches with a known-bad barrier.
+            return Response(
+                {
+                    "detail": " ".join(blockers),
+                    "code": "preparation-blocked",
+                },
+                status=409,
+            )
 
+        execution_options = {
+            "mode": "judge",
+            "q": estimate.requested_query,
+            "auto_source": "mt",
+            "engines": [],
+            "threshold": MACHINERY_DEFAULT_THRESHOLD,
+            "judge_proposal_only": True,
+            "judge_pretranslate": False,
+            "judge_mutating_repairs": False,
+            "judge_candidate_severities": list(DEFAULT_CANDIDATE_SEVERITIES),
+            "overwrite_existing": False,
+        }
         idempotency_key = str(estimate.pk)
         try:
             with transaction.atomic():
@@ -298,11 +384,22 @@ class ProducerProjectRunStart(APIView):
                     scope_path=project.get_absolute_url(),
                     requested_query=estimate.requested_query,
                     requested_mode="judge",
-                    cap=settings.JUDGE_MAX_UNITS_PER_RUN,
+                    cap=len(units),
+                    execution_version=1,
+                    scope_cursor=0,
+                    execution_options=execution_options,
                     scope_hash=scope_hash,
                     scope_snapshot=[unit.pk for unit in units],
                     configuration_snapshot=judge_configuration_snapshot(),
                     idempotency_key=idempotency_key,
+                    # Task 3: the closed preparation scope is fixed at start,
+                    # before dispatch. A run dispatched without it is legacy by
+                    # definition, and the executor must refuse rather than
+                    # resume with a silently new MT volume.
+                    preparation_snapshot=(
+                        preparation_scope.to_json() if preparation_scope else {}
+                    ),
+                    preparation_phase="pending",
                 )
         except IntegrityError:
             # A concurrent identical POST already reserved this estimate's
@@ -392,6 +489,28 @@ class ProducerRunResume(ProducerRunDetail):
                 status=409,
             )
         attempt = serializer.validated_data["attempt"]
+        # A resume re-runs the remaining preparation with the *current*
+        # engine settings. When the project's routed MT engine changed since
+        # the run fixed its preparation scope, the old consent covers a
+        # different spend than the resume would make: refuse and require a
+        # fresh estimate. A provider quota increase without a configuration
+        # change keeps the ordinary explicit resume path.
+        if run.scope_type == ProducerRun.ScopeType.PROJECT and run.preparation_snapshot:
+            current_engine = configured_routed_engine(
+                Project.objects.filter(pk=run.scope_id)
+                .values_list("machinery_settings", flat=True)
+                .first()
+                or {}
+            )
+            if current_engine != run.preparation_snapshot.get("mt_engine"):
+                return Response(
+                    {
+                        "detail": "The machine translation configuration changed "
+                        "since this run; estimate and start a new run.",
+                        "code": "estimate-drift",
+                    },
+                    status=409,
+                )
         idempotency_key = f"resume:{run.pk}:{attempt}"
         try:
             with transaction.atomic():
@@ -410,6 +529,14 @@ class ProducerRunResume(ProducerRunDetail):
                     scope_hash=run.scope_hash,
                     scope_snapshot=run.scope_snapshot,
                     configuration_snapshot=run.configuration_snapshot,
+                    preparation_snapshot=run.preparation_snapshot,
+                    preparation_phase=(
+                        # A blocked preparation retries only its remaining
+                        # missing strings; the closed scope never widens.
+                        "pending"
+                        if run.preparation_phase == "blocked"
+                        else run.preparation_phase
+                    ),
                     resumed_from=run,
                     idempotency_key=idempotency_key,
                 )

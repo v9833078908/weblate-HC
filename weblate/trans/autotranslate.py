@@ -6,18 +6,22 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any, Literal
+from uuid import uuid4
 
 from celery import current_task
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Case, Count, IntegerField, QuerySet, Value, When
 from django.db.models.functions import MD5, Lower
 from django.utils import timezone
 from django.utils.translation import gettext, ngettext
 
 from weblate.checks.models import CHECKS
-from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.base import (
+    MachineTranslationError,
+    MachineTranslationServiceError,
+)
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
 from weblate.trans.judge import (
@@ -29,10 +33,11 @@ from weblate.trans.judge import (
 )
 from weblate.trans.judge_loop import (
     DEFAULT_CANDIDATE_SEVERITIES,
+    _run_cancel_requested,
     build_request,
     run_judge_batch,
 )
-from weblate.trans.machinery import fetch_machinery_matches
+from weblate.trans.machinery import MachineryBatchOutcome, fetch_machinery_matches
 from weblate.trans.models import (
     Category,
     Component,
@@ -64,7 +69,7 @@ from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from weblate.auth.models import User
     from weblate.auth.results import PermissionResult
@@ -127,6 +132,9 @@ class JudgeSummary:
             untranslated=self.untranslated + other.untranslated,
             cap_remainder=self.cap_remainder + other.cap_remainder,
         )
+
+
+JUDGE_CHUNK_SIZE: int = 100
 
 
 def format_judge_summary(summary: JudgeSummary) -> str:
@@ -224,6 +232,77 @@ def check_auto_translate_permission(
         # the same review right as the "approved" mode is required.
         return user.has_perm("unit.review", translation)
     return user.has_perm("meta:unit.direct_edit", translation)
+
+
+@dataclass(frozen=True, slots=True)
+class PreparationScope:
+    """
+    The closed pre-judge machine-translation scope, fixed before any paid call.
+
+    ``unit_ids`` covers every selected string in the selected
+    component/language pairs, translated or not; ``missing_ids`` is the
+    subset whose target plurals are all empty at snapshot time. Judge's own
+    capped scope is computed from these pairs separately and is never
+    recounted after MT through changed state filters.
+    """
+
+    unit_ids: tuple[int, ...]
+    missing_ids: tuple[int, ...]
+    per_language_missing: dict[str, int]
+    mt_engine: str | None
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "version": 1,
+            "unit_ids": sorted(self.unit_ids),
+            "missing_ids": sorted(self.missing_ids),
+            "per_language_missing": dict(sorted(self.per_language_missing.items())),
+            "mt_engine": self.mt_engine,
+        }
+
+    @staticmethod
+    def from_json(payload: Mapping[str, Any]) -> PreparationScope:
+        return PreparationScope(
+            unit_ids=tuple(int(pk) for pk in payload.get("unit_ids", [])),
+            missing_ids=tuple(int(pk) for pk in payload.get("missing_ids", [])),
+            per_language_missing={
+                str(language): int(count)
+                for language, count in payload.get("per_language_missing", {}).items()
+            },
+            mt_engine=(
+                str(engine)
+                if isinstance(engine := payload.get("mt_engine"), str)
+                else None
+            ),
+        )
+
+
+def unit_missing_translation(unit: Unit) -> bool:
+    """Whether the unit has no stored target text in any plural form."""
+    return not any(unit.get_target_plurals())
+
+
+def _target_forms_count(unit: Unit) -> int:
+    """Count the plural form slots this unit's target actually carries."""
+    return len(split_plural(unit.target))
+
+
+def unit_target_incomplete(unit: Unit) -> bool:
+    """
+    Whether the unit's target is partial for its plural cardinality.
+
+    A fully empty unit is *missing* (the preparation MT fills it); a fully
+    written one is ready. Only a unit whose stored forms are fewer than the
+    language requires is incomplete: a singular unit written by MT has one
+    slot filled and is ready, while a plural unit with only some forms
+    filled blocks readiness and must not be machine-overwritten.
+    """
+    if not unit.is_plural:
+        return False
+    targets = unit.get_target_plurals()
+    expected = unit.translation.plural.number
+    filled = sum(bool(text) for text in targets)
+    return 0 < filled < expected
 
 
 class _AttemptCounter:
@@ -337,6 +416,19 @@ class BaseAutoTranslate:
     ) -> None:
         for unit in units:
             request = build_request(unit)
+            # Never overwrite a row that already has a terminal outcome: a
+            # preparation failure must not erase an earlier cap or
+            # permission reason recorded for the same unit.
+            existing = JudgeRunUnit.objects.filter(
+                run=run, unit_id_snapshot=unit.id
+            ).first()
+            if (
+                existing is not None
+                and existing.outcome != JudgeRunUnit.Outcome.PENDING
+            ):
+                # A terminal row (cap/permission/passed/…) keeps its reason;
+                # only a fresh or still-PENDING row takes this skip.
+                continue
             JudgeRunUnit.objects.update_or_create(
                 run=run,
                 unit_id_snapshot=unit.id,
@@ -375,6 +467,7 @@ class AutoTranslate(BaseAutoTranslate):
         allow_non_shared_tm_source_components: bool = False,
         overwrite_existing: bool = False,
         judge_limit: int | None = None,
+        judge_uncapped: bool = False,
         producer_run: ProducerRun | None = None,
         judge_pretranslate: bool = True,
         judge_mutating_repairs: bool = True,
@@ -398,6 +491,7 @@ class AutoTranslate(BaseAutoTranslate):
         self.target_state = STATE_TRANSLATED
         self.overwrite_existing = overwrite_existing
         self.judge_limit = judge_limit
+        self.judge_uncapped = judge_uncapped
         self.producer_run = producer_run
         self.judge_pretranslate = judge_pretranslate
         self.judge_mutating_repairs = judge_mutating_repairs
@@ -413,6 +507,13 @@ class AutoTranslate(BaseAutoTranslate):
             self.target_state = STATE_FUZZY
         elif self.mode == "approved" and translation.enable_review:
             self.target_state = STATE_APPROVED
+        # Mandatory pre-judge preparation writes only units still missing at
+        # store time; a human's concurrent write is never overwritten.
+        self.preparation_write_lock = False
+        # Snapshot of the sources the preparation fetch was based on: a unit
+        # whose source changed between fetch and store never receives the
+        # stale answer (C5).
+        self.preparation_source_hashes: dict[int, str] | None = None
 
     def get_units(self):
         units = self.translation.unit_set.exclude(state=STATE_READONLY)
@@ -666,10 +767,13 @@ class AutoTranslate(BaseAutoTranslate):
         engines_list: list[str],
         threshold: int,
         on_batch: Callable[[list[Unit]], None] | None = None,
+        on_failure: Callable[[MachineryBatchOutcome], None] | None = None,
     ) -> dict[int, UnitMemoryResultDict]:
         """Get the translations."""
         units: list[Unit] = list(self.get_units().select_related("source_unit"))
         num_units = len(units)
+        if not num_units:
+            return {}
 
         machinery_settings = self.translation.component.project.get_machinery_settings()
 
@@ -718,6 +822,7 @@ class AutoTranslate(BaseAutoTranslate):
             set_progress=self.set_progress,
             log_translation=self.translation,
             on_batch=on_batch,
+            on_failure=on_failure,
         )
         for engine in engines:
             if not engine.is_rate_limited():
@@ -737,9 +842,116 @@ class AutoTranslate(BaseAutoTranslate):
             self.set_progress(self.progress_base)
         return translations
 
-    def process_mt(self, engines: list[str], threshold: int) -> None:
+    def fetch_mt_checked(
+        self,
+        engines_list: list[str],
+        threshold: int,
+        on_batch: Callable[[list[Unit]], None] | None = None,
+    ) -> tuple[dict[int, UnitMemoryResultDict], list[MachineryBatchOutcome]]:
+        """Fetch translations and report every classified batch failure."""
+        failures: list[MachineryBatchOutcome] = []
+
+        def observe(outcome: MachineryBatchOutcome) -> None:
+            failures.append(outcome)
+            if outcome.reason_code == (
+                MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED
+            ):
+                self.add_warning(
+                    gettext(
+                        "%(service)s refused the request: the translation quota "
+                        "is exhausted. Ask the administrator to top it up, then "
+                        "run the operation again."
+                    )
+                    % {"service": outcome.service}
+                )
+            elif outcome.reason_code == (
+                MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
+            ):
+                self.add_warning(
+                    gettext(
+                        "%(service)s refused the request: the credit balance "
+                        "is spent. Ask the administrator to top it up, then "
+                        "run the operation again."
+                    )
+                    % {"service": outcome.service}
+                )
+            elif outcome.reason_code is not None:
+                self.add_warning(
+                    gettext("%(service)s failed: %(reason)s")
+                    % {"service": outcome.service, "reason": outcome.error or ""}
+                )
+
+        translations = self.fetch_mt(
+            engines_list,
+            threshold,
+            on_batch=on_batch,
+            on_failure=observe,
+        )
+        return translations, failures
+
+    def process_mt(
+        self, engines: list[str], threshold: int, *, empty_only: bool = False
+    ) -> None:
         """Perform automatic translation based on machine translation."""
-        translations = self.fetch_mt(engines, int(threshold), on_batch=self.store_batch)
+        if empty_only and not self.overwrite_existing:
+            # Mandatory pre-judge preparation writes only units still missing
+            # at store time; a human's concurrent write is never overwritten.
+            if not self.unit_ids:
+                self.post_process()
+                return
+            store_unit_ids = set(self.unit_ids)
+            # Capture the sources this fetch is based on; store_results
+            # refuses an answer whose source changed in between (C5).
+            self.preparation_source_hashes = {
+                unit.pk: compute_context_hash(
+                    source=unit.source,
+                    note="",
+                    explanation="",
+                    glossary_terms=(),
+                )
+                for unit in self.get_units()
+                .filter(pk__in=store_unit_ids)
+                .select_related("source_unit")
+            }
+            self.preparation_write_lock = True
+            try:
+                translations, failures = self.fetch_mt_checked(engines, int(threshold))
+                translations = {
+                    unit_id: result
+                    for unit_id, result in translations.items()
+                    if unit_id in store_unit_ids
+                }
+                if translations:
+                    self.store_results(translations)
+            finally:
+                self.preparation_write_lock = False
+            self.progress_steps = self.progress_base + len(translations)
+            self.post_process()
+            fatal = next(
+                (
+                    outcome
+                    for outcome in failures
+                    if outcome.reason_code
+                    in {
+                        MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+                        MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT,
+                        MachineTranslationServiceError.REASON_AUTHENTICATION,
+                        MachineTranslationServiceError.REASON_PERMISSION,
+                    }
+                ),
+                None,
+            )
+            if fatal is not None and self.failure_message is None:
+                self.failure_message = (
+                    gettext("Automatic translation failed: %s") % fatal.error
+                )
+                if fatal.error not in self.warnings:
+                    self.add_warning(self.failure_message)
+            return
+
+        translations, failures = self.fetch_mt_checked(
+            engines, int(threshold), on_batch=self.store_batch
+        )
 
         # Adjust total number to show correct progress
         self.progress_steps = self.progress_base + len(translations)
@@ -753,8 +965,30 @@ class AutoTranslate(BaseAutoTranslate):
         }
         if remaining:
             self.store_results(remaining)
-
         self.post_process()
+        fatal = next(
+            (
+                outcome
+                for outcome in failures
+                if outcome.reason_code
+                in {
+                    MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+                    MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT,
+                    MachineTranslationServiceError.REASON_AUTHENTICATION,
+                    MachineTranslationServiceError.REASON_PERMISSION,
+                }
+            ),
+            None,
+        )
+        if fatal is not None and self.failure_message is None:
+            # A confirmed refusal is an operation failure even when earlier
+            # batches stored translations: the completion message must not
+            # claim success while strings were left untranslated.
+            self.failure_message = (
+                gettext("Automatic translation failed: %s") % fatal.error
+            )
+            if fatal.error not in self.warnings:
+                self.add_warning(self.failure_message)
 
     def store_batch(self, units: list[Unit]) -> None:
         """Store one fetched batch so a crash cannot discard the whole run."""
@@ -771,8 +1005,8 @@ class AutoTranslate(BaseAutoTranslate):
             self.translation.log_info("updating %d strings", len(translations))
             for unit in (
                 self.translation.unit_set.filter(id__in=translations.keys())
-                .prefetch_bulk()
                 .select_for_update()
+                .prefetch_bulk()
             ):
                 translation: UnitMemoryResultDict = translations[unit.pk]
                 # Use first existing origin for user
@@ -782,32 +1016,71 @@ class AutoTranslate(BaseAutoTranslate):
                     if origin is not None:
                         user = origin.user
                         break
-                # Copy translation
-                self.update(
-                    unit,
-                    self.target_state,
-                    translation["translation"],
-                    user=user,
-                )
+                if self.preparation_write_lock:
+                    # Empty-only preparation: re-read under the row lock and
+                    # never overwrite a target a human wrote since the fetch.
+                    # The skipped unit is not counted as written. prefetch_bulk
+                    # populated related caches, not the row's own target.
+                    fresh = (
+                        type(unit)
+                        .objects.filter(pk=unit.pk)
+                        .values_list("target", flat=True)
+                        .first()
+                    )
+                    source_unchanged = (
+                        self.preparation_source_hashes is None
+                        or self.preparation_source_hashes.get(unit.pk)
+                        == compute_context_hash(
+                            source=unit.source,
+                            note="",
+                            explanation="",
+                            glossary_terms=(),
+                        )
+                    )
+                    if (
+                        fresh is not None
+                        and not any(form for form in split_plural(fresh))
+                        and source_unchanged
+                    ):
+                        self.update(
+                            unit,
+                            self.target_state,
+                            translation["translation"],
+                            user=user,
+                        )
+                        self.written.add(unit.pk)
+                else:
+                    # Copy translation
+                    self.update(
+                        unit,
+                        self.target_state,
+                        translation["translation"],
+                        user=user,
+                    )
+                    self.written.add(unit.pk)
             # Flush the deferred changes of this transaction; a later crash
             # then leaves stored translations with their history intact.
             self.translation.store_update_changes()
-        self.written.update(translations)
         self.set_progress(self.progress_base + len(self.written))
 
     def preview_judge_scope(self) -> tuple[JudgeScopePreview, list[Unit]]:
         """Return the ordered, capped judge scope used by execution."""
         validate_judge_configuration()
-        limit = (
-            settings.JUDGE_MAX_UNITS_PER_RUN
-            if self.judge_limit is None
-            else self.judge_limit
-        )
+        if self.judge_uncapped or (
+            self.producer_run is not None and self.producer_run.execution_version >= 1
+        ):
+            limit = self.judge_limit
+        else:
+            limit = (
+                settings.JUDGE_MAX_UNITS_PER_RUN
+                if self.judge_limit is None
+                else self.judge_limit
+            )
         units = (
             self.get_units().select_related("source_unit").order_by("position", "pk")
         )
         matched = units.count()
-        selected = list(units[:limit])
+        selected = list(units[:limit]) if limit is not None else list(units)
         processed = len(selected)
         writable = sum(
             not unit.translated or self.overwrite_existing for unit in selected
@@ -829,7 +1102,7 @@ class AutoTranslate(BaseAutoTranslate):
         )
 
     def process_judge(  # ruff: ignore[too-many-locals, too-many-statements, complex-structure]
-        self, *, engines: list[str], threshold: int
+        self, *, engines: list[str], threshold: int, prepare: bool = True
     ) -> None:
         preview, units = self.preview_judge_scope()
         self.judge_units_matched = preview.matched
@@ -838,6 +1111,19 @@ class AutoTranslate(BaseAutoTranslate):
         if not units:
             self.judge_summary = JudgeSummary(cap_remainder=preview.remaining)
             return
+        if (
+            self.overwrite_existing
+            and self.producer_run is not None
+            and not prepare
+            and self.producer_run.preparation_phase == "ready"
+        ):
+            # A batch judge run whose mandatory preparation already ran never
+            # overwrites existing text; an overwrite request belongs to a
+            # plain MT run. Direct process_judge callers and runs whose
+            # preparation never started keep the historical behavior.
+            raise JudgeError(
+                gettext("Overwrite cannot be combined with the judge mode.")
+            )
         if self.producer_run is not None:
             # A redelivered attempt (acks_late/reject_on_worker_lost) must
             # neither lose a unit's already-recorded outcome nor pay for it
@@ -857,38 +1143,39 @@ class AutoTranslate(BaseAutoTranslate):
                 if not units:
                     self.judge_summary = JudgeSummary(cap_remainder=preview.remaining)
                     return
-            JudgeRunUnit.objects.bulk_create(
-                [
-                    JudgeRunUnit(
-                        run=self.producer_run,
-                        unit=unit,
-                        unit_id_snapshot=unit.id,
-                        translation_id=unit.translation_id,
-                        component_id=unit.translation.component_id,
-                        project_id=unit.translation.component.project_id,
-                        input_target=unit.get_target_plurals(),
-                        input_target_hash=compute_target_hash(
+            # Up-front reservation for this delivery's judge units: an
+            # existing PENDING or terminal row is left untouched.
+            for unit in units:
+                request = build_request(unit)
+                JudgeRunUnit.objects.get_or_create(
+                    run=self.producer_run,
+                    unit_id_snapshot=unit.id,
+                    defaults={
+                        "unit": unit,
+                        "translation_id": unit.translation_id,
+                        "component_id": unit.translation.component_id,
+                        "project_id": unit.translation.component.project_id,
+                        "input_target": unit.get_target_plurals(),
+                        "input_target_hash": compute_target_hash(
                             unit.get_target_plurals()
                         ),
-                        context_hash=compute_context_hash(
-                            source=(request := build_request(unit)).source,
+                        "context_hash": compute_context_hash(
+                            source=request.source,
                             note=request.note,
                             explanation=request.explanation,
                             glossary_terms=request.glossary_terms,
                             clarification=request.clarification,
                         ),
-                        outcome=JudgeRunUnit.Outcome.PENDING,
-                    )
-                    for unit in units
-                ],
-                ignore_conflicts=True,
-            )
+                        "outcome": JudgeRunUnit.Outcome.PENDING,
+                    },
+                )
         writable_ids = {
             unit.id for unit in units if not unit.translated or self.overwrite_existing
         }
-        if not self.judge_pretranslate or self.judge_proposal_only:
+        if not self.judge_pretranslate or self.judge_proposal_only or not prepare:
             # A proposal-only run judges the currently stored text and cannot
-            # reach either the MT or state-mutating repair paths.
+            # reach either the MT or state-mutating repair paths; a batch
+            # judge run receives its preparation from the outer global pass.
             writable_ids = set()
 
         # Phase 1: pre-translate writable strings through the native MT path.
@@ -1170,9 +1457,10 @@ class AutoTranslate(BaseAutoTranslate):
         engines: list[str],
         threshold: int,
         source_component_ids: list[int] | None,
+        prepare: bool = True,
     ) -> None:
         if self.mode == "judge":
-            self.process_judge(engines=engines, threshold=threshold)
+            self.process_judge(engines=engines, threshold=threshold, prepare=prepare)
         elif auto_source == "mt":
             self.process_mt(engines, threshold)
         else:
@@ -1185,6 +1473,7 @@ class AutoTranslate(BaseAutoTranslate):
         engines: list[str],
         threshold: int,
         source_component_ids: list[int] | None,
+        prepare: bool = True,
     ) -> str:
         translation = self.translation
         self.failure_message = None
@@ -1203,11 +1492,21 @@ class AutoTranslate(BaseAutoTranslate):
                 engines=engines,
                 threshold=threshold,
                 source_component_ids=source_component_ids,
+                prepare=prepare,
             )
         except (JudgeError, MachineTranslationError, Component.DoesNotExist) as error:
             translation.log_error("failed automatic translation: %s", error)
             self.failure_message = gettext("Automatic translation failed: %s") % error
             self.add_warning(self.failure_message)
+            return self.failure_message
+
+        if self.failure_message is not None:
+            # A confirmed refusal recorded by the dispatch (for instance a
+            # spent MT quota) is an operation failure even when earlier
+            # batches stored translations.
+            translation.log_error(
+                "failed automatic translation: %s", self.failure_message
+            )
             return self.failure_message
 
         translation.log_info("completed automatic translation")
@@ -1337,10 +1636,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
     def get_task_meta(self) -> dict[str, Any]:
         return self._task_meta
 
-    def preview_judge_scope(self) -> JudgeScopePreview:
-        """Aggregate the same permission-filtered, globally capped judge scope."""
+    def preview_judge_scope(self, *, execution_version: int = 1) -> JudgeScopePreview:
+        """Aggregate the permission-filtered judge scope."""
         validate_judge_configuration()
-        remaining = settings.JUDGE_MAX_UNITS_PER_RUN
+        judge_uncapped = execution_version >= 1
+        remaining = None if judge_uncapped else settings.JUDGE_MAX_UNITS_PER_RUN
         matched = processed = writable = initial_calls = worst_case_calls = 0
         for translation in self.translations:
             if not self._can_process_translation(translation):
@@ -1357,6 +1657,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ),
                 overwrite_existing=self.overwrite_existing,
                 judge_limit=remaining,
+                judge_uncapped=judge_uncapped,
             )
             preview, _units = auto_translate.preview_judge_scope()
             matched += preview.matched
@@ -1364,7 +1665,10 @@ class BatchAutoTranslate(BaseAutoTranslate):
             writable += preview.writable
             initial_calls += preview.initial_calls
             worst_case_calls += preview.worst_case_calls
-            remaining -= preview.processed
+            if remaining is not None:
+                remaining -= preview.processed
+                if remaining <= 0:
+                    break
         return JudgeScopePreview(
             matched=matched,
             processed=processed,
@@ -1374,10 +1678,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
             worst_case_calls=worst_case_calls,
         )
 
-    def preview_judge_scope_snapshot(self) -> tuple[JudgeScopePreview, list[Unit]]:
-        """Return the globally capped, ordered units behind a judge estimate."""
+    def preview_judge_scope_snapshot(
+        self, *, execution_version: int = 1
+    ) -> tuple[JudgeScopePreview, list[Unit]]:
+        """Return the ordered units behind a judge estimate."""
         validate_judge_configuration()
-        remaining = settings.JUDGE_MAX_UNITS_PER_RUN
+        judge_uncapped = execution_version >= 1
+        remaining = None if judge_uncapped else settings.JUDGE_MAX_UNITS_PER_RUN
         selected: list[Unit] = []
         matched = writable = initial_calls = worst_case_calls = 0
         for translation in self.translations:
@@ -1395,13 +1702,17 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ),
                 overwrite_existing=self.overwrite_existing,
                 judge_limit=remaining,
+                judge_uncapped=judge_uncapped,
             ).preview_judge_scope()
             matched += preview.matched
             writable += preview.writable
             initial_calls += preview.initial_calls
             worst_case_calls += preview.worst_case_calls
             selected.extend(units)
-            remaining -= preview.processed
+            if remaining is not None:
+                remaining -= preview.processed
+                if remaining <= 0:
+                    break
         return (
             JudgeScopePreview(
                 matched=matched,
@@ -1437,6 +1748,276 @@ class BatchAutoTranslate(BaseAutoTranslate):
             if count:
                 rows.append((translation, count))
         return MTScopePreview(matched=matched, writable=matched, per_translation=rows)
+
+    def build_preparation_scope(self) -> PreparationScope:
+        """
+        Fix the closed preparation scope before any paid call (C1/C2).
+
+        Permission-filtered selected pairs come from ``get_units()`` over the
+        original query, *before* the judge cap: a late language past the cap
+        is still prepared, and a language without the direct-edit permission
+        is a pre-flight blocker rather than a silent skip.
+        """
+        unit_ids: list[int] = []
+        missing_ids: list[int] = []
+        per_language_missing: dict[str, int] = {}
+        engines: set[str] = set()
+        for translation in self.translations:
+            if not self._can_process_translation(translation):
+                continue
+            units = list(
+                AutoTranslate(
+                    user=self.user,
+                    translation=translation,
+                    q=self.q,
+                    mode=self.mode,
+                    component_wide=self.component_wide,
+                    unit_ids=self.unit_ids,
+                    allow_non_shared_tm_source_components=(
+                        self.allow_non_shared_tm_source_components
+                    ),
+                    overwrite_existing=self.overwrite_existing,
+                )
+                .get_units()
+                .select_related("source_unit")
+            )
+            missing = [unit for unit in units if not any(unit.get_target_plurals())]
+            if (
+                missing
+                and self.user is not None
+                and not bool(self.user.has_perm("meta:unit.direct_edit", translation))
+            ):
+                raise PermissionDenied(
+                    gettext(
+                        "Machine translation of missing strings in %(language)s "
+                        "requires direct edit permission."
+                    )
+                    % {"language": translation.language.code}
+                )
+            unit_ids.extend(unit.pk for unit in units)
+            missing_ids.extend(unit.pk for unit in missing)
+            if missing:
+                language_code = translation.language.code
+                per_language_missing[language_code] = per_language_missing.get(
+                    language_code, 0
+                ) + len(missing)
+                engine = self._preparation_engine_for(translation)
+                if engine is None:
+                    # No engine can fill this language; the preparation
+                    # barrier blocks the judge phase with this warning, and
+                    # estimate reports the blocker before any paid call.
+                    self.add_warning(
+                        gettext(
+                            "No machine translation engine is configured for "
+                            "%(language)s; missing strings cannot be prepared."
+                        )
+                        % {"language": language_code}
+                    )
+                else:
+                    engines.add(engine)
+        if len(engines) > 1:
+            raise JudgeError(
+                gettext(
+                    "The preparation scope spans projects with different machine "
+                    "translation engines; run each project separately."
+                )
+            )
+        return PreparationScope(
+            unit_ids=tuple(unit_ids),
+            missing_ids=tuple(missing_ids),
+            per_language_missing=per_language_missing,
+            mt_engine=next(iter(engines), None),
+        )
+
+    @staticmethod
+    def _preparation_engine_for(translation: Translation) -> str | None:
+        """Return the routed MT engine a mandatory preparation would use, if any."""
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.forms import configured_routed_engine
+
+        return configured_routed_engine(
+            translation.component.project.get_machinery_settings()
+        )
+
+    # Mandatory pre-judge preparation over the whole selected scope (C3):
+    # one pass fills the missing strings of every language before any judge
+    # request, and a confirmed refusal or a remaining gap fails the run
+    # before the judge phase starts.
+
+    def _set_preparation_phase(self, run: ProducerRun, phase: str) -> None:
+        run.preparation_phase = phase
+        ProducerRun.objects.filter(pk=run.pk).update(preparation_phase=phase)
+
+    def _finalize_preparation_failure(
+        self,
+        run: ProducerRun,
+        scope: PreparationScope,
+        failure: str,
+    ) -> str:
+        """Record a failed preparation and skip every reserved judge row."""
+        self.failure_message = failure
+        ProducerRun.objects.filter(pk=run.pk).update(
+            preparation_phase="blocked",
+            failure=failure,
+        )
+        blocked_units = list(
+            Unit.objects.filter(pk__in=scope.unit_ids).select_related(
+                "translation", "translation__component"
+            )
+        )
+        self._record_skipped_judge_units(
+            run, blocked_units, JudgeRunUnit.SkipReason.MT_PREREQUISITE
+        )
+        JudgeRunUnit.objects.filter(
+            run=run, outcome=JudgeRunUnit.Outcome.PENDING
+        ).update(
+            outcome=JudgeRunUnit.Outcome.SKIPPED,
+            skip_reason=JudgeRunUnit.SkipReason.MT_PREREQUISITE,
+        )
+        return failure
+
+    def _find_incomplete_units(self, scope: PreparationScope) -> dict[str, list[int]]:
+        """Plural strings in scope with only some forms filled."""
+        incomplete: dict[str, list[int]] = {}
+        for unit in Unit.objects.filter(pk__in=scope.unit_ids).select_related(
+            "translation", "translation__component"
+        ):
+            if unit_target_incomplete(unit):
+                incomplete.setdefault(unit.translation.language.code, []).append(
+                    unit.pk
+                )
+        return incomplete
+
+    def _run_preparation(
+        self,
+        run: ProducerRun,
+        scope: PreparationScope,
+        threshold: int,
+        engines: list[str] | None = None,
+    ) -> str | None:
+        """
+        Fill the scope's missing strings, or return a failure message.
+
+        Returns ``None`` when every selected string is ready to be judged.
+        A ``ready`` row in the database is never trusted blindly: the closed
+        scope is re-read and any *remaining* gap still blocks.
+        """
+        remaining = Unit.objects.filter(pk__in=scope.missing_ids).select_related(
+            "translation", "translation__component"
+        )
+        # A human write since the snapshot satisfies the requirement without
+        # another paid call (C5: crash/redelivery never pays twice).
+        still_missing: dict[int, list[int]] = {}
+        for unit in remaining:
+            if unit_missing_translation(unit):
+                still_missing.setdefault(unit.translation_id, []).append(unit.pk)
+        if not still_missing:
+            incomplete = self._find_incomplete_units(scope)
+            if incomplete:
+                return self._finalize_preparation_failure(
+                    run,
+                    scope,
+                    gettext(
+                        "Judges were not started: %(count)d strings have only "
+                        "some of their plural forms filled. Fill them manually "
+                        "and start again."
+                    )
+                    % {"count": sum(len(ids) for ids in incomplete.values())},
+                )
+            self._set_preparation_phase(run, "ready")
+            return None
+
+        self._set_preparation_phase(run, "preparing")
+
+        translations_by_id = {
+            translation.pk: translation for translation in self.translations
+        }
+        for translation_id, missing_unit_ids in still_missing.items():
+            translation = translations_by_id.get(translation_id)
+            if translation is None:
+                # The unit's translation left the scope after the snapshot:
+                # an explicit scope change, not a reason to call it ready.
+                return self._finalize_preparation_failure(
+                    run,
+                    scope,
+                    gettext(
+                        "Judges were not started: the scope changed while the "
+                        "run was waiting. Start a new run."
+                    ),
+                )
+            auto_translate = AutoTranslate(
+                user=self.user,
+                translation=translation,
+                q=self.q,
+                mode=self.mode,
+                component_wide=self.component_wide,
+                unit_ids=list(missing_unit_ids),
+                allow_non_shared_tm_source_components=(
+                    self.allow_non_shared_tm_source_components
+                ),
+                producer_run=run,
+            )
+            engine_ids = [engine for engine in (engines or []) if engine]
+            if scope.mt_engine and scope.mt_engine not in engine_ids:
+                engine_ids.append(scope.mt_engine)
+            auto_translate.process_mt(
+                engine_ids,
+                threshold,
+                empty_only=True,
+            )
+            self.updated += auto_translate.updated
+            for warning in auto_translate.get_warnings():
+                self.add_warning(warning)
+            if auto_translate.failure_message is not None:
+                return self._finalize_preparation_failure(
+                    run,
+                    scope,
+                    gettext(
+                        "Judges were not started. Machine translation stopped: "
+                        "%(reason)s Ask the administrator, then start a new run."
+                    )
+                    % {"reason": auto_translate.failure_message},
+                )
+            if _run_cancel_requested(run):
+                # G4: the operator asked to stop between preparation
+                # batches. Already stored MT stays; the finalize path maps
+                # the requested state to cancelled/partial.
+                return None
+
+        # Global barrier: re-read every missing id; only a fully ready scope
+        # opens the judge phase (C3). A scope with no usable engine is never
+        # "ready": the judge evaluates whatever text exists, and missing
+        # strings are honestly skipped per unit, so the leftover check does
+        # not block a run that could not have paid for preparation.
+        leftover = [
+            unit.pk
+            for unit in Unit.objects.filter(pk__in=scope.missing_ids)
+            if unit_missing_translation(unit)
+        ]
+        incomplete = self._find_incomplete_units(scope)
+        if (leftover or incomplete) and scope.mt_engine is not None:
+            return self._finalize_preparation_failure(
+                run,
+                scope,
+                gettext(
+                    "Judges were not started: %(missing)d strings still have no "
+                    "translation%(incomplete)s. Review the warnings, then start "
+                    "a new run."
+                )
+                % {
+                    "missing": len(leftover),
+                    "incomplete": (
+                        ""
+                        if not incomplete
+                        else gettext(
+                            " and %(count)d strings have only some plural forms filled"
+                        )
+                        % {"count": sum(len(ids) for ids in incomplete.values())}
+                    ),
+                },
+            )
+        self._set_preparation_phase(run, "ready")
+        return None
 
     def _preload_workflow_settings(self) -> None:
         self.translations = list(self.translations)
@@ -1504,9 +2085,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         task_id = (
             current_task.request.id if current_task and current_task.request.id else ""
         )
-        # Claim the queued run under a row lock: `auto_translate` uses late
-        # acknowledgement, so the broker can redeliver the same task, and two
-        # workers must never both observe QUEUED and both pay for the seats.
+        superseded = False
         with transaction.atomic():
             claimed = (
                 ProducerRun.objects.select_for_update()
@@ -1523,6 +2102,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ProducerRun.Status.PARTIAL,
             }:
                 return claimed
+            if matches and claimed.status == ProducerRun.Status.CANCEL_REQUESTED:
+                claimed.status = ProducerRun.Status.CANCELLED
+                claimed.finished = timezone.now()
+                claimed.save(update_fields=["status", "finished"])
+                return claimed
             if claimed is not None and claimed.status not in {
                 ProducerRun.Status.QUEUED,
                 ProducerRun.Status.RUNNING,
@@ -1533,12 +2117,15 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 and claimed is not None
                 and claimed.status == ProducerRun.Status.RUNNING
             ):
-                if task_id and claimed.task_id == task_id:
+                if task_id and (
+                    claimed.task_id == task_id
+                    or str(claimed.dispatch_task_id or "") == task_id
+                ):
+                    if claimed.task_id != task_id:
+                        claimed.task_id = task_id
+                        claimed.save(update_fields=["task_id"])
                     return claimed
-                # Someone else's in-flight attempt (or a call outside any
-                # task context): never adopt or fail a RUNNING run this
-                # worker does not own.
-                matches = False
+                superseded = True
                 claimed = None
             if (
                 matches
@@ -1551,6 +2138,17 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     claimed.task_id = task_id
                 claimed.save(update_fields=["status", "started", "task_id"])
                 return claimed
+        if superseded:
+            failed_run = ProducerRun.objects.filter(pk=self.producer_run_id).first()
+            if failed_run is not None:
+                failed_run.status = ProducerRun.Status.FAILED
+                failed_run.finished = timezone.now()
+                failed_run.failure = gettext(
+                    "This delivery was superseded by another task generation."
+                )
+                failed_run.save(update_fields=["status", "finished", "failure"])
+            msg = gettext("This delivery was superseded by another task generation.")
+            raise ValueError(msg)
         # Both failure paths run outside the claim transaction so the FAILED
         # transition below is not rolled back by the exception that follows.
         if claimed is None:
@@ -1562,6 +2160,84 @@ class BatchAutoTranslate(BaseAutoTranslate):
         claimed.save(update_fields=["status", "finished", "failure"])
         msg = claimed.failure
         raise ValueError(msg)
+
+    def _judge_scope_ids(self) -> list[int]:
+        """Return the judge scope in the exact per-translation order the pass uses."""
+        ordered_ids: list[int] = []
+        for translation in self.translations:
+            auto_translate = AutoTranslate(
+                user=self.user,
+                translation=translation,
+                q=self.q,
+                mode=self.mode,
+                component_wide=self.component_wide,
+                unit_ids=self.unit_ids,
+                allow_non_shared_tm_source_components=(
+                    self.allow_non_shared_tm_source_components
+                ),
+                overwrite_existing=self.overwrite_existing,
+            )
+            ordered_ids.extend(
+                auto_translate.get_units()
+                .order_by("position", "pk")
+                .values_list("pk", flat=True)
+            )
+        return ordered_ids
+
+    def _apply_cap_skips(self, run: ProducerRun) -> None:
+        """
+        Record judge-cap skips for the closed scope once, globally.
+
+        The judge scope is the first ``run.cap`` units of the closed
+        preparation scope in the stable per-translation order; everything
+        past it is SKIPPED with reason ``cap`` *before* any preparation MT
+        runs, so a preparation failure never overwrites the more specific
+        reason with ``mt-prerequisite``.
+        """
+        cap = run.cap if run.cap is not None else 0
+        ordered_ids = self._judge_scope_ids()
+        if len(ordered_ids) <= cap:
+            return
+        skipped = list(
+            Unit.objects.filter(pk__in=ordered_ids[cap:]).select_related(
+                "translation", "translation__component"
+            )
+        )
+        self._record_skipped_judge_units(run, skipped, JudgeRunUnit.SkipReason.CAP)
+
+    def _reserve_judge_rows(self, run: ProducerRun) -> None:
+        """Create the up-front PENDING reservation for the judge scope."""
+        cap = run.cap if run.cap is not None else 0
+        # Same per-translation query order the judge pass uses.
+        ordered_ids = self._judge_scope_ids()
+        ordered = list(
+            Unit.objects.filter(pk__in=ordered_ids[:cap]).select_related(
+                "translation", "translation__component"
+            )
+        )
+        ordered.sort(key=lambda unit: ordered_ids.index(unit.pk))
+        for unit in ordered:
+            request = build_request(unit)
+            JudgeRunUnit.objects.get_or_create(
+                run=run,
+                unit_id_snapshot=unit.id,
+                defaults={
+                    "unit": unit,
+                    "translation_id": unit.translation_id,
+                    "component_id": unit.translation.component_id,
+                    "project_id": unit.translation.component.project_id,
+                    "input_target": unit.get_target_plurals(),
+                    "input_target_hash": compute_target_hash(unit.get_target_plurals()),
+                    "context_hash": compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        explanation=request.explanation,
+                        glossary_terms=request.glossary_terms,
+                        clarification=request.clarification,
+                    ),
+                    "outcome": JudgeRunUnit.Outcome.PENDING,
+                },
+            )
 
     def _producer_run_request_matches(self, run: ProducerRun) -> bool:
         """
@@ -1707,12 +2383,21 @@ class BatchAutoTranslate(BaseAutoTranslate):
         run.status = status
         run.finished = timezone.now()
         run.failure = failure
+        # A failure path may have updated the phase directly in the
+        # database (``_finalize_preparation_failure``); the in-memory copy
+        # predates that update, so the summary must read the durable value.
+        run.preparation_phase = (
+            ProducerRun.objects.filter(pk=run.pk)
+            .values_list("preparation_phase", flat=True)
+            .first()
+            or run.preparation_phase
+        )
         summary = asdict(self.judge_summary or JudgeSummary())
         if run.requested_mode in {"judge", "recheck", "drain"}:
             outcomes = dict(
-                JudgeRunUnit.objects.filter(run=run).values_list("outcome").annotate(
-                    count=Count("pk")
-                )
+                JudgeRunUnit.objects.filter(run=run)
+                .values_list("outcome")
+                .annotate(count=Count("pk"))
             )
             summary.update(
                 evaluated=sum(
@@ -1735,6 +2420,36 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ),
             )
         summary["written"] = self.updated
+        if run.preparation_snapshot:
+            # C5/C6: the preparation outcome survives finalization as its
+            # own summary block, never merged into the judge tally.
+            try:
+                scope = PreparationScope.from_json(run.preparation_snapshot)
+            except (TypeError, ValueError, KeyError):
+                scope = None
+            summary["mt_preparation"] = {
+                "selected": len(scope.unit_ids) if scope else None,
+                "missing_initial": len(scope.missing_ids) if scope else None,
+                "written": self.updated,
+                "remaining": len(
+                    [
+                        unit
+                        for unit in Unit.objects.filter(
+                            pk__in=(scope.missing_ids if scope else ())
+                        )
+                        if unit_missing_translation(unit)
+                    ]
+                )
+                if scope
+                else None,
+                "per_language_remaining": (
+                    dict(scope.per_language_missing) if scope else {}
+                ),
+                "phase": run.preparation_phase,
+                "reason_code": (
+                    "mt-prerequisite" if run.preparation_phase == "blocked" else ""
+                ),
+            }
         run.summary = summary
         run.warnings = self.get_warnings()
         run.save(update_fields=["status", "finished", "failure", "summary", "warnings"])
@@ -1779,20 +2494,47 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 source_component_ids=source_component_ids,
             )
         except Exception as error:
-            if self.active_producer_run is not None:
+            if (
+                self.active_producer_run is not None
+                and self.active_producer_run.execution_version == 0
+            ) or (
+                (
+                    self.active_producer_run is not None
+                    and self.active_producer_run.execution_version >= 1
+                )
+                and isinstance(
+                    error,
+                    (DatabaseError, MemoryError, SystemExit, KeyboardInterrupt),
+                )
+            ):
                 self._finish_producer_run(
                     self.active_producer_run, ProducerRun.Status.FAILED, str(error)
                 )
             raise
-        if self.active_producer_run is not None:
-            status = (
-                ProducerRun.Status.FAILED
-                if self.failure_message
-                else ProducerRun.Status.COMPLETED
-            )
-            self._finish_producer_run(
-                self.active_producer_run, status, self.failure_message or ""
-            )
+        if (
+            self.active_producer_run is not None
+            and self.active_producer_run.status
+            not in {
+                ProducerRun.Status.COMPLETED,
+                ProducerRun.Status.FAILED,
+                ProducerRun.Status.CANCELLED,
+                ProducerRun.Status.PARTIAL,
+            }
+        ):
+            if (
+                self.active_producer_run.execution_version >= 1
+                and not self.failure_message
+            ):
+                pass
+            else:
+                status = (
+                    ProducerRun.Status.FAILED
+                    if self.failure_message
+                    else ProducerRun.Status.COMPLETED
+                )
+                self._finish_producer_run(
+                    self.active_producer_run, status, self.failure_message or ""
+                )
         return message
 
     def _perform(  # ruff: ignore[complex-structure]
@@ -1804,8 +2546,57 @@ class BatchAutoTranslate(BaseAutoTranslate):
         source_component_ids: list[int] | None,
     ) -> str:
         judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
+        preparation_scope: PreparationScope | None = None
+        if (
+            self.mode == "judge"
+            and self.overwrite_existing
+            and self.producer_run_id is not None
+            and ProducerRun.objects.filter(
+                pk=self.producer_run_id, requested_mode="judge"
+            ).exists()
+        ):
+            # A queued bulk judge run never overwrites existing text; an
+            # overwrite request belongs to a plain MT run. A direct batch
+            # without a queued run keeps the historical behavior.
+            failure = gettext("Overwrite cannot be combined with the judge mode.")
+            self.add_warning(gettext("Automatic translation failed: %s") % failure)
+            self.failure_message = gettext("Automatic translation failed: %s") % failure
+            return self.failure_message
         if judge_preview is not None:
             producer_run = self._adopt_producer_run()
+            if self.mode == "judge" and producer_run is not None:
+                # Only a producer-dispatched bulk judge run (phase
+                # ``judge-project``) carries the mandatory preparation
+                # contract; a queued run without a snapshot predates it and
+                # must not silently resume with the new MT volume. Older
+                # direct/queued test launches build their scope here.
+                if (
+                    self.producer_run_id is not None
+                    and not producer_run.preparation_snapshot
+                    and producer_run.requested_mode == "judge"
+                    and producer_run.dispatch_phase == "judge-project"
+                ):
+                    self._finish_producer_run(
+                        producer_run,
+                        ProducerRun.Status.FAILED,
+                        gettext(
+                            "This run was queued before the mandatory "
+                            "translation step existed and cannot resume. "
+                            "Start a new run."
+                        ),
+                    )
+                    raise JudgeError(producer_run.failure)
+                if producer_run.preparation_snapshot:
+                    preparation_scope = PreparationScope.from_json(
+                        producer_run.preparation_snapshot
+                    )
+                else:
+                    preparation_scope = self.build_preparation_scope()
+                    producer_run.preparation_snapshot = preparation_scope.to_json()
+                    producer_run.preparation_phase = "pending"
+                    producer_run.save(
+                        update_fields=["preparation_snapshot", "preparation_phase"]
+                    )
         elif auto_source == "mt":
             producer_run = self._create_producer_run()
         else:
@@ -1822,6 +2613,79 @@ class BatchAutoTranslate(BaseAutoTranslate):
             self.judge_summary = JudgeSummary()
         judge_remaining = judge_preview.processed if judge_preview is not None else None
         selected_workspace_source_component_ids: dict[int, list[int]] | None = None
+        if producer_run is not None and preparation_scope is not None:
+            # Judge-cap skips are recorded once, globally, before any
+            # preparation MT: the reason must survive a preparation failure
+            # instead of being overwritten by ``mt-prerequisite``. The judge
+            # scope itself is reserved up front as PENDING rows so a crash
+            # leaves honest coverage rather than empty evidence.
+            self._reserve_judge_rows(producer_run)
+            self._apply_cap_skips(producer_run)
+        # Global preparation barrier (C3): fill every missing string in the
+        # closed scope before any judge request of any language. A confirmed
+        # refusal or a remaining gap fails the whole run here. The mandatory
+        # preparation runs when this dispatch asked for machine translation
+        # (``auto_source="mt"``) and is not proposal-only; a proposal-only
+        # run judges the stored text as-is, and an overwrite request never
+        # uses the empty-only preparation.
+        # A single-unit re-check and the deferred-retry drain are durable
+        # purposes judged on the stored text: they never widen into a paid
+        # project-wide preparation (C3).
+        purpose_judges_stored_text = producer_run is not None and (
+            producer_run.requested_mode in {"recheck", "drain"}
+        )
+        preparation_requested = (
+            auto_source == "mt"
+            and producer_run is not None
+            and preparation_scope is not None
+            and not self.judge_proposal_only
+            and not self.overwrite_existing
+            and not purpose_judges_stored_text
+        )
+        if (
+            preparation_requested
+            and producer_run is not None
+            and preparation_scope is not None
+            and producer_run.status
+            not in {
+                ProducerRun.Status.COMPLETED,
+                ProducerRun.Status.FAILED,
+                ProducerRun.Status.CANCELLED,
+                ProducerRun.Status.PARTIAL,
+            }
+        ):
+            preparation_failure = self._run_preparation(
+                producer_run, preparation_scope, threshold, engines
+            )
+            if preparation_failure is not None:
+                if judge_preview is not None and judge_preview.remaining:
+                    self.judge_summary = replace(
+                        self.judge_summary or JudgeSummary(),
+                        cap_remainder=judge_preview.remaining,
+                    )
+                self._finish_producer_run(
+                    producer_run,
+                    ProducerRun.Status.FAILED,
+                    preparation_failure,
+                )
+                return preparation_failure
+            if _run_cancel_requested(producer_run):
+                # The preparation stopped for a cancellation, not readiness;
+                # the finalize path maps it to cancelled/partial.
+                self._finish_producer_run(producer_run, ProducerRun.Status.FAILED, "")
+                return self.failure_message or self.get_message()
+        elif (
+            auto_source == "mt"
+            and producer_run is not None
+            and preparation_scope is not None
+            and not self.judge_proposal_only
+            and not self.overwrite_existing
+            and not purpose_judges_stored_text
+        ):
+            # Nothing to prepare, or no engine to prepare with: the closed
+            # scope is re-checked (a human write or a ready snapshot never
+            # pays a probe) and the phase is recorded before the judge pass.
+            self._run_preparation(producer_run, preparation_scope, threshold, engines)
         if (
             self.mode != "judge"
             and auto_source == "others"
@@ -1837,6 +2701,23 @@ class BatchAutoTranslate(BaseAutoTranslate):
                         selected_source_language_id, []
                     ).append(component_id)
 
+        # The judge phase skips only local MT pretranslation when the global
+        # preparation actually ran (auto_source="mt" with a missing scope);
+        # otherwise each translation prepares its own writable strings.
+        globally_prepared = (
+            producer_run is not None
+            and preparation_scope is not None
+            and preparation_requested
+            and producer_run.preparation_phase == "ready"
+        )
+        if producer_run is not None and producer_run.execution_version >= 1:
+            return self._perform_chunk_loop(
+                producer_run=producer_run,
+                auto_source=auto_source,
+                engines=engines,
+                threshold=threshold,
+                globally_prepared=globally_prepared,
+            )
         for pos, translation in enumerate(self.translations, start=1):
             auto_translate = AutoTranslate(
                 user=self.user,
@@ -1878,23 +2759,6 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 # set_progress(pos) below publishes the snapshot.
                 self._attempt_counter.eligible = self._count_eligible_units()
                 self._attempt_counter.snapshot_taken = True
-            if self.mode == "judge" and producer_run is not None:
-                matched_units = list(
-                    auto_translate.get_units().order_by("position", "pk")
-                )
-                if judge_remaining is not None and not judge_remaining:
-                    self._record_skipped_judge_units(
-                        producer_run,
-                        matched_units,
-                        JudgeRunUnit.SkipReason.CAP,
-                    )
-                    self.set_progress(pos)
-                    continue
-                self._record_skipped_judge_units(
-                    producer_run,
-                    matched_units[judge_remaining:],
-                    JudgeRunUnit.SkipReason.CAP,
-                )
             auto_translate.progress_range = (
                 100 * (pos - 1) // self.progress_steps,
                 100 * pos // self.progress_steps,
@@ -1966,6 +2830,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 engines=engines,
                 threshold=threshold,
                 source_component_ids=effective_source_component_ids,
+                prepare=not globally_prepared,
             )
             judge_remaining = self._finish_translation(auto_translate, judge_remaining)
             self.set_progress(pos)
@@ -1989,3 +2854,111 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 self.failure_message or "",
             )
         return self.failure_message or self.get_message()
+
+    def _perform_chunk_loop(
+        self,
+        *,
+        producer_run: ProducerRun,
+        auto_source: Literal["mt", "others"],
+        engines: list[str],
+        threshold: int,
+        globally_prepared: bool,
+    ) -> str:
+        from weblate.trans.tasks import (  # ruff: ignore[import-outside-top-level]
+            publish_producer_run_dispatch,
+        )
+
+        cursor = producer_run.scope_cursor
+        snapshot = producer_run.scope_snapshot or []
+        chunk_ids = snapshot[cursor : cursor + JUDGE_CHUNK_SIZE]
+        if not chunk_ids:
+            self._finish_producer_run(producer_run, ProducerRun.Status.COMPLETED, "")
+            return gettext("Automatic translation completed.")
+
+        unit_translation_map = dict(
+            Unit.objects.filter(pk__in=chunk_ids).values_list("pk", "translation_id")
+        )
+        chunk_by_translation: dict[int, list[int]] = {}
+        for unit_id in chunk_ids:
+            trans_id = unit_translation_map.get(unit_id)
+            if trans_id is not None:
+                chunk_by_translation.setdefault(trans_id, []).append(unit_id)
+
+        for pos, translation in enumerate(self.translations, start=1):
+            trans_chunk_ids = chunk_by_translation.get(translation.pk)
+            if not trans_chunk_ids:
+                continue
+            auto_translate = AutoTranslate(
+                user=self.user,
+                translation=translation,
+                q=self.q,
+                mode=self.mode,
+                component_wide=self.component_wide,
+                unit_ids=trans_chunk_ids,
+                allow_non_shared_tm_source_components=(
+                    self.allow_non_shared_tm_source_components
+                ),
+                overwrite_existing=self.overwrite_existing,
+                judge_uncapped=True,
+                producer_run=producer_run,
+                judge_pretranslate=False,
+                judge_mutating_repairs=self.judge_mutating_repairs,
+                judge_candidate_severities=self.judge_candidate_severities,
+                judge_proposal_only=self.judge_proposal_only,
+            )
+            auto_translate.batch_counter = self._attempt_counter
+            if not self._can_process_translation(translation):
+                self._record_skipped_judge_units(
+                    producer_run,
+                    list(auto_translate.get_units().order_by("position", "pk")),
+                    JudgeRunUnit.SkipReason.PERMISSION,
+                )
+                self.set_progress(pos)
+                continue
+
+            auto_translate.perform(
+                auto_source=auto_source,
+                engines=engines,
+                threshold=threshold,
+                source_component_ids=None,
+                prepare=not globally_prepared,
+            )
+            self._finish_translation(auto_translate, None)
+            self.set_progress(pos)
+
+        new_cursor = cursor + len(chunk_ids)
+        has_more = new_cursor < len(snapshot)
+        if has_more:
+            with transaction.atomic():
+                locked = ProducerRun.objects.select_for_update().get(pk=producer_run.pk)
+                if locked.status == ProducerRun.Status.CANCEL_REQUESTED:
+                    locked.status = ProducerRun.Status.CANCELLED
+                    locked.finished = timezone.now()
+                    locked.save(update_fields=["status", "finished"])
+                    return gettext("Automatic translation cancelled.")
+                if locked.status != ProducerRun.Status.RUNNING:
+                    return gettext("Automatic translation stopped.")
+                locked.scope_cursor = new_cursor
+                next_task_id = uuid4()
+                locked.dispatch_task_id = next_task_id
+                locked.dispatch_requested_at = timezone.now()
+                locked.dispatch_published_at = None
+                locked.dispatch_attempts = 0
+                locked.dispatch_error = ""
+                locked.save(
+                    update_fields=[
+                        "scope_cursor",
+                        "dispatch_task_id",
+                        "dispatch_requested_at",
+                        "dispatch_published_at",
+                        "dispatch_attempts",
+                        "dispatch_error",
+                    ]
+                )
+            publish_producer_run_dispatch(run_id=producer_run.pk)
+            return gettext("Automatic translation chunk completed.")
+
+        producer_run.scope_cursor = new_cursor
+        ProducerRun.objects.filter(pk=producer_run.pk).update(scope_cursor=new_cursor)
+        self._finish_producer_run(producer_run, ProducerRun.Status.COMPLETED, "")
+        return gettext("Automatic translation completed.")

@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from contextlib import suppress
 from typing import TYPE_CHECKING, TypedDict, cast
 from urllib.parse import unquote
+from uuid import uuid4
 
 from celery.result import AsyncResult
 from django.conf import settings
@@ -27,6 +28,7 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.datastructures import MultiValueDictKeyError
 from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy
@@ -158,6 +160,11 @@ from weblate.trans.exceptions import (
     PluralFormsMismatchError,
 )
 from weblate.trans.forms import AutoForm
+from weblate.trans.judge import (
+    judge_configuration_ready,
+    judge_configuration_snapshot,
+)
+from weblate.trans.judge_loop import DEFAULT_CANDIDATE_SEVERITIES
 from weblate.trans.models import (
     Announcement,
     Category,
@@ -173,7 +180,7 @@ from weblate.trans.models import (
     SuggestionAddResult,
     Unit,
 )
-from weblate.trans.models.judge import JudgeCandidateError
+from weblate.trans.models.judge import JudgeCandidateError, ProducerRun
 from weblate.trans.models.project import ProjectQuerySet, prefetch_project_flags
 from weblate.trans.models.translation import Translation, TranslationQuerySet
 from weblate.trans.tasks import (
@@ -182,6 +189,7 @@ from weblate.trans.tasks import (
     create_project_backup,
     generate_report,
     project_removal,
+    publish_producer_run_dispatch,
 )
 from weblate.trans.util import get_upload_error_message
 from weblate.trans.views.files import download_multi
@@ -3670,7 +3678,18 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
 
         return self.get_paginated_response(serializer.data)
 
-    @extend_schema(description="Trigger automatic translation.", methods=["post"])
+    @extend_schema(
+        description="Trigger automatic translation.",
+        methods=["post"],
+        responses={
+            HTTP_200_OK: OpenApiResponse(
+                description="Automatic translation completed synchronously."
+            ),
+            HTTP_202_ACCEPTED: OpenApiResponse(
+                description="Automatic translation queued asynchronously (judge mode)."
+            ),
+        },
+    )
     @action(detail=True, methods=["post"])
     def autotranslate(self, request: Request, **kwargs):
         translation = self.get_object()
@@ -3700,6 +3719,103 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
             self.permission_denied(
                 request,
                 getattr(auto_permission, "reason", "Can not auto translate"),
+            )
+
+        if autoform.cleaned_data["mode"] == "judge":
+            if not request.user.has_perm("unit.review", translation):
+                self.permission_denied(request, "Can not review translations")
+            if not judge_configuration_ready():
+                raise ValidationError(
+                    {"mode": gettext("The LLM judge is not configured.")}
+                )
+
+            batch = BatchAutoTranslate(
+                translation,
+                user=get_request_user(request),
+                q=autoform.cleaned_data["q"],
+                mode="judge",
+                overwrite_existing=autoform.cleaned_data.get(
+                    "overwrite_existing", False
+                ),
+            )
+            _preview, units = batch.preview_judge_scope_snapshot(execution_version=1)
+            preparation_requested = autoform.cleaned_data.get(
+                "auto_source"
+            ) == "mt" and not autoform.cleaned_data.get("overwrite_existing", False)
+            if preparation_requested:
+                try:
+                    preparation_scope = batch.build_preparation_scope()
+                except PermissionDenied as error:
+                    raise PermissionDenied(str(error)) from error
+                blockers = [
+                    warning
+                    for warning in batch.get_warnings()
+                    if "cannot be prepared" in warning or "configured" in warning
+                ]
+                if blockers:
+                    raise ValidationError({"auto_source": " ".join(blockers)})
+            else:
+                preparation_scope = None
+
+            dispatch_task_id = uuid4()
+            execution_options = {
+                "mode": "judge",
+                "q": autoform.cleaned_data["q"],
+                "auto_source": autoform.cleaned_data["auto_source"],
+                "engines": autoform.cleaned_data["engines"],
+                "threshold": autoform.cleaned_data["threshold"],
+                "judge_proposal_only": False,
+                "judge_pretranslate": False,
+                "judge_mutating_repairs": False,
+                "judge_candidate_severities": list(DEFAULT_CANDIDATE_SEVERITIES),
+                "overwrite_existing": autoform.cleaned_data.get(
+                    "overwrite_existing", False
+                ),
+            }
+            run = ProducerRun.objects.create(
+                actor=get_request_user(request),
+                dispatch_task_id=dispatch_task_id,
+                dispatch_phase="judge-translation",
+                dispatch_requested_at=timezone.now(),
+                scope_type=ProducerRun.ScopeType.TRANSLATION,
+                scope_id=str(translation.pk),
+                scope_label=str(translation),
+                scope_path=translation.get_absolute_url(),
+                requested_query=autoform.cleaned_data["q"],
+                requested_mode="judge",
+                cap=len(units),
+                execution_version=1,
+                scope_cursor=0,
+                execution_options=execution_options,
+                scope_snapshot=[unit.pk for unit in units],
+                configuration_snapshot=judge_configuration_snapshot(),
+                preparation_snapshot=(
+                    preparation_scope.to_json() if preparation_scope else {}
+                ),
+                preparation_phase="pending" if preparation_scope else "",
+            )
+            if not units and not (preparation_scope and preparation_scope.missing_ids):
+                run.status = ProducerRun.Status.COMPLETED
+                run.finished = timezone.now()
+                run.summary = {"completed": True, "units": 0}
+                run.save(update_fields=["status", "finished", "summary"])
+            else:
+                transaction.on_commit(
+                    lambda: publish_producer_run_dispatch(run_id=run.pk)
+                )
+
+            return Response(
+                data={
+                    "details": gettext(
+                        "Automatic translation queued. You can close this page."
+                    ),
+                    "run_id": str(run.pk),
+                    "report_url": reverse(
+                        "judge-run", kwargs={"pk": run.pk}, request=request
+                    ),
+                    "status": run.status,
+                },
+                status=HTTP_202_ACCEPTED,
             )
 
         auto = BatchAutoTranslate(

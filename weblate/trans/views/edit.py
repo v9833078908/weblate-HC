@@ -26,6 +26,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.text import normalize_newlines
 from django.utils.translation import gettext, gettext_lazy, ngettext
@@ -64,10 +65,13 @@ from weblate.trans.forms import (
 )
 from weblate.trans.judge import (
     JudgeError,
+    judge_configuration_ready,
+    judge_configuration_snapshot,
     judge_seat_profiles,
     validate_judge_configuration,
 )
 from weblate.trans.judge_loop import (
+    DEFAULT_CANDIDATE_SEVERITIES,
     active_judge_candidate,
     active_recheck_run,
     generation_pending,
@@ -89,6 +93,7 @@ from weblate.trans.models.judge import (
     ALLOWED_RESOLUTION_TRANSITIONS,
     JudgeCandidateError,
     JudgeResolutionError,
+    ProducerRun,
     active_round,
     active_verdict,
     compute_context_hash,
@@ -101,7 +106,11 @@ from weblate.trans.models.judge import (
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.models.unit import fill_in_source_translation
-from weblate.trans.tasks import auto_translate, generate_judge_candidate
+from weblate.trans.tasks import (
+    auto_translate,
+    generate_judge_candidate,
+    publish_producer_run_dispatch,
+)
 from weblate.trans.templatetags.translations import (
     try_linkify_filename,
     unit_state_class,
@@ -1648,6 +1657,7 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
     )
     judge_preview = batch.preview_judge_scope() if mode == "judge" else None
     mt_preview = batch.preview_mt_scope() if mode != "judge" else None
+    preparation = _judge_preparation_preview(batch) if judge_preview else None
     preview = judge_preview or mt_preview
     judge_cost: dict[str, str | bool] = {"available": False}
     if judge_preview is not None:
@@ -1742,56 +1752,218 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
             else 0,
             "judge_cost": judge_cost,
             "pretranslation_cost": pretranslation_cost,
+            "preparation": preparation,
         }
     )
 
 
-@require_POST
-@login_required
-def auto_translation(request: AuthenticatedHttpRequest, path):
-    obj = parse_path(
-        request,
-        path,
-        (Translation, Component, Category, Project, ProjectLanguage, Workspace),
-    )
-    update_locked = False
-    translation_id: int | None = None
-    component_id: int | None = None
-    category_id: int | None = None
-    project_id: int | None = None
-    language_id: int | None = None
-    workspace_id: str | None = None
+def _judge_preparation_preview(batch: BatchAutoTranslate) -> dict[str, object]:
+    """Return the mandatory pre-judge machine translation volume and blockers."""
+    # C6/Task 3: the mandatory pre-judge MT volume is priced before the
+    # operator consents. A permission failure is a blocker, not a crash:
+    # the preview says the judge cannot start and why, and never pays a
+    # provider probe to find out.
+    try:
+        prep_scope = batch.build_preparation_scope()
+    except PermissionDenied as error:
+        return {
+            "missing": 0,
+            "per_language": {},
+            "engine": None,
+            "blockers": [str(error)],
+        }
+    return {
+        "missing": len(prep_scope.missing_ids),
+        "per_language": dict(sorted(prep_scope.per_language_missing.items())),
+        "engine": prep_scope.mt_engine,
+        "blockers": [
+            warning
+            for warning in batch.get_warnings()
+            if "cannot be prepared" in warning or "configured" in warning
+        ],
+    }
 
+
+_AutoTarget = Translation | Component | Category | Project | ProjectLanguage | Workspace
+
+
+def _start_judge_producer_run(
+    request: AuthenticatedHttpRequest, obj: _AutoTarget, autoform: AutoForm
+) -> HttpResponseRedirect:
+    form_obj = (
+        obj.component
+        if isinstance(obj, Translation)
+        else obj.project
+        if isinstance(obj, (Category, ProjectLanguage))
+        else obj
+    )
+    if not request.user.has_perm("unit.review", form_obj):
+        raise PermissionDenied
+    if not judge_configuration_ready():
+        messages.error(request, gettext("The LLM judge is not configured."))
+        return redirect(obj)
+    batch = BatchAutoTranslate(
+        obj,
+        user=request.user,
+        q=autoform.cleaned_data["q"],
+        mode="judge",
+        component_wide=isinstance(obj, Component),
+        overwrite_existing=autoform.cleaned_data.get("overwrite_existing", False),
+    )
+    _preview, units = batch.preview_judge_scope_snapshot(execution_version=1)
+    preparation_requested = autoform.cleaned_data.get(
+        "auto_source"
+    ) == "mt" and not autoform.cleaned_data.get("overwrite_existing", False)
+    if preparation_requested:
+        try:
+            preparation_scope = batch.build_preparation_scope()
+        except PermissionDenied as error:
+            messages.error(request, str(error))
+            return redirect(obj)
+        blockers = [
+            warning
+            for warning in batch.get_warnings()
+            if "cannot be prepared" in warning or "configured" in warning
+        ]
+        if blockers:
+            messages.error(request, " ".join(blockers))
+            return redirect(obj)
+    else:
+        preparation_scope = None
     match obj:
         case Translation():
-            translation = obj
-            project = translation.component.project
-            autoform = AutoForm(translation.component, request.user, request.POST)
-            update_locked = translation.component.locked
-            translation_id = translation.id
+            scope_type = ProducerRun.ScopeType.TRANSLATION
+            scope_id = str(obj.pk)
         case Component():
-            component = obj
-            project = component.project
-            autoform = AutoForm(component, request.user, request.POST)
-            update_locked = component.locked
-            component_id = component.id
-        case Category():
-            category = obj
-            project = category.project
-            autoform = AutoForm(category.project, request.user, request.POST)
-            update_locked = category.component_set.filter(locked=True).exists()
-            category_id = category.id
+            scope_type = ProducerRun.ScopeType.COMPONENT
+            scope_id = str(obj.pk)
         case Project():
-            project = obj
-            autoform = AutoForm(project, request.user, request.POST)
-            update_locked = project.locked
-            project_id = project.id
+            scope_type = ProducerRun.ScopeType.PROJECT
+            scope_id = str(obj.pk)
+        case Workspace():
+            scope_type = ProducerRun.ScopeType.WORKSPACE
+            scope_id = str(obj.pk)
+        case Category():
+            scope_type = ProducerRun.ScopeType.PROJECT
+            scope_id = str(obj.project.pk)
         case ProjectLanguage():
-            project = obj.project
-            autoform = AutoForm(project, request.user, request.POST)
-            update_locked = project.locked
-            project_id = project.id
-            language_id = obj.language.id
+            scope_type = ProducerRun.ScopeType.PROJECT
+            scope_id = str(obj.project.pk)
+        case _:
+            scope_type = ProducerRun.ScopeType.PROJECT
+            scope_id = str(getattr(obj, "pk", 0))
+
+    execution_options = {
+        "mode": "judge",
+        "q": autoform.cleaned_data["q"],
+        "auto_source": autoform.cleaned_data["auto_source"],
+        "engines": autoform.cleaned_data["engines"],
+        "threshold": autoform.cleaned_data["threshold"],
+        "judge_proposal_only": False,
+        "judge_pretranslate": False,
+        "judge_mutating_repairs": False,
+        "judge_candidate_severities": list(DEFAULT_CANDIDATE_SEVERITIES),
+        "overwrite_existing": autoform.cleaned_data.get("overwrite_existing", False),
+    }
+    dispatch_task_id = uuid4()
+    run = ProducerRun.objects.create(
+        actor=request.user,
+        dispatch_task_id=dispatch_task_id,
+        dispatch_phase=f"judge-{scope_type}",
+        dispatch_requested_at=timezone.now(),
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_label=str(obj),
+        scope_path=obj.get_absolute_url(),
+        requested_query=autoform.cleaned_data["q"],
+        requested_mode="judge",
+        cap=len(units),
+        execution_version=1,
+        scope_cursor=0,
+        execution_options=execution_options,
+        scope_snapshot=[unit.pk for unit in units],
+        configuration_snapshot=judge_configuration_snapshot(),
+        preparation_snapshot=(preparation_scope.to_json() if preparation_scope else {}),
+        preparation_phase="pending" if preparation_scope else "",
+    )
+    if not units and not (preparation_scope and preparation_scope.missing_ids):
+        run.status = ProducerRun.Status.COMPLETED
+        run.finished = timezone.now()
+        run.summary = {"completed": True, "units": 0}
+        run.save(update_fields=["status", "finished", "summary"])
+        messages.info(
+            request,
+            gettext("There are no strings matching the criteria to judge."),
+        )
+        return redirect_next(request.POST.get("next"), obj)
+
+    if settings.CELERY_TASK_ALWAYS_EAGER:
+        publish_producer_run_dispatch(run_id=run.pk)
+        messages.success(
+            request,
+            gettext("Automatic translation completed."),
+            f"task:{dispatch_task_id}",
+        )
+    else:
+        transaction.on_commit(lambda: publish_producer_run_dispatch(run_id=run.pk))
+        try:
+            queued_ahead = get_queue_length("translate")
+        except Exception:
+            LOGGER.exception("could not read the translate queue length")
+            queued_ahead = 0
+        if queued_ahead > 1:
+            message = ngettext(
+                "Automatic translation queued: %d run is ahead of it. "
+                "You can close this page.",
+                "Automatic translation queued: %d runs are ahead of it. "
+                "You can close this page.",
+                queued_ahead - 1,
+            ) % (queued_ahead - 1)
+        else:
+            message = gettext("Automatic translation queued. You can close this page.")
+        add_user_task(
+            request.user.id,
+            str(dispatch_task_id),
+            text=message,
+            label=str(obj),
+            url=run.get_absolute_url(),
+        )
+    return redirect_next(request.POST.get("next"), obj)
+
+
+def _resolve_auto_target(
+    obj: _AutoTarget, request: AuthenticatedHttpRequest
+) -> tuple[AutoForm, bool, dict[str, Any]]:
+    target_kwargs: dict[str, Any] = {
+        "translation_id": None,
+        "component_id": None,
+        "category_id": None,
+        "project_id": None,
+        "language_id": None,
+        "workspace_id": None,
+    }
+    match obj:
+        case Translation():
+            autoform = AutoForm(obj.component, request.user, request.POST)
+            update_locked = obj.component.locked
+            target_kwargs["translation_id"] = obj.id
+        case Component():
+            autoform = AutoForm(obj, request.user, request.POST)
+            update_locked = obj.locked
+            target_kwargs["component_id"] = obj.id
+        case Category():
+            autoform = AutoForm(obj.project, request.user, request.POST)
+            update_locked = obj.component_set.filter(locked=True).exists()
+            target_kwargs["category_id"] = obj.id
+        case Project():
+            autoform = AutoForm(obj, request.user, request.POST)
+            update_locked = obj.locked
+            target_kwargs["project_id"] = obj.id
+        case ProjectLanguage():
+            autoform = AutoForm(obj.project, request.user, request.POST)
+            update_locked = obj.project.locked
+            target_kwargs["project_id"] = obj.project.id
+            target_kwargs["language_id"] = obj.language.id
         case Workspace():
             autoform = AutoForm(obj, request.user, request.POST)
             update_locked = not (
@@ -1800,11 +1972,22 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
                 .exclude_source()
                 .exists()
             )
-            workspace_id = str(obj.pk)
+            target_kwargs["workspace_id"] = str(obj.pk)
         case _:  # pragma: no cover
             msg = "Unsupported object for auto translation"
             raise PermissionDenied(msg)
+    return autoform, update_locked, target_kwargs
 
+
+@require_POST
+@login_required
+def auto_translation(request: AuthenticatedHttpRequest, path):
+    obj: _AutoTarget = parse_path(
+        request,
+        path,
+        (Translation, Component, Category, Project, ProjectLanguage, Workspace),
+    )
+    autoform, update_locked, target_kwargs = _resolve_auto_target(obj, request)
     permission = request.user.has_perm("translation.auto", obj)
     if not permission:
         reason = getattr(permission, "reason", "")
@@ -1821,19 +2004,25 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             ),
         )
         return redirect(obj)
-
     if not autoform.is_valid():
         show_form_errors(request, autoform)
         return redirect(obj)
 
+    if autoform.cleaned_data["mode"] == "judge":
+        return _start_judge_producer_run(request, obj, autoform)
+    _run_non_judge_auto_translate(request, obj, autoform, target_kwargs)
+    return redirect_next(request.POST.get("next"), obj)
+
+
+def _run_non_judge_auto_translate(
+    request: AuthenticatedHttpRequest,
+    obj: _AutoTarget,
+    autoform: AutoForm,
+    target_kwargs: dict[str, Any],
+) -> None:
     if settings.CELERY_TASK_ALWAYS_EAGER:
         result = auto_translate(
-            translation_id=translation_id,
-            component_id=component_id,
-            category_id=category_id,
-            project_id=project_id,
-            language_id=language_id,
-            workspace_id=workspace_id,
+            **target_kwargs,
             user_id=request.user.id,
             mode=autoform.cleaned_data["mode"],
             q=autoform.cleaned_data["q"],
@@ -1847,28 +2036,18 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
         for warning in result.get("warnings", []):
             messages.warning(request, warning)
     else:
-        # The task id is allocated and registered (metadata + liveness)
-        # before publication: a fast worker can start - and heartbeat - the
-        # task before this view finishes, so the records must already exist
-        # when the first poll arrives. A publish failure removes both, so a
-        # dead task never sits in the user list.
         task_id = str(uuid4())
         store_task_metadata(
             task_id,
-            component_id=component_id,
-            translation_id=translation_id,
+            component_id=target_kwargs["component_id"],
+            translation_id=target_kwargs["translation_id"],
             user_id=request.user.id,
         )
         register_task_liveness(task_id)
         try:
             task = auto_translate.apply_async(
                 kwargs={
-                    "translation_id": translation_id,
-                    "component_id": component_id,
-                    "category_id": category_id,
-                    "project_id": project_id,
-                    "language_id": language_id,
-                    "workspace_id": workspace_id,
+                    **target_kwargs,
                     "user_id": request.user.id,
                     "mode": autoform.cleaned_data["mode"],
                     "q": autoform.cleaned_data["q"],
@@ -1890,8 +2069,6 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
         try:
             queued_ahead = get_queue_length("translate")
         except Exception:
-            # The run is already queued; a broker hiccup must not fail the
-            # request over the wording of its confirmation message.
             LOGGER.exception("could not read the translate queue length")
             queued_ahead = 0
         if queued_ahead > 1:
@@ -1903,8 +2080,6 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
                 queued_ahead - 1,
             ) % (queued_ahead - 1)
         else:
-            # The task is queued, not started: a free worker is not observable
-            # from here, so the message never claims the run is running.
             message = gettext("Automatic translation queued. You can close this page.")
         add_user_task(
             request.user.id,
@@ -1914,8 +2089,6 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             url=obj.get_absolute_url(),
         )
         messages.success(request, message, f"task:{task.id}")
-
-    return redirect_next(request.POST.get("next"), obj)
 
 
 @login_required

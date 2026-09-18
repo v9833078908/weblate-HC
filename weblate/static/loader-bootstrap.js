@@ -1514,6 +1514,26 @@ onReady(() => {
                   true,
                 );
             preview.textContent = `${scope} ${cost}`;
+            if (isJudge() && data.preparation) {
+              const prep = data.preparation;
+              const languages = Object.keys(prep.per_language).length;
+              const preparation =
+                prep.missing > 0
+                  ? interpolate(
+                      gettext(
+                        "Machine translation runs first: %(missing)s missing string(s) in %(languages)s language(s); existing text is not changed.",
+                      ),
+                      { missing: prep.missing, languages },
+                      true,
+                    )
+                  : gettext(
+                      "All strings are already translated; no preparation.",
+                    );
+              preview.textContent += ` ${preparation}`;
+              for (const blocker of prep.blockers) {
+                preview.textContent += ` ${blocker}`;
+              }
+            }
             if (isJudge()) {
               const judgeCost = data.judge_cost.available
                 ? interpolate(

@@ -319,7 +319,12 @@ repository state, background tasks, outbound requests, and rendered UI.
        provider response is
        untrusted input parsed against a strict schema; a batch that exceeds
        :setting:`JUDGE_REQUEST_DEADLINE`, or is malformed, is recorded as
-       unparsed and never treated as a favorable verdict. *(documented)*
+       unparsed and never treated as a favorable verdict. A judge run also
+       drives that already-modelled project machine-translation data flow
+       itself before any review request: every empty target string in the
+       selected scope, across all its languages, is sent through it, and a
+       language the preparation cannot complete stops the run before the
+       judge batch is ever formed. *(documented)*
        (source: :ref:`llm-judge`, :doc:`/admin/config`)
    * - Project backup archives and Weblate filesystem
      - Uploaded ZIP members and metadata become restored project state;
@@ -384,9 +389,15 @@ Reachability preconditions:
 * An LLM judge finding is in model only when reachable from an authenticated
   automatic translation run in judge mode, and an outbound request finding
   only when :setting:`JUDGE_ENABLED`, the site-wide key, and both seat
-  models are configured. :setting:`JUDGE_MAX_UNITS_PER_RUN` caps a run's
-  selected scope; rows beyond that cap are recorded as skipped and the
-  report marks the coverage incomplete. Repair of a parsed major or critical
+  models are configured. For legacy runs (version 0), :setting:`JUDGE_MAX_UNITS_PER_RUN`
+  caps a run's selected scope and rows beyond that cap are recorded as skipped.
+  For full-scope runs (version 1), a single operator confirmation authorizes a
+  durable, multi-day billable execution chain across the entire confirmed scope,
+  processed in small internal chunks with automatic dispatch continuation;
+  cancellation between chunks serves as the primary operational circuit breaker.
+  Internal execution state (cursor, generation task UUIDs, and safe execution options)
+  is kept private and never exposed across tenant boundaries.
+  Repair of a parsed major or critical
   finding uses the already-modelled, project-configured machine-translation
   data flow. Only the deterministic ``max-length`` repair still writes to a
   target, and it remains restricted to strings the run explicitly marked

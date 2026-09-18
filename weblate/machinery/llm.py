@@ -38,6 +38,7 @@ from weblate.machinery.base import (
     BatchMachineTranslation,
     MachineryRateLimitError,
     MachineTranslationError,
+    MachineTranslationServiceError,
 )
 from weblate.utils.errors import add_breadcrumb
 from weblate.utils.hash import calculate_hash, hash_to_checksum
@@ -2877,6 +2878,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 except MachineTranslationError:
                     tail = None
             return self._merge_half_translations([error.translations, tail], error)
+        except MachineTranslationServiceError:
+            # Splitting a refused batch only sends more refused requests.
+            raise
         except MachineTranslationError as error:
             halves = self._split_sources(sources, source_occurrences)
             if halves is None:

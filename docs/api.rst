@@ -2477,27 +2477,25 @@ Translations
     :<json string q: Automatic translation search string, see :ref:`search-strings`.
     :<json string auto_source: Automatic translation source - ``mt`` or ``others``
     :<json string component: Turn on contribution to shared translation memory for the project to get access to additional components.
-    :<json array engines: Machine translation engines. Required when ``auto_source`` is ``mt``.
+    :<json array engines: Machine translation engines. Required when ``auto_source`` is ``mt``, except for ``mode: judge``, which resolves the project's configured engine for its mandatory preparation.
     :<json string threshold: Score threshold
 
     .. note::
 
        ``mode: judge`` requires the same right as approving translations
        (:guilabel:`Review strings`) and a project with review enabled.
-       Each authorized ``judge`` request now records a producer run
-       (actor, scope, per-string outcome), the same durable history
-       already visible for automatic translation started from the web UI,
-       see :ref:`llm-judge`. The ``weblate auto_translate`` management
-       command does not offer a ``judge`` mode.
-       A ``200`` response only reports how the run ended: the returned
-       details also describe a run that was refused by the machine
-       translation service or that produced no verdict at all. Even a
-       verdict of its own is not a claim that the translation is
-       linguistically correct. An already approved unit can also be
-       lowered to translated by a ``pass`` verdict, unless
-       :setting:`JUDGE_MAY_APPROVE` is enabled and the string carries a
-       complete set of current verdicts.
-
+       Each authorized ``judge`` request records a durable producer run
+       (actor, scope, per-string outcome), returning an asynchronous ``202 Accepted``
+       response with the ``run_id`` and ``report_url``. Full-scope judge runs
+       execute in small chunks with automatic Celery task continuation across
+       worker deliveries and restarts; non-judge modes retain the synchronous
+       ``200 OK`` response. The ``weblate auto_translate`` management command
+       does not offer a ``judge`` mode.
+       A ``judge`` run first machine translates every empty string of the
+       selected scope - across all languages - and the judges only start once
+       preparation is complete. If preparation is blocked (no engine, missing
+       permission, provider refusal), the judges do not start and the report
+       details state the blocker.
 .. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/file/
 
     Download current translation file as it is stored in the VCS (without the ``format``
@@ -3682,7 +3680,9 @@ or an undo receipt disappears on its own.
     Price a judge scope without contacting a provider: permission-filtered
     selected/excluded counts, and both the initial call count and the
     worst-case call count a full repair-and-recheck cycle could reach.
-    Never generates a candidate or calls a provider itself.
+    The response also prices the mandatory machine-translation preparation
+    that runs before any judge request. Never generates a candidate or
+    calls a provider itself.
 
     :param slug: Project URL slug
     :type slug: string
@@ -3695,18 +3695,21 @@ or an undo receipt disappears on its own.
     :>json int excluded: Strings matched but excluded (for example, already cached with current evidence)
     :>json int initial_calls: Judge calls the first pass alone would make
     :>json int worst_case_calls: Upper bound including every allowed repair and re-check round
-    :>json string basis: Short note on what the worst case does and does not include
+    :>json object preparation: The pre-judge machine-translation volume: ``missing`` (exact count), ``per_language``, ``engine``, ``blockers`` (human-readable reasons the judge could not start), ``mt_cost_known`` (false means the MT cost is unknown, not zero)
+    :>json string basis: Short note on what the worst case does and does not include; the preparation cost is reported separately and is not included in the judge call counts
     :statuscode 409: the judge is not configured (``code: not-configured``)
 
 .. http:post:: /api/producer/projects/(string:slug)/runs/
 
     Start the run an estimate already priced. Fenced atomically against
-    drift: the scope, judge configuration, and matched string set are
-    re-derived and compared against the estimate's own snapshot before
-    anything is dispatched. An identical repeated POST for the same
-    ``estimate_id`` returns the same run rather than starting a second
-    one; the response status distinguishes a fresh ``201`` from an
-    idempotent replay's ``200``.
+    drift: the scope, judge configuration, matched string set, and the
+    preparation volume are re-derived and compared against the estimate's
+    own snapshot before anything is dispatched. A preparation blocker
+    (missing permission or no usable engine) refuses the start with
+    ``code: preparation-blocked`` before any provider call. An identical
+    repeated POST for the same ``estimate_id`` returns the same run rather
+    than starting a second one; the response status distinguishes a fresh
+    ``201`` from an idempotent replay's ``200``.
 
     :param slug: Project URL slug
     :type slug: string
@@ -3715,14 +3718,17 @@ or an undo receipt disappears on its own.
     :<json string estimate_id: The ``estimate_id`` from :http:post:`/api/producer/projects/(string:slug)/runs/estimate/`
     :statuscode 201: a new run was created
     :statuscode 200: an identical prior request's run was returned unchanged
-    :statuscode 409: the scope or judge configuration drifted since the estimate, or the judge is not configured (``code: estimate-drift`` or ``code: not-configured``)
+    :statuscode 409: the scope or judge configuration drifted since the estimate, preparation is blocked, or the judge is not configured (``code: estimate-drift``, ``code: preparation-blocked``, or ``code: not-configured``)
 
 .. http:get:: /api/producer/runs/(str:id)/
 
     Read one durable run by ID: status, timing, a text-free summary of
-    per-string outcomes, warnings, and ``coverage``. For judge runs,
-    ``coverage`` separates rows with a usable conclusion from every other
-    recorded outcome and lists skip reasons; ``scope_complete`` is true only
+    per-string outcomes, warnings, ``preparation_phase``, and ``coverage``.
+    ``preparation_phase`` is ``blocked`` when the mandatory
+    machine-translation step could not finish and the judges never started.
+    For judge runs, ``coverage`` separates rows with a usable conclusion
+    from every other recorded outcome and lists skip reasons;
+    ``scope_complete`` is true only
     when the saved scope is fully evidenced, false for a known incomplete
     terminal run, and null when the run cannot prove its denominator. A run
     outlives the Celery task that executes it and the client connection that
@@ -3751,14 +3757,19 @@ or an undo receipt disappears on its own.
     provider failure only; a run whose seats disagreed, that produced a
     candidate awaiting review, or that was cancelled is not "failed" and
     is not resumable through this endpoint. A string already judged with
-    unchanged input is not billed again.
+    unchanged input is not billed again. The new run carries the failed
+    run's closed preparation scope and machine translates only the strings
+    still missing; strings already written by the preparation are never
+    rewritten. A resume whose machine-translation configuration changed
+    since the scope was fixed is refused with ``code: estimate-drift`` and
+    needs a fresh estimate.
 
     :param id: Run ID (UUID)
     :type id: string
     :<json int attempt: The next attempt number for this run's resume chain, starting at 1
     :statuscode 201: a new resume run was created
     :statuscode 200: an identical prior resume request's run was returned unchanged
-    :statuscode 409: the run is not in a resumable state (``code: not-resumable``)
+    :statuscode 409: the run is not in a resumable state, or the MT configuration drifted (``code: not-resumable`` or ``code: estimate-drift``)
 
 .. http:post:: /api/producer/decisions/(int:id)/apply-candidate/
 

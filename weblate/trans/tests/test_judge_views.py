@@ -202,8 +202,13 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
                 "threshold": 80,
             },
         )
-
         self.assertRedirects(response, self.project.get_absolute_url())
+        run = ProducerRun.objects.filter(
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(self.project.pk),
+        ).latest("created")
+        self.assertEqual(run.execution_version, 1)
+        self.assertEqual(run.scope_cursor, 0)
 
     def test_translation_estimate_uses_the_judge_default_query(self) -> None:
         translation = self.get_translation()
@@ -249,7 +254,21 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
                 "judge_calls_worst_case",
                 "judge_cost",
                 "pretranslation_cost",
+                "preparation",
             },
+        )
+        # The judge preview prices the mandatory MT volume separately from
+        # the judge counts; with no routed engine configured the blockers
+        # say so before any dispatch or paid probe.
+        preparation = response.json()["preparation"]
+        self.assertGreater(preparation["missing"], 0)
+        self.assertEqual(
+            sum(preparation["per_language"].values()), preparation["missing"]
+        )
+        self.assertEqual(preparation["engine"], None)
+        self.assertTrue(
+            any("configured" in warning for warning in preparation["blockers"]),
+            preparation,
         )
 
     @override_settings(

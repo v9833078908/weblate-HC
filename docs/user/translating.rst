@@ -461,7 +461,9 @@ Two modes of operation are possible:
 
 When using machine translation, select at least one configured engine. A run
 without a selected engine is rejected instead of silently completing without
-translating strings.
+translating strings. The judge mode is the exception: its preparation step
+resolves the project's configured machine-translation engine per language, so
+a judge run does not need an explicit selection.
 
 When using other components as the source, Weblate applies translations only
 when plural forms are compatible. If the source component uses different plural
@@ -493,6 +495,17 @@ observed cost ranges when enough recent priced requests exist. A missing cost
 range is not a zero-cost estimate. Progress counts completed judge batches and
 can jump to completion when cached verdicts or skipped repair rounds reduce
 the actual work.
+
+A judge run carries two separate volumes. Before any judge request, a
+mandatory preparation step machine translates every empty string in the
+selected scope, across all its languages; existing translations are never
+overwritten by this step. The judges then evaluate the capped selection on the
+prepared text. If the preparation cannot finish - no engine for a language,
+insufficient edit permission, or a provider refusal such as an exhausted
+quota - the judges do not start, the run is reported as failed with the
+remaining strings listed, and the machine translations written so far are
+kept. Fix the cause and start a new run; only the still-missing strings are
+translated again.
 
 The component language page also shows delivery readiness separately from AI
 evaluation. Current, stale, and incomplete judge evidence are review signals,

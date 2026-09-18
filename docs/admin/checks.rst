@@ -174,7 +174,16 @@ restore the original rule where either seat's critical holds the string.
 Each seat's opinion and any disagreement are shown on the ``judge`` checks
 card of the string.
 
-A selected string with no translation after the pretranslation phase is not sent
+Before judging, the run must prepare its scope: every empty string in the
+selected scope, in every selected language, is machine translated first -
+the judges never start against text the mandatory preparation left missing,
+and existing translations are never overwritten by that step. A language
+whose missing strings cannot be prepared (no configured engine, no direct
+edit permission, or a provider refusal such as an exhausted quota) blocks
+the judge phase and fails the run with an explicit warning; starting again
+after the cause is fixed re-translates only the still-missing strings.
+
+A selected string with no translation after the preparation phase is not sent
 to either judge. The producer report records it as skipped with the reason
 ``This string had no translation to judge.``, and it still consumes its
 preselected per-run cap slot.
