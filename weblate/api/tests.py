@@ -11535,6 +11535,10 @@ class TranslationAPITest(APIBaseTest):
             code=200,
         )
         self.assertContains(response, "Automatic translation completed")
+        self.assertIn("warnings", response.data)
+        self.assertIsInstance(response.data["warnings"], list)
+        self.assertIn("report_url", response.data)
+        self.assertTrue(response.data["report_url"])
 
     def test_autotranslate_json(self) -> None:
         self.test_autotranslate("json")

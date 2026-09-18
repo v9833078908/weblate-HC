@@ -67,6 +67,7 @@ from weblate.trans.models.judge import (
     compute_context_hash,
     compute_target_hash,
 )
+from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tasks import (
     JudgeExecutionGuardError,
     auto_translate,
@@ -2342,6 +2343,175 @@ class ProducerRunCreationTest(ViewTestCase):
         self.assertEqual(result["message"], "The execution lock was not released.")
         self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertIsNotNone(run.finished)
+
+
+class ProducerRunRefusalAggregationTest(ViewTestCase):
+    """Usage-log refusals must surface in the run they belong to."""
+
+    def _make_run(self, *, status: str = ProducerRun.Status.RUNNING) -> ProducerRun:
+        return ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="translate",
+            cap=1,
+            status=status,
+        )
+
+    def _finish(
+        self, run: ProducerRun, status: str = ProducerRun.Status.COMPLETED
+    ) -> None:
+        auto = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="translate",
+            component_wide=True,
+            unit_ids=[self.get_unit().pk],
+        )
+        auto._finish_producer_run(run, status)  # ruff: ignore[private-member-access]
+
+    def test_refusal_only_run_becomes_partial_with_warning(self) -> None:
+        run = self._make_run()
+        LLMUsageLog.objects.create(
+            run=run,
+            model="test-model",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            outcome=LLMUsageLog.Outcome.REFUSED,
+            refusal_reason="Mismatching assistant reply items.",
+            batch_size=1,
+        )
+        self._finish(run)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.PARTIAL)
+        self.assertTrue(
+            any("Mismatching assistant reply items" in w for w in run.warnings)
+        )
+
+    def test_refusal_and_applied_stays_completed_with_warning(self) -> None:
+        run = self._make_run()
+        LLMUsageLog.objects.create(
+            run=run,
+            model="test-model",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            outcome=LLMUsageLog.Outcome.APPLIED,
+            batch_size=1,
+        )
+        LLMUsageLog.objects.create(
+            run=run,
+            model="test-model",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            outcome=LLMUsageLog.Outcome.REFUSED,
+            refusal_reason="Mismatching assistant reply items.",
+            batch_size=1,
+        )
+        self._finish(run)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertTrue(
+            any("Mismatching assistant reply items" in w for w in run.warnings)
+        )
+
+    def test_partial_outcome_only_warns_without_status_change(self) -> None:
+        run = self._make_run()
+        LLMUsageLog.objects.create(
+            run=run,
+            model="test-model",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            outcome=LLMUsageLog.Outcome.PARTIAL,
+            refusal_reason="Some items refused.",
+            batch_size=2,
+        )
+        self._finish(run)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertTrue(any("Some items refused" in w for w in run.warnings))
+
+    def test_failed_run_is_not_demoted_by_refusal_aggregation(self) -> None:
+        run = self._make_run()
+        LLMUsageLog.objects.create(
+            run=run,
+            model="test-model",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            outcome=LLMUsageLog.Outcome.REFUSED,
+            refusal_reason="Mismatching assistant reply items.",
+            batch_size=1,
+        )
+        self._finish(run, ProducerRun.Status.FAILED)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+
+    def test_judge_usage_is_not_aggregated(self) -> None:
+        run = self._make_run()
+        LLMUsageLog.objects.create(
+            run=run,
+            model="test-model",
+            operation=LLMUsageLog.Operation.JUDGE,
+            outcome=LLMUsageLog.Outcome.REFUSED,
+            refusal_reason="Judge refusal.",
+            batch_size=1,
+        )
+        self._finish(run)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertFalse(run.warnings)
+
+    def test_regression_engine_refusal_marks_run_partial_not_completed(self) -> None:
+        """Engine refusal + error must finalize as PARTIAL, not COMPLETED."""
+
+        class RefusingTranslation(DummyTranslation):
+            """Writes a refused usage record then raises, like the OpenAI layer."""
+
+            def __init__(self, settings):
+                super().__init__(settings)
+                self.usage_run_id = None
+
+            def batch_translate(self, units, user=None, threshold=75, **kwargs):
+                LLMUsageLog.objects.create(
+                    run_id=self.usage_run_id,
+                    model="test-model",
+                    operation=LLMUsageLog.Operation.TRANSLATION,
+                    outcome=LLMUsageLog.Outcome.REFUSED,
+                    refusal_reason="Mismatching assistant reply items.",
+                    batch_size=len(units),
+                )
+                msg = "Mismatching assistant reply items."
+                raise MachineTranslationError(msg)
+
+        auto = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="translate",
+            component_wide=True,
+            unit_ids=[self.get_unit().pk],
+        )
+
+        with (
+            mock.patch.object(
+                BatchAutoTranslate, "_can_process_translation", return_value=True
+            ),
+            mock.patch(
+                "weblate.trans.autotranslate.MACHINERY",
+                {"weblate": RefusingTranslation},
+            ),
+        ):
+            auto.perform(
+                auto_source="mt",
+                engines=["weblate"],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        run = auto.active_producer_run
+        self.assertIsNotNone(run)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.PARTIAL)
+        self.assertTrue(
+            any("Mismatching assistant reply items" in w for w in run.warnings)
+        )
 
 
 class RecordingTranslation(DummyTranslation):
