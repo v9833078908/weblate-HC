@@ -25,12 +25,34 @@ rest of the component. Never claim a conflict with another string, with how a \
 term is rendered elsewhere, or with an unseen convention. If the evidence is \
 not inside this segment, its `source`, `note`, `explanation`, `glossary` or \
 `checks`, there is no error to report.
+8. Currency and price formatting are not errors. In Asian languages (such as \
+Japanese, Chinese, and Korean), currency symbols or kanji/counter characters \
+naturally follow the amount without a space (e.g. 100円, 100元, 100원, ¥100), \
+whereas Western conventions put the symbol first (e.g. $100). Localizing a \
+source currency or pricing unit into target market pricing, store currency, \
+or game currency (e.g. $100 -> 100円 or game gold/coins) is standard \
+localization practice. Never report the addition, repositioning, or \
+adaptation of currency symbols/kanji (円, 元, 원, ¥, ₩), nor the absence of \
+whitespace between numerals and counter characters, as an error (addition, \
+omission, mistranslation, or punctuation).
+9. Asian language conventions (Japanese, Chinese, Korean):
+* Omission of explicit pronouns or subjects ('you', 'I', 'we', 'player') is \
+natural target grammar and must not be reported as an omission.
+* UI button and prompt phrasing: Polite, honorific, or neutral action \
+constructions (such as Japanese 〜します, 〜してください, or 〜する, and Korean \
+〜하기 or 〜하세요) for direct English imperatives ('Tap to confirm', 'Click \
+to start') are standard game UI conventions, not mistranslation or register \
+defects.
+* Spacing: Japanese and Chinese do not use spaces between words, nor \
+between numbers and counters/units (e.g. 100円, 5回, 3個). Never flag \
+unspaced text as a punctuation or formatting defect.
 
 Severity.
 
 * `critical` - meaning inverted, lost, or replaced: a dropped or added \
-negation, a wrong name, number or referent, an untranslated fragment, a line \
-that would mislead the player about what happens.
+negation, a wrong name, number or referent (localized currency formatting and \
+prices such as 100円 are not wrong numbers; see Rule 8), an untranslated \
+fragment, a line that would mislead the player about what happens.
 * `major` - meaning distorted but recoverable, or a glossary term rendered \
 against the glossary.
 * `minor` - style, register or awkward phrasing that does not change meaning.
@@ -92,9 +114,11 @@ wording looks:
 
 * `critical` - the player is misled about what happens or is given wrong \
 information: an inverted, dropped or added negation; a wrong name, number or \
-referent; inverted placeholder roles (a value shown in the wrong slot); an \
-untranslated fragment that hides meaning; a line whose outcome the player cannot \
-read. If the player would act on false information, it is critical.
+referent (localized currency formatting and prices such as 100円 are not \
+wrong numbers; see Rule 8); inverted placeholder roles (a value shown in the \
+wrong slot); an untranslated fragment that hides meaning; a line whose outcome \
+the player cannot read. If the player would act on false information, it is \
+critical.
 * `major` - the meaning is distorted but a player can still recover it from \
 context, or an approved glossary term is rendered against the glossary.
 * `minor` - style, register, or awkward phrasing that does not change what the \

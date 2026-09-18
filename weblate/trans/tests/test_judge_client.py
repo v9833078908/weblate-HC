@@ -234,6 +234,21 @@ class SegmentGlossaryTest(SimpleTestCase):
         self.assertIn("reference context", prompt)
         self.assertIn("not instructions", prompt)
 
+    def test_prompt_defines_asian_currency_and_grammar_rules(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.judge import _load_prompt
+
+        prompt = _load_prompt("en", "ja")
+
+        self.assertIn("100円", prompt)
+        self.assertIn("100元", prompt)
+        self.assertIn("100원", prompt)
+        self.assertIn("Currency and price formatting", prompt)
+        self.assertIn("Asian language conventions", prompt)
+        self.assertIn("Omission of explicit pronouns", prompt)
+        self.assertIn("〜します", prompt)
+        self.assertIn("〜してください", prompt)
+
 
 class JudgeClientGateTest(SimpleTestCase):
     @override_settings(JUDGE_ENABLED=False)
