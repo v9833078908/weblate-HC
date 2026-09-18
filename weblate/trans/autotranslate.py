@@ -1562,6 +1562,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self._attempt_counter = _AttemptCounter()
         self.batch_counter = self._attempt_counter
         self.active_producer_run: ProducerRun | None = None
+        # Judge tally carried over from earlier continuation chunks. It is
+        # filled in ``_perform`` from the run's durable summary; a batch that
+        # never gets there (a direct ``_finish_producer_run`` caller, the
+        # legacy-snapshot refusal) has nothing to carry.
+        self._chunk_prior_summary: dict[str, int] | None = None
 
         match obj:
             case Translation():
@@ -1667,9 +1672,12 @@ class BatchAutoTranslate(BaseAutoTranslate):
             initial_calls += preview.initial_calls
             worst_case_calls += preview.worst_case_calls
             if remaining is not None:
-                remaining -= preview.processed
-                if remaining <= 0:
-                    break
+                # The cap is one shared budget, but the whole
+                # permission-filtered scope still has to be counted: the
+                # remainder is what the cap left unjudged, and stopping the
+                # loop here would both hide it from the report and silence
+                # the cap warning for later translations.
+                remaining = max(0, remaining - preview.processed)
         return JudgeScopePreview(
             matched=matched,
             processed=processed,
@@ -1711,9 +1719,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
             worst_case_calls += preview.worst_case_calls
             selected.extend(units)
             if remaining is not None:
-                remaining -= preview.processed
-                if remaining <= 0:
-                    break
+                # See ``preview_judge_scope``: the budget is shared, the
+                # counted scope is not truncated by it.
+                remaining = max(0, remaining - preview.processed)
         return (
             JudgeScopePreview(
                 matched=matched,
@@ -2068,6 +2076,24 @@ class BatchAutoTranslate(BaseAutoTranslate):
             )
         return total
 
+    def _producer_execution_version(self) -> int:
+        """
+        Return the execution contract of the run this dispatch belongs to.
+
+        ``0`` is the historical capped contract, ``1`` the full-scope one.
+        The dispatched task carries only a run id, so the version is read
+        from the row itself; a batch with no run at all is a direct console
+        call and keeps the historical cap.
+        """
+        if self.producer_run_id is None:
+            return 0
+        return (
+            ProducerRun.objects.filter(pk=self.producer_run_id)
+            .values_list("execution_version", flat=True)
+            .first()
+            or 0
+        )
+
     def _adopt_producer_run(self) -> ProducerRun:
         """
         Claim the pre-created run for this dispatch, or create a fresh one.
@@ -2126,7 +2152,12 @@ class BatchAutoTranslate(BaseAutoTranslate):
                         claimed.task_id = task_id
                         claimed.save(update_fields=["task_id"])
                     return claimed
-                superseded = True
+                if task_id:
+                    # The delivery names a generation other than the run's
+                    # current one, so this worker is a stale redelivery: it
+                    # must not continue, and the run is marked failed so it
+                    # cannot stay RUNNING with nobody able to finish it.
+                    superseded = True
                 claimed = None
             if (
                 matches
@@ -2636,7 +2667,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
         threshold: int,
         source_component_ids: list[int] | None,
     ) -> str:
-        judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
+        judge_preview = (
+            self.preview_judge_scope(
+                execution_version=self._producer_execution_version()
+            )
+            if self.mode == "judge"
+            else None
+        )
         preparation_scope: PreparationScope | None = None
         if (
             self.mode == "judge"
@@ -2719,7 +2756,21 @@ class BatchAutoTranslate(BaseAutoTranslate):
             return gettext("Automatic translation completed.")
         judge_remaining = judge_preview.processed if judge_preview is not None else None
         selected_workspace_source_component_ids: dict[int, list[int]] | None = None
-        if producer_run is not None and preparation_scope is not None:
+        if (
+            producer_run is not None
+            and preparation_scope is not None
+            # The reservation belongs to the run's first dispatch only: a
+            # continuation chunk re-enters ``_perform`` with the same closed
+            # scope, and repeating it would resolve the glossary and issue a
+            # ``get_or_create`` round trip for every unit of the whole
+            # snapshot on every chunk -- O(scope) per chunk, O(scope * chunks)
+            # per run. The rows are already durable, and a version-1 run's
+            # coverage counts unreserved scope as pending, so a continuation
+            # loses nothing by skipping it. A redelivered first dispatch
+            # repeats an idempotent call; a cancelled or finished run never
+            # reaches this point.
+            and (producer_run.execution_version < 1 or not producer_run.scope_cursor)
+        ):
             # Judge-cap skips are recorded once, globally, before any
             # preparation MT: the reason must survive a preparation failure
             # instead of being overwritten by ``mt-prerequisite``. The judge
