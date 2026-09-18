@@ -11,6 +11,7 @@ from django.conf import settings
 from django.test import override_settings
 from django.utils import timezone
 
+from weblate.trans import autotranslate
 from weblate.trans.autotranslate import BatchAutoTranslate
 from weblate.trans.models.judge import JudgeRunUnit, ProducerRun
 from weblate.trans.models.unit import Unit
@@ -462,3 +463,64 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
             self.assertEqual(run.status, ProducerRun.Status.CANCELLED)
             self.assertIsNotNone(run.finished)
             mock_pub.assert_not_called()
+
+    def test_continuation_chunk_costs_its_chunk_not_the_whole_scope(self) -> None:
+        """A continuation must not re-derive the closed scope it inherits."""
+        task_id = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.QUEUED,
+            dispatch_task_id=task_id,
+        )
+        with (
+            patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.tasks.publish_producer_run_dispatch"),
+            patch("weblate.trans.autotranslate.AutoTranslate.perform"),
+            patch(
+                "weblate.trans.autotranslate.build_request",
+                wraps=autotranslate.build_request,
+            ) as build_request,
+        ):
+            mock_task.request.id = task_id
+            batch_1 = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            batch_1.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            run.refresh_from_db()
+            scope_size = len(run.scope_snapshot)
+            self.assertGreater(scope_size, 2)
+
+            # The reservation is durable after the first dispatch; the
+            # continuation inherits it and must not resolve the source,
+            # glossary and context of every unit in the run again.
+            build_request.reset_mock()
+            mock_task.request.id = str(run.dispatch_task_id)
+            batch_2 = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            batch_2.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            self.assertLess(
+                build_request.call_count,
+                scope_size,
+                "a continuation chunk resolved more units than the whole scope",
+            )
