@@ -380,8 +380,6 @@ class ProducerRun(models.Model):
     request_fingerprint = models.CharField(max_length=64, blank=True)
     scope_hash = models.CharField(max_length=64, blank=True)
     scope_snapshot = models.JSONField(default=list, blank=True)
-    preparation_phase = models.CharField(max_length=20, blank=True, default="")
-    preparation_snapshot = models.JSONField(default=dict, blank=True)
     resumed_from = models.ForeignKey(
         "self",
         on_delete=models.deletion.SET_NULL,
