@@ -1307,8 +1307,9 @@ class AutoForm(forms.Form):
             self.data = copy_form_data(self.data)
             self.data["component"] = ""
         self.obj = obj
+        self.user = user
         self.project: Project | None = None
-        machinery_settings = {}
+        self.machinery_settings: dict = {}
 
         if isinstance(obj, Component):
             self.components = obj.project.component_set.filter(
@@ -1340,6 +1341,7 @@ class AutoForm(forms.Form):
             # Site-wide add-ons
             self.components = Component.objects.all()
             machinery_settings = Setting.objects.get_settings_dict(SettingCategory.MT)
+        self.machinery_settings = machinery_settings
 
         # Fetching first few entries is faster than doing a count query on possibly
         # thousands of components
@@ -1423,7 +1425,16 @@ class AutoForm(forms.Form):
             self.cleaned_data.get("auto_source") == "mt"
             and "engines" in self.cleaned_data
             and not self.cleaned_data["engines"]
+            and self.cleaned_data.get("mode") != "judge"
         ):
+            # A standalone MT run with no engine would silently update
+            # nothing; it must not start. The judge mode is exempt here: its
+            # mandatory preparation resolves the project's configured routed
+            # engine per language even with no explicit selection, so a fully
+            # prepared judge scope never needs an unused engine. With no
+            # routed engine either, the execution-time preparation barrier
+            # blocks the judge phase with an explicit per-language warning -
+            # a quieter failure than a dead button.
             self.add_error(
                 "engines",
                 gettext("Select at least one machine translation engine."),

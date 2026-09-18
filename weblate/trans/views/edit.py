@@ -1648,6 +1648,7 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
     )
     judge_preview = batch.preview_judge_scope() if mode == "judge" else None
     mt_preview = batch.preview_mt_scope() if mode != "judge" else None
+    preparation = _judge_preparation_preview(batch) if judge_preview else None
     preview = judge_preview or mt_preview
     judge_cost: dict[str, str | bool] = {"available": False}
     if judge_preview is not None:
@@ -1742,8 +1743,36 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
             else 0,
             "judge_cost": judge_cost,
             "pretranslation_cost": pretranslation_cost,
+            "preparation": preparation,
         }
     )
+
+
+def _judge_preparation_preview(batch: BatchAutoTranslate) -> dict[str, object]:
+    """Return the mandatory pre-judge machine translation volume and blockers."""
+    # C6/Task 3: the mandatory pre-judge MT volume is priced before the
+    # operator consents. A permission failure is a blocker, not a crash:
+    # the preview says the judge cannot start and why, and never pays a
+    # provider probe to find out.
+    try:
+        prep_scope = batch.build_preparation_scope()
+    except PermissionDenied as error:
+        return {
+            "missing": 0,
+            "per_language": {},
+            "engine": None,
+            "blockers": [str(error)],
+        }
+    return {
+        "missing": len(prep_scope.missing_ids),
+        "per_language": dict(sorted(prep_scope.per_language_missing.items())),
+        "engine": prep_scope.mt_engine,
+        "blockers": [
+            warning
+            for warning in batch.get_warnings()
+            if "cannot be prepared" in warning or "configured" in warning
+        ],
+    }
 
 
 @require_POST

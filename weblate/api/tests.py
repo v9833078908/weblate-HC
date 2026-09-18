@@ -17974,6 +17974,76 @@ class ProducerAPITest(APIBaseTest):
         JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
     )
+    def test_resume_after_mt_engine_change_requires_a_new_estimate(self) -> None:
+        # Task 3: the old consent priced spend on one routed engine; a
+        # resume must never silently re-run the remaining preparation on a
+        # different one.
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        original = self.make_failed_project_judge_run(
+            preparation_snapshot={
+                "version": 1,
+                "unit_ids": [],
+                "missing_ids": [],
+                "per_language_missing": {},
+                "mt_engine": "litellm",
+            }
+        )
+        response = self.do_request(
+            "api:producer-run-resume",
+            kwargs={"pk": original.pk},
+            method="post",
+            request={"attempt": 1},
+            format="json",
+            superuser=True,
+            code=409,
+        )
+        self.assertEqual(response.data["code"], "estimate-drift")
+        self.assertEqual(ProducerRun.objects.filter(resumed_from=original).count(), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_resume_with_unchanged_mt_engine_is_allowed(self) -> None:
+        # A provider-side quota top-up changes nothing in the configuration:
+        # the ordinary explicit resume path stays available.
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        original = self.make_failed_project_judge_run(
+            preparation_snapshot={
+                "version": 1,
+                "unit_ids": [],
+                "missing_ids": [],
+                "per_language_missing": {},
+                "mt_engine": "openrouter",
+            }
+        )
+        with (
+            patch(
+                "weblate.trans.tasks.auto_translate.apply_async",
+                return_value=SimpleNamespace(id="task-resume-3"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.do_request(
+                "api:producer-run-resume",
+                kwargs={"pk": original.pk},
+                method="post",
+                request={"attempt": 1},
+                format="json",
+                superuser=True,
+                code=201,
+            )
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
     def test_resume_is_permission_scoped(self) -> None:
         original = self.make_failed_project_judge_run()
         self.do_request(
@@ -18045,6 +18115,10 @@ class ProducerConsoleRealRunEndToEndTest(RepoTestMixin, APITransactionTestCase):
         self.project.save(update_fields=["translation_review"])
         self.translation = self.component.translation_set.get(language_code="cs")
         self.unit = self.translation.unit_set.get(source="Hello, world!\n")
+        # The mandatory preparation contract machine-translates empty
+        # strings before any judge call; this run prices judge-only work,
+        # so the string starts translated and no engine is required.
+        self.unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
 
     def serve_pass(self) -> None:
         http_mock.register(
@@ -18088,20 +18162,22 @@ class ProducerConsoleRealRunEndToEndTest(RepoTestMixin, APITransactionTestCase):
         ).data
         self.assertEqual(estimate["selected"], 1)
 
-        started = self.do_request(
-            "api:producer-project-run-start",
-            kwargs={"slug": self.project.slug},
-            method="post",
-            request={
-                "kind": "judge",
-                "scope": {"query": f"id:{self.unit.pk}"},
-                "estimate_id": estimate["estimate_id"],
-            },
-            format="json",
-            superuser=True,
-            code=201,
-        ).data
+        from django.test import TestCase  # ruff: ignore[import-outside-top-level]
 
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            started = self.do_request(
+                "api:producer-project-run-start",
+                kwargs={"slug": self.project.slug},
+                method="post",
+                request={
+                    "kind": "judge",
+                    "scope": {"query": f"id:{self.unit.pk}"},
+                    "estimate_id": estimate["estimate_id"],
+                },
+                format="json",
+                superuser=True,
+                code=201,
+            ).data
         polled = self.do_request(
             "api:producer-run-detail",
             kwargs={"pk": started["id"]},

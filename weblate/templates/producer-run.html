@@ -43,6 +43,48 @@
   {% for warning in run.warnings %}
     <div class="alert alert-warning">{{ warning }}</div>
   {% endfor %}
+  {% with prep=run.summary.mt_preparation %}
+    {% if prep %}
+      <div class="card mb-3" aria-labelledby="judge-preparation-heading">
+        <div class="card-header">
+          <h4 id="judge-preparation-heading" class="card-title">{% translate "Translation preparation" %}</h4>
+        </div>
+        <div class="card-body">
+          <p class="mb-1">
+            {% if run.preparation_phase == "ready" %}
+              {% translate "Every string was translated before the judges started." %}
+            {% elif run.preparation_phase == "blocked" %}
+              <span class="text-warning-emphasis fw-semibold">{% translate "Judges were not started: the machine-translation step could not finish." %}</span>
+            {% else %}
+              {{ run.get_preparation_phase_display|default:run.preparation_phase }}
+            {% endif %}
+          </p>
+          <dl class="row mb-0">
+            <dt class="col-sm-4">{% translate "Strings that were missing" %}</dt>
+            <dd class="col-sm-8">
+              {{ prep.missing_initial|default:"-" }}
+            </dd>
+            <dt class="col-sm-4">{% translate "Written by machine translation" %}</dt>
+            <dd class="col-sm-8">
+              {{ prep.written|default:0 }}
+            </dd>
+            <dt class="col-sm-4">{% translate "Still missing" %}</dt>
+            <dd class="col-sm-8">
+              {{ prep.remaining|default:0 }}
+            </dd>
+          </dl>
+          {% if prep.per_language_remaining %}
+            <p class="mt-2 mb-0">
+              {% translate "Per language:" %}
+              {% for language, count in prep.per_language_remaining.items %}
+                {{ language }}: {{ count }}{% if not forloop.last %};{% endif %}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% endwith %}
   {% if coverage %}
     <div class="card mb-3" aria-labelledby="judge-coverage-heading">
       <div class="card-header">

@@ -91,3 +91,57 @@ class JudgeAutoFormTest(ViewTestCase):
             },
         )
         self.assertTrue(form.is_valid())
+
+    def test_judge_with_mt_and_no_engine_is_accepted(self) -> None:
+        # Task 3: a judge scope that is already complete must not be forced
+        # to select an engine it will never use; the preparation barrier
+        # covers the missing-string case at execution with an explicit
+        # per-language blocker.
+        self.user.is_superuser = True
+        self.user.save()
+        form = AutoForm(
+            obj=self.component,
+            user=self.user,
+            data={
+                "mode": "judge",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+                "q": "state:empty",
+            },
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_judge_accepts_when_a_routed_engine_is_configured(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        form = AutoForm(
+            obj=self.component,
+            user=self.user,
+            data={
+                "mode": "judge",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+                "q": "state:empty",
+            },
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_standalone_mt_without_engine_is_still_rejected(self) -> None:
+        # The silent zero-write launch stays refused outside judge mode.
+        form = AutoForm(
+            obj=self.component,
+            user=self.user,
+            data={
+                "mode": "translate",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+                "q": "state:empty",
+            },
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("engines", form.errors)
