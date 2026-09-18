@@ -507,6 +507,11 @@ remaining strings listed, and the machine translations written so far are
 kept. Fix the cause and start a new run; only the still-missing strings are
 translated again.
 
+While the judges are working, the run keeps re-checking the strings whose
+request it is about to send. If a string loses its text in the meantime, that
+request is not sent, the run is reported as failed, and the verdicts recorded
+before that point are kept.
+
 The component language page also shows delivery readiness separately from AI
 evaluation. Current, stale, and incomplete judge evidence are review signals,
 not release approval. Users need automatic translation and review permissions

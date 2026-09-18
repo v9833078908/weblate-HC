@@ -1897,6 +1897,9 @@ Defaults to 2000. In legacy runs, a filter wider than this is truncated to the c
 the run report records the unselected strings as cap skips and labels coverage incomplete.
 Full-scope judge runs (execution version 1) process their full confirmed scope in small
 durable chunks with automatic Celery continuation and do not truncate at this cap.
+Either way the cap limits the judge phase only: the mandatory machine-translation
+preparation of a judge run covers every empty string of the selected scope, including
+strings past the cap, and the run report prices that volume separately.
 
 .. seealso::
 

@@ -188,6 +188,12 @@ to either judge. The producer report records it as skipped with the reason
 ``This string had no translation to judge.``, and it still consumes its
 preselected per-run cap slot.
 
+The run keeps re-checking the strings it is about to judge. If a string that
+had text loses it while the judges are working - a human edit or a deletion -
+its request is not sent, the run stops as failed with an explicit
+scope-change warning, and the verdicts recorded up to that point stay in the
+report.
+
 Both seats receive the glossary entries matched against each string, including
 their source and target explanations and effective flags. Each entry uses the
 same cleanup, filtering and serialization contract as LLM-based automatic

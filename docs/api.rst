@@ -3726,6 +3726,9 @@ or an undo receipt disappears on its own.
     per-string outcomes, warnings, ``preparation_phase``, and ``coverage``.
     ``preparation_phase`` is ``blocked`` when the mandatory
     machine-translation step could not finish and the judges never started.
+    A run stopped because a string lost its text while the judges were
+    working states that reason in ``failure`` and keeps the results it had
+    already recorded.
     For judge runs, ``coverage`` separates rows with a usable conclusion
     from every other recorded outcome and lists skip reasons;
     ``scope_complete`` is true only
