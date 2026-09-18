@@ -88,6 +88,8 @@ WEBLATE_CELERY_VISIBILITY_TIMEOUT=14400
 # container stop_grace_period (90 s). Lower it only together with the other
 # two, keeping the strict ordering.
 WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT=20
+# Duplicate delivery waits behind the single-instance judge execution lock.
+WEBLATE_JUDGE_GUARD_WAIT_RETRIES=480
 
 # --- Mail ---------------------------------------------------------------
 # Outgoing mail goes through Yandex 360 for herocraft.com: implicit SSL on

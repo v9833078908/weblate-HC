@@ -1,0 +1,61 @@
+{
+  "labels_origin": "agent-seeded-controlled: pass rows carry correct German translations authored for this held-out; defect rows carry seeded mistranslations (dropped URL, invented content) - not human labels",
+  "records": [
+    {
+      "record_id": "h000",
+      "family": "fam-h000",
+      "stratum": "ui",
+      "language": "de",
+      "source_language": "en",
+      "source": "Hello, world!\n",
+      "target": "Hallo, Welt!\n",
+      "label": "pass",
+      "severity": "",
+      "project_slug": "test",
+      "component_slug": "test",
+      "unit_id": 306093
+    },
+    {
+      "record_id": "h001",
+      "family": "fam-h001",
+      "stratum": "ui",
+      "language": "de",
+      "source_language": "en",
+      "source": "Orangutan has %d banana.\n\u001e\u001eOrangutan has %d bananas.\n",
+      "target": "Orang-Utan hat %d Banane.\n\u001e\u001eOrang-Utan hat %d Bananen.\n",
+      "label": "pass",
+      "severity": "",
+      "project_slug": "test",
+      "component_slug": "test",
+      "unit_id": 306094
+    },
+    {
+      "record_id": "h002",
+      "family": "fam-h002",
+      "stratum": "ui",
+      "language": "de",
+      "source_language": "en",
+      "source": "Try Weblate at <https://demo.weblate.org/>!\n",
+      "target": "Probieren Sie Weblate jetzt überall kostenlos aus!\n",
+      "label": "defect",
+      "severity": "major",
+      "project_slug": "test",
+      "component_slug": "test",
+      "unit_id": 306095
+    },
+    {
+      "record_id": "h003",
+      "family": "fam-h003",
+      "stratum": "ui",
+      "language": "de",
+      "source_language": "en",
+      "source": "Thank you for using Weblate.",
+      "target": "Vielen Dank für Ihre 12 Bestellungen bei Weblate.",
+      "label": "defect",
+      "severity": "major",
+      "project_slug": "test",
+      "component_slug": "test",
+      "unit_id": 306096
+    }
+  ]
+}
