@@ -7,12 +7,18 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # Обязательный MT до запуска судей и явный отказ при исчерпании лимита
 
 Дата: 2026-09-17.
-Статус: одобрен к реализации 2026-09-17; **реализован** 2026-09-18 на
-`feat/mt-prerequisite-before-judge` (задачи 1-4, коммиты 1784e815,
-823e561b, fddd639a, 26f9f37a, b3a3b19b, ac19ac3d, поверх
-`299a4011` первого плана); ожидает ревью и мерджа в `main` через PR.
-Проверено: полные suite judge/autotranslate/api/machinery, миграция 0136 в
-disposable test DB, `prek` на изменённых файлах. Применение миграций на
+Статус: одобрен к реализации 2026-09-17; **реализован и слит в `main`**
+2026-09-18. Задачи 1-4 приехали в `main` через PR #2 (полный объём
+durable-чанками, классификация отказов провайдера, preparation pipeline),
+#5, #6 (отказы MT в `ProducerRun` и REST), #7 (workspace batch translation
+и guard отчёта), #9 (возврат legacy-контракта судей, однократный резерв
+объёма) и #10 (барьер реально работает на продюсерском пути, объект без
+движка блокируется, сценарий 7 — guard перед каждым батчем судей).
+PR #8 (`feat/mt-prerequisite-before-judge`) закрыт как superseded: его
+содержимое уже находилось в `main`, а остаток — SPDX-заголовок миграции
+0136 и уточнения документации — вынесен в отдельное изменение.
+Проверено: suite judge/autotranslate/api/machinery; миграция 0136 в
+disposable test DB; `prek` на изменённых файлах. Применение миграций на
 живом экземпляре, деплой, обновление статики, перезапуск worker'ов и
 платные проверки у провайдеров остаются под отдельным разрешением.
 Исполнялся **вторым**, после
@@ -349,13 +355,13 @@ Legacy queued/running bulk judge без нового preparation snapshot нел
 
 **Actions:**
 
-- [ ] Классифицировать HTTP и HTTP-200 upstream refusals до split-rescue.
-- [ ] Передавать failure на caller thread; подключить warnings/failure и
+- [x] Классифицировать HTTP и HTTP-200 upstream refusals до split-rescue.
+- [x] Передавать failure на caller thread; подключить warnings/failure и
       request stopping для mandatory preparation, без потери успешно
       полученных результатов и без DB-write из pool thread.
-- [ ] Проверить LSP references `fetch_machinery_matches`, мигрировать всех
+- [x] Проверить LSP references `fetch_machinery_matches`, мигрировать всех
       затронутых callers и сохранить контракт возвращаемых переводов.
-- [ ] Убрать ложный успешный итог standalone MT при provider refusal;
+- [x] Убрать ложный успешный итог standalone MT при provider refusal;
       не менять `auto_source=others`/component copy/обычный suggest semantics.
 
 **Verification:** HTTP mocks: 402; 403 monthly limit; обычный 403; HTTP 200
@@ -390,24 +396,24 @@ resume не повторяет выполненные записи и не ра�
 
 **Actions:**
 
-- [ ] Реализовать C1/C2 один раз для preview и исполнения; перед HTTP
+- [x] Реализовать C1/C2 один раз для preview и исполнения; перед HTTP
       проверить оба permission-набора: review/auto и direct-edit для MT.
       Если нужный MT запрещён хотя бы в выбранной паре — отказ до расходов,
       не тихое исключение языка из prerequisite.
-- [ ] Разделить `_perform` на проход подготовки всех языков и проход судей;
+- [x] Разделить `_perform` на проход подготовки всех языков и проход судей;
       убрать локальное MT-before-judge из второго прохода, исключить двойной MT.
-- [ ] Добавить C5 snapshot/state, атомарное резервирование и новую причину
+- [x] Добавить C5 snapshot/state, атомарное резервирование и новую причину
       skipped; финализировать без зависших PENDING в `failed` (остановка по
       причине) или `cancelled`/`partial` — последние только как результат
       отмены, действующая семантика статусов не меняется.
-- [ ] Ввести store-time missing/source guard и корректный actual-written
+- [x] Ввести store-time missing/source guard и корректный actual-written
       счётчик; не держать locks на время HTTP.
-- [ ] Устранить обход bulk флагами; preserve single-unit/candidate/drain
+- [x] Устранить обход bulk флагами; preserve single-unit/candidate/drain
       purpose, добавить safety gate перед реальными judge batches.
-- [ ] Сохранить исходные nonempty/approved targets и states на judge-phase
+- [x] Сохранить исходные nonempty/approved targets и states на judge-phase
       этого pipeline; writable membership задаётся missing-at-start, а не
       `not translated`. Не включать старые state projections для approved.
-- [ ] Обновить resume/cancellation контракты вместе с задачей 3 до интеграции.
+- [x] Обновить resume/cancellation контракты вместе с задачей 3 до интеграции.
 
 **Verification:** в `JudgeAutoTranslateTest` и соседних поведенческих тестах:
 
@@ -461,28 +467,28 @@ weblate/trans/tests/test_judge_deferrals.py weblate/trans/tests/test_tasks.py`.
 
 **Actions:**
 
-- [ ] Общий scope validator для estimate/start; одинаково учесть explicit
+- [x] Общий scope validator для estimate/start; одинаково учесть explicit
       unit_ids (включая пустой список), query, права, подготовку и judge cap.
       Нельзя трактовать `[]` как «все» через `or None`.
-- [ ] Включить preparation snapshot/config version в estimate/hash;
+- [x] Включить preparation snapshot/config version в estimate/hash;
       старый estimate без нового контракта отвергать как estimate-drift,
       не считать его разрешением на дополнительные MT-расходы.
-- [ ] Preview API расширить preparation counts/per-language/missing/blockers
+- [x] Preview API расширить preparation counts/per-language/missing/blockers
       и basis; judge counts не выдавать за полный MT+judge cost. Если оценки
       MT нет — «стоимость неизвестна», не ноль. Никаких платных probes.
-- [ ] Producer start/dispatch/resume переносит preparation отдельно от judge
+- [x] Producer start/dispatch/resume переносит preparation отдельно от judge
       snapshot; existing idempotency и on_commit dispatch сохраняются.
-- [ ] AutoForm валидирует движок для обязательного missing MT; полностью
+- [x] AutoForm валидирует движок для обязательного missing MT; полностью
       готовый judge scope не требует неиспользуемого движка. Standalone
       `auto_source=mt` без engines не проходит в тихий нулевой запуск.
-- [ ] Прокинуть warnings через run serializer, task result и durable report;
+- [x] Прокинуть warnings через run serializer, task result и durable report;
       rendering C6, явная phase подготовки, локализация и доступность.
-- [ ] Resume после смены MT-настроек требует нового estimate; увеличение
+- [x] Resume после смены MT-настроек требует нового estimate; увеличение
       лимита у провайдера без изменения конфигурации допускает обычный
       явный resume. Не переиспользовать старый consent для другого движка.
-- [ ] Не показывать пересланные провайдером URL ключей в warning; permission
+- [x] Не показывать пересланные провайдером URL ключей в warning; permission
       на MT configuration management не подменять permission на review.
-- [ ] Обновить endpoint schema существующим способом проекта и проверяемые
+- [x] Обновить endpoint schema существующим способом проекта и проверяемые
       контракты, не менять unrelated producer endpoints.
 
 **Verification:** estimate/start с explicit IDs и с default scope одинаковы;
@@ -529,16 +535,16 @@ collected bundle, а не stale static. Обновление static/worker об�
 
 **Actions:**
 
-- [ ] Описать два объёма, all-language barrier, empty-only запись, warning
+- [x] Описать два объёма, all-language barrier, empty-only запись, warning
       лимита и повтор после его исправления. Не обещать автоматическую
       починку баланса или judge-проверку всего проекта при cap.
-- [ ] Обновить threat model: bulk judge теперь включает явный MT-write
+- [x] Обновить threat model: bulk judge теперь включает явный MT-write
       prerequisite, direct-edit permission и больший, явно подтверждённый
       MT snapshot; per-unit recheck не расширяет outbound scope.
-- [ ] Проверить existing add-on и non-judge tests; не закреплять тестами
+- [x] Проверить existing add-on и non-judge tests; не закреплять тестами
       случайные тексты/проводку. Tests, предполагающие пустой fake judge
       input, заменить настоящим непустым fixture, а не отключать guard.
-- [ ] Удалить одноразовые smoke scripts после доказательства; обновить
+- [x] Удалить одноразовые smoke scripts после доказательства; обновить
       статус этого плана фактическими результатами, не писать «зелено» заранее.
 
 **Verification:** итоговый прогон без реальных провайдеров:
