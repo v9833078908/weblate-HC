@@ -189,9 +189,12 @@ endpoint, что нарушает «без автоматического пер
 Запуск резервирует конечный request cap до каждого HTTP-запроса, включая retry
 и дробление batch. Кэш только при совпадении полного snapshot и профиля.
 Новая операция usage — новый член `LLMUsageLog.Operation` `repeat_recommend`
-(16 симв., влезает в существующий max_length 20; choices — Python-уровень,
-БД-миграция не требуется). Учёт фиксирует реальные запросы, токены, nullable
-cost и связь с run.
+(16 симв., влезает в существующий max_length 20). Choices записаны в состояние
+миграции 0104 (`weblate/trans/migrations/0104_llm_usage_operation.py:19`),
+поэтому новый член требует AlterField-миграцию состояния поля `operation`
+(без изменения схемы БД) — тот же паттерн, что каждая новая запись
+`ActionEvents` порождает `alter_change_action`. Учёт фиксирует реальные
+запросы, токены, nullable cost и связь с run.
 
 Таймаут после отправки означает неопределённый результат платного запроса:
 не обещать exactly-once внешний HTTP без поддержки провайдера. Durable attempts
@@ -276,7 +279,9 @@ MT и отображается отдельным итогом. Без opt-in п
   пишет с `is_batch_update=False`, либо явно зовёт scoped recheck после commit.
 - [ ] Сохранять provenance и событие для пакетного применения/исключений:
   новые члены `ActionEvents` (`weblate/trans/actions.py:21`) с включением в
-  `ACTIONS_LOG`/`ACTIONS_REVERTABLE`/`ACTIONS_SHOW_CONTENT`;
+  `ACTIONS_LOG`/`ACTIONS_REVERTABLE`/`ACTIONS_SHOW_CONTENT`, каждый с
+  AlterField-миграцией состояния `change.action` (репозиторный паттерн
+  `alter_change_action`, например 0027–0031, 0055, 0056, 0105);
   `models/change.py` — только details-рендер, не место перечисления.
 - [ ] Реализовать guarded undo и результаты по группам, включая partial.
 - [ ] Проверить отсутствие обходного native propagation за пределы snapshot.
@@ -286,6 +291,8 @@ approved conflict остаётся, остальные разрешённые п
 lock и потеря прав между GET/POST не пишут; чужой проект не раскрывается;
 повтор POST не дублирует историю; undo не стирает последующую правку.
 Проверить несовместимые placeholders, plurals и ограничения длины.
+`DJANGO_SETTINGS_MODULE=weblate.settings_test uv run ./manage.py
+makemigrations --check --dry-run` не находит несохранённых изменений.
 
 ### Задача 3. Нативная очередь групп и редакторские решения
 
@@ -326,8 +333,10 @@ lock и потеря прав между GET/POST не пишут; чужой п
   без shared-строк не затрагивается; 409 — новый публичный контракт core API.
 - [ ] Bulk suggestion acceptance также использует защиту: без явного решения
   shared-строки пропускаются с причиной, не получают тихий propagation;
-  per-unit причины расширяют результат задачи `bulk_accept_user_suggestions`
-  (`weblate/trans/views/bulk_suggestions.py:44`, сейчас только агрегаты).
+  per-unit причины расширяют result-контракт воркера
+  `bulk_accept_user_suggestions` (`weblate/trans/tasks.py:552`, сейчас только
+  accepted/failed/total/message/completion_message), а показ причин — в
+  `add_bulk_accept_result_message` (`weblate/trans/views/bulk_suggestions.py:44`).
   Импорт не интерактивен: внешний отличающийся target делает связь stale,
   не распространяет его автоматически на группу.
 
@@ -364,7 +373,8 @@ stale во второй вкладке, reload, undo. Проверить labels,
   запускает новый preview применения задачи 2, а не автоaccept.
 - [ ] Расширить usage и историю runs без подмены judge-результатов: новый
   член `LLMUsageLog.Operation` `repeat_recommend`
-  (`weblate/trans/models/llm_usage.py:46-49`; без БД-миграции, см. §3.3).
+  (`weblate/trans/models/llm_usage.py:46-49`) с AlterField-миграцией состояния
+  поля `operation`, см. §3.3.
 
 **Проверка:** HTTP mocks в новых suites через `./rundev.sh test`; чужой ID,
 неполный ответ, prompt injection в source, cap при retry, cancel, redelivery,
@@ -373,6 +383,8 @@ Unit/state/JudgeVerdict. Существующие `test_judge_client.py` и
 `test_llm_usage.py` сохраняют поведение. Browser smoke: запуск с тестовым
 транспортом, прогресс, partial, reload, явное принятие выбранных групп.
 Реальные платные calls не нужны для этой проверки.
+`DJANGO_SETTINGS_MODULE=weblate.settings_test uv run ./manage.py
+makemigrations --check --dry-run` не находит несохранённых изменений.
 
 ### Задача 5. Reuse до MT и один кандидат разрешённой группы
 
