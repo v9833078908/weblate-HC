@@ -30,6 +30,11 @@ Weblate 2026.8.1
   and source explanations directly from a full CSV/TSV/XLSX loc-kit table
   through a previewed, resumable :guilabel:`Update from a loc-kit table` flow;
   existing source strings, translations, flags, and notes remain unchanged.
+* An LLM judge run now machine translates every empty string of its selected
+  scope, in all its languages, before the first judge request; if that
+  preparation cannot complete - no engine, missing permission, or a provider
+  refusal - the judges do not start and the run reports why; see
+  :ref:`llm-judge`.
 
 .. rubric:: Improvements
 

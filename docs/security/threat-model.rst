@@ -319,7 +319,12 @@ repository state, background tasks, outbound requests, and rendered UI.
        provider response is
        untrusted input parsed against a strict schema; a batch that exceeds
        :setting:`JUDGE_REQUEST_DEADLINE`, or is malformed, is recorded as
-       unparsed and never treated as a favorable verdict. *(documented)*
+       unparsed and never treated as a favorable verdict. A judge run also
+       drives that already-modelled project machine-translation data flow
+       itself before any review request: every empty target string in the
+       selected scope, across all its languages, is sent through it, and a
+       language the preparation cannot complete stops the run before the
+       judge batch is ever formed. *(documented)*
        (source: :ref:`llm-judge`, :doc:`/admin/config`)
    * - Project backup archives and Weblate filesystem
      - Uploaded ZIP members and metadata become restored project state;

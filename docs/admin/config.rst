@@ -1894,7 +1894,10 @@ JUDGE_MAX_UNITS_PER_RUN
 
 Maximum number of strings a single judge run may touch. Defaults to 2000. A
 filter wider than this is truncated to the cap; the run report records the
-unselected strings as cap skips and labels its coverage incomplete.
+unselected strings as cap skips and labels its coverage incomplete. The cap
+limits the judge phase only: the mandatory machine-translation preparation
+before it covers every empty string of the selected scope, including strings
+past the cap, and its volume is reported separately.
 
 .. seealso::
 
