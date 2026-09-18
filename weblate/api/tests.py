@@ -11539,6 +11539,43 @@ class TranslationAPITest(APIBaseTest):
     def test_autotranslate_json(self) -> None:
         self.test_autotranslate("json")
 
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_autotranslate_judge_mode_returns_async_202(self) -> None:
+        self.project.translation_review = True
+        self.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.project.save(update_fields=["translation_review", "machinery_settings"])
+        with (
+            patch("weblate.api.views.publish_producer_run_dispatch") as mock_pub,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.do_request(
+                "api:translation-autotranslate",
+                self.translation_kwargs,
+                superuser=True,
+                method="post",
+                request={
+                    "mode": "judge",
+                    "q": "state:empty",
+                    "auto_source": "others",
+                    "engines": [],
+                    "threshold": "80",
+                },
+                format="json",
+                code=202,
+            )
+        self.assertIn("run_id", response.data)
+        self.assertIn("report_url", response.data)
+        run = ProducerRun.objects.get(pk=response.data["run_id"])
+        self.assertEqual(run.execution_version, 1)
+        self.assertEqual(run.scope_type, ProducerRun.ScopeType.TRANSLATION)
+        self.assertEqual(run.requested_mode, "judge")
+        mock_pub.assert_called_once_with(run_id=run.pk)
+
     def test_autotranslate_restrict_direct_editing(self) -> None:
         translation = Translation.objects.get(**self.translation_kwargs)
         WorkflowSetting.objects.create(
@@ -17828,6 +17865,38 @@ class ProducerAPITest(APIBaseTest):
             request={
                 "kind": "judge",
                 "scope": {"query": "state:empty"},
+                "estimate_id": estimate["estimate_id"],
+            },
+            format="json",
+            code=409,
+        )
+        self.assertEqual(response.data["code"], "estimate-drift")
+        self.assertEqual(ProducerRun.objects.filter(requested_mode="judge").count(), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_run_start_refuses_a_legacy_execution_version_estimate(self) -> None:
+        estimate = self.do_request(
+            "api:producer-project-judge-estimate",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={"kind": "judge", "scope": {"query": ""}},
+            format="json",
+        ).data
+        ProducerRun.objects.filter(pk=estimate["estimate_id"]).update(
+            execution_version=0
+        )
+        response = self.do_request(
+            "api:producer-project-run-start",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "kind": "judge",
+                "scope": {"query": ""},
                 "estimate_id": estimate["estimate_id"],
             },
             format="json",

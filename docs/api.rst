@@ -2484,26 +2484,18 @@ Translations
 
        ``mode: judge`` requires the same right as approving translations
        (:guilabel:`Review strings`) and a project with review enabled.
-       Each authorized ``judge`` request now records a producer run
-       (actor, scope, per-string outcome), the same durable history
-       already visible for automatic translation started from the web UI,
-       see :ref:`llm-judge`. The ``weblate auto_translate`` management
-       command does not offer a ``judge`` mode.
-       A ``200`` response only reports how the run ended: the returned
-       details also describe a run that was refused by the machine
-       translation service or that produced no verdict at all. Even a
-       verdict of its own is not a claim that the translation is
-       linguistically correct. An already approved unit can also be
-       lowered to translated by a ``pass`` verdict, unless
-       :setting:`JUDGE_MAY_APPROVE` is enabled and the string carries a
-       complete set of current verdicts.
+       Each authorized ``judge`` request records a durable producer run
+       (actor, scope, per-string outcome), returning an asynchronous ``202 Accepted``
+       response with the ``run_id`` and ``report_url``. Full-scope judge runs
+       execute in small chunks with automatic Celery task continuation across
+       worker deliveries and restarts; non-judge modes retain the synchronous
+       ``200 OK`` response. The ``weblate auto_translate`` management command
+       does not offer a ``judge`` mode.
        A ``judge`` run first machine translates every empty string of the
-       selected scope - in all its languages, including strings past
-       :setting:`JUDGE_MAX_UNITS_PER_RUN` - and the judges only start once
-       nothing is missing. If preparation is blocked (no engine, missing
-       permission, provider refusal), no judge request is made and the
-       details say so; the strings translated in the meantime are kept.
-
+       selected scope - across all languages - and the judges only start once
+       preparation is complete. If preparation is blocked (no engine, missing
+       permission, provider refusal), the judges do not start and the report
+       details state the blocker.
 .. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/file/
 
     Download current translation file as it is stored in the VCS (without the ``format``

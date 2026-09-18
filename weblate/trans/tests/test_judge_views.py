@@ -202,8 +202,13 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
                 "threshold": 80,
             },
         )
-
         self.assertRedirects(response, self.project.get_absolute_url())
+        run = ProducerRun.objects.filter(
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(self.project.pk),
+        ).latest("created")
+        self.assertEqual(run.execution_version, 1)
+        self.assertEqual(run.scope_cursor, 0)
 
     def test_translation_estimate_uses_the_judge_default_query(self) -> None:
         translation = self.get_translation()

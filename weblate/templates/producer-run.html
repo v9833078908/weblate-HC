@@ -108,9 +108,15 @@
           <dd class="col-sm-8">
             {{ coverage.without_result }}
           </dd>
-          <dt class="col-sm-4">{% translate "Recorded strings" %}</dt>
+          {% if coverage.pending %}
+            <dt class="col-sm-4">{% translate "Pending strings" %}</dt>
+            <dd class="col-sm-8">
+              {{ coverage.pending }}
+            </dd>
+          {% endif %}
+          <dt class="col-sm-4">{% translate "Total scope strings" %}</dt>
           <dd class="col-sm-8">
-            {{ coverage.recorded }}
+            {{ coverage.total|default:coverage.recorded }}
           </dd>
         </dl>
         {% if coverage.skip_reasons %}

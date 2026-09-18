@@ -50,10 +50,15 @@ from weblate.api.throttling import (
     ScopedRateThrottle,
     UserRateThrottle,
 )
+from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD
 from weblate.trans.autotranslate import BatchAutoTranslate, PreparationScope
 from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import judge_configuration_ready, judge_configuration_snapshot
-from weblate.trans.judge_loop import accept_judge_candidate, undo_judge_application
+from weblate.trans.judge_loop import (
+    DEFAULT_CANDIDATE_SEVERITIES,
+    accept_judge_candidate,
+    undo_judge_application,
+)
 from weblate.trans.models import Project
 from weblate.trans.models.judge import (
     JudgeApplication,
@@ -186,12 +191,17 @@ def _preparation_estimate_payload(
 
 
 def _scope_hash_for(
-    project: Project, scope: dict, units: list[Unit], preparation: dict
+    project: Project,
+    scope: dict,
+    units: list[Unit],
+    preparation: dict,
+    execution_version: int = 1,
 ) -> str:
-    """Bind the estimate to its exact selection and MT volume."""
+    """Bind the estimate to its exact selection, MT volume and execution version."""
     return hashlib.sha256(
         json.dumps(
             {
+                "execution_version": execution_version,
                 "project": project.pk,
                 "scope": scope,
                 "unit_ids": [unit.pk for unit in units],
@@ -231,7 +241,9 @@ class ProducerProjectJudgeEstimate(APIView):
         _batch, preview, units, preparation, _blockers, _scope = (
             _preparation_estimate_payload(project, self.request.user, scope)
         )
-        scope_hash = _scope_hash_for(project, scope, units, preparation)
+        scope_hash = _scope_hash_for(
+            project, scope, units, preparation, execution_version=1
+        )
         estimate = ProducerRun.objects.create(
             actor=self.request.user,
             scope_type=ProducerRun.ScopeType.PROJECT,
@@ -240,7 +252,9 @@ class ProducerProjectJudgeEstimate(APIView):
             scope_path=project.get_absolute_url(),
             requested_query=scope.get("query", ""),
             requested_mode="judge-estimate",
-            cap=settings.JUDGE_MAX_UNITS_PER_RUN,
+            cap=len(units),
+            execution_version=1,
+            scope_cursor=0,
             scope_hash=scope_hash,
             scope_snapshot=[unit.pk for unit in units],
             configuration_snapshot=judge_configuration_snapshot(),
@@ -289,6 +303,14 @@ class ProducerProjectRunStart(APIView):
             scope_id=str(project.pk),
             requested_mode="judge-estimate",
         )
+        if estimate.execution_version != 1:
+            return Response(
+                {
+                    "detail": "The estimate uses a legacy execution contract.",
+                    "code": "estimate-drift",
+                },
+                status=409,
+            )
         scope = serializer.validated_data.get("scope", {})
         if scope.get("query", "") != estimate.requested_query:
             return Response(
@@ -314,7 +336,9 @@ class ProducerProjectRunStart(APIView):
         _batch, _preview, units, preparation, blockers, preparation_scope = (
             _preparation_estimate_payload(project, self.request.user, scope)
         )
-        scope_hash = _scope_hash_for(project, scope, units, preparation)
+        scope_hash = _scope_hash_for(
+            project, scope, units, preparation, execution_version=1
+        )
         if scope_hash != estimate.scope_hash:
             return Response(
                 {
@@ -334,6 +358,18 @@ class ProducerProjectRunStart(APIView):
                 status=409,
             )
 
+        execution_options = {
+            "mode": "judge",
+            "q": estimate.requested_query,
+            "auto_source": "mt",
+            "engines": [],
+            "threshold": MACHINERY_DEFAULT_THRESHOLD,
+            "judge_proposal_only": True,
+            "judge_pretranslate": False,
+            "judge_mutating_repairs": False,
+            "judge_candidate_severities": list(DEFAULT_CANDIDATE_SEVERITIES),
+            "overwrite_existing": False,
+        }
         idempotency_key = str(estimate.pk)
         try:
             with transaction.atomic():
@@ -348,7 +384,10 @@ class ProducerProjectRunStart(APIView):
                     scope_path=project.get_absolute_url(),
                     requested_query=estimate.requested_query,
                     requested_mode="judge",
-                    cap=settings.JUDGE_MAX_UNITS_PER_RUN,
+                    cap=len(units),
+                    execution_version=1,
+                    scope_cursor=0,
+                    execution_options=execution_options,
                     scope_hash=scope_hash,
                     scope_snapshot=[unit.pk for unit in units],
                     configuration_snapshot=judge_configuration_snapshot(),

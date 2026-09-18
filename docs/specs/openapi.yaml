@@ -28092,6 +28092,27 @@ paths:
               $ref: '#/components/headers/X-RateLimit-Remaining'
             X-RateLimit-Reset:
               $ref: '#/components/headers/X-RateLimit-Reset'
+        '202':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  details:
+                    type: string
+                  run_id:
+                    type: string
+                    format: uuid
+                  report_url:
+                    type: string
+                  status:
+                    type: string
+                required:
+                - details
+                - run_id
+                - report_url
+                - status
+          description: Automatic translation run queued asynchronously (judge mode).
   /api/translations/{component__project__slug}/{component__slug}/{language__code}/changes/:
     get:
       operationId: api_translations_changes_list

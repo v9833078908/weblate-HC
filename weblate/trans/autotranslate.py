@@ -6,11 +6,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any, Literal
+from uuid import uuid4
 
 from celery import current_task
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Case, Count, IntegerField, QuerySet, Value, When
 from django.db.models.functions import MD5, Lower
 from django.utils import timezone
@@ -131,6 +132,9 @@ class JudgeSummary:
             untranslated=self.untranslated + other.untranslated,
             cap_remainder=self.cap_remainder + other.cap_remainder,
         )
+
+
+JUDGE_CHUNK_SIZE: int = 100
 
 
 def format_judge_summary(summary: JudgeSummary) -> str:
@@ -463,6 +467,7 @@ class AutoTranslate(BaseAutoTranslate):
         allow_non_shared_tm_source_components: bool = False,
         overwrite_existing: bool = False,
         judge_limit: int | None = None,
+        judge_uncapped: bool = False,
         producer_run: ProducerRun | None = None,
         judge_pretranslate: bool = True,
         judge_mutating_repairs: bool = True,
@@ -486,6 +491,7 @@ class AutoTranslate(BaseAutoTranslate):
         self.target_state = STATE_TRANSLATED
         self.overwrite_existing = overwrite_existing
         self.judge_limit = judge_limit
+        self.judge_uncapped = judge_uncapped
         self.producer_run = producer_run
         self.judge_pretranslate = judge_pretranslate
         self.judge_mutating_repairs = judge_mutating_repairs
@@ -1060,16 +1066,21 @@ class AutoTranslate(BaseAutoTranslate):
     def preview_judge_scope(self) -> tuple[JudgeScopePreview, list[Unit]]:
         """Return the ordered, capped judge scope used by execution."""
         validate_judge_configuration()
-        limit = (
-            settings.JUDGE_MAX_UNITS_PER_RUN
-            if self.judge_limit is None
-            else self.judge_limit
-        )
+        if self.judge_uncapped or (
+            self.producer_run is not None and self.producer_run.execution_version >= 1
+        ):
+            limit = self.judge_limit
+        else:
+            limit = (
+                settings.JUDGE_MAX_UNITS_PER_RUN
+                if self.judge_limit is None
+                else self.judge_limit
+            )
         units = (
             self.get_units().select_related("source_unit").order_by("position", "pk")
         )
         matched = units.count()
-        selected = list(units[:limit])
+        selected = list(units[:limit]) if limit is not None else list(units)
         processed = len(selected)
         writable = sum(
             not unit.translated or self.overwrite_existing for unit in selected
@@ -1625,10 +1636,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
     def get_task_meta(self) -> dict[str, Any]:
         return self._task_meta
 
-    def preview_judge_scope(self) -> JudgeScopePreview:
-        """Aggregate the same permission-filtered, globally capped judge scope."""
+    def preview_judge_scope(self, *, execution_version: int = 1) -> JudgeScopePreview:
+        """Aggregate the permission-filtered judge scope."""
         validate_judge_configuration()
-        remaining = settings.JUDGE_MAX_UNITS_PER_RUN
+        judge_uncapped = execution_version >= 1
+        remaining = None if judge_uncapped else settings.JUDGE_MAX_UNITS_PER_RUN
         matched = processed = writable = initial_calls = worst_case_calls = 0
         for translation in self.translations:
             if not self._can_process_translation(translation):
@@ -1645,6 +1657,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ),
                 overwrite_existing=self.overwrite_existing,
                 judge_limit=remaining,
+                judge_uncapped=judge_uncapped,
             )
             preview, _units = auto_translate.preview_judge_scope()
             matched += preview.matched
@@ -1652,7 +1665,10 @@ class BatchAutoTranslate(BaseAutoTranslate):
             writable += preview.writable
             initial_calls += preview.initial_calls
             worst_case_calls += preview.worst_case_calls
-            remaining -= preview.processed
+            if remaining is not None:
+                remaining -= preview.processed
+                if remaining <= 0:
+                    break
         return JudgeScopePreview(
             matched=matched,
             processed=processed,
@@ -1662,10 +1678,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
             worst_case_calls=worst_case_calls,
         )
 
-    def preview_judge_scope_snapshot(self) -> tuple[JudgeScopePreview, list[Unit]]:
-        """Return the globally capped, ordered units behind a judge estimate."""
+    def preview_judge_scope_snapshot(
+        self, *, execution_version: int = 1
+    ) -> tuple[JudgeScopePreview, list[Unit]]:
+        """Return the ordered units behind a judge estimate."""
         validate_judge_configuration()
-        remaining = settings.JUDGE_MAX_UNITS_PER_RUN
+        judge_uncapped = execution_version >= 1
+        remaining = None if judge_uncapped else settings.JUDGE_MAX_UNITS_PER_RUN
         selected: list[Unit] = []
         matched = writable = initial_calls = worst_case_calls = 0
         for translation in self.translations:
@@ -1683,13 +1702,17 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ),
                 overwrite_existing=self.overwrite_existing,
                 judge_limit=remaining,
+                judge_uncapped=judge_uncapped,
             ).preview_judge_scope()
             matched += preview.matched
             writable += preview.writable
             initial_calls += preview.initial_calls
             worst_case_calls += preview.worst_case_calls
             selected.extend(units)
-            remaining -= preview.processed
+            if remaining is not None:
+                remaining -= preview.processed
+                if remaining <= 0:
+                    break
         return (
             JudgeScopePreview(
                 matched=matched,
@@ -2062,9 +2085,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         task_id = (
             current_task.request.id if current_task and current_task.request.id else ""
         )
-        # Claim the queued run under a row lock: `auto_translate` uses late
-        # acknowledgement, so the broker can redeliver the same task, and two
-        # workers must never both observe QUEUED and both pay for the seats.
+        superseded = False
         with transaction.atomic():
             claimed = (
                 ProducerRun.objects.select_for_update()
@@ -2081,6 +2102,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ProducerRun.Status.PARTIAL,
             }:
                 return claimed
+            if matches and claimed.status == ProducerRun.Status.CANCEL_REQUESTED:
+                claimed.status = ProducerRun.Status.CANCELLED
+                claimed.finished = timezone.now()
+                claimed.save(update_fields=["status", "finished"])
+                return claimed
             if claimed is not None and claimed.status not in {
                 ProducerRun.Status.QUEUED,
                 ProducerRun.Status.RUNNING,
@@ -2091,12 +2117,15 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 and claimed is not None
                 and claimed.status == ProducerRun.Status.RUNNING
             ):
-                if task_id and claimed.task_id == task_id:
+                if task_id and (
+                    claimed.task_id == task_id
+                    or str(claimed.dispatch_task_id or "") == task_id
+                ):
+                    if claimed.task_id != task_id:
+                        claimed.task_id = task_id
+                        claimed.save(update_fields=["task_id"])
                     return claimed
-                # Someone else's in-flight attempt (or a call outside any
-                # task context): never adopt or fail a RUNNING run this
-                # worker does not own.
-                matches = False
+                superseded = True
                 claimed = None
             if (
                 matches
@@ -2109,6 +2138,17 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     claimed.task_id = task_id
                 claimed.save(update_fields=["status", "started", "task_id"])
                 return claimed
+        if superseded:
+            failed_run = ProducerRun.objects.filter(pk=self.producer_run_id).first()
+            if failed_run is not None:
+                failed_run.status = ProducerRun.Status.FAILED
+                failed_run.finished = timezone.now()
+                failed_run.failure = gettext(
+                    "This delivery was superseded by another task generation."
+                )
+                failed_run.save(update_fields=["status", "finished", "failure"])
+            msg = gettext("This delivery was superseded by another task generation.")
+            raise ValueError(msg)
         # Both failure paths run outside the claim transaction so the FAILED
         # transition below is not rolled back by the exception that follows.
         if claimed is None:
@@ -2454,13 +2494,26 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 source_component_ids=source_component_ids,
             )
         except Exception as error:
-            if self.active_producer_run is not None:
+            if (
+                self.active_producer_run is not None
+                and self.active_producer_run.execution_version == 0
+            ) or (
+                (
+                    self.active_producer_run is not None
+                    and self.active_producer_run.execution_version >= 1
+                )
+                and isinstance(
+                    error,
+                    (DatabaseError, MemoryError, SystemExit, KeyboardInterrupt),
+                )
+            ):
                 self._finish_producer_run(
                     self.active_producer_run, ProducerRun.Status.FAILED, str(error)
                 )
             raise
-        if self.active_producer_run is not None and (
-            self.active_producer_run.status
+        if (
+            self.active_producer_run is not None
+            and self.active_producer_run.status
             not in {
                 ProducerRun.Status.COMPLETED,
                 ProducerRun.Status.FAILED,
@@ -2468,14 +2521,20 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ProducerRun.Status.PARTIAL,
             }
         ):
-            status = (
-                ProducerRun.Status.FAILED
-                if self.failure_message
-                else ProducerRun.Status.COMPLETED
-            )
-            self._finish_producer_run(
-                self.active_producer_run, status, self.failure_message or ""
-            )
+            if (
+                self.active_producer_run.execution_version >= 1
+                and not self.failure_message
+            ):
+                pass
+            else:
+                status = (
+                    ProducerRun.Status.FAILED
+                    if self.failure_message
+                    else ProducerRun.Status.COMPLETED
+                )
+                self._finish_producer_run(
+                    self.active_producer_run, status, self.failure_message or ""
+                )
         return message
 
     def _perform(  # ruff: ignore[complex-structure]
@@ -2651,6 +2710,14 @@ class BatchAutoTranslate(BaseAutoTranslate):
             and preparation_requested
             and producer_run.preparation_phase == "ready"
         )
+        if producer_run is not None and producer_run.execution_version >= 1:
+            return self._perform_chunk_loop(
+                producer_run=producer_run,
+                auto_source=auto_source,
+                engines=engines,
+                threshold=threshold,
+                globally_prepared=globally_prepared,
+            )
         for pos, translation in enumerate(self.translations, start=1):
             auto_translate = AutoTranslate(
                 user=self.user,
@@ -2787,3 +2854,111 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 self.failure_message or "",
             )
         return self.failure_message or self.get_message()
+
+    def _perform_chunk_loop(
+        self,
+        *,
+        producer_run: ProducerRun,
+        auto_source: Literal["mt", "others"],
+        engines: list[str],
+        threshold: int,
+        globally_prepared: bool,
+    ) -> str:
+        from weblate.trans.tasks import (  # ruff: ignore[import-outside-top-level]
+            publish_producer_run_dispatch,
+        )
+
+        cursor = producer_run.scope_cursor
+        snapshot = producer_run.scope_snapshot or []
+        chunk_ids = snapshot[cursor : cursor + JUDGE_CHUNK_SIZE]
+        if not chunk_ids:
+            self._finish_producer_run(producer_run, ProducerRun.Status.COMPLETED, "")
+            return gettext("Automatic translation completed.")
+
+        unit_translation_map = dict(
+            Unit.objects.filter(pk__in=chunk_ids).values_list("pk", "translation_id")
+        )
+        chunk_by_translation: dict[int, list[int]] = {}
+        for unit_id in chunk_ids:
+            trans_id = unit_translation_map.get(unit_id)
+            if trans_id is not None:
+                chunk_by_translation.setdefault(trans_id, []).append(unit_id)
+
+        for pos, translation in enumerate(self.translations, start=1):
+            trans_chunk_ids = chunk_by_translation.get(translation.pk)
+            if not trans_chunk_ids:
+                continue
+            auto_translate = AutoTranslate(
+                user=self.user,
+                translation=translation,
+                q=self.q,
+                mode=self.mode,
+                component_wide=self.component_wide,
+                unit_ids=trans_chunk_ids,
+                allow_non_shared_tm_source_components=(
+                    self.allow_non_shared_tm_source_components
+                ),
+                overwrite_existing=self.overwrite_existing,
+                judge_uncapped=True,
+                producer_run=producer_run,
+                judge_pretranslate=False,
+                judge_mutating_repairs=self.judge_mutating_repairs,
+                judge_candidate_severities=self.judge_candidate_severities,
+                judge_proposal_only=self.judge_proposal_only,
+            )
+            auto_translate.batch_counter = self._attempt_counter
+            if not self._can_process_translation(translation):
+                self._record_skipped_judge_units(
+                    producer_run,
+                    list(auto_translate.get_units().order_by("position", "pk")),
+                    JudgeRunUnit.SkipReason.PERMISSION,
+                )
+                self.set_progress(pos)
+                continue
+
+            auto_translate.perform(
+                auto_source=auto_source,
+                engines=engines,
+                threshold=threshold,
+                source_component_ids=None,
+                prepare=not globally_prepared,
+            )
+            self._finish_translation(auto_translate, None)
+            self.set_progress(pos)
+
+        new_cursor = cursor + len(chunk_ids)
+        has_more = new_cursor < len(snapshot)
+        if has_more:
+            with transaction.atomic():
+                locked = ProducerRun.objects.select_for_update().get(pk=producer_run.pk)
+                if locked.status == ProducerRun.Status.CANCEL_REQUESTED:
+                    locked.status = ProducerRun.Status.CANCELLED
+                    locked.finished = timezone.now()
+                    locked.save(update_fields=["status", "finished"])
+                    return gettext("Automatic translation cancelled.")
+                if locked.status != ProducerRun.Status.RUNNING:
+                    return gettext("Automatic translation stopped.")
+                locked.scope_cursor = new_cursor
+                next_task_id = uuid4()
+                locked.dispatch_task_id = next_task_id
+                locked.dispatch_requested_at = timezone.now()
+                locked.dispatch_published_at = None
+                locked.dispatch_attempts = 0
+                locked.dispatch_error = ""
+                locked.save(
+                    update_fields=[
+                        "scope_cursor",
+                        "dispatch_task_id",
+                        "dispatch_requested_at",
+                        "dispatch_published_at",
+                        "dispatch_attempts",
+                        "dispatch_error",
+                    ]
+                )
+            publish_producer_run_dispatch(run_id=producer_run.pk)
+            return gettext("Automatic translation chunk completed.")
+
+        producer_run.scope_cursor = new_cursor
+        ProducerRun.objects.filter(pk=producer_run.pk).update(scope_cursor=new_cursor)
+        self._finish_producer_run(producer_run, ProducerRun.Status.COMPLETED, "")
+        return gettext("Automatic translation completed.")

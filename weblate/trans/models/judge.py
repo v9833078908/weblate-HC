@@ -402,6 +402,12 @@ class ProducerRun(models.Model):
         ],
         blank=True,
     )
+    # Full-scope bulk execution (execution_version 1): the run processes
+    # its entire confirmed scope_snapshot in small durable chunks without
+    # an artificial 2000-unit cap.
+    execution_version = models.PositiveSmallIntegerField(default=0)
+    scope_cursor = models.PositiveIntegerField(default=0)
+    execution_options = models.JSONField(default=dict, blank=True)
 
     class Meta:
         # State-only rename: the table still holds every judge run written
@@ -442,6 +448,11 @@ class ProducerRun(models.Model):
         )
         super().save(*args, **kwargs)
 
+    def get_absolute_url(self) -> str:
+        from django.urls import reverse  # ruff: ignore[import-outside-top-level]
+
+        return reverse("judge-run", kwargs={"pk": self.id})
+
     def get_requested_mode_label(self) -> str:
         """Return a short human label for the launch mode, for history rows."""
         return str(RUN_KIND_LABELS.get(self.requested_mode, self.requested_mode))
@@ -473,9 +484,6 @@ class ProducerRun(models.Model):
             for outcome, count in outcome_counts.items()
             if outcome not in result_outcomes
         }
-        cap_remainder = self.summary.get("cap_remainder")
-        if not isinstance(cap_remainder, int) or isinstance(cap_remainder, bool):
-            cap_remainder = None
         snapshot = {
             unit_id
             for unit_id in self.scope_snapshot
@@ -486,23 +494,52 @@ class ProducerRun(models.Model):
             self.Status.CANCELLED,
             self.Status.PARTIAL,
         }
-        if not terminal or not snapshot:
-            scope_complete: bool | None = None
-        elif recorded - with_result or (
-            set(
-                rows.filter(outcome__in=result_outcomes).values_list(
-                    "unit_id_snapshot", flat=True
-                )
+        cap_remainder = self.summary.get("cap_remainder")
+        if not isinstance(cap_remainder, int) or isinstance(cap_remainder, bool):
+            cap_remainder = None
+        if self.execution_version >= 1:
+            total_scope: int | None = len(snapshot)
+            pending_count = max(0, total_scope - recorded) + outcome_counts.get(
+                JudgeRunUnit.Outcome.PENDING, 0
             )
-            < snapshot
-        ):
-            scope_complete = False
-        elif cap_remainder is None:
-            scope_complete = None
+            if self.status == self.Status.COMPLETED:
+                covered_ids = set(
+                    rows.exclude(outcome=JudgeRunUnit.Outcome.PENDING).values_list(
+                        "unit_id_snapshot", flat=True
+                    )
+                )
+                scope_complete = bool(snapshot and snapshot.issubset(covered_ids))
+            elif self.status in {
+                self.Status.FAILED,
+                self.Status.CANCELLED,
+                self.Status.PARTIAL,
+            }:
+                scope_complete = False
+            else:
+                scope_complete = None
+            cap_remainder = None
         else:
-            scope_complete = cap_remainder == 0
+            total_scope = len(snapshot) if terminal else None
+            pending_count = outcome_counts.get(JudgeRunUnit.Outcome.PENDING, 0)
+            if not terminal or not snapshot:
+                scope_complete = None
+            elif recorded - with_result or (
+                set(
+                    rows.filter(outcome__in=result_outcomes).values_list(
+                        "unit_id_snapshot", flat=True
+                    )
+                )
+                < snapshot
+            ):
+                scope_complete = False
+            elif cap_remainder is None:
+                scope_complete = None
+            else:
+                scope_complete = cap_remainder == 0
         return {
+            "total": total_scope,
             "recorded": recorded,
+            "pending": pending_count,
             "with_result": with_result,
             "without_result": recorded - with_result,
             "without_result_by_outcome": without_result_by_outcome,
@@ -510,6 +547,7 @@ class ProducerRun(models.Model):
             "cached": rows.filter(outcome__in=result_outcomes, cached=True).count(),
             "cap_remainder": cap_remainder,
             "scope_complete": scope_complete,
+            "execution_version": self.execution_version,
         }
 
 

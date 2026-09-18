@@ -1892,12 +1892,11 @@ JUDGE_MAX_UNITS_PER_RUN
 
 .. versionadded:: 2026.8.1
 
-Maximum number of strings a single judge run may touch. Defaults to 2000. A
-filter wider than this is truncated to the cap; the run report records the
-unselected strings as cap skips and labels its coverage incomplete. The cap
-limits the judge phase only: the mandatory machine-translation preparation
-before it covers every empty string of the selected scope, including strings
-past the cap, and its volume is reported separately.
+Maximum number of strings a legacy judge run (execution version 0) may touch.
+Defaults to 2000. In legacy runs, a filter wider than this is truncated to the cap;
+the run report records the unselected strings as cap skips and labels coverage incomplete.
+Full-scope judge runs (execution version 1) process their full confirmed scope in small
+durable chunks with automatic Celery continuation and do not truncate at this cap.
 
 .. seealso::
 

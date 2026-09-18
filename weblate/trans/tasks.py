@@ -94,9 +94,22 @@ def _requires_producer_execution_guard(
     return bool(task_id) and (mode == "judge" or auto_source == "mt")
 
 
+class StaleProducerTaskError(JudgeExecutionGuardError):
+    """Raised when a task delivery has already been superseded by a newer UUID."""
+
+
 @contextmanager
 def producer_execution_guard(*, producer_run_id: str | None, task_id: str):
     """Acquire a file-only guard for one Celery delivery's producer run."""
+    if producer_run_id and task_id:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.judge import ProducerRun
+
+        run = ProducerRun.objects.filter(pk=producer_run_id).first()
+        if run is not None:
+            current_uuid = str(run.dispatch_task_id or "")
+            if current_uuid and task_id not in {current_uuid, run.task_id}:
+                raise StaleProducerTaskError
     lock = WeblateLock(
         scope="producer-execution",
         key=producer_run_id or task_id,
@@ -153,6 +166,13 @@ def guard_producer_execution(function):
                 producer_run_id=producer_run_id, task_id=task_id
             ):
                 return function(self, *args, **kwargs)
+        except StaleProducerTaskError:
+            return {
+                "message": gettext(
+                    "This delivery generation was superseded by a newer task."
+                ),
+                "warnings": [],
+            }
         except JudgeExecutionGuardError as error:
             try:
                 return self.retry(
@@ -1812,6 +1832,37 @@ def _producer_run_dispatch_kwargs(run) -> dict[str, Any] | None:
         "judge_mutating_repairs": False,
     }
     scope_type = type(run).ScopeType
+    if run.execution_version >= 1:
+        options = run.execution_options or {}
+        kwargs = {
+            "user_id": run.actor_id,
+            "mode": options.get("mode", run.requested_mode or "judge"),
+            "auto_source": options.get("auto_source", "mt"),
+            "source_component_id": options.get("source_component_id"),
+            "engines": options.get("engines", []),
+            "threshold": options.get("threshold", MACHINERY_DEFAULT_THRESHOLD),
+            "producer_run_id": str(run.pk),
+            "judge_pretranslate": options.get("judge_pretranslate", False),
+            "judge_mutating_repairs": options.get("judge_mutating_repairs", False),
+            "judge_proposal_only": options.get("judge_proposal_only", True),
+            "judge_candidate_severities": tuple(
+                options.get("judge_candidate_severities", DEFAULT_CANDIDATE_SEVERITIES)
+            ),
+            "overwrite_existing": options.get("overwrite_existing", False),
+            "q": run.requested_query,
+            "unit_ids": run.scope_snapshot or None,
+        }
+        if run.scope_type == scope_type.PROJECT:
+            kwargs["project_id"] = int(run.scope_id)
+        elif run.scope_type == scope_type.COMPONENT:
+            kwargs["component_id"] = int(run.scope_id)
+        elif run.scope_type == scope_type.TRANSLATION:
+            kwargs["translation_id"] = int(run.scope_id)
+        elif run.scope_type == scope_type.WORKSPACE:
+            kwargs["workspace_id"] = run.scope_id
+        else:
+            return None
+        return kwargs
     if run.dispatch_phase == "judge-recheck":
         if (
             run.scope_type != scope_type.TRANSLATION
@@ -1859,7 +1910,13 @@ def publish_producer_run_dispatch(*, run_id, skip_locked: bool = False) -> bool:
             return False
         if run.dispatch_published_at is not None:
             return True
-        if run.status != ProducerRun.Status.QUEUED or run.actor_id is None:
+        is_valid_queued = run.status == ProducerRun.Status.QUEUED
+        is_valid_running = (
+            run.status == ProducerRun.Status.RUNNING
+            and run.execution_version >= 1
+            and run.scope_cursor < len(run.scope_snapshot or [])
+        )
+        if not (is_valid_queued or is_valid_running) or run.actor_id is None:
             return False
         task_id = run.dispatch_task_id
         kwargs = _producer_run_dispatch_kwargs(run)
@@ -2835,12 +2892,32 @@ def drain_producer_run_dispatches() -> None:
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models.judge import ProducerRun
 
-    run_ids = ProducerRun.objects.filter(
+    cancelling_runs = ProducerRun.objects.filter(
+        status=ProducerRun.Status.CANCEL_REQUESTED
+    )
+    for run in cancelling_runs.iterator():
+        with transaction.atomic():
+            locked = ProducerRun.objects.select_for_update().filter(pk=run.pk).first()
+            if locked and locked.status == ProducerRun.Status.CANCEL_REQUESTED:
+                locked.status = ProducerRun.Status.CANCELLED
+                locked.finished = timezone.now()
+                locked.save(update_fields=["status", "finished"])
+
+    queued_ids = ProducerRun.objects.filter(
         status=ProducerRun.Status.QUEUED,
         dispatch_task_id__isnull=False,
         dispatch_published_at__isnull=True,
     ).values_list("pk", flat=True)
-    for run_id in run_ids.iterator():
+    for run_id in queued_ids.iterator():
+        publish_producer_run_dispatch(run_id=run_id, skip_locked=True)
+
+    running_ids = ProducerRun.objects.filter(
+        status=ProducerRun.Status.RUNNING,
+        execution_version__gte=1,
+        dispatch_task_id__isnull=False,
+        dispatch_published_at__isnull=True,
+    ).values_list("pk", flat=True)
+    for run_id in running_ids.iterator():
         publish_producer_run_dispatch(run_id=run_id, skip_locked=True)
 
 

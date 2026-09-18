@@ -2433,3 +2433,53 @@ class JudgeAutoTranslateTest(ViewTestCase):
         run.refresh_from_db()
         self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertTrue(run.failure)
+
+    def test_preview_judge_scope_uncapped_for_execution_version_1(self) -> None:
+        translation = self.get_translation()
+        Unit.objects.filter(translation__component=self.component).delete()
+        for i in range(5):
+            Unit.objects.create(
+                translation=translation,
+                id_hash=i + 1000,
+                source=f"source string {i}",
+                target=f"target string {i}",
+                state=STATE_TRANSLATED,
+                position=i,
+            )
+        with override_settings(JUDGE_MAX_UNITS_PER_RUN=2):
+            batch = BatchAutoTranslate(
+                self.component,
+                user=self.user,
+                q="",
+                mode="judge",
+                enforce_permissions=False,
+            )
+            preview_v1 = batch.preview_judge_scope(execution_version=1)
+            self.assertEqual(preview_v1.matched, 5)
+            self.assertEqual(preview_v1.processed, 5)
+            self.assertEqual(preview_v1.remaining, 0)
+
+            preview_v0 = batch.preview_judge_scope(execution_version=0)
+            self.assertEqual(preview_v0.matched, 5)
+            self.assertEqual(preview_v0.processed, 2)
+            self.assertEqual(preview_v0.remaining, 3)
+
+            _preview, units_v1 = batch.preview_judge_scope_snapshot(execution_version=1)
+            self.assertEqual(len(units_v1), 5)
+
+            _preview, units_v0 = batch.preview_judge_scope_snapshot(execution_version=0)
+            self.assertEqual(len(units_v0), 2)
+
+    def test_scope_hash_includes_execution_version(self) -> None:
+        from weblate.api.producer.views import (  # ruff: ignore[import-outside-top-level]
+            _scope_hash_for,
+        )
+
+        unit = self.get_unit()
+        hash_v1 = _scope_hash_for(
+            self.project, {"query": ""}, [unit], {}, execution_version=1
+        )
+        hash_v0 = _scope_hash_for(
+            self.project, {"query": ""}, [unit], {}, execution_version=0
+        )
+        self.assertNotEqual(hash_v1, hash_v0)
