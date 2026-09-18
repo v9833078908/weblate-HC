@@ -144,7 +144,15 @@ def _run_guarded_auto_translate_process(
                 outcome=JudgeRunUnit.Outcome.PENDING,
             ).values_list("unit_id_snapshot", flat=True)
         )
-        assert pending == {unit.id for unit in units}
+        all_rows = sorted(
+            JudgeRunUnit.objects.filter(run_id=run.pk if run else None).values_list(
+                "unit_id_snapshot", "outcome", "skip_reason"
+            )
+        )
+        assert {unit.id for unit in units} <= pending, (
+            f"pending={sorted(pending)} units={sorted(unit.id for unit in units)} "
+            f"run={run.pk if run else None} all={all_rows}"
+        )
         out = {}
         for unit in units:
             request = build_request(unit)
@@ -316,7 +324,12 @@ class PersistedProducerRunRecoveryTest(RepoTestMixin, TransactionTestCase):
     def _judged_rows(self, run):
         return list(
             JudgeRunUnit.objects.filter(run=run)
-            .exclude(outcome=JudgeRunUnit.Outcome.SKIPPED)
+            .exclude(
+                outcome__in=(
+                    JudgeRunUnit.Outcome.SKIPPED,
+                    JudgeRunUnit.Outcome.PENDING,
+                )
+            )
             .order_by("unit_id_snapshot")
         )
 
@@ -340,6 +353,14 @@ class PersistedProducerRunRecoveryTest(RepoTestMixin, TransactionTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].outcome, JudgeRunUnit.Outcome.PASSED)
         self.assertEqual(rows[0].verdict.max_severity, "none")
+        # The unjudged scope unit keeps its durable PENDING reservation
+        # across the crash: honest coverage instead of empty evidence.
+        self.assertCountEqual(
+            JudgeRunUnit.objects.filter(
+                run=first_run, outcome=JudgeRunUnit.Outcome.PENDING
+            ).values_list("unit_id_snapshot", flat=True),
+            [pk for pk in scope if pk != rows[0].unit_id_snapshot],
+        )
         persisted_verdict_id = rows[0].verdict_id
         persisted_unit_id = rows[0].unit_id_snapshot
 

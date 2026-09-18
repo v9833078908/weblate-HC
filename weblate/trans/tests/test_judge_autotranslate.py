@@ -43,6 +43,10 @@ from weblate.utils.state import (
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_UNITS_PER_RUN=2000,
     JUDGE_MAY_APPROVE=False,
+    WEBLATE_MACHINERY=(
+        *settings.WEBLATE_MACHINERY,
+        "weblate_customization.machinery.RoutedLLMTranslation",
+    ),
 )
 class JudgeAutoTranslateTest(ViewTestCase):
     def test_batch_scope_accepts_a_project(self) -> None:
@@ -408,10 +412,12 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
     def test_standalone_mt_reports_failure_on_quota_refusal(self) -> None:
         """A confirmed provider refusal fails the run, with a durable warning."""
-        from weblate.machinery.base import (  # noqa: PLC0415
+        from weblate.machinery.base import (  # ruff: ignore[import-outside-top-level]
             MachineTranslationServiceError,
         )
-        from weblate.trans.machinery import MachineryBatchOutcome  # noqa: PLC0415
+        from weblate.trans.machinery import (  # ruff: ignore[import-outside-top-level]
+            MachineryBatchOutcome,
+        )
 
         refusal = MachineTranslationServiceError(
             "quota exhausted",
@@ -2014,6 +2020,395 @@ class JudgeAutoTranslateTest(ViewTestCase):
         run.refresh_from_db()
         # Someone else's RUNNING run must not be failed by this worker.
         self.assertEqual(run.status, ProducerRun.Status.RUNNING)
+
+    def _enable_openrouter(self) -> None:
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+
+    def test_preparation_fills_missing_then_judges(self) -> None:
+        """Missing strings are machine-filled before the first judge call."""
+        from weblate.machinery.models import (  # ruff: ignore[import-outside-top-level]
+            MACHINERY,
+        )
+
+        self._enable_openrouter()
+        unit = self.get_unit()
+        unit.translate(self.user, [""], STATE_EMPTY)
+        engine = MACHINERY["openrouter"]({"key": "test"})
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+
+        def fake_fetch(units, *, services, on_failure=None, **kwargs):
+            origin = services[0] if services else engine
+            for mt_unit in units:
+                mt_unit.machinery = {
+                    "translation": ["Pre-filled"],
+                    "quality": [90],
+                    "origin": [origin],
+                }
+            return {mt_unit.id: mt_unit.machinery for mt_unit in units}
+
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=fake_fetch,
+            ),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run_batch,
+        ):
+            batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        unit.refresh_from_db()
+        self.assertEqual(unit.target.strip(), "Pre-filled")
+        self.assertTrue(run_batch.called)
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.preparation_phase, "ready")
+
+    def test_quota_refusal_blocks_judge_globally(self) -> None:
+        """A quota refusal on one language stops the judge phase everywhere."""
+        from weblate.machinery.base import (  # ruff: ignore[import-outside-top-level]
+            MachineTranslationServiceError,
+        )
+        from weblate.trans.machinery import (  # ruff: ignore[import-outside-top-level]
+            MachineryBatchOutcome,
+        )
+
+        self._enable_openrouter()
+        unit = self.get_unit()
+        unit.translate(self.user, [""], STATE_EMPTY)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+
+        def fake_fetch(units, *, services, on_failure=None, **kwargs):
+            if on_failure is not None:
+                on_failure(
+                    MachineryBatchOutcome(
+                        status="failed",
+                        service="OpenRouter",
+                        unit_ids=tuple(mt_unit.id for mt_unit in units),
+                        reason_code=(
+                            MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED
+                        ),
+                        error="The quota is exhausted.",
+                    )
+                )
+            return {}
+
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=fake_fetch,
+            ),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run_batch,
+        ):
+            message = batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        run_batch.assert_not_called()
+        self.assertIn("Judges were not started", message)
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "")
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertEqual(run.preparation_phase, "blocked")
+        self.assertFalse(JudgeVerdict.objects.exists())
+        row = JudgeRunUnit.objects.get(unit_id_snapshot=unit.id)
+        self.assertEqual(row.outcome, JudgeRunUnit.Outcome.SKIPPED)
+        self.assertEqual(row.skip_reason, JudgeRunUnit.SkipReason.MT_PREREQUISITE)
+
+    def test_human_write_during_preparation_is_not_overwritten(self) -> None:
+        """A human translation written after the fetch is never replaced."""
+        self._enable_openrouter()
+        unit = self.get_unit()
+        unit.translate(self.user, [""], STATE_EMPTY)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+
+        def fake_fetch(units, *, services, on_failure=None, **kwargs):
+            # The MT answer arrives, but the human already wrote the target.
+            for mt_unit in units:
+                mt_unit.machinery = {
+                    "translation": ["MT answer"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            live = type(unit).objects.get(pk=unit.pk)
+            live.translate(self.user, ["Human text"], STATE_TRANSLATED)
+            return {mt_unit.id: mt_unit.machinery for mt_unit in units}
+
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=fake_fetch,
+            ),
+            mock.patch("weblate.trans.autotranslate.run_judge_batch", return_value={}),
+        ):
+            batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        unit.refresh_from_db()
+        self.assertEqual(unit.target.strip(), "Human text")
+
+    def test_ready_scope_skips_paid_probe(self) -> None:
+        """A fully translated scope never pays for a preparation call."""
+        unit = self.get_unit()
+        unit.translate(self.user, ["Already translated"], STATE_TRANSLATED)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with (
+            mock.patch("weblate.trans.autotranslate.fetch_machinery_matches") as fetch,
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run_batch,
+        ):
+            batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        fetch.assert_not_called()
+        self.assertTrue(run_batch.called)
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.preparation_phase, "ready")
+
+    def test_changed_source_is_not_stored_from_a_stale_preparation_answer(
+        self,
+    ) -> None:
+        """A preparation answer for an older source never lands (C5)."""
+        self._enable_openrouter()
+        unit = self.get_unit()
+        old_source = unit.source
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+
+        def fake_fetch(units, *, services, on_failure=None, **kwargs):
+            for mt_unit in units:
+                mt_unit.machinery = {
+                    "translation": ["Stale answer"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            live = type(unit).objects.get(pk=unit.pk)
+            live.source = f"{old_source} (changed)"
+            live.save(update_fields=["source"])
+            return {mt_unit.id: mt_unit.machinery for mt_unit in units}
+
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=fake_fetch,
+            ),
+            mock.patch("weblate.trans.autotranslate.run_judge_batch", return_value={}),
+        ):
+            batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        unit.refresh_from_db()
+        self.assertEqual(unit.change_set.filter(action=ActionEvents.AUTO).count(), 0)
+
+    def test_cancellation_between_preparation_batches_keeps_written_mt(self) -> None:
+        """A cancel request between language batches stops new paid work."""
+        self._enable_openrouter()
+        unit = self.get_unit()
+        unit.translate(self.user, [""], STATE_EMPTY)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        run = batch._create_producer_run()  # ruff: ignore[private-member-access]
+        run.status = ProducerRun.Status.RUNNING
+        run.save(update_fields=["status"])
+        scope = batch.build_preparation_scope()
+
+        def fake_fetch(units, *, services, on_failure=None, **kwargs):
+            ProducerRun.objects.filter(pk=run.pk).update(
+                status=ProducerRun.Status.CANCEL_REQUESTED
+            )
+            for mt_unit in units:
+                mt_unit.machinery = {
+                    "translation": ["Stored before cancel"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            return {mt_unit.id: mt_unit.machinery for mt_unit in units}
+
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=fake_fetch,
+            ),
+        ):
+            # Returns None: the stop was a cancellation, not a failure.
+            outcome = batch._run_preparation(  # ruff: ignore[private-member-access]
+                run, scope, 80, []
+            )
+
+        self.assertIsNone(outcome)
+        unit.refresh_from_db()
+        self.assertEqual(unit.target.strip(), "Stored before cancel")
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.CANCEL_REQUESTED)
+        self.assertEqual(run.preparation_phase, "preparing")
+
+    def test_resume_of_a_blocked_run_retries_only_remaining_missing(self) -> None:
+        """A resumed preparation never re-pays for an already-filled string."""
+        self._enable_openrouter()
+        filled = self.get_unit()
+        filled.translate(self.user, [""], STATE_EMPTY)
+        still_empty = self.get_unit("Thank you for using Weblate.", language="de")
+        still_empty.translate(self.user, [""], STATE_EMPTY)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[filled.id, still_empty.id],
+            enforce_permissions=False,
+        )
+        run = batch._create_producer_run()  # ruff: ignore[private-member-access]
+        run.status = ProducerRun.Status.RUNNING
+        run.save(update_fields=["status"])
+        scope = batch.build_preparation_scope()
+        # The human filled one missing string after the failure.
+        filled.translate(self.user, ["Human fill"], STATE_TRANSLATED)
+
+        prepared_ids: list[int] = []
+
+        def fake_fetch(units, *, services, on_failure=None, **kwargs):
+            prepared_ids.extend(mt_unit.id for mt_unit in units)
+            for mt_unit in units:
+                mt_unit.machinery = {
+                    "translation": ["Prepared"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            return {mt_unit.id: mt_unit.machinery for mt_unit in units}
+
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=fake_fetch,
+            ),
+        ):
+            outcome = batch._run_preparation(  # ruff: ignore[private-member-access]
+                run, scope, 80, []
+            )
+
+        self.assertIsNone(outcome)
+        self.assertEqual(prepared_ids, [still_empty.id])
+        run.refresh_from_db()
+        self.assertEqual(run.preparation_phase, "ready")
+
+    def test_recheck_of_an_empty_unit_never_pays_a_preparation_probe(self) -> None:
+        """A single-unit recheck judges emptiness without project MT."""
+        unit = self.get_unit()
+        unit.translate(self.user, [""], STATE_EMPTY)
+        run = self._make_queued_recheck_run(unit, query=f"id:{unit.pk}")
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q=f"id:{unit.pk}",
+            mode="judge",
+            unit_ids=[unit.pk],
+            enforce_permissions=False,
+            producer_run_id=str(run.pk),
+            judge_pretranslate=False,
+        )
+        with (
+            mock.patch("weblate.trans.autotranslate.fetch_machinery_matches") as fetch,
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run_batch,
+        ):
+            batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        fetch.assert_not_called()
+        # The stored text is empty: the judge phase honestly skips the unit
+        # as untranslated (no fake pass) and no verdict is ever bought.
+        self.assertFalse(run_batch.called)
+        self.assertFalse(JudgeVerdict.objects.exists())
+        self.assertEqual(
+            JudgeRunUnit.objects.get(unit_id_snapshot=unit.id).outcome,
+            JudgeRunUnit.Outcome.SKIPPED,
+        )
+
+    def test_summary_carries_mt_preparation_block(self) -> None:
+        """The durable summary reports the preparation as its own block."""
+        self._enable_openrouter()
+        unit = self.get_unit()
+        unit.translate(self.user, [""], STATE_EMPTY)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.fetch_machinery_matches",
+                side_effect=lambda *_args, **_kwargs: {},
+            ),
+            mock.patch("weblate.trans.autotranslate.run_judge_batch", return_value={}),
+        ):
+            batch.perform(
+                auto_source="mt", engines=[], threshold=80, source_component_ids=None
+            )
+
+        run = ProducerRun.objects.get()
+        prep = run.summary.get("mt_preparation")
+        self.assertIsInstance(prep, dict)
+        # A preparation that wrote nothing and left the string missing is
+        # a blocked barrier, not a silent success.
+        self.assertEqual(run.preparation_phase, "blocked")
+        self.assertEqual(prep["phase"], "blocked")
+        self.assertEqual(prep["reason_code"], "mt-prerequisite")
+        self.assertEqual(prep["missing_initial"], 1)
+        self.assertEqual(prep["remaining"], 1)
 
     def test_worker_fails_a_run_whose_query_mismatches(self) -> None:
         unit = self.get_unit()
