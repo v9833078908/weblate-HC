@@ -80,24 +80,25 @@
 В `weblate/trans/tests/test_basic_views.py`, сразу после `test_matomo` (заканчивается строкой 91):
 
 ```python
-    @override_settings(CLARITY_PROJECT_ID="abc12345")
-    def test_clarity(self) -> None:
-        response = self.client.get(self.project_url)
-        self.assertContains(response, static("js/clarity.js"))
-        self.assertContains(response, 'data-project-id="abc12345"')
-        self.assertContains(response, 'data-language="en"')
-        self.assertContains(response, f'data-project="{self.project.name}"')
-        self.assertContains(response, f'data-username="{self.user.username}"')
-        self.assertContains(response, 'href="https://www.clarity.ms"')
-        self.assertContains(response, 'href="https://scripts.clarity.ms"')
-        # The official snippet is inline, this integration must not be
-        self.assertNotContains(response, "clarity.ms/tag")
+@override_settings(CLARITY_PROJECT_ID="abc12345")
+def test_clarity(self) -> None:
+    response = self.client.get(self.project_url)
+    self.assertContains(response, static("js/clarity.js"))
+    self.assertContains(response, 'data-project-id="abc12345"')
+    self.assertContains(response, 'data-language="en"')
+    self.assertContains(response, f'data-project="{self.project.name}"')
+    self.assertContains(response, f'data-username="{self.user.username}"')
+    self.assertContains(response, 'href="https://www.clarity.ms"')
+    self.assertContains(response, 'href="https://scripts.clarity.ms"')
+    # The official snippet is inline, this integration must not be
+    self.assertNotContains(response, "clarity.ms/tag")
 
-    def test_clarity_disabled(self) -> None:
-        response = self.client.get(self.project_url)
-        self.assertNotContains(response, static("js/clarity.js"))
-        self.assertNotContains(response, "clarity-tracker")
-        self.assertNotIn("clarity.ms", response["Content-Security-Policy"])
+
+def test_clarity_disabled(self) -> None:
+    response = self.client.get(self.project_url)
+    self.assertNotContains(response, static("js/clarity.js"))
+    self.assertNotContains(response, "clarity-tracker")
+    self.assertNotIn("clarity.ms", response["Content-Security-Policy"])
 ```
 
 `test_clarity_disabled` проходит и до реализации — это сторож на будущее: он ловит регрессию «CSP или загрузчик подключаются безусловно». Драйвер задачи — `test_clarity`.
@@ -120,8 +121,8 @@ DEFAULT_CLARITY_PROJECT_ID = None
 `weblate/trans/models/_conf.py`, после блока Google Analytics (строка 64):
 
 ```python
-    # Microsoft Clarity
-    CLARITY_PROJECT_ID = defaults.DEFAULT_CLARITY_PROJECT_ID
+# Microsoft Clarity
+CLARITY_PROJECT_ID = defaults.DEFAULT_CLARITY_PROJECT_ID
 ```
 
 **Step 5: Настройка в примере настроек**
@@ -147,15 +148,15 @@ CLARITY_PROJECT_ID = get_env_str(
 `weblate/trans/context_processors.py`: в `CONTEXT_SETTINGS` после `"GOOGLE_ANALYTICS_ID"` (строка 42) добавить
 
 ```python
-    "CLARITY_PROJECT_ID",
+("CLARITY_PROJECT_ID",)
 ```
 
 и в `get_preconnect_list` после блока Google Analytics (строка 84):
 
 ```python
-    if settings.CLARITY_PROJECT_ID:
-        result.append("www.clarity.ms")
-        result.append("scripts.clarity.ms")
+if settings.CLARITY_PROJECT_ID:
+    result.append("www.clarity.ms")
+    result.append("scripts.clarity.ms")
 ```
 
 Тег грузится с `www.clarity.ms`, библиотека — со `scripts.clarity.ms`; оба хоста стоят прогреть заранее, потому что скрипт стартует из подвала.
@@ -270,20 +271,20 @@ git commit -m "feat(trans): add optional Microsoft Clarity tracking hook"
 В конец `test_clarity`:
 
 ```python
-        script_src = next(
-            directive
-            for directive in response["Content-Security-Policy"].split(";")
-            if directive.strip().startswith("script-src ")
-        )
-        self.assertIn("www.clarity.ms", script_src)
-        self.assertIn("scripts.clarity.ms", script_src)
-        self.assertNotIn("'unsafe-inline'", script_src)
-        connect_src = next(
-            directive
-            for directive in response["Content-Security-Policy"].split(";")
-            if directive.strip().startswith("connect-src ")
-        )
-        self.assertIn("*.clarity.ms", connect_src)
+script_src = next(
+    directive
+    for directive in response["Content-Security-Policy"].split(";")
+    if directive.strip().startswith("script-src ")
+)
+self.assertIn("www.clarity.ms", script_src)
+self.assertIn("scripts.clarity.ms", script_src)
+self.assertNotIn("'unsafe-inline'", script_src)
+connect_src = next(
+    directive
+    for directive in response["Content-Security-Policy"].split(";")
+    if directive.strip().startswith("connect-src ")
+)
+self.assertIn("*.clarity.ms", connect_src)
 ```
 
 **Step 2: Убедиться, что тест падает**
@@ -296,20 +297,20 @@ Expected: FAIL, `AssertionError: 'www.clarity.ms' not found in " script-src 'sel
 `weblate/middleware.py`, новый метод после `build_csp_google_analytics` (заканчивается строкой 401):
 
 ```python
-    def build_csp_clarity(self) -> None:
-        # Microsoft Clarity
-        if settings.CLARITY_PROJECT_ID:
-            # The tag bootstrap loads the library from a separate host
-            self.directives["script-src"].add("www.clarity.ms")
-            self.directives["script-src"].add("scripts.clarity.ms")
-            # Uploads are load balanced across a.clarity.ms … z.clarity.ms
-            self.directives["connect-src"].add("*.clarity.ms")
+def build_csp_clarity(self) -> None:
+    # Microsoft Clarity
+    if settings.CLARITY_PROJECT_ID:
+        # The tag bootstrap loads the library from a separate host
+        self.directives["script-src"].add("www.clarity.ms")
+        self.directives["script-src"].add("scripts.clarity.ms")
+        # Uploads are load balanced across a.clarity.ms … z.clarity.ms
+        self.directives["connect-src"].add("*.clarity.ms")
 ```
 
 и вызов в `CSPBuilder.__init__` после `self.build_csp_google_analytics()` (строка 317):
 
 ```python
-        self.build_csp_clarity()
+self.build_csp_clarity()
 ```
 
 Хосты добавляются литералами, а не через `add_csp_host`: тот берёт `urlparse(...).hostname` и подстановочную маску построить не может.

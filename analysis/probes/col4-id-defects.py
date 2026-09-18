@@ -90,7 +90,7 @@ for unit in units:
             continue
         if term.target.lower() in tl:
             continue
-        surf = [s for s in surfaces(term.source, unit.source)]
+        surf = list(surfaces(term.source, unit.source))
         # skip if EVERY matched surface is a known homograph or variant
         if surf and all(
             (term.source, s.lower()) in HOMOGRAPH or (term.source, s.lower()) in VARIANT

@@ -1,6 +1,8 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[suspicious-subprocess-import]
+# - the harness's whole purpose is running the package as a subprocess CLI.
 
 import subprocess
 import sys

@@ -77,16 +77,19 @@
 ```python
 # вернуть распаркованное (только наши пер-юнитные read-only на пустых таргетах):
 from weblate.checks.flags import Flags
+
 qs = Unit.objects.filter(translation__component=c, target="").exclude(
-    translation__language=c.source_language)
+    translation__language=c.source_language
+)
 buf = []
 for u in qs:
     fl = Flags(u.extra_flags)
-    if "read-only" in fl:            # 195 старых — источник-уровень, тут пусто
-        fl.remove("read-only"); u.extra_flags = fl.format()
-        u.state = u.original_state    # 0 (пусто)
+    if "read-only" in fl:  # 195 старых — источник-уровень, тут пусто
+        fl.remove("read-only")
+        u.extra_flags = fl.format()
+        u.state = u.original_state  # 0 (пусто)
         buf.append(u)
-Unit.objects.bulk_update(buf, ["extra_flags","state"], batch_size=500)
+Unit.objects.bulk_update(buf, ["extra_flags", "state"], batch_size=500)
 ```
 
 Существующие 195 `read-only` заданы на уровне источника (у их таргет-юнитов

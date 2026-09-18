@@ -14,38 +14,44 @@ END_DATE="${END_DATE:-}"
 # line re-fires this minute every year. Fire only when the current UTC minute
 # (first 16 chars of RFC3339) matches AT_DATE's minute.
 if [ -n "$AT_DATE" ]; then
-	now_min="$(date -u +%Y-%m-%dT%H:%M)"
-	at_min="$(printf '%s' "$AT_DATE" | cut -c1-16)"
-	[ "$now_min" = "$at_min" ] || exit 0
+    now_min="$(date -u +%Y-%m-%dT%H:%M)"
+    at_min="$(printf '%s' "$AT_DATE" | cut -c1-16)"
+    [ "$now_min" = "$at_min" ] || exit 0
 fi
 
 # END_DATE (recurring cutoff): both sides use the same fixed %Y-%m-%dT%H:%M:%SZ
 # layout, so comparing their digit-only forms numerically preserves chronological
 # order. Stop firing once now is strictly past END_DATE.
 if [ -n "$END_DATE" ]; then
-	now_num="$(date -u +%Y%m%d%H%M%S)"
-	end_num="$(printf '%s' "$END_DATE" | tr -cd '0-9')"
-	[ "$now_num" -le "$end_num" ] || exit 0
+    now_num="$(date -u +%Y%m%d%H%M%S)"
+    end_num="$(printf '%s' "$END_DATE" | tr -cd '0-9')"
+    [ "$now_num" -le "$end_num" ] || exit 0
 fi
 
 ENDPOINT="$(printf '%s' "$ENDPOINT_URL_B64" | base64 -d)"
 
 strip_quotes() {
-	# Strip a single matching pair of surrounding quotes.
-	v="$1"
-	case "$v" in
-		\"*\") v="${v#\"}"; v="${v%\"}" ;;
-		\'*\') v="${v#\'}"; v="${v%\'}" ;;
-	esac
-	printf '%s' "$v"
+    # Strip a single matching pair of surrounding quotes.
+    v="$1"
+    case "$v" in
+    \"*\")
+        v="${v#\"}"
+        v="${v%\"}"
+        ;;
+    \'*\')
+        v="${v#\'}"
+        v="${v%\'}"
+        ;;
+    esac
+    printf '%s' "$v"
 }
 
 # Read the per-app secret from the dotenv at dispatch time (never from cron env).
 read_secret() {
-	[ -f "$WEBHOOK_ENV_FILE" ] || return 0
-	line="$(grep -E '^WEBHOOK_CRON_SECRET=' "$WEBHOOK_ENV_FILE" | tail -n 1 || true)"
-	value="$(strip_quotes "${line#WEBHOOK_CRON_SECRET=}")"
-	printf '%s' "$value"
+    [ -f "$WEBHOOK_ENV_FILE" ] || return 0
+    line="$(grep -E '^WEBHOOK_CRON_SECRET=' "$WEBHOOK_ENV_FILE" | tail -n 1 || true)"
+    value="$(strip_quotes "${line#WEBHOOK_CRON_SECRET=}")"
+    printf '%s' "$value"
 }
 WEBHOOK_CRON_SECRET="$(read_secret)"
 
@@ -60,15 +66,15 @@ ENVELOPE="{\"event\":\"schedule.triggered\",\"schedule_id\":\"$CRON_NAME\",\"run
 # --location-trusted: internal-cluster pods get a cross-host 307 to the
 # internal.<preview-host>; the Bearer must survive that same-platform redirect.
 HTTP_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' \
-	--max-time 10 \
-	--location-trusted --max-redirs 2 \
-	-X "$METHOD" \
-	-H "Authorization: Bearer $WEBHOOK_CRON_SECRET" \
-	-H "Content-Type: application/json" \
-	-H "X-Webhook-Id: $RUN_ID" \
-	-H "X-Webhook-Timestamp: $DISPATCH_TIME" \
-	-d "$ENVELOPE" \
-	"$ENDPOINT" 2>/dev/null || true)"
+    --max-time 10 \
+    --location-trusted --max-redirs 2 \
+    -X "$METHOD" \
+    -H "Authorization: Bearer $WEBHOOK_CRON_SECRET" \
+    -H "Content-Type: application/json" \
+    -H "X-Webhook-Id: $RUN_ID" \
+    -H "X-Webhook-Timestamp: $DISPATCH_TIME" \
+    -d "$ENVELOPE" \
+    "$ENDPOINT" 2> /dev/null || true)"
 
 echo "dispatch complete (cron=$CRON_NAME http=${HTTP_STATUS:-000})"
 exit 0

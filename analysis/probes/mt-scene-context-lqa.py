@@ -53,13 +53,9 @@ def main() -> None:
 
     packet = json.loads(pathlib.Path(args.packet).read_text(encoding="utf-8"))
     key_rows = json.loads(pathlib.Path(args.key).read_text(encoding="utf-8"))
-    annotations = json.loads(
-        pathlib.Path(args.annotations).read_text(encoding="utf-8")
-    )
+    annotations = json.loads(pathlib.Path(args.annotations).read_text(encoding="utf-8"))
 
-    labels = {
-        (row["lang"], row["context"]): row["labels"] for row in key_rows
-    }
+    labels = {(row["lang"], row["context"]): row["labels"] for row in key_rows}
     reviewed = {(entry["lang"], entry["context"]) for entry in packet}
 
     per_arm: dict[tuple[str, str], Counter] = defaultdict(Counter)
@@ -99,9 +95,7 @@ def main() -> None:
         for arm in ("P", "S0", "S"):
             counts = per_arm.get((lang, arm), Counter())
             critical = sum(
-                value
-                for name, value in counts.items()
-                if name.endswith(":critical")
+                value for name, value in counts.items() if name.endswith(":critical")
             )
             print(
                 f"{lang}-{arm:7} {lines:5} {counts['register']:4} "

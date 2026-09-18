@@ -100,9 +100,13 @@ New private helpers on `BaseLLMTranslation` (all pure except the one HTTP call):
 ```python
 LLM_CHUNK_SEPARATOR = "\n\n"
 
-def _chunk_fragments(text) -> list[str] | None          # split, None if < 2 fragments
-def _merge_unbalanced_fragments(fragments, mapping) -> list[str] | None
-def _translate_in_chunks(source_language, target_language, sources) -> DownloadMultipleTranslations | None
+
+def _chunk_fragments(text) -> list[str] | None:  # split, None if < 2 fragments
+    ...
+def _merge_unbalanced_fragments(fragments, mapping) -> list[str] | None: ...
+def _translate_in_chunks(
+    source_language, target_language, sources
+) -> DownloadMultipleTranslations | None: ...
 ```
 
 ---
@@ -110,6 +114,7 @@ def _translate_in_chunks(source_language, target_language, sources) -> DownloadM
 ### Task 1: Fragment splitting and the safe-merge rule (pure helpers)
 
 **Files:**
+
 - Modify: `weblate/machinery/llm.py` (near `_split_sources`, `llm.py:2700`)
 - Test: `weblate/machinery/tests.py` (same module-level test class as
   `test_translate_continues_a_reply_that_ends_early`, `tests.py:5559`; reuse its
@@ -128,6 +133,7 @@ def test_chunk_fragments_splits_on_blank_lines(self) -> None:
     # No blank line -> no fallback candidate.
     self.assertIsNone(machine._chunk_fragments("single paragraph"))
 
+
 def test_merge_unbalanced_fragments_joins_split_markup(self) -> None:
     machine = self.get_machine()
     # <b> opens in fragment 1 and closes in fragment 2: they must travel together.
@@ -138,18 +144,20 @@ def test_merge_unbalanced_fragments_joins_split_markup(self) -> None:
         ["@@PH1@@Bold start\n\nstill bold@@PH2@@", "plain tail"],
     )
 
+
 def test_merge_unbalanced_fragments_declines_when_never_balanced(self) -> None:
     machine = self.get_machine()
     self.assertIsNone(
-        machine._merge_unbalanced_fragments(["@@PH1@@open", "never closed"], {"@@PH1@@": "<b>"})
+        machine._merge_unbalanced_fragments(
+            ["@@PH1@@open", "never closed"], {"@@PH1@@": "<b>"}
+        )
     )
+
 
 def test_merge_declines_on_unmapped_placeholder_at_boundary(self) -> None:
     machine = self.get_machine()
     # Conservative rule: a token we cannot classify keeps its fragment merged.
-    self.assertIsNone(
-        machine._merge_unbalanced_fragments(["@@PH9@@x", "y"], {})
-    )
+    self.assertIsNone(machine._merge_unbalanced_fragments(["@@PH9@@x", "y"], {}))
 ```
 
 **Step 2: Run tests to verify they fail**
@@ -166,6 +174,7 @@ LLM_CHUNK_SEPARATOR = "\n\n"  # module level, near LLM_PREFIX_RESCUE_LIMIT
 _MARKUP_OPEN_RE = re.compile(r"^<([a-zA-Z][\w-]*)(?:\s[^>]*)?>$")
 _MARKUP_CLOSE_RE = re.compile(r"^</([a-zA-Z][\w-]*)>$")
 
+
 @classmethod
 def _chunk_fragments(cls, text: str) -> list[str] | None:
     fragments = text.split(LLM_CHUNK_SEPARATOR)
@@ -173,8 +182,11 @@ def _chunk_fragments(cls, text: str) -> list[str] | None:
         return None
     return fragments
 
+
 @classmethod
-def _fragment_tag_delta(cls, fragment: str, mapping: dict[str, str]) -> list[str] | None:
+def _fragment_tag_delta(
+    cls, fragment: str, mapping: dict[str, str]
+) -> list[str] | None:
     """Open-tag stack this fragment leaves behind; None when unclassifiable."""
     stack: list[str] = []
     for token, _end in cls._iter_placeholders(fragment):
@@ -189,6 +201,7 @@ def _fragment_tag_delta(cls, fragment: str, mapping: dict[str, str]) -> list[str
             stack.pop()
         # Non-tag placeholders ({0}, %KEY%) never span fragments: neutral.
     return stack
+
 
 @classmethod
 def _merge_unbalanced_fragments(
@@ -232,6 +245,7 @@ git commit -m "feat(machinery): add safe paragraph fragmenting for long LLM sour
 ### Task 2: The fallback itself, wired into the sync path
 
 **Files:**
+
 - Modify: `weblate/machinery/llm.py:2624-2687` (sync
   `_download_multiple_translations_with_context_cache`)
 - Test: `weblate/machinery/tests.py`
@@ -249,6 +263,7 @@ LONG_SOURCE = (
     "\n\n@@PH3@@Dig, Craft, and Trade!@@PH4@@"
     "\n\nPlay this RPG as a true Digger."
 )
+
 
 def test_translate_falls_back_to_chunks_for_a_single_long_string(self) -> None:
     machine = self.get_machine()
@@ -273,6 +288,7 @@ def test_translate_falls_back_to_chunks_for_a_single_long_string(self) -> None:
     for token in ("@@PH1@@", "@@PH2@@", "@@PH3@@", "@@PH4@@"):
         self.assertIn(token, result)
 
+
 def test_chunk_fallback_declines_without_blank_lines(self) -> None:
     machine = self.get_machine()
     with (
@@ -284,6 +300,7 @@ def test_chunk_fallback_declines_without_blank_lines(self) -> None:
         self.assertRaises(MachineTranslationError),
     ):
         machine.download_multiple_translations("en", "fr", [("one line only", None)])
+
 
 def test_chunk_fallback_declines_on_rate_limit(self) -> None:
     machine = self.get_machine()
@@ -299,6 +316,7 @@ def test_chunk_fallback_declines_on_rate_limit(self) -> None:
     ):
         machine.download_multiple_translations("en", "fr", [(LONG_SOURCE, None)])
     self.assertEqual(calls, [1])  # no fragment batch after a refusal
+
 
 def test_chunk_fallback_failure_propagates_original_error(self) -> None:
     machine = self.get_machine()
@@ -372,6 +390,7 @@ def _translate_in_chunks(
 ```
 
 Executor notes:
+
 - Verify `_build_string_payload`'s exact signature (`llm.py:1092`) — the plan assumes
   `(source_text, unit, source_language, source_occurrence)`; adjust the call if it
   differs, the mapping key is `"placeholders"` (see `LLMStringContext`, `llm.py:307`).
@@ -379,6 +398,7 @@ Executor notes:
   `unit.translated` guard above prevents the existing-translation duplication.
 
 Wiring, sync path (`llm.py:2664-2667`):
+<!--- skip doccmd[all]: next --><!-- except-branch fragment, not standalone code -->
 
 ```python
         except MachineTranslationError as error:
@@ -417,6 +437,7 @@ git commit -m "feat(machinery): translate a long single string in paragraph chun
 ### Task 3: The async twin
 
 **Files:**
+
 - Modify: `weblate/machinery/llm.py:2790-2846`
   (`_adownload_multiple_translations_with_context_cache`)
 - Test: `weblate/machinery/tests.py`
@@ -457,9 +478,11 @@ git commit -m "feat(machinery): async twin of the long-string chunk fallback"
 ### Task 4: Changelog and push
 
 **Files:**
+
 - Modify: `docs/changes.rst` (top, unreleased section)
 
 **Steps:**
+
 1. Add one concise entry: long single strings rejected by the LLM reply parser are
    now retried paragraph-by-paragraph and stored as one string.
 2. `uv run prek run --files docs/changes.rst` (hook-scoped; never bare `--files`).

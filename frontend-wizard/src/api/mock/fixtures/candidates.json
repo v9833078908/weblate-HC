@@ -1,10 +1,64 @@
 {
   "pirate-ships": [
-    { "term": "Галеон", "why": "название", "context": "«На горизонте показался вражеский Галеон»", "suggested": { "en": "Galleon", "fr": "Galéon", "ja": "ガレオン" } },
-    { "term": "Дукат", "why": "валюта", "context": "«Цена: 300 дукатов»", "suggested": { "en": "ducat", "fr": "ducat", "ja": "ダカット" } },
-    { "term": "Капитан Сильвер", "why": "имя", "context": "«Капитан Сильвер ухмыльнулся»", "suggested": { "en": "Captain Silver", "fr": "Capitaine Silver", "ja": "シルバー船長" } },
-    { "term": "абордаж", "why": "термин", "context": "«Начать абордаж!»", "suggested": { "en": "boarding", "fr": "abordage", "ja": "登舷" } },
-    { "term": "Ромовая бухта", "why": "название локации", "context": "«Вернуться в Ромовую бухту»", "suggested": { "en": "Rum Bay", "fr": "Baie du Rhum", "ja": "ラム湾" } },
-    { "term": "пиастр", "why": "валюта", "context": "«Награда: 10 пиастров»", "suggested": { "en": "piastre", "fr": "piastre", "ja": "ピアストル" } }
+    {
+      "term": "Галеон",
+      "why": "название",
+      "context": "«На горизонте показался вражеский Галеон»",
+      "suggested": {
+        "en": "Galleon",
+        "fr": "Galéon",
+        "ja": "ガレオン"
+      }
+    },
+    {
+      "term": "Дукат",
+      "why": "валюта",
+      "context": "«Цена: 300 дукатов»",
+      "suggested": {
+        "en": "ducat",
+        "fr": "ducat",
+        "ja": "ダカット"
+      }
+    },
+    {
+      "term": "Капитан Сильвер",
+      "why": "имя",
+      "context": "«Капитан Сильвер ухмыльнулся»",
+      "suggested": {
+        "en": "Captain Silver",
+        "fr": "Capitaine Silver",
+        "ja": "シルバー船長"
+      }
+    },
+    {
+      "term": "абордаж",
+      "why": "термин",
+      "context": "«Начать абордаж!»",
+      "suggested": {
+        "en": "boarding",
+        "fr": "abordage",
+        "ja": "登舷"
+      }
+    },
+    {
+      "term": "Ромовая бухта",
+      "why": "название локации",
+      "context": "«Вернуться в Ромовую бухту»",
+      "suggested": {
+        "en": "Rum Bay",
+        "fr": "Baie du Rhum",
+        "ja": "ラム湾"
+      }
+    },
+    {
+      "term": "пиастр",
+      "why": "валюта",
+      "context": "«Награда: 10 пиастров»",
+      "suggested": {
+        "en": "piastre",
+        "fr": "piastre",
+        "ja": "ピアストル"
+      }
+    }
   ]
 }

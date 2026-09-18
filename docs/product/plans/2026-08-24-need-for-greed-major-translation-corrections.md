@@ -26,7 +26,7 @@
 
 ## Task 2: German corrections
 
-**Language:** `de`  
+**Language:** `de`
 **Count:** 2
 
 - `(ui, 360308, chestUsedIn)` -> `Kann im <color=#E3BA59>Truhenplatz</color> oder im <color=#E3BA59>Super-Platz</color> geöffnet werden.`
@@ -36,11 +36,11 @@ Write only source- and old-target-matched rows in separate `ui/de` and `loot/de`
 
 ## Task 3: French critical and major corrections
 
-**Language:** `fr`  
+**Language:** `fr`
 **Count:** 10
 
 - `(ui, 359515, amountFormatted)` -> `{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}`
-- `(ui, 359527, humanTimer)` -> `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|} `
+- `(ui, 359527, humanTimer)` -> `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|}`
 - `(ui, 359637, craftSlot)` -> `Emplacement d’artisanat`
 - `(ui, 359747, upgradeCraftTitle)` -> `Niv. d’artisanat {value}`
 - `(tutorial, 367161, DialogueBeforeUpgradeCharacter2)` -> `D'accord, j'investirai en moi — mais seulement pour que tu arrêtes de me harceler !`
@@ -54,7 +54,7 @@ Write guarded component/language batches and reread every row. For `amountFormat
 
 ## Task 4: Polish corrections
 
-**Language:** `pl`  
+**Language:** `pl`
 **Count:** 5
 
 - `(ui, 369281, upgradeCraftTitle)` -> `Poziom wytwarzania {value}`
@@ -67,7 +67,7 @@ Write guarded component/language batches. Reread all rows and verify markup pres
 
 ## Task 5: Italian corrections
 
-**Language:** `it`  
+**Language:** `it`
 **Count:** 8
 
 - `(ui, 368815, upgradeCraftTitle)` -> `Livello creazione {value}`
@@ -83,10 +83,10 @@ Write guarded component/language batches and reread every row.
 
 ## Task 6: Turkish corrections
 
-**Language:** `tr`  
+**Language:** `tr`
 **Count:** 16
 
-- `(ui, 369527, humanTimer)` -> `{hours:cond:>0?{hours} sa. |}{minutes:cond:>0?{minutes} dk. |}{seconds:cond:>=0?{seconds} sn.|} `
+- `(ui, 369527, humanTimer)` -> `{hours:cond:>0?{hours} sa. |}{minutes:cond:>0?{minutes} dk. |}{seconds:cond:>=0?{seconds} sn.|}`
 - `(ui, 369657, craftItem)` -> `Eşya üret`
 - `(ui, 369662, craftClosedRecipeDescription)` -> `Yetersiz Demirhane Seviyesi\n\nHer yükseltmeyle giderek daha nadir ve değerli hazineler üretebileceksiniz. Bu fırını efsanelere yaraşır bir demirhaneye dönüştürme zamanı!`
 - `(ui, 369672, craftStockFullTitle)` -> `Depoda hazine için yer yok!`
@@ -107,7 +107,7 @@ Write guarded component/language batches and reread every row. Preserve the exac
 
 ## Task 7: Indonesian corrections
 
-**Language:** `id`  
+**Language:** `id`
 **Count:** 17
 
 - `(ui, 368259, craftItem)` -> `Buat item`

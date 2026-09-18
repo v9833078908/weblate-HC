@@ -7,14 +7,14 @@ const nextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        { source: '/projects/:path*', destination: '/' },
-        { source: '/runs/:path*', destination: '/' },
-        { source: '/dev/:path*', destination: '/' },
-        { source: '/emails/:path*', destination: '/' },
-        { source: '/advanced', destination: '/' },
+        { source: "/projects/:path*", destination: "/" },
+        { source: "/runs/:path*", destination: "/" },
+        { source: "/dev/:path*", destination: "/" },
+        { source: "/emails/:path*", destination: "/" },
+        { source: "/advanced", destination: "/" },
       ],
-    }
+    };
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

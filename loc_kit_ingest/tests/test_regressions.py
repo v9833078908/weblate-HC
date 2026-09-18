@@ -9,8 +9,11 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
+from translate.storage.pypo import pofile
+from translate.storage.tbx import tbxfile
+
 from loc_kit_ingest.cli import main
-from loc_kit_ingest.model import Severity, StringUnit
+from loc_kit_ingest.model import GlossaryTerm, ParseResult, Severity, StringUnit
 from loc_kit_ingest.parser import parse_component
 from loc_kit_ingest.profile import load_profile
 from loc_kit_ingest.reader import read_sheets
@@ -127,8 +130,6 @@ def test_fixture_pipeline_produces_valid_tbx(tmp_path):
 
 def test_po_preserves_leading_trailing_whitespace(tmp_path):
     """Leading/trailing whitespace in PO values must survive render + parse-back."""
-    from loc_kit_ingest.model import ParseResult
-
     fixture_dir = Path(__file__).parent / "fixtures"
     profile = load_profile(fixture_dir / "temple.loc-ingest.json")
     comp = profile.components[0]
@@ -148,8 +149,6 @@ def test_po_preserves_leading_trailing_whitespace(tmp_path):
         skipped_rows=(),
     )
     paths = render_component(comp, result, tmp_path)
-    from translate.storage.pypo import pofile
-
     ru_store = pofile.parsestring(paths["ru"].read_bytes())
     unit = next(u for u in ru_store.units if u.getid() == "ws_key")
     assert unit.target == "  spaced  "
@@ -160,8 +159,6 @@ def test_po_preserves_leading_trailing_whitespace(tmp_path):
 
 def test_tbx_preserves_internal_newlines(tmp_path):
     """Internal newlines in TBX explanations must survive render + parse-back."""
-    from loc_kit_ingest.model import GlossaryTerm, ParseResult
-
     fixture_dir = Path(__file__).parent / "fixtures"
     profile = load_profile(fixture_dir / "terms.loc-ingest.json")
     comp = profile.components[0]
@@ -183,8 +180,6 @@ def test_tbx_preserves_internal_newlines(tmp_path):
         skipped_rows=(),
     )
     paths = render_component(comp, result, tmp_path)
-    from translate.storage.tbx import tbxfile
-
     parsed = tbxfile.parsestring(paths["en"].read_bytes())
     unit = next(u for u in parsed.units if u.getid() == '["Test","Терм"]')
     assert "\n" in unit.getnotes("definition")

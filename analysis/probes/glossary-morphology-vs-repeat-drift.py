@@ -85,10 +85,10 @@ CAPS_WORD_RE = re.compile(r"\b[А-ЯЁ]{4,}\b")
 
 
 def get(url: str) -> dict:
-    request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage]
+    request = urllib.request.Request(
         url, headers={"Authorization": f"Token {TOKEN}", "User-Agent": "drift-probe"}
     )
-    with urllib.request.urlopen(request, timeout=180) as response:  # ruff: ignore[suspicious-url-open-usage]
+    with urllib.request.urlopen(request, timeout=180) as response:
         return json.loads(response.read().decode())
 
 

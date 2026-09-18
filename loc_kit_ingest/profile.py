@@ -1,13 +1,17 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[complex-structure, too-many-branches, too-many-locals, too-many-statements]
+# - the profile parsers are long validation sequences whose shape mirrors the
+#   document schema; splitting them would obscure the validation order.
 
 from __future__ import annotations
 
 import json
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from itertools import pairwise
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from loc_kit_ingest.model import Diagnostic, Severity
 
@@ -288,7 +292,10 @@ def _check_unknown(obj: dict[str, Any], allowed: frozenset[str], *, label: str) 
         raise _err(msg, f"unknown field(s) {extras} in {label}")
 
 
-def _require(obj: dict[str, Any], field: str, *, label: str) -> Any:
+_ParsedField = TypeVar("_ParsedField")
+
+
+def _require(obj: dict[str, Any], field: str, *, label: str) -> _ParsedField:
     if field not in obj:
         msg = "profile.missing"
         raise _err(msg, f"missing required field '{field}' in {label}")
@@ -413,7 +420,7 @@ def _check_po_column_locations(
 
 
 # --------------------------------------------------------------------------- #
-# Grammar (v1)
+# Grammar v1
 # --------------------------------------------------------------------------- #
 
 
@@ -507,7 +514,7 @@ def _parse_pairs_grammar(
 
     # Sort regions by first_term_row to check for gaps and overlaps.
     sorted_regions = sorted(regions, key=lambda r: r.first_term_row)
-    for prev, curr in zip(sorted_regions, sorted_regions[1:]):
+    for prev, curr in pairwise(sorted_regions):
         if curr.first_term_row <= prev.last_description_row:
             msg = "profile.region_overlap"
             raise _err(
@@ -777,7 +784,7 @@ def _parse_record_map_grammar(
 
     # Sort regions to check for overlap between records and section captions.
     sorted_regions = sorted(regions, key=lambda r: r.first_record_row)
-    for prev, curr in zip(sorted_regions, sorted_regions[1:]):
+    for prev, curr in pairwise(sorted_regions):
         if curr.first_record_row <= prev.last_record_row:
             msg = "profile.region_overlap"
             raise _err(
@@ -827,6 +834,8 @@ def _check_record_map_field_locations(
     grammar: RecordMapGrammar, *, languages: tuple[LanguageColumn, ...]
 ) -> None:
     """
+    Check that record-map field locations do not collide.
+
     No two of {language term, note} fields may read the same (row_offset,
     column) cell, and section_field's column may not collide with any
     language or note column at any offset.
@@ -915,7 +924,7 @@ def _parse_component(
         raise _err(msg, "component must be an object")
 
     kind = obj.get("kind")
-    if kind not in ("po", "tbx"):
+    if kind not in {"po", "tbx"}:
         msg = "profile.invalid_kind"
         raise _err(msg, f"unknown kind {kind!r}; must be 'po' or 'tbx'")
 
@@ -981,7 +990,7 @@ def _parse_component(
     if not isinstance(langs_raw, list) or not langs_raw:
         msg = "profile.invalid_languages"
         raise _err(msg, "languages must be a non-empty list")
-    languages = tuple(_parse_language(l, component=component) for l in langs_raw)
+    languages = tuple(_parse_language(lang, component=component) for lang in langs_raw)
 
     # Check unique language codes and columns.
     seen_codes: dict[str, str] = {}
@@ -1004,7 +1013,7 @@ def _parse_component(
         seen_cols[lang.column] = lang.code
 
     # Source language must be in languages.
-    lang_codes = {l.code for l in languages}
+    lang_codes = {lang.code for lang in languages}
     if source_lang not in lang_codes:
         msg = "profile.source_lang_missing"
         raise _err(

@@ -282,9 +282,7 @@
     </div>
 
     {% if autoform %}
-      <div class="tab-pane" id="auto">
-        {% include "snippets/autoform.html" with object=object autoform=autoform %}
-      </div>
+      <div class="tab-pane" id="auto">{% include "snippets/autoform.html" with object=object autoform=autoform %}</div>
     {% endif %}
 
     <div class="tab-pane" id="history">

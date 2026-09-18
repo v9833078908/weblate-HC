@@ -4,13 +4,21 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from loc_kit_ingest.infer import infer_profile
 from loc_kit_ingest.parser import parse_component
-from loc_kit_ingest.profile import load_profile, parse_profile
+from loc_kit_ingest.profile import (
+    ComponentProfile,
+    KeyColumn,
+    KeyedGrammar,
+    LanguageColumn,
+    load_profile,
+    parse_profile,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -359,25 +367,14 @@ def test_source_markup_diagnostics_are_capped_per_component(
 
 def _rebuild_component(component, *, allow_blank_rows):
     """Return a copy of a component with allow_blank_rows changed."""
-    from loc_kit_ingest.profile import KeyedGrammar
-
     new_grammar = KeyedGrammar(
         skip_rows=component.grammar.skip_rows,
         allow_blank_rows=allow_blank_rows,
     )
-    from dataclasses import replace
-
     return replace(component, grammar=new_grammar)
 
 
 def _make_simple_po_component(*, tmp_allow_blank):
-    from loc_kit_ingest.profile import (
-        ComponentProfile,
-        KeyColumn,
-        KeyedGrammar,
-        LanguageColumn,
-    )
-
     return ComponentProfile(
         sheet="test",
         component="Test",

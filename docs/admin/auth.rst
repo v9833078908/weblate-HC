@@ -817,8 +817,6 @@ there is any) into :setting:`django:INSTALLED_APPS`:
     INSTALLED_APPS += (
         # Install authentication app here
     )
-
-
 .. _2fa:
 
 Two-factor authentication

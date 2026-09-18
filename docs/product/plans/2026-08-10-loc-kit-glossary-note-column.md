@@ -136,7 +136,9 @@ def test_flat_note_on_a_source_less_row_is_refused() -> None:
 
 def test_unrecognised_extra_column_has_actionable_error() -> None:
     rows = [["ru", "en", "Character limit"], ["Партия", "Party", "40"]]
-    with pytest.raises(InferenceError, match="recognised term-note header, for example"):
+    with pytest.raises(
+        InferenceError, match="recognised term-note header, for example"
+    ):
         infer_glossary_profile("S", rows, component="s")
 ```
 
@@ -154,11 +156,29 @@ Expected: FAIL because a populated `note` column is currently rejected as a non-
 # into every LLM prompt, where a wrong guess is invisible.
 _NOTE_HEADERS = frozenset(
     {
-        "note", "notes", "comment", "comments", "description", "descriptions",
-        "explanation", "explanations", "context", "usage", "definition", "meaning",
-        "примечание", "примечания", "комментарий", "комментарии",
-        "описание", "описания", "пояснение", "пояснения", "контекст",
-        "определение", "значение",
+        "note",
+        "notes",
+        "comment",
+        "comments",
+        "description",
+        "descriptions",
+        "explanation",
+        "explanations",
+        "context",
+        "usage",
+        "definition",
+        "meaning",
+        "примечание",
+        "примечания",
+        "комментарий",
+        "комментарии",
+        "описание",
+        "описания",
+        "пояснение",
+        "пояснения",
+        "контекст",
+        "определение",
+        "значение",
     }
 )
 ```
@@ -226,22 +246,22 @@ def _reject_note_outside_term_rows(
 **Step 5: call it without a rescan.** Preserve the existing one-pass `populated` loop at `infer.py:555-559`. Immediately after it, add:
 
 ```python
-    note_col = _find_note_column(header_row, populated, languages, notes)
-    mapped = set(languages)
-    if note_col is not None:
-        mapped.add(note_col)
-    unmapped = sorted(populated - mapped)
+note_col = _find_note_column(header_row, populated, languages, notes)
+mapped = set(languages)
+if note_col is not None:
+    mapped.add(note_col)
+unmapped = sorted(populated - mapped)
 ```
 
 Replace the old `unmapped = sorted(populated - languages.keys())` line. The error should say:
 
 ```python
-        msg = (
-            f"column {col + 1} ({header_text!r}) holds data but is not a "
-            "recognised language column; rename the header to a recognised "
-            "term-note header, for example note, description, comment, or "
-            "explanation, or supply an explicit profile"
-        )
+msg = (
+    f"column {col + 1} ({header_text!r}) holds data but is not a "
+    "recognised language column; rename the header to a recognised "
+    "term-note header, for example note, description, comment, or "
+    "explanation, or supply an explicit profile"
+)
 ```
 
 **Step 6: reject an unattached flat note, then emit the grammar.** The generated
@@ -251,13 +271,14 @@ imported and then discarded. After `term_rows` is complete and before building
 `grammar`, add:
 
 ```python
-    if note_col is not None and not paired:
-        _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
+if note_col is not None and not paired:
+    _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
 ```
 
 This is deliberately a temporary flat-only shape: leave current pairs behavior
 untouched in Task 1, then replace both branches with the unified path in Task 2.
 After the existing `if paired: grammar["notes"] = ...` block, add:
+<!--- skip doccmd[all]: next --><!-- elif-branch fragment, not standalone code -->
 
 ```python
     elif note_col is not None:
@@ -322,7 +343,9 @@ def test_explicit_pairs_layout_orders_description_before_note_column() -> None:
     )
     (comp,) = document["components"]
     assert comp["grammar"]["regions"][0]["record_stride"] == 2
-    scopes = [(n["scope"], n["column"], n["row_offset"]) for n in comp["grammar"]["notes"]]
+    scopes = [
+        (n["scope"], n["column"], n["row_offset"]) for n in comp["grammar"]["notes"]
+    ]
     assert scopes[0] == ("source", 1, 1)
     assert scopes[-1] == ("source", 3, 0)
     parse_profile(document)
@@ -367,33 +390,33 @@ Expected: FAIL because Task 1 emits a note column only for flat grammar.
 Delete both Task 1's `if note_col is not None and not paired` guard and its flat-only `elif`. Start an empty `note_fields` list, populate it with the existing pairs fields, then append the source note column after the shared guard:
 
 ```python
-    note_fields: list[dict[str, Any]] = []
-    if paired:
-        # Keep the existing validation that every described language is an
-        # initial target, then preserve its current source/target fields.
-        note_fields.extend(
-            {
-                "scope": "source" if col == source_col else "target",
-                "column": col + 1,
-                "header": _cell(header_row, col),
-                "row_offset": 1,
-            }
-            | ({} if col == source_col else {"language": languages[col]})
-            for col in sorted(languages)
-            if col == source_col or languages[col] in target_langs
-        )
-    if note_col is not None:
-        _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
-        note_fields.append(
-            {
-                "scope": "source",
-                "column": note_col + 1,
-                "header": _cell(header_row, note_col),
-                "row_offset": 0,
-            }
-        )
-    if note_fields:
-        grammar["notes"] = note_fields
+note_fields: list[dict[str, Any]] = []
+if paired:
+    # Keep the existing validation that every described language is an
+    # initial target, then preserve its current source/target fields.
+    note_fields.extend(
+        {
+            "scope": "source" if col == source_col else "target",
+            "column": col + 1,
+            "header": _cell(header_row, col),
+            "row_offset": 1,
+        }
+        | ({} if col == source_col else {"language": languages[col]})
+        for col in sorted(languages)
+        if col == source_col or languages[col] in target_langs
+    )
+if note_col is not None:
+    _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
+    note_fields.append(
+        {
+            "scope": "source",
+            "column": note_col + 1,
+            "header": _cell(header_row, note_col),
+            "row_offset": 0,
+        }
+    )
+if note_fields:
+    grammar["notes"] = note_fields
 ```
 
 The current pairs fields must precede this append: `_join_notes` preserves declaration order.
@@ -438,34 +461,34 @@ GLOSSARY_NOTE_CSV = (
 **Step 2: add the contract test** to `LocKitGlossaryUploadUITest`, beside `test_term_description_sheet_maps_descriptions_as_explanations`:
 
 ```python
-    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
-    def test_note_column_reaches_the_created_glossary_llm_entry(self) -> None:
-        self._start(upload=self._csv("Terms.csv", GLOSSARY_NOTE_CSV), slug=self.slug)
-        draft = self._draft()
-        draft.refresh_from_db()
+@override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+def test_note_column_reaches_the_created_glossary_llm_entry(self) -> None:
+    self._start(upload=self._csv("Terms.csv", GLOSSARY_NOTE_CSV), slug=self.slug)
+    draft = self._draft()
+    draft.refresh_from_db()
 
-        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
-        preview = json.loads(draft.preview_json)
-        self.assertEqual(preview["term_count"], 2)
-        self.assertEqual(preview["note_count"], 2)
-        self.assertIn("мужской род", preview["terms"][0]["source_explanation"])
+    self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+    preview = json.loads(draft.preview_json)
+    self.assertEqual(preview["term_count"], 2)
+    self.assertEqual(preview["note_count"], 2)
+    self.assertIn("мужской род", preview["terms"][0]["source_explanation"])
 
-        page = self.client.get(
-            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
-        )
-        self.assertContains(page, "мужской род")
+    page = self.client.get(
+        reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+    )
+    self.assertContains(page, "мужской род")
 
-        self._confirm()
-        component = Component.objects.get(slug=self.slug)
-        translation = component.translation_set.get(language__code="fr")
-        unit = translation.unit_set.get(source="Партия")
-        # ruff: ignore[private-member-access]
-        entry = BaseLLMTranslation._get_glossary_entry(unit)
-        self.assertIsNotNone(entry)
-        self.assertEqual(
-            entry["source_explanation"],
-            "Правящая политическая партия. Во французском le Parti, мужской род.",
-        )
+    self._confirm()
+    component = Component.objects.get(slug=self.slug)
+    translation = component.translation_set.get(language__code="fr")
+    unit = translation.unit_set.get(source="Партия")
+    # ruff: ignore[private-member-access]
+    entry = BaseLLMTranslation._get_glossary_entry(unit)
+    self.assertIsNotNone(entry)
+    self.assertEqual(
+        entry["source_explanation"],
+        "Правящая политическая партия. Во французском le Parti, мужской род.",
+    )
 ```
 
 This intentionally verifies the deterministic contract. Do not call OpenRouter, assert a model output, or attempt to observe a server-to-provider request from the browser.

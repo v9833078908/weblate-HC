@@ -7,6 +7,7 @@ This reference provides a definitive guide to interpreting, debugging, and resol
 ## 1. Built-in Weblate Quality Checks
 
 ### 1.1. `same` (`SameCheck` — `weblate/checks/same.py`)
+
 - **What it checks:** Tests whether a translation unit's source is identical to its target (`source == target`).
 - **Typical Causes:**
   - *True Positive (Defect):* The string was accidentally left untranslated or machine translation failed to translate the string.
@@ -18,6 +19,7 @@ This reference provides a definitive guide to interpreting, debugging, and resol
 ---
 
 ### 1.2. `multiple_capital` (`MultipleCapitalCheck` — `weblate/checks/chars.py`)
+
 - **What it checks:** Scans the target for sequences of 2 or more uppercase letters (`\p{Lu}{2,}`) that do not appear in uppercase in the source string.
 - **Typical Causes:**
   - *True Positive (Defect):* Accidental shouting/caps-lock typos in translation (e.g. `CLick HERE`).
@@ -29,6 +31,7 @@ This reference provides a definitive guide to interpreting, debugging, and resol
 ---
 
 ### 1.3. `reused` (`ReusedCheck` — `weblate/checks/consistency.py`)
+
 - **What it checks:** Flags when **different source strings** within the same component share the **exact same target string** (`Unit.objects.same_target(unit).exists()`).
 - **Typical Causes:**
   - *True Positive (Mistranslation / Context Hallucination):* Two distinct game concepts were erroneously merged (e.g. `Unit_DriverVermaht` with source `Стрелок` translated as `Fahrer` because the context key contained `Driver`, colliding with `Unit_DriverRKKA` `Водитель` $\to$ `Fahrer`).
@@ -43,6 +46,7 @@ This reference provides a definitive guide to interpreting, debugging, and resol
 ---
 
 ### 1.4. `inconsistent` (`ConsistencyCheck` — `weblate/checks/consistency.py`)
+
 - **What it checks:** Flags when the **exact same source string** has different translations in different units across the component.
 - **Typical Causes:**
   - *True Positive (Defect):* Accidental synonym usage or inconsistency in UI buttons.
@@ -56,26 +60,32 @@ This reference provides a definitive guide to interpreting, debugging, and resol
 ## 2. Custom Game Checks (`weblate_customization/checks.py`)
 
 ### 2.1. `game-markup` (`GameMarkupCheck`)
+
 - **What it checks:** Ensures Unity rich-text tags (`<color=#RRGGBB>`, `<size=N>`, `<b>`, `<i>`, `<link>`, `<sprite name="...">`) in target match the source multiset exactly.
 - **Remediation:** Fix broken or missing opening/closing tags. Flag: `ignore-game-markup`.
 
 ### 2.2. `game-line-break` (`GameLineBreakCheck`)
+
 - **What it checks:** Ensures the Hero Craft engine line separator `$` is neither lost nor added, and that no whitespace hugs it tightly.
 - **Remediation:** Remove whitespace around `$` or restore missing `$`. Flag: `ignore-game-line-break`.
 
 ### 2.3. `game-token` (`GameTokenCheck`)
+
 - **What it checks:** Validates that engine substitution identifiers (`item_type[|{0}]`, `skirmish_league_id[gen|в {0}]`) survive into target. Brackets without `|` are treated as normal prose.
 - **Remediation:** Restore the exact lookup key before the bracket. Flag: `ignore-game-token`.
 
 ### 2.4. `game-number` (`GameNumberCheck`)
+
 - **What it checks:** Ensures all numbers from source appear in target (with normalized decimal separators and date handling).
 - **Remediation:** Fix missing or altered numbers. Flag: `ignore-game-number`.
 
 ### 2.5. `cyrillic-leak` (`CyrillicLeakCheck`)
+
 - **What it checks:** Flags any Cyrillic characters appearing in non-Cyrillic target languages (EN, DE, FR, ES, JA, ZH, etc.).
 - **Remediation:** Translate remaining Cyrillic text. Flag: `ignore-cyrillic-leak`.
 
 ### 2.6. `game-length` (`GameLengthCheck`)
+
 - **What it checks:** Flags strings that exceed maximum pixel or character length thresholds for the given UI slot.
 - **Remediation:** Shorten target or use standard abbreviations. Flag: `ignore-game-length`.
 
@@ -95,7 +105,9 @@ This reference provides a definitive guide to interpreting, debugging, and resol
 | `game-line-break` | `ignore-game-line-break` | Exceptions to the tight `$` separator rule. |
 
 ### How to apply flags via Weblate API
+
 To add a flag without losing existing flags, format the comma-separated `extra_flags` field on the unit:
+
 ```http
 PATCH /api/units/{unit_id}/
 Authorization: Token {token}

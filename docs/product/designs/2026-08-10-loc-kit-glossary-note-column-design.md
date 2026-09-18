@@ -85,15 +85,35 @@ graph LR
 # A column of prose about the term, not a translation of it. Recognised by
 # header text only: a shape rule would silently route "Character limit" into
 # every LLM prompt.
-_NOTE_HEADERS = frozenset({
-    # English
-    "note", "notes", "comment", "comments", "description", "descriptions",
-    "explanation", "explanations", "context", "usage", "definition", "meaning",
-    # Russian
-    "примечание", "примечания", "комментарий", "комментарии",
-    "описание", "описания", "пояснение", "пояснения",
-    "контекст", "определение", "значение",
-})
+_NOTE_HEADERS = frozenset(
+    {
+        # English
+        "note",
+        "notes",
+        "comment",
+        "comments",
+        "description",
+        "descriptions",
+        "explanation",
+        "explanations",
+        "context",
+        "usage",
+        "definition",
+        "meaning",
+        # Russian
+        "примечание",
+        "примечания",
+        "комментарий",
+        "комментарии",
+        "описание",
+        "описания",
+        "пояснение",
+        "пояснения",
+        "контекст",
+        "определение",
+        "значение",
+    }
+)
 ```
 
 Сравнение — `header.strip().casefold()`, точное совпадение.

@@ -639,13 +639,13 @@ def state_for_verdict(
 Добавить свойство `verdict` в тело класса `JudgeVerdict` (рядом с `__str__`):
 
 ```python
-    @property
-    def verdict(self) -> str:
-        """Derived, never stored: the severity->verdict mapping is
-        reopened by R3 and must change without a data migration (D4)."""
-        if self.unparsed:
-            return self.Verdict.UNPARSED
-        return verdict_for_severity(self.max_severity)
+@property
+def verdict(self) -> str:
+    """Derived, never stored: the severity->verdict mapping is
+    reopened by R3 and must change without a data migration (D4)."""
+    if self.unparsed:
+        return self.Verdict.UNPARSED
+    return verdict_for_severity(self.max_severity)
 ```
 
 ### Step 4: Прогнать тесты
@@ -779,14 +779,32 @@ class JudgeRoundTest(ViewTestCase):
         unit = self.get_unit()
         run = uuid.uuid4()
         self.make(
-            unit, "critical", seat=1, run_id=run,
-            errors=[{"span": "ВРАТА", "category": "terminology", "severity": "critical",
-                     "description": "the Gates are called DOORS here"}],
+            unit,
+            "critical",
+            seat=1,
+            run_id=run,
+            errors=[
+                {
+                    "span": "ВРАТА",
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "the Gates are called DOORS here",
+                }
+            ],
         )
         self.make(
-            unit, "major", seat=2, run_id=run,
-            errors=[{"span": "clause", "category": "fluency", "severity": "major",
-                     "description": "the second clause has no verb"}],
+            unit,
+            "major",
+            seat=2,
+            run_id=run,
+            errors=[
+                {
+                    "span": "clause",
+                    "category": "fluency",
+                    "severity": "major",
+                    "description": "the second clause has no verb",
+                }
+            ],
         )
         description = describe_latest_verdict(unit)
         self.assertIn("the Gates are called DOORS here", description)
@@ -797,17 +815,26 @@ class JudgeRoundTest(ViewTestCase):
         # and errors must stay distinguishable after normalization.
         unit = self.get_unit()
         self.make(
-            unit, "major",
+            unit,
+            "major",
             errors=[
-                {"span": "a", "category": "markup", "severity": "major",
-                 "description": "target dropped <color=#FF0000>"},
-                {"span": "b", "category": "fluency", "severity": "major",
-                 "description": "register too formal"},
+                {
+                    "span": "a",
+                    "category": "markup",
+                    "severity": "major",
+                    "description": "target dropped <color=#FF0000>",
+                },
+                {
+                    "span": "b",
+                    "category": "fluency",
+                    "severity": "major",
+                    "description": "register too formal",
+                },
             ],
         )
         description = describe_latest_verdict(unit)
         self.assertIn("color=#FF0000", description)  # not eaten by strip_tags
-        self.assertIn(" | ", description)            # explicit separator
+        self.assertIn(" | ", description)  # explicit separator
 ```
 
 ### Step 2: Прогнать и убедиться, что падает
@@ -1042,9 +1069,16 @@ class JudgeCheckTest(ViewTestCase):
     def test_description_carries_escaped_evidence(self) -> None:
         unit = self.get_unit()
         self.make(
-            unit, "critical",
-            errors=[{"span": "x", "category": "terminology", "severity": "critical",
-                     "description": "the Gates are called DOORS here"}],
+            unit,
+            "critical",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "the Gates are called DOORS here",
+                }
+            ],
         )
         Check.objects.filter(unit=unit).delete()
         unit.run_checks()
@@ -1154,8 +1188,8 @@ JUDGE_CHECKS = frozenset({JudgeFlagCheck.check_id, JudgeRejectCheck.check_id})
 Добавить в `weblate/checks/defaults.py`, в конец кортежа `DEFAULT_CHECK_LIST`:
 
 ```python
-    "weblate.checks.judge.JudgeFlagCheck",
-    "weblate.checks.judge.JudgeRejectCheck",
+("weblate.checks.judge.JudgeFlagCheck",)
+("weblate.checks.judge.JudgeRejectCheck",)
 ```
 
 Регистрация через `DEFAULT_CHECK_LIST` означает: env-переменные `WEBLATE_ADD_CHECK` и
@@ -1312,38 +1346,82 @@ class JudgeClientGateTest(SimpleTestCase):
 class JudgeClientTest(SimpleTestCase):
     @http_mock.activate
     def test_parses_a_verdict(self) -> None:
-        http_mock.register("POST", CHAT_URL, json=_reply([{
-            "id": 0, "verdict": "reject",
-            "errors": [{"span": "PORTES", "category": "terminology",
-                        "severity": "critical",
-                        "description": "«ВРАТА» rendered as «DOORS»; glossary says Gates"}],
-            "back_translation": "The door is blocked by the DOORS",
-        }]))
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "reject",
+                        "errors": [
+                            {
+                                "span": "PORTES",
+                                "category": "terminology",
+                                "severity": "critical",
+                                "description": "«ВРАТА» rendered as «DOORS»; glossary says Gates",
+                            }
+                        ],
+                        "back_translation": "The door is blocked by the DOORS",
+                    }
+                ]
+            ),
+        )
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertFalse(result.unparsed)
-        self.assertEqual(result.max_severity, "critical")   # derived from errors
+        self.assertEqual(result.max_severity, "critical")  # derived from errors
         self.assertEqual(result.model_verdict, "reject")
         self.assertIn("Gates", result.errors[0]["description"])
         self.assertIn("DOORS", result.back_translation)
 
     @http_mock.activate
     def test_max_severity_is_derived_from_the_worst_error(self) -> None:
-        http_mock.register("POST", CHAT_URL, json=_reply([{
-            "id": 0, "verdict": "flag",
-            "errors": [
-                {"span": "a", "category": "fluency", "severity": "minor", "description": "x"},
-                {"span": "b", "category": "style", "severity": "major", "description": "y"},
-            ],
-            "back_translation": "",
-        }]))
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "flag",
+                        "errors": [
+                            {
+                                "span": "a",
+                                "category": "fluency",
+                                "severity": "minor",
+                                "description": "x",
+                            },
+                            {
+                                "span": "b",
+                                "category": "style",
+                                "severity": "major",
+                                "description": "y",
+                            },
+                        ],
+                        "back_translation": "",
+                    }
+                ]
+            ),
+        )
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(result.max_severity, "major")
 
     @http_mock.activate
     def test_no_errors_is_severity_none(self) -> None:
-        http_mock.register("POST", CHAT_URL, json=_reply([{
-            "id": 0, "verdict": "pass", "errors": [], "back_translation": "",
-        }]))
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "pass",
+                        "errors": [],
+                        "back_translation": "",
+                    }
+                ]
+            ),
+        )
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(result.max_severity, "none")
 
@@ -1352,21 +1430,46 @@ class JudgeClientTest(SimpleTestCase):
         # D6: one HTTP call per batch of JUDGE_BATCH_SIZE, results aligned
         # to input order by segment id.
         reqs = [REQ, REQ, REQ]
-        http_mock.register("POST", CHAT_URL, json=_reply([
-            {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
-            {"id": 1, "verdict": "reject",
-             "errors": [{"span": "x", "category": "omission", "severity": "critical",
-                         "description": "z"}], "back_translation": ""},
-            {"id": 2, "verdict": "pass", "errors": [], "back_translation": ""},
-        ]))
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+                    {
+                        "id": 1,
+                        "verdict": "reject",
+                        "errors": [
+                            {
+                                "span": "x",
+                                "category": "omission",
+                                "severity": "critical",
+                                "description": "z",
+                            }
+                        ],
+                        "back_translation": "",
+                    },
+                    {"id": 2, "verdict": "pass", "errors": [], "back_translation": ""},
+                ]
+            ),
+        )
         results = request_verdicts(reqs, model="vendor/model-a")
-        self.assertEqual([r.max_severity for r in results], ["none", "critical", "none"])
+        self.assertEqual(
+            [r.max_severity for r in results], ["none", "critical", "none"]
+        )
         self.assertEqual(len(http_mock.calls), 1)
 
     @http_mock.activate
-    def test_sends_strict_schema_batch_and_requires_providers_to_honour_it(self) -> None:
-        http_mock.register("POST", CHAT_URL, json=_reply([
-            {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]))
+    def test_sends_strict_schema_batch_and_requires_providers_to_honour_it(
+        self,
+    ) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
         request_verdicts([REQ], model="vendor/model-a")
         body = json.loads(http_mock.calls[0].request.content)
         self.assertTrue(body["response_format"]["json_schema"]["strict"])
@@ -1379,12 +1482,22 @@ class JudgeClientTest(SimpleTestCase):
     def test_render_preview_is_attached_when_placeholders_are_present(self) -> None:
         # Arm D: rendered pair goes into the segment (user precondition).
         req = JudgeRequest(
-            unit_key="K", source="{0} 个国家 {1}", target="{1} 的 {0}",
-            source_language="ru", target_language="zh_Hans", note="",
-            glossary_terms=[], failing_checks=[],
+            unit_key="K",
+            source="{0} 个国家 {1}",
+            target="{1} 的 {0}",
+            source_language="ru",
+            target_language="zh_Hans",
+            note="",
+            glossary_terms=[],
+            failing_checks=[],
         )
-        http_mock.register("POST", CHAT_URL, json=_reply([
-            {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]))
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
         request_verdicts([req], model="vendor/model-a")
         segment = json.loads(http_mock.calls[0].request.content)["segments"][0]
         self.assertIn("rendered_source", segment)
@@ -1396,8 +1509,9 @@ class JudgeClientTest(SimpleTestCase):
 
     @http_mock.activate
     def test_malformed_json_makes_the_batch_unparsed(self) -> None:
-        http_mock.register("POST", CHAT_URL,
-                           json={"choices": [{"message": {"content": "not json"}}]})
+        http_mock.register(
+            "POST", CHAT_URL, json={"choices": [{"message": {"content": "not json"}}]}
+        )
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertTrue(result.unparsed)
 
@@ -1481,8 +1595,14 @@ JUDGE_REQUEST_TIMEOUT = 120
 SEVERITIES = ("none", "minor", "major", "critical")
 # Measured category set (st2-zh-recalibration.py:59-68).
 CATEGORIES = (
-    "terminology", "mistranslation", "omission", "addition",
-    "fluency", "punctuation", "markup", "register",
+    "terminology",
+    "mistranslation",
+    "omission",
+    "addition",
+    "fluency",
+    "punctuation",
+    "markup",
+    "register",
 )
 # Deterministic, order-revealing sample values (measured driver).
 _SAMPLE_VALUES = ("3", "7", "15", "28", "42", "56", "64", "77")
@@ -1523,6 +1643,7 @@ UNPARSED = JudgeResult(
 
 def render_preview(text: str) -> str | None:
     """Substitute sample values into engine placeholders; None if none."""
+
     def sub(match: re.Match[str]) -> str:
         param, plain, named = match.groups()
         if named is not None:
@@ -1630,11 +1751,26 @@ from weblate.trans.tests.test_views import ViewTestCase
 
 
 def result(severity, verdict, **kw):
-    errs = [] if severity == "none" else [
-        {"span": "x", "category": "terminology", "severity": severity, "description": "d"}
-    ]
-    return JudgeResult(max_severity=severity, model_verdict=verdict, errors=errs,
-                       back_translation=kw.get("bt", ""), unparsed=kw.get("unparsed", False))
+    errs = (
+        []
+        if severity == "none"
+        else [
+            {
+                "span": "x",
+                "category": "terminology",
+                "severity": severity,
+                "description": "d",
+            }
+        ]
+    )
+    return JudgeResult(
+        max_severity=severity,
+        model_verdict=verdict,
+        errors=errs,
+        back_translation=kw.get("bt", ""),
+        unparsed=kw.get("unparsed", False),
+    )
+
 
 PASS = result("none", "pass")
 MAJOR = result("major", "flag")
@@ -1643,8 +1779,10 @@ DEAD = JudgeResult("none", "", [], "", unparsed=True)
 
 
 @override_settings(
-    JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY="sk-test",
-    JUDGE_MODEL_SEAT_1="vendor-a/model", JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
 )
 class JudgeLoopTest(ViewTestCase):
@@ -1657,7 +1795,9 @@ class JudgeLoopTest(ViewTestCase):
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch("weblate.trans.judge_loop.repair_target", return_value=repair),
         ):
-            verdicts = run_judge_batch([unit], writable_ids=writable_ids, user=self.user)
+            verdicts = run_judge_batch(
+                [unit], writable_ids=writable_ids, user=self.user
+            )
         return unit, verdicts[unit.id], client
 
     def test_both_seats_judge_every_string(self) -> None:
@@ -1697,14 +1837,16 @@ class JudgeLoopTest(ViewTestCase):
 
     def test_confirmed_defect_triggers_one_repair_judged_by_both_seats(self) -> None:
         unit, verdict, client = self.run_batch(
-            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"])
+            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"]
+        )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(verdict.attempt, 1)
         self.assertEqual(client.call_count, 4)
 
     def test_exhausted_loop_returns_the_last_negative_verdict(self) -> None:
         _, verdict, _ = self.run_batch(
-            [CRITICAL, CRITICAL, CRITICAL, CRITICAL], repair=["still wrong"])
+            [CRITICAL, CRITICAL, CRITICAL, CRITICAL], repair=["still wrong"]
+        )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
     def test_repair_that_changes_nothing_stops_the_loop(self) -> None:
@@ -1717,7 +1859,8 @@ class JudgeLoopTest(ViewTestCase):
         unit = self.get_unit()
         unit.translate(self.user, ["Human translation"], 20)
         _, verdict, client = self.run_batch(
-            [CRITICAL, CRITICAL], repair=["MACHINE OVERWRITE"], writable=False)
+            [CRITICAL, CRITICAL], repair=["MACHINE OVERWRITE"], writable=False
+        )
         self.assertEqual(self.get_unit().target, "Human translation")
 
     def test_repair_sees_the_round_verdict_projected(self) -> None:
@@ -1741,13 +1884,15 @@ class JudgeLoopTest(ViewTestCase):
     def test_every_verdict_of_one_run_shares_the_run_id(self) -> None:
         unit, _, _ = self.run_batch([CRITICAL, CRITICAL, PASS, PASS], repair=["fixed"])
         self.assertEqual(
-            len(set(unit.judge_verdicts.values_list("run_id", flat=True))), 1)
+            len(set(unit.judge_verdicts.values_list("run_id", flat=True))), 1
+        )
 
     def test_each_seat_votes_once_per_round(self) -> None:
         unit, _, _ = self.run_batch([CRITICAL, CRITICAL, PASS, PASS], repair=["fixed"])
         self.assertEqual(
             set(unit.judge_verdicts.values_list("attempt", "seat")),
-            {(0, 1), (0, 2), (1, 1), (1, 2)})
+            {(0, 1), (0, 2), (1, 1), (1, 2)},
+        )
 ```
 
 ### Step 2: Прогнать и убедиться, что падает
@@ -1874,7 +2019,9 @@ from weblate.trans.tests.test_views import ViewTestCase
 
 class JudgeAutoFormTest(ViewTestCase):
     def modes(self, user):
-        return [c[0] for c in AutoForm(obj=self.component, user=user).fields["mode"].choices]
+        return [
+            c[0] for c in AutoForm(obj=self.component, user=user).fields["mode"].choices
+        ]
 
     def test_judge_mode_requires_review_permission(self) -> None:
         self.user.is_superuser = True
@@ -1896,9 +2043,15 @@ class JudgeAutoFormTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         form = AutoForm(
-            obj=self.component, user=self.user,
-            data={"mode": "translate", "auto_source": "mt",
-                  "engines": [], "threshold": 80, "overwrite_existing": True},
+            obj=self.component,
+            user=self.user,
+            data={
+                "mode": "translate",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+                "overwrite_existing": True,
+            },
         )
         self.assertFalse(form.is_valid())
         self.assertIn("overwrite_existing", form.errors)
@@ -1915,35 +2068,35 @@ Expected: FAIL — `judge` отсутствует в choices
 Modify `weblate/trans/forms.py`. Поле рядом с `threshold` (~строка 1225):
 
 ```python
-    overwrite_existing = forms.BooleanField(
-        label=gettext_lazy("Overwrite the existing translation"),
-        required=False,
-        initial=False,
-        help_text=gettext_lazy(
-            "By default the judge mode only translates empty strings and "
-            "strings marked for editing; strings that already have a "
-            "translation are judged, not rewritten."
-        ),
-    )
+overwrite_existing = forms.BooleanField(
+    label=gettext_lazy("Overwrite the existing translation"),
+    required=False,
+    initial=False,
+    help_text=gettext_lazy(
+        "By default the judge mode only translates empty strings and "
+        "strings marked for editing; strings that already have a "
+        "translation are judged, not rewritten."
+    ),
+)
 ```
 
 Расширить блок choices (там же, где `approved`, — он ставит state 30 и требует
 `unit.review`):
 
 ```python
-        if user is not None and (user.has_perm("unit.review", obj) or obj is None):
-            choices.append(("approved", gettext("Add as approved translation")))
-            choices.append(("judge", gettext("Add as translation with an LLM judge")))
+if user is not None and (user.has_perm("unit.review", obj) or obj is None):
+    choices.append(("approved", gettext("Add as approved translation")))
+    choices.append(("judge", gettext("Add as translation with an LLM judge")))
 ```
 
 Добавить `Field("overwrite_existing")` в layout после `SearchField("q")`. В `clean`:
 
 ```python
-        if cleaned.get("overwrite_existing") and cleaned.get("mode") != "judge":
-            self.add_error(
-                "overwrite_existing",
-                gettext("Overwrite applies only to the LLM judge mode."),
-            )
+if cleaned.get("overwrite_existing") and cleaned.get("mode") != "judge":
+    self.add_error(
+        "overwrite_existing",
+        gettext("Overwrite applies only to the LLM judge mode."),
+    )
 ```
 
 **Не менять** `self.helper = FormHelper(self)` и не добавлять `form_tag`: эта форма
@@ -1998,8 +2151,10 @@ from weblate.utils.state import STATE_FUZZY, STATE_TRANSLATED
 
 
 @override_settings(
-    JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY="sk-test",
-    JUDGE_MODEL_SEAT_1="vendor-a/model", JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_UNITS_PER_RUN=2000,
 )
 class JudgeAutoTranslateTest(ViewTestCase):
@@ -2008,22 +2163,33 @@ class JudgeAutoTranslateTest(ViewTestCase):
             out = {}
             for u in units:
                 out[u.id] = JudgeVerdict.objects.create(
-                    unit=u, max_severity=severity, model_verdict=verdict_kind,
+                    unit=u,
+                    max_severity=severity,
+                    model_verdict=verdict_kind,
                     unparsed=(verdict_kind == JudgeVerdict.Verdict.UNPARSED),
-                    judge_model="vendor-a/model", seat=1,
+                    judge_model="vendor-a/model",
+                    seat=1,
                     target_hash=compute_target_hash(u.get_target_plurals()),
-                    context_hash="c")
+                    context_hash="c",
+                )
             return out
 
-        auto = AutoTranslate(translation=self.get_translation(), user=self.user,
-                             q=q, mode="judge", overwrite_existing=overwrite)
-        with mock.patch("weblate.trans.autotranslate.run_judge_batch",
-                        side_effect=fake_batch):
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q=q,
+            mode="judge",
+            overwrite_existing=overwrite,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
             auto.process_judge(engines=[], threshold=80)
         return auto
 
     def test_reject_lands_on_a_state_that_does_not_ship(self) -> None:
         from weblate.utils.state import FUZZY_STATES
+
         unit = self.get_unit()
         unit.translate(self.user, ["some target"], STATE_TRANSLATED)
         self.perform(JudgeVerdict.Verdict.REJECT, severity="critical")
@@ -2051,8 +2217,12 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertEqual(self.get_unit().target, "Human translation")
 
     def test_fresh_translation_starts_at_needs_editing(self) -> None:
-        auto = AutoTranslate(translation=self.get_translation(), user=self.user,
-                             q="state:empty", mode="judge")
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q="state:empty",
+            mode="judge",
+        )
         self.assertEqual(auto.fresh_translation_state, STATE_FUZZY)
 
     def test_a_run_over_the_cap_is_refused(self) -> None:
@@ -2292,23 +2462,23 @@ git commit -m "feat(judge): wire the judge mode through Celery, the view, and a 
 Добавить в `weblate/trans/models/unit.py` рядом с `all_checks`:
 
 ```python
-    @property
-    def deterministic_checks(self) -> list[Check]:
-        """Checks shown as facts: judge verdicts render in their own card."""
-        from weblate.checks.judge import JUDGE_CHECKS
+@property
+def deterministic_checks(self) -> list[Check]:
+    """Checks shown as facts: judge verdicts render in their own card."""
+    from weblate.checks.judge import JUDGE_CHECKS
 
-        return [check for check in self.all_checks if check.name not in JUDGE_CHECKS]
+    return [check for check in self.all_checks if check.name not in JUDGE_CHECKS]
 ```
 
 В enforced-ветке `translate()` (около `unit.py:2444-2449`) исключить судейские из
 множества, чтобы `judge-reject` не считался enforced-провалом:
 
 ```python
-        from weblate.checks.judge import JUDGE_CHECKS
-        enforced_hit = (
-            self.all_checks_names & set(component.enforced_checks)
-        ) - JUDGE_CHECKS
-        if self.state >= STATE_TRANSLATED and component.enforced_checks and enforced_hit:
+from weblate.checks.judge import JUDGE_CHECKS
+
+enforced_hit = (self.all_checks_names & set(component.enforced_checks)) - JUDGE_CHECKS
+if self.state >= STATE_TRANSLATED and component.enforced_checks and enforced_hit:
+    ...
 ```
 
 В `weblate/templates/translate.html` заменить `unit.all_checks` на

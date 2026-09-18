@@ -22,12 +22,16 @@ flowchart TD
 ```
 
 ### Step 1: Scope Resolution
+
 Identify the target component:
+
 - Weblate URL or coordinates: `project_slug / component_slug / language_code` (e.g. `victory-banner/common/de`).
 - Local loc-kit file path if working offline.
 
 ### Step 2: Data Extraction
+
 Run the bundled extraction script to securely pull component metadata, unit inventory, and failing quality checks:
+
 ```bash
 python .claude/skills/weblate-lqa/scripts/audit_component.py \
   --project <project_slug> \
@@ -35,12 +39,15 @@ python .claude/skills/weblate-lqa/scripts/audit_component.py \
   --lang <lang_code> \
   --save-verdicts-draft /tmp/verdicts_draft.json
 ```
+
 *(The script loads the API token securely from `deploy/.env.local` or environment variables without printing secrets. Fill in `review_scope` in the saved draft before scoring — see Step 5.)*
 
 ### Step 3: Layer 0 — Weblate Check Diagnostics
+
 Group all failing checks by their exact `check_id` (`same`, `multiple_capital`, `reused`, `game-token`, `game-number`, `game-markup`, `game-length`, `cyrillic-leak`).
 
 Consult `references/weblate-checks-guide.md` to classify every triggered check:
+
 1. **True Positives (Real Bugs):**
    - Context hallucinations (e.g. source `Стрелок` translated as `Fahrer` due to context key `Unit_DriverVermaht`).
    - Domain term collisions (e.g. `Выгрузить` translated as `Entladen` instead of `Aussteigen`).
@@ -51,13 +58,16 @@ Consult `references/weblate-checks-guide.md` to classify every triggered check:
    - Target grammatical convergence flagged by `reused` (e.g. German *Sanitäter* for both singular and plural).
 
 ### Step 4: Layer 1 — MQM-Core Game Profile Audit
+
 Audit the units against the 4 core dimensions in `references/mqm-game-profile.md`:
+
 - **Accuracy (`accuracy/`):** mistranslation, omission, addition, context hallucination.
 - **Terminology & Lore (`terminology/`):** glossary violations, acronym leaks (e.g. English `AT` in German instead of `Pz.-`), inappropriate domain register.
 - **Fluency & Style (`fluency/`):** grammar, noun capitalization, compound spacing, formality register (*Sie* vs *Du*). <!-- # codespell:ignore -->
 - **Game Engine (`game_engine/`):** placeholder corruption, keybinding syntax, length overflow.
 
 Assign severity penalty points for reviewed findings:
+
 - **Neutral (0 pt):** Stylistic remark.
 - **Minor (1 pt):** Minor typo or minor punctuation variance.
 - **Major (5 pt):** Terminology/acronym leak, mechanic distortion, wrong domain register.
@@ -71,6 +81,7 @@ covering more than what was actually tracked here — see
 `references/mqm-game-profile.md` §4 (Sampling & Coverage).
 
 ### Step 5: Scorecard Generation & Remediation Plan
+
 1. Build the verdicts file with an explicit `review_scope` — either
    `{"coverage": "full"}` (every unit in the component was actually reviewed) or
    `{"reviewed_unit_ids": [...]}` (the exact IDs tracked in Step 4, including units
@@ -151,6 +162,7 @@ Always structure the LQA report using this format:
   `references/mqm-game-profile.md` §1.3.
 
 ## 3. Bundled Resources
+
 - `references/mqm-game-profile.md` — Full MQM typology, scoring mathematics, and release gates.
 - `references/weblate-checks-guide.md` — Complete catalog of Weblate checks and flag remediation matrix.
 - `scripts/audit_component.py` — Secure CLI tool for unit extraction and MQM scorecard generation.

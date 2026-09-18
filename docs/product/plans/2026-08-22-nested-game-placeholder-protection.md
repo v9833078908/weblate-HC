@@ -119,6 +119,7 @@ In ``weblate_customization/src/weblate_customization/checks.py``:
    ```text
    {identifier:cond:comparison?branch[|alternate]}
    ```
+
    ``identifier``, ``:cond:``, the comparison, ``?``, the optional ``|``, and
    structural braces are syntax. A nested ``{...}`` is an opaque syntax
    placeholder. Everything else in a branch is visible, translatable text.

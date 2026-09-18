@@ -5,11 +5,39 @@
     "limits_source": "справочник Steamworks v2026-09",
     "markup": "BBCode",
     "source_locale": "русский",
-    "locales": ["en", "de", "fr", "es", "pt_BR", "tr", "ja", "ko", "zh_Hans"],
+    "locales": [
+      "en",
+      "de",
+      "fr",
+      "es",
+      "pt_BR",
+      "tr",
+      "ja",
+      "ko",
+      "zh_Hans"
+    ],
     "fields": [
-      { "id": "short", "label": "Краткое описание", "limit": 300, "markup": true, "required": true },
-      { "id": "about", "label": "Об игре", "limit": 8000, "markup": true, "required": true },
-      { "id": "legal", "label": "Правовая информация", "limit": 500, "markup": true, "required": false }
+      {
+        "id": "short",
+        "label": "Краткое описание",
+        "limit": 300,
+        "markup": true,
+        "required": true
+      },
+      {
+        "id": "about",
+        "label": "Об игре",
+        "limit": 8000,
+        "markup": true,
+        "required": true
+      },
+      {
+        "id": "legal",
+        "label": "Правовая информация",
+        "limit": 500,
+        "markup": true,
+        "required": false
+      }
     ]
   },
   "google_play": {
@@ -18,11 +46,39 @@
     "limits_source": "справочник Google Play",
     "markup": null,
     "source_locale": "русский, ru-RU",
-    "locales": ["en", "de", "fr", "es", "pt_BR", "tr", "ja", "ko", "zh_Hans"],
+    "locales": [
+      "en",
+      "de",
+      "fr",
+      "es",
+      "pt_BR",
+      "tr",
+      "ja",
+      "ko",
+      "zh_Hans"
+    ],
     "fields": [
-      { "id": "title", "label": "Название", "limit": 30, "markup": false, "required": true },
-      { "id": "short", "label": "Краткое описание", "limit": 80, "markup": false, "required": true },
-      { "id": "full", "label": "Полное описание", "limit": 4000, "markup": false, "required": true }
+      {
+        "id": "title",
+        "label": "Название",
+        "limit": 30,
+        "markup": false,
+        "required": true
+      },
+      {
+        "id": "short",
+        "label": "Краткое описание",
+        "limit": 80,
+        "markup": false,
+        "required": true
+      },
+      {
+        "id": "full",
+        "label": "Полное описание",
+        "limit": 4000,
+        "markup": false,
+        "required": true
+      }
     ]
   },
   "app_store": {
@@ -31,13 +87,53 @@
     "limits_source": "справочник App Store Connect",
     "markup": null,
     "source_locale": "русский",
-    "locales": ["en", "de", "fr", "es", "pt_BR", "tr", "ja", "ko", "zh_Hans"],
+    "locales": [
+      "en",
+      "de",
+      "fr",
+      "es",
+      "pt_BR",
+      "tr",
+      "ja",
+      "ko",
+      "zh_Hans"
+    ],
     "fields": [
-      { "id": "name", "label": "Название", "limit": 30, "markup": false, "required": true },
-      { "id": "subtitle", "label": "Подзаголовок", "limit": 30, "markup": false, "required": true },
-      { "id": "description", "label": "Описание", "limit": 4000, "markup": false, "required": true },
-      { "id": "keywords", "label": "Ключевые слова", "limit": 100, "markup": false, "required": false },
-      { "id": "promotional", "label": "Промотекст", "limit": 170, "markup": false, "required": false }
+      {
+        "id": "name",
+        "label": "Название",
+        "limit": 30,
+        "markup": false,
+        "required": true
+      },
+      {
+        "id": "subtitle",
+        "label": "Подзаголовок",
+        "limit": 30,
+        "markup": false,
+        "required": true
+      },
+      {
+        "id": "description",
+        "label": "Описание",
+        "limit": 4000,
+        "markup": false,
+        "required": true
+      },
+      {
+        "id": "keywords",
+        "label": "Ключевые слова",
+        "limit": 100,
+        "markup": false,
+        "required": false
+      },
+      {
+        "id": "promotional",
+        "label": "Промотекст",
+        "limit": 170,
+        "markup": false,
+        "required": false
+      }
     ]
   },
   "custom": {
@@ -46,7 +142,17 @@
     "limits_source": "без ограничений",
     "markup": null,
     "source_locale": "русский",
-    "locales": ["en", "de", "fr", "es", "pt_BR", "tr", "ja", "ko", "zh_Hans"],
+    "locales": [
+      "en",
+      "de",
+      "fr",
+      "es",
+      "pt_BR",
+      "tr",
+      "ja",
+      "ko",
+      "zh_Hans"
+    ],
     "fields": []
   }
 }

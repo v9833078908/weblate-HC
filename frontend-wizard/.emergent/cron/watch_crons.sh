@@ -13,15 +13,15 @@ CRON_API_URL="${CRON_API_URL:-}"
 
 # sha256 of $1, or empty when the file is absent (matches the install writer).
 hash_file() {
-	if [ -f "$1" ]; then
-		sha256sum "$1" 2>/dev/null | cut -d' ' -f1
-	else
-		printf ''
-	fi
+    if [ -f "$1" ]; then
+        sha256sum "$1" 2> /dev/null | cut -d' ' -f1
+    else
+        printf ''
+    fi
 }
 
 current="$(hash_file "$YAML")"
-applied="$(cat "$APPLIED" 2>/dev/null || printf '')"
+applied="$(cat "$APPLIED" 2> /dev/null || printf '')"
 
 # Converged: nothing to do.
 [ "$current" = "$applied" ] && exit 0
@@ -30,8 +30,8 @@ applied="$(cat "$APPLIED" 2>/dev/null || printf '')"
 
 # Fire-and-forget preview reconcile; silent on any transport failure.
 curl -sS -o /dev/null --max-time 15 \
-	-X POST \
-	-H "Content-Type: application/json" \
-	-d "{\"job_id\":\"$JOB_ID\",\"scope\":\"preview\"}" \
-	"$CRON_API_URL/internal/crons/reconcile" >/dev/null 2>&1 || true
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d "{\"job_id\":\"$JOB_ID\",\"scope\":\"preview\"}" \
+    "$CRON_API_URL/internal/crons/reconcile" > /dev/null 2>&1 || true
 exit 0

@@ -608,7 +608,6 @@ class RecentCostRangeTest(TestCase):
 
 class RunSpendSmokeTest(TestCase):
     def test_unknown_price_is_reported_separately(self) -> None:
-        from weblate.trans.models import ProducerRun
 
         run = ProducerRun.objects.create(
             scope_type=ProducerRun.ScopeType.COMPONENT,

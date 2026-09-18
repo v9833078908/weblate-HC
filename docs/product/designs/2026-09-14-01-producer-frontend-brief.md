@@ -137,7 +137,8 @@ Git PR из фронта (план гейта `docs/product/plans/2026-08-10-git
 **Статус прогона.** `queued → running (import → languages → translate[lang]
 → checks) → completed | failed`; `no-update` при потере liveness
 (`weblate/utils/celery.py`). Судья: `queued → running → completed | failed`
-+ счётчики исходов (`JudgeRunUnit.Outcome`). Прогон никогда не «завершён»
+
+- счётчики исходов (`JudgeRunUnit.Outcome`). Прогон никогда не «завершён»
 без явного результата; повторный запуск — только незавершённого хвоста
 (`state:empty`).
 

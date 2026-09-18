@@ -88,7 +88,7 @@ below, applied with `re.I` and a leading `\b`, so the numbers can be recomputed 
 the committed TSV. No probe script ships with this document; a reusable one under
 `analysis/probes/` would be a separate, separately approved item.
 
-```
+```text
 ru: бля\w*|хуй\w*|хуё\w*|хер(?:ов|ня|ню|ни)\w*|хрен\w*|пизд\w*|[её]б\w*|заеб\w*
     |сук[аиуе]\b|говн\w*|дерьм\w*|жоп\w*|ср[ае]т\w*|сран\w*|мраз\w*|гнид\w*|ебен\w*
     |[её]пт\w*|нахрен|охрен\w*|нажир\w*|поп[её]рл\w*|мудак\w*|мудил\w*|похуй|пох\b

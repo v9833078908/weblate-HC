@@ -1,17 +1,20 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[ambiguous-unicode-character-docstring]
+# - the fixture docstrings deliberately quote Cyrillic sample values.
 
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from loc_kit_ingest.model import Severity
 from loc_kit_ingest.parser import parse_component
-from loc_kit_ingest.profile import load_profile, parse_profile
+from loc_kit_ingest.profile import PairRegion, PairsGrammar, load_profile, parse_profile
 from loc_kit_ingest.reader import read_sheets
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -190,10 +193,6 @@ def test_preserves_internal_newlines_and_markup(terms_component):
         ["опи\nсание", "descrip\ntion", "説明"],
     ]
     # Adjust component to match this 2-row region
-    from dataclasses import replace
-
-    from loc_kit_ingest.profile import PairRegion, PairsGrammar
-
     component = replace(
         terms_component,
         grammar=PairsGrammar(
@@ -261,7 +260,7 @@ def test_record_map_parses_one_row_records(record_map_component, record_map_rows
 def test_record_map_allows_records_without_notes(record_map_component, record_map_rows):
     result = parse_component(record_map_component, record_map_rows)
     settings_term = next(u for u in result.units if u.values["en"] == "Settings")
-    assert settings_term.source_explanation == ""
+    assert not settings_term.source_explanation
     assert settings_term.target_explanations == {"en": ""}
 
     quit_term = next(u for u in result.units if u.values["en"] == "Quit")
@@ -277,7 +276,7 @@ def test_record_map_blank_section_is_not_inherited(
     errors = [d for d in result.diagnostics if d.severity is Severity.ERROR]
     assert errors == []
     term = next(u for u in result.units if u.values["ru"] == "Враг")
-    assert term.section == ""
+    assert not term.section
     assert term.context == '["","Враг"]'
 
 

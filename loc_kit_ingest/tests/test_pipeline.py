@@ -403,7 +403,7 @@ def _fixture_rows():
     with (FIXTURES / "glossary-record-map.csv").open(
         newline="", encoding="utf-8"
     ) as handle:
-        return [row for row in csv.reader(handle)]
+        return list(csv.reader(handle))
 
 
 def test_record_map_renders_and_parses_back(tmp_path):

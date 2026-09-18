@@ -106,7 +106,7 @@ def compute_context_hash(
     note: str,
     explanation: str,
     glossary_terms: Iterable[Mapping[str, object]],
-) -> str:
+) -> str: ...
 ```
 
 Hash `[source, note, explanation, *terms]`. Update every caller to pass the request explanation or the current `locked.source_unit.explanation`. Do not add a compatibility default: every call site must state which explanation belongs to its context.

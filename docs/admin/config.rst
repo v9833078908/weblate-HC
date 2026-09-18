@@ -2763,8 +2763,6 @@ The default setting is:
         # Daily limit: 50 emails per day
         (50, 86400),
     ]
-
-
 .. setting:: RATELIMIT_ATTEMPTS
 
 RATELIMIT_ATTEMPTS

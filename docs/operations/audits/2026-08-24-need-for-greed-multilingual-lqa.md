@@ -121,14 +121,13 @@
 3. **Weblate flags:** after an editor validates the classifications, add `ignore-reused` to Italian Units 368597, 368705, 368819, 368893 and Turkish Units 369529, 369825. Do not add `ignore-game-markup` to French Units 359515/359527 or `ignore-reused` to Turkish Unit 366670. Do not bulk-add `ignore-same`; review each term/name first.
 4. **Remaining coverage:** every non-UI component was reviewed in full. The only unreviewed strings are in `ui`: units not at a zero-based multiple-of-five API position and without a current check warning. Review those remaining UI units before claiming a component-wide project grade.
 
-
 ---
 
-# Weblate LQA Audit: need-for-greed / all game components (FR)
+## Weblate LQA Audit: need-for-greed / all game components (FR)
 
 > Findings are analyst-reviewed with two conservative LLM-assisted passes in this session. They are not verdicts from `weblate/trans/judge.py`.
 
-## 1. MQM-Core Quality Scorecard
+### 1. MQM-Core Quality Scorecard
 
 | Metric | Value |
 |---|---|
@@ -145,7 +144,7 @@
 | **Minor Defects (1 pt)** | 2 | See log |
 | **Total Penalty Points** | 117 pt | Tool-computed using 3146 reviewed source words |
 
-### Component scorecards
+#### Component scorecards
 
 | Component | Coverage | Score | Grade | C/M/m |
 |---|---:|---:|---|---:|
@@ -158,7 +157,7 @@
 | Buyers | full | 100.00 | Grade A (Pass) | 0/0/0 |
 | Google Play | full | 92.42 | Fail (Critical Blocker) | 1/0/0 |
 
-## 2. Reviewed Defect Log (MQM Categories)
+### 2. Reviewed Defect Log (MQM Categories)
 
 - **CRITICAL** `amountFormatted` (Unit 359515, `ui`)
   - **Source:** `{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}`
@@ -167,11 +166,11 @@
   - **Explanation:** The target inserts non-breaking and narrow spaces inside the custom formatting expressions, changing the engine syntax from the source and potentially breaking placeholder parsing.
   - **Recommended target:** `{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}`
 - **CRITICAL** `humanTimer` (Unit 359527, `ui`)
-  - **Source:** `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|} `
-  - **Target:** `{hours :cond :>0 ?{hours}h. |}{minutes :cond :>0 ?{minutes}m. |}{seconds :cond :>=0 ?{seconds}s.|} `
+  - **Source:** `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|}`
+  - **Target:** `{hours :cond :>0 ?{hours}h. |}{minutes :cond :>0 ?{minutes}m. |}{seconds :cond :>=0 ?{seconds}s.|}`
   - **Category:** `game_engine/broken_placeholder`
   - **Explanation:** The target adds non-breaking and narrow spaces within all three conditional placeholders, altering syntax that must remain unchanged for reliable engine parsing.
-  - **Recommended target:** `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|} `
+  - **Recommended target:** `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|}`
 - **MAJOR** `craftSlot` (Unit 359637, `ui`)
   - **Source:** `Craft slot`
   - **Target:** `Artisanat`
@@ -238,7 +237,7 @@
   - **Category:** `accuracy/untranslated`
   - **Explanation:** The target is empty while the source is a meaningful full Google Play store description.
 
-## 3. Weblate Quality Checks Analysis (Layer 0)
+### 3. Weblate Quality Checks Analysis (Layer 0)
 
 | Check | Count | Classification |
 |---|---:|---|
@@ -248,21 +247,20 @@
 | `punctuation_spacing` | 5 | False positives caused by emoji shortcodes such as :monocle: and :sunglasses:. |
 | `same` | 28 | All but the French Ball-Roller item were benign names, syntactic placeholders, onomatopoeia, or accepted game terms; Ball-Roller is logged as a Major terminology/untranslated issue. |
 
-## 4. Actionable Remediation Plan
+### 4. Actionable Remediation Plan
 
 1. **Release blockers:** translate `google-play/gp_full` (the empty full store description) for this language. French must also restore the exact engine expressions in `ui/amountFormatted` and `ui/humanTimer` without spaces inside `{...}`.
 2. **String corrections:** apply the recommended targets in the defect log for every Major/Minor item whose recommendation is supplied. For full store descriptions, commission a complete locale-native marketing translation rather than copying the source.
 3. **Weblate flags:** after an editor validates the classifications, add `ignore-reused` to Italian Units 368597, 368705, 368819, 368893 and Turkish Units 369529, 369825. Do not add `ignore-game-markup` to French Units 359515/359527 or `ignore-reused` to Turkish Unit 366670. Do not bulk-add `ignore-same`; review each term/name first.
 4. **Remaining coverage:** every non-UI component was reviewed in full. The only unreviewed strings are in `ui`: units not at a zero-based multiple-of-five API position and without a current check warning. Review those remaining UI units before claiming a component-wide project grade.
 
-
 ---
 
-# Weblate LQA Audit: need-for-greed / all game components (PL)
+## Weblate LQA Audit: need-for-greed / all game components (PL)
 
 > Findings are analyst-reviewed with two conservative LLM-assisted passes in this session. They are not verdicts from `weblate/trans/judge.py`.
 
-## 1. MQM-Core Quality Scorecard
+### 1. MQM-Core Quality Scorecard
 
 | Metric | Value |
 |---|---|
@@ -279,7 +277,7 @@
 | **Minor Defects (1 pt)** | 8 | See log |
 | **Total Penalty Points** | 58 pt | Tool-computed using 3117 reviewed source words |
 
-### Component scorecards
+#### Component scorecards
 
 | Component | Coverage | Score | Grade | C/M/m |
 |---|---:|---:|---|---:|
@@ -292,11 +290,11 @@
 | Buyers | full | 100.00 | Grade A (Pass) | 0/0/0 |
 | Google Play | full | 92.42 | Fail (Critical Blocker) | 1/0/0 |
 
-## 2. Reviewed Defect Log (MQM Categories)
+### 2. Reviewed Defect Log (MQM Categories)
 
 - **MINOR** `humanTimer` (Unit 369061, `ui`)
-  - **Source:** `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|} `
-  - **Target:** `{hours:cond:>0?{hours}g. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|} `
+  - **Source:** `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|}`
+  - **Target:** `{hours:cond:>0?{hours}g. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|}`
   - **Category:** `fluency/spelling_orthography`
   - **Explanation:** “g.” is not the standard Polish abbreviation for “godzina”; “godz.” is the appropriate abbreviation. The conditional syntax and placeholders remain intact.
   - **Recommended target:** `{hours:cond:>0?{hours} godz. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|}`
@@ -378,28 +376,27 @@
   - **Category:** `accuracy/untranslated`
   - **Explanation:** The target is empty while the source is a meaningful full Google Play store description.
 
-## 3. Weblate Quality Checks Analysis (Layer 0)
+### 3. Weblate Quality Checks Analysis (Layer 0)
 
 | Check | Count | Classification |
 |---|---:|---|
 | `inconsistent` | 2 | Not scored: each returned row has no duplicate same-source peer in its component inventory; retain as stale or cross-component diagnostic pending a fresh check refresh. |
 | `same` | 36 | All but the French Ball-Roller item were benign names, syntactic placeholders, onomatopoeia, or accepted game terms; Ball-Roller is logged as a Major terminology/untranslated issue. |
 
-## 4. Actionable Remediation Plan
+### 4. Actionable Remediation Plan
 
 1. **Release blockers:** translate `google-play/gp_full` (the empty full store description) for this language. French must also restore the exact engine expressions in `ui/amountFormatted` and `ui/humanTimer` without spaces inside `{...}`.
 2. **String corrections:** apply the recommended targets in the defect log for every Major/Minor item whose recommendation is supplied. For full store descriptions, commission a complete locale-native marketing translation rather than copying the source.
 3. **Weblate flags:** after an editor validates the classifications, add `ignore-reused` to Italian Units 368597, 368705, 368819, 368893 and Turkish Units 369529, 369825. Do not add `ignore-game-markup` to French Units 359515/359527 or `ignore-reused` to Turkish Unit 366670. Do not bulk-add `ignore-same`; review each term/name first.
 4. **Remaining coverage:** every non-UI component was reviewed in full. The only unreviewed strings are in `ui`: units not at a zero-based multiple-of-five API position and without a current check warning. Review those remaining UI units before claiming a component-wide project grade.
 
-
 ---
 
-# Weblate LQA Audit: need-for-greed / all game components (IT)
+## Weblate LQA Audit: need-for-greed / all game components (IT)
 
 > Findings are analyst-reviewed with two conservative LLM-assisted passes in this session. They are not verdicts from `weblate/trans/judge.py`.
 
-## 1. MQM-Core Quality Scorecard
+### 1. MQM-Core Quality Scorecard
 
 | Metric | Value |
 |---|---|
@@ -416,7 +413,7 @@
 | **Minor Defects (1 pt)** | 14 | See log |
 | **Total Penalty Points** | 79 pt | Tool-computed using 3126 reviewed source words |
 
-### Component scorecards
+#### Component scorecards
 
 | Component | Coverage | Score | Grade | C/M/m |
 |---|---:|---:|---|---:|
@@ -429,7 +426,7 @@
 | Buyers | full | 100.00 | Grade A (Pass) | 0/0/0 |
 | Google Play | full | 92.42 | Fail (Critical Blocker) | 1/0/0 |
 
-## 2. Reviewed Defect Log (MQM Categories)
+### 2. Reviewed Defect Log (MQM Categories)
 
 - **MINOR** `craftSelectChestNotEnoughTitle` (Unit 368715, `ui`)
   - **Source:** `No chests in stock`
@@ -438,8 +435,10 @@
   - **Explanation:** “Nessun” is singular, but “Forzieri” is plural. The noun must be singular here.
   - **Recommended target:** `Nessun forziere in magazzino`
 - **MINOR** `terrain0Description` (Unit 368755, `ui`)
-  - **Source:** `Every hero starts somewhere!\nBuried here are your first treasures — and your first troubles. This is where you'll learn to mine, smelt, show off, and survive.`
-  - **Target:** `Ogni eroe inizia da qualche parte!\nQui sono sepolti i tuoi primi tesori — e i tuoi primi problemi. Qui imparerai a estrarre, fondere, sfoggiare e sopravvivere.`
+  - **Source:** `Every hero starts somewhere!
+\nBuried here are your first treasures — and your first troubles. This is where you'll learn to mine, smelt, show off, and survive.`
+  - **Target:** `Ogni eroe inizia da qualche parte!
+\nQui sono sepolti i tuoi primi tesori — e i tuoi primi problemi. Qui imparerai a estrarre, fondere, sfoggiare e sopravvivere.`
   - **Category:** `fluency/grammar_syntax`
   - **Explanation:** “Sfoggiare” is transitive and lacks an object here, so it does not correctly render the intransitive “show off.”
   - **Recommended target:** `Ogni eroe inizia da qualche parte!\nQui sono sepolti i tuoi primi tesori — e i tuoi primi problemi. Qui imparerai a estrarre, fondere, metterti in mostra e sopravvivere.`
@@ -569,7 +568,7 @@
   - **Category:** `accuracy/omission`
   - **Explanation:** The target is completely blank while the source contains a full, meaningful store description with feature copy and formatting.
 
-## 3. Weblate Quality Checks Analysis (Layer 0)
+### 3. Weblate Quality Checks Analysis (Layer 0)
 
 | Check | Count | Classification |
 |---|---:|---|
@@ -577,21 +576,20 @@
 | `reused` | 4 | Italian pairs are grammatical convergence/case variants; Turkish Trade/Trading is convergence, but Crab Warmcoat -> Yengeç Sıcaklığı collides with Crab Warmth and is logged Major. |
 | `same` | 38 | All but the French Ball-Roller item were benign names, syntactic placeholders, onomatopoeia, or accepted game terms; Ball-Roller is logged as a Major terminology/untranslated issue. |
 
-## 4. Actionable Remediation Plan
+### 4. Actionable Remediation Plan
 
 1. **Release blockers:** translate `google-play/gp_full` (the empty full store description) for this language. French must also restore the exact engine expressions in `ui/amountFormatted` and `ui/humanTimer` without spaces inside `{...}`.
 2. **String corrections:** apply the recommended targets in the defect log for every Major/Minor item whose recommendation is supplied. For full store descriptions, commission a complete locale-native marketing translation rather than copying the source.
 3. **Weblate flags:** after an editor validates the classifications, add `ignore-reused` to Italian Units 368597, 368705, 368819, 368893 and Turkish Units 369529, 369825. Do not add `ignore-game-markup` to French Units 359515/359527 or `ignore-reused` to Turkish Unit 366670. Do not bulk-add `ignore-same`; review each term/name first.
 4. **Remaining coverage:** every non-UI component was reviewed in full. The only unreviewed strings are in `ui`: units not at a zero-based multiple-of-five API position and without a current check warning. Review those remaining UI units before claiming a component-wide project grade.
 
-
 ---
 
-# Weblate LQA Audit: need-for-greed / all game components (TR)
+## Weblate LQA Audit: need-for-greed / all game components (TR)
 
 > Findings are analyst-reviewed with two conservative LLM-assisted passes in this session. They are not verdicts from `weblate/trans/judge.py`.
 
-## 1. MQM-Core Quality Scorecard
+### 1. MQM-Core Quality Scorecard
 
 | Metric | Value |
 |---|---|
@@ -608,7 +606,7 @@
 | **Minor Defects (1 pt)** | 10 | See log |
 | **Total Penalty Points** | 115 pt | Tool-computed using 3129 reviewed source words |
 
-### Component scorecards
+#### Component scorecards
 
 | Component | Coverage | Score | Grade | C/M/m |
 |---|---:|---:|---|---:|
@@ -621,14 +619,14 @@
 | Buyers | full | 100.00 | Grade A (Pass) | 0/0/0 |
 | Google Play | full | 92.42 | Fail (Critical Blocker) | 1/0/0 |
 
-## 2. Reviewed Defect Log (MQM Categories)
+### 2. Reviewed Defect Log (MQM Categories)
 
 - **MAJOR** `humanTimer` (Unit 369527, `ui`)
-  - **Source:** `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|} `
-  - **Target:** `{hours:cond:>0?{hours}s. |}{minutes:cond:>0?{minutes}d. |}{seconds:cond:>=0?{seconds}dk.|} `
+  - **Source:** `{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?{seconds}s.|}`
+  - **Target:** `{hours:cond:>0?{hours}s. |}{minutes:cond:>0?{minutes}d. |}{seconds:cond:>=0?{seconds}dk.|}`
   - **Category:** `accuracy/mistranslation`
   - **Explanation:** The target mislabels the time units: “d.” is not the standard abbreviation for minutes, and “dk.” denotes minutes rather than seconds. This can make displayed durations materially incorrect.
-  - **Recommended target:** `{hours:cond:>0?{hours} sa. |}{minutes:cond:>0?{minutes} dk. |}{seconds:cond:>=0?{seconds} sn.|} `
+  - **Recommended target:** `{hours:cond:>0?{hours} sa. |}{minutes:cond:>0?{minutes} dk. |}{seconds:cond:>=0?{seconds} sn.|}`
 - **MINOR** `weightInformation` (Unit 369587, `ui`)
   - **Source:** `The capacity of the horse’s bag is an important indicator.\nThe weight of found items affects their transportation.\nUpgrade your bag to increase its capacity and carry more items.`
   - **Target:** `At çantasının Kapasite'si önemli bir göstergedir.\nBulunan eşyaların ağırlığı taşımalarını etkiler.\nKapasite'sini artırmak ve daha fazla eşya taşımak için çantanızı yükseltin.`
@@ -785,7 +783,7 @@
   - **Category:** `accuracy/untranslated`
   - **Explanation:** The target is empty while the source is a meaningful full Google Play store description.
 
-## 3. Weblate Quality Checks Analysis (Layer 0)
+### 3. Weblate Quality Checks Analysis (Layer 0)
 
 | Check | Count | Classification |
 |---|---:|---|
@@ -794,23 +792,23 @@
 | `inconsistent` | 2 | Not scored: each returned row has no duplicate same-source peer in its component inventory; retain as stale or cross-component diagnostic pending a fresh check refresh. |
 | `reused` | 4 | Italian pairs are grammatical convergence/case variants; Turkish Trade/Trading is convergence, but Crab Warmcoat -> Yengeç Sıcaklığı collides with Crab Warmth and is logged Major. |
 | `same` | 32 | All but the French Ball-Roller item were benign names, syntactic placeholders, onomatopoeia, or accepted game terms; Ball-Roller is logged as a Major terminology/untranslated issue. |
+
 - Heuristic candidates `AT` in Units 367601 and 367608 are false positives: `at` is Turkish for “horse”, not an English acronym leak.
 
-## 4. Actionable Remediation Plan
+### 4. Actionable Remediation Plan
 
 1. **Release blockers:** translate `google-play/gp_full` (the empty full store description) for this language. French must also restore the exact engine expressions in `ui/amountFormatted` and `ui/humanTimer` without spaces inside `{...}`.
 2. **String corrections:** apply the recommended targets in the defect log for every Major/Minor item whose recommendation is supplied. For full store descriptions, commission a complete locale-native marketing translation rather than copying the source.
 3. **Weblate flags:** after an editor validates the classifications, add `ignore-reused` to Italian Units 368597, 368705, 368819, 368893 and Turkish Units 369529, 369825. Do not add `ignore-game-markup` to French Units 359515/359527 or `ignore-reused` to Turkish Unit 366670. Do not bulk-add `ignore-same`; review each term/name first.
 4. **Remaining coverage:** every non-UI component was reviewed in full. The only unreviewed strings are in `ui`: units not at a zero-based multiple-of-five API position and without a current check warning. Review those remaining UI units before claiming a component-wide project grade.
 
-
 ---
 
-# Weblate LQA Audit: need-for-greed / all game components (ID)
+## Weblate LQA Audit: need-for-greed / all game components (ID)
 
 > Findings are analyst-reviewed with two conservative LLM-assisted passes in this session. They are not verdicts from `weblate/trans/judge.py`.
 
-## 1. MQM-Core Quality Scorecard
+### 1. MQM-Core Quality Scorecard
 
 | Metric | Value |
 |---|---|
@@ -827,7 +825,7 @@
 | **Minor Defects (1 pt)** | 5 | See log |
 | **Total Penalty Points** | 120 pt | Tool-computed using 3121 reviewed source words |
 
-### Component scorecards
+#### Component scorecards
 
 | Component | Coverage | Score | Grade | C/M/m |
 |---|---:|---:|---|---:|
@@ -840,7 +838,7 @@
 | Buyers | full | 100.00 | Grade A (Pass) | 0/0/0 |
 | Google Play | full | 90.91 | Fail (Critical Blocker) | 1/1/0 |
 
-## 2. Reviewed Defect Log (MQM Categories)
+### 2. Reviewed Defect Log (MQM Categories)
 
 - **MAJOR** `craftItem` (Unit 368259, `ui`)
   - **Source:** `Craft item`
@@ -986,14 +984,14 @@
   - **Category:** `accuracy/untranslated`
   - **Explanation:** The target is empty while the source is a meaningful full Google Play store description.
 
-## 3. Weblate Quality Checks Analysis (Layer 0)
+### 3. Weblate Quality Checks Analysis (Layer 0)
 
 | Check | Count | Classification |
 |---|---:|---|
 | `inconsistent` | 2 | Not scored: each returned row has no duplicate same-source peer in its component inventory; retain as stale or cross-component diagnostic pending a fresh check refresh. |
 | `same` | 46 | All but the French Ball-Roller item were benign names, syntactic placeholders, onomatopoeia, or accepted game terms; Ball-Roller is logged as a Major terminology/untranslated issue. |
 
-## 4. Actionable Remediation Plan
+### 4. Actionable Remediation Plan
 
 1. **Release blockers:** translate `google-play/gp_full` (the empty full store description) for this language. French must also restore the exact engine expressions in `ui/amountFormatted` and `ui/humanTimer` without spaces inside `{...}`.
 2. **String corrections:** apply the recommended targets in the defect log for every Major/Minor item whose recommendation is supplied. For full store descriptions, commission a complete locale-native marketing translation rather than copying the source.

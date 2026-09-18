@@ -138,7 +138,7 @@ in-game duration string, not a typo of "second") in
    (mirrors the `misc/**.tsv` etc. reasoning already applied to codespell).
 2. Add the confirmed code-level words to `[tool.typos.default.extend-words]`
    or `extend-identifiers`, matching the existing entries in that section
-   (`ba`, `billling`, `hasttr`, etc.) - one entry per word with a comment.
+   (`ba`, `billing`, `hasattr`, etc.) - one entry per word with a comment.
 3. Run `uv run prek run typos --all-files` after every change.
 
 **Acceptance:** `typos` has no findings, and every new exclude/word entry has

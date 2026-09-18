@@ -72,7 +72,7 @@ real_modes = gm.get_glossary_term_modes
 
 
 def run(name, terms, source, target):
-    gm.get_glossary_terms = lambda unit, include_variants=True: list(terms)
+    gm.get_glossary_terms = lambda _unit, _include_variants=True: list(terms)
     gm.get_glossary_term_modes = lambda term: term.modes
     try:
         hard, advisory = evaluate_glossary_terms(UNIT, source, target)

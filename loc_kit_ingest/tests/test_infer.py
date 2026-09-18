@@ -79,7 +79,7 @@ def test_underfilled_column_is_demoted_with_a_note():
     data_rows[0][2] = "Hallo"  # 1 of 4 rows filled: 25% share
     rows = [header, *data_rows]
 
-    document, notes = infer_component("Sheet1", rows, component="Test", min_fill=50.0)
+    _, notes = infer_component("Sheet1", rows, component="Test", min_fill=50.0)
 
     assert any("under the 50% threshold" in note and "-> de" in note for note in notes)
 

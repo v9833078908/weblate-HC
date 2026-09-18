@@ -309,9 +309,7 @@ def build_glossary_prompt_entry(unit: Unit) -> GlossaryPromptEntry | None:
         getattr(source_unit, "explanation", "")
     ):
         entry["source_explanation"] = source_explanation
-    if target_explanation := _normalize_prompt_text(
-        getattr(unit, "explanation", "")
-    ):
+    if target_explanation := _normalize_prompt_text(getattr(unit, "explanation", "")):
         entry["target_explanation"] = target_explanation
 
     effective_flags = set(modes)
@@ -372,9 +370,7 @@ def test_glossary_prompt_entry_cleans_read_only_source(self) -> None:
 
 
 def test_glossary_prompt_entries_deduplicate_identical_entries(self) -> None:
-    term = cast(
-        "Unit", make_unit(code="fr", source="Ship", target="Vaisseau")
-    )
+    term = cast("Unit", make_unit(code="fr", source="Ship", target="Vaisseau"))
 
     self.assertEqual(
         build_glossary_prompt_entries([term, term]),
@@ -406,9 +402,7 @@ def _get_batch_glossary(self, units: list[Unit]) -> list[GlossaryPromptEntry]:
     full = self._get_full_glossary(units[0])
     if full is not None:
         return build_glossary_prompt_entries(full)
-    missing = [
-        unit for unit in units if getattr(unit, "glossary_terms", None) is None
-    ]
+    missing = [unit for unit in units if getattr(unit, "glossary_terms", None) is None]
     if missing:
         fetch_glossary_terms(missing, include_variants=False)
     return build_glossary_prompt_entries(
@@ -477,14 +471,16 @@ In `weblate/trans/tests/test_judge_client.py`, add
 new representation:
 
 ```python
-glossary_terms=[
-    {
-        "source": "ГЕРМОДВЕРЬ",
-        "target": "porte blindée",
-        "source_explanation": "Бронированная герметичная дверь.",
-        "flags": ["terminology"],
-    }
-],
+glossary_terms = (
+    [
+        {
+            "source": "ГЕРМОДВЕРЬ",
+            "target": "porte blindée",
+            "source_explanation": "Бронированная герметичная дверь.",
+            "flags": ["terminology"],
+        }
+    ],
+)
 ```
 
 Add:
@@ -497,9 +493,7 @@ class SegmentGlossaryTest(SimpleTestCase):
 
         request = replace(REQ, glossary_terms=list(REQ.glossary_terms))
 
-        self.assertEqual(
-            _segment(0, request)["glossary"], list(request.glossary_terms)
-        )
+        self.assertEqual(_segment(0, request)["glossary"], list(request.glossary_terms))
 ```
 
 ### Step 2: Add complete context-hash tests
@@ -540,16 +534,12 @@ def test_context_hash_reacts_to_glossary_explanations_and_flags(self) -> None:
         {**plain, "target_explanation": "Use on the battle screen."},
         {**plain, "flags": ["exact"]},
     )
-    baseline = compute_context_hash(
-        source="Door", note="", glossary_terms=[plain]
-    )
+    baseline = compute_context_hash(source="Door", note="", glossary_terms=[plain])
     for entry in variants:
         with self.subTest(entry=entry):
             self.assertNotEqual(
                 baseline,
-                compute_context_hash(
-                    source="Door", note="", glossary_terms=[entry]
-                ),
+                compute_context_hash(source="Door", note="", glossary_terms=[entry]),
             )
 
 
@@ -557,12 +547,8 @@ def test_context_hash_ignores_only_glossary_order(self) -> None:
     first = {"source": "a", "target": "b"}
     second = {"source": "c", "target": "d"}
     self.assertEqual(
-        compute_context_hash(
-            source="Door", note="", glossary_terms=[first, second]
-        ),
-        compute_context_hash(
-            source="Door", note="", glossary_terms=[second, first]
-        ),
+        compute_context_hash(source="Door", note="", glossary_terms=[first, second]),
+        compute_context_hash(source="Door", note="", glossary_terms=[second, first]),
     )
 ```
 
@@ -586,16 +572,14 @@ class JudgeGlossaryContextTest(ViewTestCase):
 
     def add_term(self) -> None:
         id_hash = calculate_hash("Hello", "")
-        source_unit = (
-            self.glossary_component.source_translation.unit_set.create(
-                source="Hello",
-                target="Hello",
-                context="",
-                id_hash=id_hash,
-                position=1,
-                state=STATE_TRANSLATED,
-                explanation="A greeting, not a character name.",
-            )
+        source_unit = self.glossary_component.source_translation.unit_set.create(
+            source="Hello",
+            target="Hello",
+            context="",
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+            explanation="A greeting, not a character name.",
         )
         self.glossary.unit_set.create(
             source="Hello",
@@ -625,9 +609,7 @@ class JudgeGlossaryContextTest(ViewTestCase):
             judge_model="vendor/model-a",
             seat=1,
             run_id=uuid.uuid4(),
-            target_hash=compute_target_hash(
-                request.target_plurals or [request.target]
-            ),
+            target_hash=compute_target_hash(request.target_plurals or [request.target]),
             context_hash=context_hash,
         )
 
@@ -666,9 +648,7 @@ def test_glossary_explanation_change_aborts_repair(self) -> None:
             "weblate.trans.judge_loop.repair_target", side_effect=change_context
         ),
     ):
-        verdicts = run_judge_batch(
-            [unit], writable_ids={unit.id}, user=self.user
-        )
+        verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
 
     self.assertNotIn(unit.id, verdicts)
     self.assertEqual(self.get_unit().target, original)
@@ -760,13 +740,13 @@ In `weblate/trans/judge_loop.py`:
 The two required call sites are:
 
 ```python
-glossary_terms=get_matched_glossary_prompt_entries(unit),
+glossary_terms = (get_matched_glossary_prompt_entries(unit),)
 ```
 
 and:
 
 ```python
-glossary_terms=get_matched_glossary_prompt_entries(locked),
+glossary_terms = (get_matched_glossary_prompt_entries(locked),)
 ```
 
 In `weblate/trans/models/judge.py`, keep the import local to avoid a trans-model

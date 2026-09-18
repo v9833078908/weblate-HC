@@ -2487,7 +2487,9 @@ class Translation(
         state: StringState | None = None,
         author: User,
     ) -> Unit | None: ...
-    def add_unit(
+    # Signature is the public Translation API fixed by the @overload stubs
+    # above and every caller; splitting it would change the API contract.
+    def add_unit(  # ruff: ignore[too-many-arguments]
         self,
         request: AuthenticatedHttpRequest | None,
         context: str,
@@ -2522,7 +2524,7 @@ class Translation(
             )
 
     @transaction.atomic
-    def _add_unit_locked(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements, too-many-branches]
+    def _add_unit_locked(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements, too-many-branches, too-many-arguments]
         self,
         request: AuthenticatedHttpRequest | None,
         context: str,
@@ -2700,7 +2702,10 @@ class Translation(
                 unit.fill_new_unit_cache()
                 unit.is_batch_update = is_batch_update
                 unit.trigger_update_variants = False
-                try:
+                # The whole save + change-creation sequence must stay inside
+                # the try so an IntegrityError rolls back atomically and the
+                # skip_existing recovery sees a consistent state.
+                try:  # ruff: ignore[too-many-statements-in-try-clause]
                     with transaction.atomic():
                         unit.save(
                             force_insert=True,

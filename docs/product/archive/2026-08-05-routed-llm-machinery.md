@@ -7,7 +7,6 @@
 > сервис сконфигурирован в БД (`Setting` category=2, name=`routed-llm`),
 > `./rundev.sh test weblate_customization/tests/test_machinery.py` — 27 passed.
 > Документ оставлен как есть, для истории.
-
 > **For Claude:** REQUIRED SUB-SKILL: Use @executing-plans to implement this plan task-by-task.
 
 **Goal:** Добавить локальный Weblate-движок `Routed LLM`, который через OpenRouter выбирает model ID по целевому языку из настраиваемой JSON-карты.
@@ -199,9 +198,7 @@ class RoutedLLMFormTest(TestCase):
 
 
 class RoutedResolveTest(SimpleTestCase):
-    def machine(
-        self, routing: dict[str, str] | None = None
-    ) -> RoutedLLMTranslation:
+    def machine(self, routing: dict[str, str] | None = None) -> RoutedLLMTranslation:
         configuration = dict(CONFIGURATION)
         if routing is not None:
             configuration["routing"] = routing
@@ -297,9 +294,7 @@ class RoutedLLMMachineryForm(BaseOpenAIMachineryForm):
     def clean_routing(self) -> dict[str, str]:
         value = self.cleaned_data["routing"]
         if not isinstance(value, dict) or not value:
-            raise ValidationError(
-                gettext("Routing must be a non-empty JSON object.")
-            )
+            raise ValidationError(gettext("Routing must be a non-empty JSON object."))
 
         result: dict[str, str] = {}
         normalized_keys: dict[str, str] = {}
@@ -645,7 +640,6 @@ class RoutedLLMTranslation(OpenAITranslation):
             )
         finally:
             self._route_target.reset(token)
-
 ```
 
 Важно: удалить старый `from typing import ClassVar, cast`, чтобы после добавления
@@ -706,9 +700,7 @@ from weblate.machinery.base import MachineTranslationError
 
 ```python
 class RoutedDownloadTest(TestCase):
-    def machine(
-        self, routing: dict[str, str] | None = None
-    ) -> RoutedLLMTranslation:
+    def machine(self, routing: dict[str, str] | None = None) -> RoutedLLMTranslation:
         configuration = dict(CONFIGURATION)
         if routing is not None:
             configuration["routing"] = routing
@@ -760,9 +752,7 @@ class RoutedDownloadTest(TestCase):
     @http_mock.activate
     def test_no_models_endpoint_call(self) -> None:
         mock_chat()
-        self.machine().download_multiple_translations(
-            "en", "ja", [("Hello", None)]
-        )
+        self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
 
         self.assertTrue(
             all("/models" not in str(call.request.url) for call in http_mock.calls)
@@ -775,9 +765,7 @@ class RoutedDownloadTest(TestCase):
         with self.assertRaisesRegex(
             MachineTranslationError, "No routed model for target language: fr"
         ):
-            machine.download_multiple_translations(
-                "en", "fr", [("Hello", None)]
-            )
+            machine.download_multiple_translations("en", "fr", [("Hello", None)])
 
         self.assertEqual(http_mock.calls, [])
 
@@ -796,9 +784,7 @@ class RoutedDownloadTest(TestCase):
         machine = self.machine()
 
         with self.assertRaises(MachineTranslationError):
-            machine.download_multiple_translations(
-                "en", "ja", [("Hello", None)]
-            )
+            machine.download_multiple_translations("en", "ja", [("Hello", None)])
 
         self.assertEqual(machine.get_model(), GEMINI)
 ```
@@ -820,28 +806,28 @@ path does not yet set the route context and resolves the fallback model.
 `_download_multiple_translations`:
 
 ```python
-    async def _adownload_multiple_translations(
-        self,
-        source_language,
-        target_language,
-        sources: list[tuple[str, Unit | None]],
-        user: User | None = None,
-        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
-        *,
-        source_occurrences: list[int] | None = None,
-    ) -> DownloadMultipleTranslations:
-        token = self._route_target.set(target_language)
-        try:
-            return await super()._adownload_multiple_translations(
-                source_language,
-                target_language,
-                sources,
-                user,
-                threshold,
-                source_occurrences=source_occurrences,
-            )
-        finally:
-            self._route_target.reset(token)
+async def _adownload_multiple_translations(
+    self,
+    source_language,
+    target_language,
+    sources: list[tuple[str, Unit | None]],
+    user: User | None = None,
+    threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+    *,
+    source_occurrences: list[int] | None = None,
+) -> DownloadMultipleTranslations:
+    token = self._route_target.set(target_language)
+    try:
+        return await super()._adownload_multiple_translations(
+            source_language,
+            target_language,
+            sources,
+            user,
+            threshold,
+            source_occurrences=source_occurrences,
+        )
+    finally:
+        self._route_target.reset(token)
 ```
 
 **Step 4: Run the complete focused suite**

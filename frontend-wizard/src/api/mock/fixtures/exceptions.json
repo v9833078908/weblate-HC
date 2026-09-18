@@ -1,6 +1,74 @@
 [
-  { "id": "e-bloodymary", "term": "Bloody Mary", "translations": { "en": "Bloody Mary", "fr": "Bloody Mary", "ja": "Bloody Mary" }, "languages": ["en", "fr", "ja", "de", "es", "pt_BR", "tr", "ko", "zh_Hans"], "rule": "read_only", "why": "Имя корабля — бренд, не переводится", "prohibits": "Любой перевод названия корабля", "exportable": true, "source": "из вашего файла" },
-  { "id": "e-fortress", "term": "Крепость", "translations": { "en": "Keep" }, "languages": ["en"], "rule": "exact", "why": "UI-термин должен совпадать во всех экранах", "prohibits": "Склонения и синонимы в английском", "exportable": true, "source": "из списка правил" },
-  { "id": "e-devil", "term": "чёрт", "translations": {}, "languages": ["ru"], "rule": "forbidden", "replacement": "проклятье", "why": "Смягчение по требованию издателя", "prohibits": "Слово «чёрт» в исходнике", "exportable": true, "source": "запрещённые слова из анкеты" },
-  { "id": "e-deadshell", "term": "Dead Shell", "translations": {}, "languages": ["en", "de", "fr", "ja", "ko", "zh_Hans"], "rule": "read_only", "why": "Название режима, оставляем как в оригинале", "prohibits": "Перевод названия режима", "exportable": true, "source": "вопрос из проверки" }
+  {
+    "id": "e-bloodymary",
+    "term": "Bloody Mary",
+    "translations": {
+      "en": "Bloody Mary",
+      "fr": "Bloody Mary",
+      "ja": "Bloody Mary"
+    },
+    "languages": [
+      "en",
+      "fr",
+      "ja",
+      "de",
+      "es",
+      "pt_BR",
+      "tr",
+      "ko",
+      "zh_Hans"
+    ],
+    "rule": "read_only",
+    "why": "Имя корабля — бренд, не переводится",
+    "prohibits": "Любой перевод названия корабля",
+    "exportable": true,
+    "source": "из вашего файла"
+  },
+  {
+    "id": "e-fortress",
+    "term": "Крепость",
+    "translations": {
+      "en": "Keep"
+    },
+    "languages": [
+      "en"
+    ],
+    "rule": "exact",
+    "why": "UI-термин должен совпадать во всех экранах",
+    "prohibits": "Склонения и синонимы в английском",
+    "exportable": true,
+    "source": "из списка правил"
+  },
+  {
+    "id": "e-devil",
+    "term": "чёрт",
+    "translations": {},
+    "languages": [
+      "ru"
+    ],
+    "rule": "forbidden",
+    "replacement": "проклятье",
+    "why": "Смягчение по требованию издателя",
+    "prohibits": "Слово «чёрт» в исходнике",
+    "exportable": true,
+    "source": "запрещённые слова из анкеты"
+  },
+  {
+    "id": "e-deadshell",
+    "term": "Dead Shell",
+    "translations": {},
+    "languages": [
+      "en",
+      "de",
+      "fr",
+      "ja",
+      "ko",
+      "zh_Hans"
+    ],
+    "rule": "read_only",
+    "why": "Название режима, оставляем как в оригинале",
+    "prohibits": "Перевод названия режима",
+    "exportable": true,
+    "source": "вопрос из проверки"
+  }
 ]

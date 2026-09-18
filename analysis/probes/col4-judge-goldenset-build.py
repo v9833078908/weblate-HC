@@ -136,7 +136,7 @@ def terminology_stratum(units: list[dict], glossary: dict[str, str]) -> list[dic
     for candidate in sorted(candidates.values(), key=lambda c: c["unit"]["unit_id"]):
         by_rendering.setdefault(candidate["rendering"], []).append(candidate)
 
-    rng = random.Random(TERM_SEED)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+    rng = random.Random(TERM_SEED)
     stratum: list[dict] = []
     for _, found in sorted(by_rendering.items()):
         stratum.extend(found if len(found) <= TERM_CAP else rng.sample(found, TERM_CAP))
@@ -462,7 +462,7 @@ def assign_splits(
     not land in dev for one and test for the other: the same text would be
     read while iterating the prompt and then measured as if it were unseen.
     """
-    rng = random.Random(seed)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+    rng = random.Random(seed)
     groups: dict[str, list] = {}
     for item in items:
         groups.setdefault(group_key(item) if group_key else "", []).append(item)
@@ -498,7 +498,7 @@ def build_mutations(clean: list[dict], clean_splits: dict[int, str]) -> list[dic
             (u for u in clean if clean_splits[id(u)] == split),
             key=operator.itemgetter("unit_id"),
         )
-        rng = random.Random(MUTATION_SEEDS[split])  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+        rng = random.Random(MUTATION_SEEDS[split])
         used, made = Counter(), Counter()
         for name in CLASS_ORDER:
             for base in bases:

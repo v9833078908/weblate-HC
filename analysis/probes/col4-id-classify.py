@@ -43,11 +43,11 @@ def matched_surfaces(term_source: str, text: str, lang: str) -> list[str]:
         return []
     spans = list(iter_word_spans(text))
     haystack = get_text_stems(text, lang)
-    out = []
-    for i in range(len(haystack) - len(needle) + 1):
-        if haystack[i : i + len(needle)] == needle:
-            out.append(text[spans[i][1] : spans[i + len(needle) - 1][2]])
-    return out
+    return [
+        text[spans[i][1] : spans[i + len(needle) - 1][2]]
+        for i in range(len(haystack) - len(needle) + 1)
+        if haystack[i : i + len(needle)] == needle
+    ]
 
 
 rows = []

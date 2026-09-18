@@ -40,7 +40,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-# ruff: ignore[module-import-not-at-top-of-file] - probe needs the repo-root package
 from loc_kit_ingest.source_markup import (
     source_markup_defects,
 )
@@ -64,15 +63,13 @@ def get(url: str, api: str) -> dict | list:
     if not url.startswith(api):
         msg = f"refusing to fetch outside {api}: {url}"
         raise ValueError(msg)
-    request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage] - host checked above
-        url, headers={"Authorization": f"Token {TOKEN}"}
-    )
+    request = urllib.request.Request(url, headers={"Authorization": f"Token {TOKEN}"})
     # The path to production drops TLS handshakes intermittently; an HTTP
     # error (401/404) is an answer, not an outage, and must fail fast.
     attempt = 0
     while True:
         try:
-            with urllib.request.urlopen(request, timeout=120) as response:  # ruff: ignore[suspicious-url-open-usage]
+            with urllib.request.urlopen(request, timeout=120) as response:
                 return json.loads(response.read().decode())
         except urllib.error.HTTPError:
             raise

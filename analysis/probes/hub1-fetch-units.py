@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Fetch heart-abyss/hub-1 unit rows in the shape detect_misalignment.py expects.
+"""
+Fetch heart-abyss/hub-1 unit rows in the shape detect_misalignment.py expects.
 
 Read-only. Reuses WeblateAuditor and load_token from the weblate-lqa skill so the
 endpoint, pagination and token source stay identical to the sanctioned audit path.
@@ -42,7 +43,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--project", default="heart-abyss")
     parser.add_argument("--component", default="hub-1")
     parser.add_argument("--out", required=True, help="output directory")
-    parser.add_argument("--lang", action="append", help="repeatable; defaults to all nine")
+    parser.add_argument(
+        "--lang", action="append", help="repeatable; defaults to all nine"
+    )
     args = parser.parse_args(argv)
 
     audit = load_audit_module()

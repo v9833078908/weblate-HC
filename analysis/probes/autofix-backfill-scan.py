@@ -88,8 +88,9 @@ class ProposedTerminalFix(AutoFix):
         # placing the full stop inside the quotes per US convention
         # (`the inscription "armory."`), which the rule would have degraded.
         # The source IS unwrapped, and only that direction is needed: it is what
-        # keeps a source mark hidden behind a quote (`с криком "Еретик!"`) from
-        # reading as punctuation the model invented.
+        # keeps a source mark hidden behind a closing quote (e.g. an exclamation
+        # mark right before the closing quote in the source) from reading as
+        # punctuation the model invented.
         if not target or target[-1] not in TERMINAL_MARKS:
             return target, False
         if len(target) > 1 and target[-2] == target[-1]:
@@ -112,7 +113,7 @@ class ProposedTerminalFix(AutoFix):
 
 
 def candidate_units():
-    """Stored units a backfill would consider, mirroring the planned command."""
+    """Return the stored units a backfill would consider, mirroring the planned command."""
     return (
         Unit.objects.exclude(state=STATE_READONLY)
         .exclude(translation__component__is_glossary=True)

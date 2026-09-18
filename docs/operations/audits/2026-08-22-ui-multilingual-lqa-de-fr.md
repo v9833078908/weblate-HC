@@ -5,6 +5,7 @@
 > Verdicts: `/tmp/verdicts_de.json`, `/tmp/verdicts_fr.json` (each declares `review_scope: {"coverage":"full"}`; FR file also carries `follow_up_candidates` for items without verified defect evidence).
 >
 > Audit-trail corrections vs the earlier in-session reports:
+>
 > 1. The earlier 12 DE / 6 FR `accuracy/untranslated` Major entries were over-classified - every one of those rows is a valid German / French homograph, placeholder token, or proper noun, i.e. a **false positive of `same`**. Reclassified to `fluency/style` Neutral (0 pt).
 > 2. The earlier 3 FR `Critical` `game_engine/broken_placeholder` entries were over-classified - the engine DSL parser behaviour for `{name:cond:>` lexeme boundaries is **not** in `weblate_customization/checks.py` (which only covers mission-DSL `identifier[|...]` per `checks.py:94-102,218-233`); runtime outcome is unverified. Severity dropped to **Major** only where `GameMarkupCheck` is confirmed positive (`amountFormatted`, `timer`), and to **observation only** for `humanTimer`.
 > 3. `humanTimer` was previously carried as a scored Minor. With no check firing and no runtime evidence, it cannot simultaneously lower MQM score; it is now stored in a separate `follow_up_candidates` block, excluded from `compute_mqm_score`.

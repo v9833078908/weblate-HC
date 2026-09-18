@@ -1,10 +1,9 @@
-'use client'
+"use client";
 
-import * as React from 'react'
-import { ArrowRight, FileUp, Languages, Download } from 'lucide-react'
-import { AppShell } from '@/components/console/AppShell'
-import { WeblateLink } from '@/components/console/primitives'
-import { Button } from '@/components/ui/button'
+import { ArrowRight, Download, FileUp, Languages } from "lucide-react";
+import { AppShell } from "@/components/console/AppShell";
+import { WeblateLink } from "@/components/console/primitives";
+import { Button } from "@/components/ui/button";
 
 export function EmptyProjectScreen({ project, navigate }) {
   return (
@@ -12,10 +11,12 @@ export function EmptyProjectScreen({ project, navigate }) {
       project={project}
       active="overview"
       navigate={navigate}
-      breadcrumb={[{ label: 'Проекты', path: '/' }, { label: project.name }]}
+      breadcrumb={[{ label: "Проекты", path: "/" }, { label: project.name }]}
     >
       <div className="mx-auto max-w-3xl py-10">
-        <h1 className="text-display-lg text-foreground">Это автоматический wizard. Загрузите лок-кит</h1>
+        <h1 className="text-display-lg text-foreground">
+          Это автоматический wizard. Загрузите лок-кит
+        </h1>
 
         <div className="mt-8 space-y-3 text-body-md text-muted-foreground">
           <div className="flex items-center gap-3">
@@ -24,7 +25,10 @@ export function EmptyProjectScreen({ project, navigate }) {
           </div>
           <div className="flex items-center gap-3">
             <Languages className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-            <span>2. Платформа переведёт его на все языки проекта и проверит качество.</span>
+            <span>
+              2. Платформа переведёт его на все языки проекта и проверит
+              качество.
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <Download className="h-5 w-5 shrink-0 text-primary" aria-hidden />
@@ -33,12 +37,18 @@ export function EmptyProjectScreen({ project, navigate }) {
         </div>
 
         <div className="mt-10 flex items-center gap-4">
-          <Button className="h-9 rounded-sm" onClick={() => navigate(`/projects/${project.slug}/localize`)}>
+          <Button
+            className="h-9 rounded-sm"
+            onClick={() => navigate(`/projects/${project.slug}/localize`)}
+          >
             Загрузить лок-кит <ArrowRight className="h-4 w-4" />
           </Button>
-          <WeblateLink url={`https://weblate.hcgameloc.internal/projects/${project.slug}/`} navigate={navigate} />
+          <WeblateLink
+            url={`https://weblate.hcgameloc.internal/projects/${project.slug}/`}
+            navigate={navigate}
+          />
         </div>
       </div>
     </AppShell>
-  )
+  );
 }

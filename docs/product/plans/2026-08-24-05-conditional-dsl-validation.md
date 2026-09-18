@@ -147,6 +147,7 @@ Expected: an error, not a pass. pytest reports
 The sibling module already does this
 (`weblate_customization/tests/test_autofixes.py:9,26`), so follow it exactly.
 Add the import in the same group and position:
+<!--- skip doccmd[all]: next --><!-- multi-line import truncated in excerpt, not standalone code -->
 
 ```python
 from django.test import SimpleTestCase
@@ -156,7 +157,7 @@ from weblate_customization.checks import (
 Then change the class statement only:
 
 ```python
-class ConditionalDslSyntaxSpansTest(SimpleTestCase):
+class ConditionalDslSyntaxSpansTest(SimpleTestCase): ...
 ```
 
 Leave `CheckTestCase` imported: `GameMarkupCheckTest` and the other check
@@ -225,17 +226,17 @@ existing tests honest.
 Add to `ConditionalDslSyntaxSpansTest`:
 
 ```python
-    def test_a_nested_conditional_is_one_outermost_record(self) -> None:
-        spans = conditional_dsl_syntax_spans(NESTED_CONDITIONAL)
-        inner = NESTED_CONDITIONAL.index("{b")
-        inner_block = "{b:cond:>0?x|}"
+def test_a_nested_conditional_is_one_outermost_record(self) -> None:
+    spans = conditional_dsl_syntax_spans(NESTED_CONDITIONAL)
+    inner = NESTED_CONDITIONAL.index("{b")
+    inner_block = "{b:cond:>0?x|}"
 
-        self.assertEqual(spans, sorted(spans))
-        self.assertTrue(all(left[1] <= right[0] for left, right in pairwise(spans)))
-        # The nested conditional travels as one child span, not as a second
-        # record whose own header span overlaps its parent's child span.
-        self.assertIn((inner, inner + len(inner_block)), spans)
-        self.assertNotIn((inner + 1, inner + 1 + len("b:cond:>0?")), spans)
+    self.assertEqual(spans, sorted(spans))
+    self.assertTrue(all(left[1] <= right[0] for left, right in pairwise(spans)))
+    # The nested conditional travels as one child span, not as a second
+    # record whose own header span overlaps its parent's child span.
+    self.assertIn((inner, inner + len(inner_block)), spans)
+    self.assertNotIn((inner + 1, inner + 1 + len("b:cond:>0?")), spans)
 ```
 
 #### Step 3: Add the check regressions
@@ -247,67 +248,71 @@ kept so both audited defects are pinned by name, not because it is new
 coverage.
 
 ```python
-    def test_rejects_whitespace_inside_conditional_syntax(self) -> None:
-        for source, target in (
-            # Already reported today through the nested placeholders.
-            (AMOUNT_FORMATTED, AMOUNT_FORMATTED_FR),
-            (HUMAN_TIMER_EN, HUMAN_TIMER_FR),
-            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("hours:cond", "hours :cond", 1)),
-            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("cond:>0?", "cond: >0 ?", 1)),
-        ):
-            with self.subTest(target=target):
-                self.assertTrue(self.check.check_single(source, target, None))
+def test_rejects_whitespace_inside_conditional_syntax(self) -> None:
+    for source, target in (
+        # Already reported today through the nested placeholders.
+        (AMOUNT_FORMATTED, AMOUNT_FORMATTED_FR),
+        (HUMAN_TIMER_EN, HUMAN_TIMER_FR),
+        (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("hours:cond", "hours :cond", 1)),
+        (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("cond:>0?", "cond: >0 ?", 1)),
+    ):
+        with self.subTest(target=target):
+            self.assertTrue(self.check.check_single(source, target, None))
 
-    def test_rejects_changed_conditional_separators(self) -> None:
-        for target in (
-            HUMAN_TIMER_EN.replace("h. |}", "h. }", 1),
-            HUMAN_TIMER_EN.replace("h. |}", "h. ||}", 1),
-            HUMAN_TIMER_EN.replace("{hours}h. |", "|{hours}h. ", 1),
-        ):
-            with self.subTest(target=target):
-                self.assertTrue(self.check.check_single(HUMAN_TIMER_EN, target, None))
 
-    def test_rejects_changed_conditional_headers(self) -> None:
-        for source, target in (
-            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("hours:cond", "hour:cond", 1)),
-            (
-                HUMAN_TIMER_EN,
-                HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>=0?", 1),
-            ),
-            (
-                HUMAN_TIMER_EN,
-                HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>1?", 1),
-            ),
-            (AMOUNT_FORMATTED, AMOUNT_FORMATTED.replace(":<=99999?", ":<99999?", 1)),
-        ):
-            with self.subTest(target=target):
-                self.assertTrue(self.check.check_single(source, target, None))
+def test_rejects_changed_conditional_separators(self) -> None:
+    for target in (
+        HUMAN_TIMER_EN.replace("h. |}", "h. }", 1),
+        HUMAN_TIMER_EN.replace("h. |}", "h. ||}", 1),
+        HUMAN_TIMER_EN.replace("{hours}h. |", "|{hours}h. ", 1),
+    ):
+        with self.subTest(target=target):
+            self.assertTrue(self.check.check_single(HUMAN_TIMER_EN, target, None))
 
-    def test_rejects_a_malformed_conditional_target(self) -> None:
-        self.assertTrue(
-            self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_EN[:-1], None)
+
+def test_rejects_changed_conditional_headers(self) -> None:
+    for source, target in (
+        (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("hours:cond", "hour:cond", 1)),
+        (
+            HUMAN_TIMER_EN,
+            HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>=0?", 1),
+        ),
+        (
+            HUMAN_TIMER_EN,
+            HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>1?", 1),
+        ),
+        (AMOUNT_FORMATTED, AMOUNT_FORMATTED.replace(":<=99999?", ":<99999?", 1)),
+    ):
+        with self.subTest(target=target):
+            self.assertTrue(self.check.check_single(source, target, None))
+
+
+def test_rejects_a_malformed_conditional_target(self) -> None:
+    self.assertTrue(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_EN[:-1], None))
+
+
+def test_a_nested_conditional_branch_is_immutable(self) -> None:
+    # Documented consequence of recording only the outermost conditional.
+    self.assertTrue(
+        self.check.check_single(
+            NESTED_CONDITIONAL, NESTED_CONDITIONAL.replace("?x|", "?z|", 1), None
         )
-
-    def test_a_nested_conditional_branch_is_immutable(self) -> None:
-        # Documented consequence of recording only the outermost conditional.
-        self.assertTrue(
-            self.check.check_single(
-                NESTED_CONDITIONAL, NESTED_CONDITIONAL.replace("?x|", "?z|", 1), None
-            )
+    )
+    self.assertFalse(
+        self.check.check_single(
+            NESTED_CONDITIONAL, NESTED_CONDITIONAL.replace("|}y|", "|}z|", 1), None
         )
-        self.assertFalse(
-            self.check.check_single(
-                NESTED_CONDITIONAL, NESTED_CONDITIONAL.replace("|}y|", "|}z|", 1), None
-            )
-        )
+    )
 
-    def test_allows_localized_conditional_branch_text(self) -> None:
-        self.assertFalse(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_TR, None))
 
-    def test_unrecognized_source_conditional_adds_no_failure(self) -> None:
-        for text in ("{value:cond:1}", "Text {value:00}: text"):
-            with self.subTest(text=text):
-                self.assertFalse(self.check.check_single(text, text, None))
+def test_allows_localized_conditional_branch_text(self) -> None:
+    self.assertFalse(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_TR, None))
+
+
+def test_unrecognized_source_conditional_adds_no_failure(self) -> None:
+    for text in ("{value:cond:1}", "Text {value:00}: text"):
+        with self.subTest(text=text):
+            self.assertFalse(self.check.check_single(text, text, None))
 ```
 
 Do not add a German row to `test_allows_localized_conditional_branch_text`:
@@ -503,20 +508,20 @@ signatures yet.
 #### Step 1: Replace `check_single()`
 
 ```python
-    def check_single(self, source: str, target: str, unit) -> bool:
-        if not target:
-            return False
-        if Counter(markup_tokens(source)) != Counter(markup_tokens(target)):
-            return True
-        if placeholder_sequence(source) != placeholder_sequence(target):
-            return True
-        if ":cond:" not in source:
-            return False
+def check_single(self, source: str, target: str, unit) -> bool:
+    if not target:
+        return False
+    if Counter(markup_tokens(source)) != Counter(markup_tokens(target)):
+        return True
+    if placeholder_sequence(source) != placeholder_sequence(target):
+        return True
+    if ":cond:" not in source:
+        return False
 
-        source_conditionals = _parse_conditional_dsl(source)[1]
-        return bool(source_conditionals) and (
-            source_conditionals != _parse_conditional_dsl(target)[1]
-        )
+    source_conditionals = _parse_conditional_dsl(source)[1]
+    return bool(source_conditionals) and (
+        source_conditionals != _parse_conditional_dsl(target)[1]
+    )
 ```
 
 The order matters for cost, not only for style. `check_single()` runs for every

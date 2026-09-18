@@ -160,6 +160,7 @@ Applying 4.1 will also make the `reused` collision on `Unit_DriverVermaht`/`Unit
 | Never touched by any method | 322 units (71.9%), mostly short UI/button/item labels outside the sampled domains |
 
 Two numbers were computed and are reported for transparency, neither should be quoted alone:
+
 - **94.85** — sample MQM (47 pt / 912 words), valid only for the 126 reviewed units.
 - ~~96.67~~ — **rejected**: same 47 pt divided by the full 1,410-word component denominator;
   mixes a partial-sample numerator with a full-population denominator and silently assumes the

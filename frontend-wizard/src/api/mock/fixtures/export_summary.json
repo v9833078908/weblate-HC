@@ -1,14 +1,42 @@
 {
   "pirate-ships": {
-    "whole": { "keys": 1255, "empty": 3, "by_language": [
-      { "language": "Французский", "empty": 2 },
-      { "language": "Японский", "empty": 1 }
-    ] },
-    "loc-kit": { "keys": 1255, "empty": 3, "by_language": [
-      { "language": "Французский", "empty": 2 },
-      { "language": "Японский", "empty": 1 }
-    ] },
-    "store-steam": { "keys": 3, "empty": 0, "by_language": [] },
-    "store-gp": { "keys": 3, "empty": 0, "by_language": [] }
+    "whole": {
+      "keys": 1255,
+      "empty": 3,
+      "by_language": [
+        {
+          "language": "Французский",
+          "empty": 2
+        },
+        {
+          "language": "Японский",
+          "empty": 1
+        }
+      ]
+    },
+    "loc-kit": {
+      "keys": 1255,
+      "empty": 3,
+      "by_language": [
+        {
+          "language": "Французский",
+          "empty": 2
+        },
+        {
+          "language": "Японский",
+          "empty": 1
+        }
+      ]
+    },
+    "store-steam": {
+      "keys": 3,
+      "empty": 0,
+      "by_language": []
+    },
+    "store-gp": {
+      "keys": 3,
+      "empty": 0,
+      "by_language": []
+    }
   }
 }

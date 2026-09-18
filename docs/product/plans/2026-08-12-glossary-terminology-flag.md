@@ -121,7 +121,9 @@ author = User.objects.get_or_create_bot(
 
 updated = 0
 with transaction.atomic():
-    for unit in component.source_translation.unit_set.select_for_update().order_by("id"):
+    for unit in component.source_translation.unit_set.select_for_update().order_by(
+        "id"
+    ):
         flags = Flags(unit.extra_flags)
         if "terminology" in flags:
             continue
@@ -226,20 +228,20 @@ Add to the glossary wizard test class that already has `_confirm()` (near
 `weblate/trans/tests/test_loc_kit_ingest_contract.py:680`):
 
 ```python
-    def test_confirmed_glossary_flags_terminology(self) -> None:
-        """Imported terms must reach every glossary language, not just the source pair."""
-        self._start()
-        self._select_sheet(self._draft())
-        self._upload_profile(self._draft(), self.PROFILE)
-        self._confirm()
+def test_confirmed_glossary_flags_terminology(self) -> None:
+    """Imported terms must reach every glossary language, not just the source pair."""
+    self._start()
+    self._select_sheet(self._draft())
+    self._upload_profile(self._draft(), self.PROFILE)
+    self._confirm()
 
-        component = Component.objects.get(
-            project=self.project, slug=self._draft_slug(), is_glossary=True
-        )
-        sources = component.source_translation.unit_set.all()
-        self.assertTrue(sources)
-        for unit in sources:
-            self.assertIn("terminology", unit.all_flags)
+    component = Component.objects.get(
+        project=self.project, slug=self._draft_slug(), is_glossary=True
+    )
+    sources = component.source_translation.unit_set.all()
+    self.assertTrue(sources)
+    for unit in sources:
+        self.assertIn("terminology", unit.all_flags)
 ```
 
 Read the surrounding tests first: reuse their exact helper names and their way of naming the created
@@ -337,8 +339,8 @@ In `form_valid`, in the block that already guards on the component having been c
 after `draft.delete()` and before `return response`:
 
 ```python
-        flag_glossary_terminology.delay_on_commit(self.object.pk)
-        return response
+flag_glossary_terminology.delay_on_commit(self.object.pk)
+return response
 ```
 
 Import it at the top of the module with the other task imports:
@@ -379,20 +381,20 @@ git commit -m "fix(loc-kit): flag imported glossary terms as terminology"
 This is the behaviour the user actually asked for; B1 only checks the flag.
 
 ```python
-    def test_confirmed_glossary_populates_a_new_language(self) -> None:
-        self._start()
-        self._select_sheet(self._draft())
-        self._upload_profile(self._draft(), self.PROFILE)
-        self._confirm()
+def test_confirmed_glossary_populates_a_new_language(self) -> None:
+    self._start()
+    self._select_sheet(self._draft())
+    self._upload_profile(self._draft(), self.PROFILE)
+    self._confirm()
 
-        component = Component.objects.get(
-            project=self.project, slug=self._draft_slug(), is_glossary=True
-        )
-        expected = component.source_translation.unit_set.count()
-        component.add_new_language(Language.objects.get(code="fr"), None)
+    component = Component.objects.get(
+        project=self.project, slug=self._draft_slug(), is_glossary=True
+    )
+    expected = component.source_translation.unit_set.count()
+    component.add_new_language(Language.objects.get(code="fr"), None)
 
-        added = component.translation_set.get(language__code="fr")
-        self.assertEqual(added.unit_set.count(), expected)
+    added = component.translation_set.get(language__code="fr")
+    self.assertEqual(added.unit_set.count(), expected)
 ```
 
 **Step 2: Run it**

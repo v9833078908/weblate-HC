@@ -2728,8 +2728,6 @@ For example with Gettext in Python it could be:
     from gettext import ngettext
 
     print(ngettext("Selected %d file", "Selected %d files", files) % files)
-
-
 .. _placeables-mt:
 
 Placeables in automatic suggestion

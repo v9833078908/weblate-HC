@@ -4,11 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Every weblate import must follow django.setup(), so it cannot sit at the top.
-# ruff: file-ignore[module-import-not-at-top-of-file]
 #
 # The probe deliberately reuses the judge's own private helpers: a measurement of
 # a prompt change is only valid if it builds and parses exactly like production.
-# ruff: file-ignore[private-member-access]
 
 """
 Paired probe for the dialog-context arm of the judge.

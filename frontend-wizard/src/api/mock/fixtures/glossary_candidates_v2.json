@@ -1,22 +1,225 @@
 {
   "total": 84,
   "terms": [
-    { "id": "c-galleon", "term": "Галеон", "category": "item", "rows": 42, "sample_keys": ["ship.galleon.name", "quest.galleon.find", "hud.enemy.galleon"], "translations": { "en": "Galleon", "de": "Galeone", "fr": "", "ja": "ガレオン" }, "explanation": "Тип вражеского корабля", "review_status": "new", "eligible": true },
-    { "id": "c-ducat", "term": "Дукат", "category": "concept", "rows": 30, "sample_keys": ["shop.price.ducat", "reward.ducat"], "translations": { "en": "ducat", "de": "Dukat", "fr": "ducat", "ja": "ダカット" }, "explanation": "Игровая валюта", "review_status": "new", "eligible": true },
-    { "id": "c-silver", "term": "Капитан Сильвер", "category": "character", "rows": 118, "sample_keys": ["dialog_character_silver", "cutscene.silver.intro"], "translations": { "en": "Captain Silver", "de": "Kapitän Silver", "fr": "Capitaine Silver", "ja": "シルバー船長" }, "explanation": "Главный антагонист", "review_status": "new", "eligible": true },
-    { "id": "c-boarding", "term": "Абордаж", "category": "concept", "rows": 26, "sample_keys": ["battle.boarding.start"], "translations": { "en": "boarding", "de": "Entern", "fr": "abordage", "ja": "登舷" }, "explanation": "Боевой режим ближнего абордажа", "review_status": "new", "eligible": true },
-    { "id": "c-rumbay", "term": "Ромовая бухта", "category": "place", "rows": 19, "sample_keys": ["loc.rumbay.name"], "translations": { "en": "Rum Bay", "de": "Rumbucht", "fr": "Baie du Rhum", "ja": "ラム湾" }, "explanation": "Стартовая локация", "review_status": "new", "eligible": true },
-    { "id": "c-piastre", "term": "Пиастр", "category": "concept", "rows": 22, "sample_keys": ["reward.piastre"], "translations": { "en": "piastre", "de": "Piaster", "fr": "piastre", "ja": "ピアストル" }, "explanation": "Редкая валюта событий", "review_status": "new", "eligible": true },
-    { "id": "c-kraken", "term": "Кракен", "category": "character", "rows": 34, "sample_keys": ["boss.kraken.name", "dialog_text_037"], "translations": { "en": "Kraken", "de": "Kraken", "fr": "Kraken", "ja": "クラーケン" }, "explanation": "Морской босс", "review_status": "existing", "eligible": false },
-    { "id": "c-helm", "term": "штурвал", "category": "item", "rows": 15, "sample_keys": ["ship.part.helm"], "translations": { "en": "helm", "de": "Steuerrad", "fr": "barre", "ja": "舵" }, "explanation": "Часть корабля", "review_status": "new", "eligible": true }
+    {
+      "id": "c-galleon",
+      "term": "Галеон",
+      "category": "item",
+      "rows": 42,
+      "sample_keys": [
+        "ship.galleon.name",
+        "quest.galleon.find",
+        "hud.enemy.galleon"
+      ],
+      "translations": {
+        "en": "Galleon",
+        "de": "Galeone",
+        "fr": "",
+        "ja": "ガレオン"
+      },
+      "explanation": "Тип вражеского корабля",
+      "review_status": "new",
+      "eligible": true
+    },
+    {
+      "id": "c-ducat",
+      "term": "Дукат",
+      "category": "concept",
+      "rows": 30,
+      "sample_keys": [
+        "shop.price.ducat",
+        "reward.ducat"
+      ],
+      "translations": {
+        "en": "ducat",
+        "de": "Dukat",
+        "fr": "ducat",
+        "ja": "ダカット"
+      },
+      "explanation": "Игровая валюта",
+      "review_status": "new",
+      "eligible": true
+    },
+    {
+      "id": "c-silver",
+      "term": "Капитан Сильвер",
+      "category": "character",
+      "rows": 118,
+      "sample_keys": [
+        "dialog_character_silver",
+        "cutscene.silver.intro"
+      ],
+      "translations": {
+        "en": "Captain Silver",
+        "de": "Kapitän Silver",
+        "fr": "Capitaine Silver",
+        "ja": "シルバー船長"
+      },
+      "explanation": "Главный антагонист",
+      "review_status": "new",
+      "eligible": true
+    },
+    {
+      "id": "c-boarding",
+      "term": "Абордаж",
+      "category": "concept",
+      "rows": 26,
+      "sample_keys": [
+        "battle.boarding.start"
+      ],
+      "translations": {
+        "en": "boarding",
+        "de": "Entern",
+        "fr": "abordage",
+        "ja": "登舷"
+      },
+      "explanation": "Боевой режим ближнего абордажа",
+      "review_status": "new",
+      "eligible": true
+    },
+    {
+      "id": "c-rumbay",
+      "term": "Ромовая бухта",
+      "category": "place",
+      "rows": 19,
+      "sample_keys": [
+        "loc.rumbay.name"
+      ],
+      "translations": {
+        "en": "Rum Bay",
+        "de": "Rumbucht",
+        "fr": "Baie du Rhum",
+        "ja": "ラム湾"
+      },
+      "explanation": "Стартовая локация",
+      "review_status": "new",
+      "eligible": true
+    },
+    {
+      "id": "c-piastre",
+      "term": "Пиастр",
+      "category": "concept",
+      "rows": 22,
+      "sample_keys": [
+        "reward.piastre"
+      ],
+      "translations": {
+        "en": "piastre",
+        "de": "Piaster",
+        "fr": "piastre",
+        "ja": "ピアストル"
+      },
+      "explanation": "Редкая валюта событий",
+      "review_status": "new",
+      "eligible": true
+    },
+    {
+      "id": "c-kraken",
+      "term": "Кракен",
+      "category": "character",
+      "rows": 34,
+      "sample_keys": [
+        "boss.kraken.name",
+        "dialog_text_037"
+      ],
+      "translations": {
+        "en": "Kraken",
+        "de": "Kraken",
+        "fr": "Kraken",
+        "ja": "クラーケン"
+      },
+      "explanation": "Морской босс",
+      "review_status": "existing",
+      "eligible": false
+    },
+    {
+      "id": "c-helm",
+      "term": "штурвал",
+      "category": "item",
+      "rows": 15,
+      "sample_keys": [
+        "ship.part.helm"
+      ],
+      "translations": {
+        "en": "helm",
+        "de": "Steuerrad",
+        "fr": "barre",
+        "ja": "舵"
+      },
+      "explanation": "Часть корабля",
+      "review_status": "new",
+      "eligible": true
+    }
   ],
   "disputed": [
-    { "id": "d-fortress", "term": "Крепость", "category": "place", "options": [ { "translation": "Keep", "language": "en", "rows": 38 }, { "translation": "Fortress", "language": "en", "rows": 6 } ] },
-    { "id": "d-shard", "term": "Осколок", "category": "item", "options": [ { "translation": "Shard", "language": "en", "rows": 21 }, { "translation": "Fragment", "language": "en", "rows": 9 } ] }
+    {
+      "id": "d-fortress",
+      "term": "Крепость",
+      "category": "place",
+      "options": [
+        {
+          "translation": "Keep",
+          "language": "en",
+          "rows": 38
+        },
+        {
+          "translation": "Fortress",
+          "language": "en",
+          "rows": 6
+        }
+      ]
+    },
+    {
+      "id": "d-shard",
+      "term": "Осколок",
+      "category": "item",
+      "options": [
+        {
+          "translation": "Shard",
+          "language": "en",
+          "rows": 21
+        },
+        {
+          "translation": "Fragment",
+          "language": "en",
+          "rows": 9
+        }
+      ]
+    }
   ],
   "questions": [
-    { "id": "q-deadshell", "term": "Dead Shell", "kind": "same_in_all_languages", "languages": ["en", "de", "fr", "ja", "ko", "zh_Hans"] },
-    { "id": "q-xray", "term": "xray m2", "kind": "wrong_script", "languages": ["ja", "ko", "zh_Hans"] },
-    { "id": "q-hp", "term": "+50% HP", "kind": "same_in_all_languages", "languages": ["en", "de", "fr"] }
+    {
+      "id": "q-deadshell",
+      "term": "Dead Shell",
+      "kind": "same_in_all_languages",
+      "languages": [
+        "en",
+        "de",
+        "fr",
+        "ja",
+        "ko",
+        "zh_Hans"
+      ]
+    },
+    {
+      "id": "q-xray",
+      "term": "xray m2",
+      "kind": "wrong_script",
+      "languages": [
+        "ja",
+        "ko",
+        "zh_Hans"
+      ]
+    },
+    {
+      "id": "q-hp",
+      "term": "+50% HP",
+      "kind": "same_in_all_languages",
+      "languages": [
+        "en",
+        "de",
+        "fr"
+      ]
+    }
   ]
 }

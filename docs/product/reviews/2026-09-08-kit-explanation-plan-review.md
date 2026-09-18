@@ -73,7 +73,6 @@ Explanation при `WeblateLockTimeoutError`: map проходит через
 `test_judge_stale_counter_counts_verdicts_the_apply_would_outdate` и
 `test_deferred_perform_load_applies_staged_explanations`.
 
-
 ## Что проверено и подтверждается
 
 | Утверждение плана | Результат |

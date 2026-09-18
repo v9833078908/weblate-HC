@@ -259,21 +259,20 @@ _DELIMITER_SCAN_ROWS = 20
 `read_sheets` (`:37-43`):
 
 ```python
-    suffix = path.suffix.lower()
-    if suffix == ".csv":
-        return {path.stem: _read_csv(path, _detect_delimiter(path))}
-    if suffix == ".tsv":
-        return {path.stem: _read_csv(path, "\t")}
-    if suffix == ".xlsx":
-        return _read_xlsx(path)
-    msg = f"unsupported file suffix: {suffix!r}"
-    raise ReaderError(msg)
+suffix = path.suffix.lower()
+if suffix == ".csv":
+    return {path.stem: _read_csv(path, _detect_delimiter(path))}
+if suffix == ".tsv":
+    return {path.stem: _read_csv(path, "\t")}
+if suffix == ".xlsx":
+    return _read_xlsx(path)
+msg = f"unsupported file suffix: {suffix!r}"
+raise ReaderError(msg)
 ```
 
 Новая функция рядом с `_read_csv`:
 
 ```python
-
 def _detect_delimiter(path: Path) -> str:
     """
     Choose the delimiter under which the sheet has a recognisable header.
@@ -469,6 +468,7 @@ def test_ignored_column_colliding_with_a_declared_field_is_rejected(column, what
     with pytest.raises(ProfileError, match="profile.ignored_column_collision"):
         parse_profile(document)
 
+
 def test_ignored_column_needs_a_positive_integer_column():
     document = _one_row_document()
     document["components"][0]["grammar"]["ignored_columns"] = [
@@ -572,38 +572,36 @@ class RecordMapGrammar:
 3. `_parse_record_map_grammar` — распарсить оба поля после блока `notes` (`:623-629`):
 
 ```python
-    ignored_raw = obj.get("ignored_columns", [])
-    if not isinstance(ignored_raw, list):
-        msg = "profile.invalid_value"
-        raise _err(msg, "'ignored_columns' must be a list")
-    ignored_columns = tuple(_parse_ignored_column(item) for item in ignored_raw)
-    seen_ignored: set[int] = set()
-    for ignored in ignored_columns:
-        if ignored.column in seen_ignored:
-            msg = "profile.duplicate_column"
-            raise _err(
-                msg, f"duplicate ignored column {ignored.column + 1}"
-            )
-        seen_ignored.add(ignored.column)
+ignored_raw = obj.get("ignored_columns", [])
+if not isinstance(ignored_raw, list):
+    msg = "profile.invalid_value"
+    raise _err(msg, "'ignored_columns' must be a list")
+ignored_columns = tuple(_parse_ignored_column(item) for item in ignored_raw)
+seen_ignored: set[int] = set()
+for ignored in ignored_columns:
+    if ignored.column in seen_ignored:
+        msg = "profile.duplicate_column"
+        raise _err(msg, f"duplicate ignored column {ignored.column + 1}")
+    seen_ignored.add(ignored.column)
 
-    allow_empty_targets = obj.get("allow_empty_targets", False)
-    if not isinstance(allow_empty_targets, bool):
-        msg = "profile.invalid_value"
-        raise _err(msg, "'allow_empty_targets' must be a boolean")
+allow_empty_targets = obj.get("allow_empty_targets", False)
+if not isinstance(allow_empty_targets, bool):
+    msg = "profile.invalid_value"
+    raise _err(msg, "'allow_empty_targets' must be a boolean")
 ```
 
 и дополнить `return RecordMapGrammar(...)` (`:693-699`):
 
 ```python
-    return RecordMapGrammar(
-        skip_rows=skip_rows,
-        regions=regions,
-        term_row_offset=term_row_offset,
-        section_field=section_field,
-        notes=notes,
-        ignored_columns=ignored_columns,
-        allow_empty_targets=allow_empty_targets,
-    )
+return RecordMapGrammar(
+    skip_rows=skip_rows,
+    regions=regions,
+    term_row_offset=term_row_offset,
+    section_field=section_field,
+    notes=notes,
+    ignored_columns=ignored_columns,
+    allow_empty_targets=allow_empty_targets,
+)
 ```
 
 4. Новый парсер рядом с `_parse_note_field` (`:483-517`):
@@ -627,27 +625,28 @@ def _parse_ignored_column(obj: Any) -> IgnoredColumn:
 5. `_check_record_map_field_locations` (`:702-740`) — коллизии в конце функции. `ignored_columns` описывает данные, которые парсер *не* читает, поэтому оно не может совпадать ни с языком, ни с note, ни с обоими видами section:
 
 ```python
-    if grammar.ignored_columns:
-        declared = {lang.column for lang in languages}
-        declared |= {note.column for note in grammar.notes}
-        if grammar.section_field is not None:
-            declared.add(grammar.section_field.column)
-        declared |= {
-            region.section_column
-            for region in grammar.regions
-            if region.section_column is not None
-        }
-        collision = sorted(
-            ignored.column for ignored in grammar.ignored_columns
-            if ignored.column in declared
+if grammar.ignored_columns:
+    declared = {lang.column for lang in languages}
+    declared |= {note.column for note in grammar.notes}
+    if grammar.section_field is not None:
+        declared.add(grammar.section_field.column)
+    declared |= {
+        region.section_column
+        for region in grammar.regions
+        if region.section_column is not None
+    }
+    collision = sorted(
+        ignored.column
+        for ignored in grammar.ignored_columns
+        if ignored.column in declared
+    )
+    if collision:
+        msg = "profile.ignored_column_collision"
+        raise _err(
+            msg,
+            f"ignored columns {[col + 1 for col in collision]} collide with a "
+            "declared language, note, or section column",
         )
-        if collision:
-            msg = "profile.ignored_column_collision"
-            raise _err(
-                msg,
-                f"ignored columns {[col + 1 for col in collision]} collide with a "
-                "declared language, note, or section column",
-            )
 ```
 
 `profile.py` не объявляет `__all__`, поэтому список экспорта править не нужно — достаточно определить `IgnoredColumn` рядом с соседними dataclass'ами.
@@ -740,8 +739,8 @@ Expected: FAIL — `test_ignored_column_header_mismatch_is_an_error` не пол
 `loc_kit_ingest/reader.py`, в ветке `isinstance(grammar, RecordMapGrammar)` после цикла по `grammar.notes` (`:150-156`):
 
 ```python
-        for ignored in grammar.ignored_columns:
-            _check("ignored column", ignored.column, ignored.header)
+for ignored in grammar.ignored_columns:
+    _check("ignored column", ignored.column, ignored.header)
 ```
 
 **Step 4: прогнать — пройдёт**
@@ -853,32 +852,31 @@ Expected: FAIL — первый и третий тесты видят `tbx.unmap
 `loc_kit_ingest/parser.py`, `_parse_record_map`. После `skip_set = set(grammar.skip_rows)` (`:625`):
 
 ```python
-    ignored_columns = {ignored.column for ignored in grammar.ignored_columns}
+ignored_columns = {ignored.column for ignored in grammar.ignored_columns}
 ```
 
 `allowed` на caption-строке (`:693`):
 
 ```python
-            allowed = {
-                region.section_column,
-                *lang_columns.values(),
-                *ignored_columns,
-            }
+allowed = {
+    region.section_column,
+    *lang_columns.values(),
+    *ignored_columns,
+}
 ```
 
 Проверка непокрытых ячеек (`:793-800`):
 
 ```python
-                for col, value in enumerate(rows[row_idx]):
-                    if col in ignored_columns:
-                        continue
-                    if (row_idx, col) not in consumed and not _is_blank(value):
-                        err(
-                            "tbx.unmapped_cell",
-                            row_idx + 1,
-                            f"column {col + 1} holds data but no declared field "
-                            "reads it",
-                        )
+for col, value in enumerate(rows[row_idx]):
+    if col in ignored_columns:
+        continue
+    if (row_idx, col) not in consumed and not _is_blank(value):
+        err(
+            "tbx.unmapped_cell",
+            row_idx + 1,
+            f"column {col + 1} holds data but no declared field reads it",
+        )
 ```
 
 **Step 4: прогнать — пройдёт**
@@ -941,18 +939,18 @@ Expected: FAIL — `…_untranslated_when_allowed` получает `tbx.missing
 `loc_kit_ingest/parser.py:749-755`:
 
 ```python
-            # A WIP kit legitimately has gaps: the profile says so explicitly,
-            # and Weblate imports a blank target as an untranslated unit
-            # (STATE_EMPTY). Without the flag a gap stays an error, so a hand
-            # written profile keeps its strict contract.
-            if not grammar.allow_empty_targets:
-                for tlang in target_langs:
-                    if _is_blank(term_values.get(tlang, "")):
-                        err(
-                            "tbx.missing_target_term",
-                            term_1based,
-                            f"target term in language {tlang!r} is empty",
-                        )
+# A WIP kit legitimately has gaps: the profile says so explicitly,
+# and Weblate imports a blank target as an untranslated unit
+# (STATE_EMPTY). Without the flag a gap stays an error, so a hand
+# written profile keeps its strict contract.
+if not grammar.allow_empty_targets:
+    for tlang in target_langs:
+        if _is_blank(term_values.get(tlang, "")):
+            err(
+                "tbx.missing_target_term",
+                term_1based,
+                f"target term in language {tlang!r} is empty",
+            )
 ```
 
 Проверку источника (`:743-748`) не трогать. Никаких per-row предупреждений при включённом флаге не добавлять: 216 строк × 9 языков утопят превью, а сводка по языкам уже приходит из инференса (Task 8).
@@ -997,6 +995,7 @@ def test_technical_id_column_becomes_an_ignored_column(header: str) -> None:
     assert any("column 1" in note and "not imported" in note for note in notes)
     parse_profile(document)
 
+
 def test_ignored_columns_absent_when_every_column_maps() -> None:
     rows = [["ru", "en"], ["Леон", "Leon"], ["Аки", "Aki"]]
     document, _notes = infer_glossary_profile("S", rows, component="s")
@@ -1024,49 +1023,48 @@ _IGNORABLE_HEADERS = frozenset({"id"})
 Блок unmapped (`:643-662`):
 
 ```python
-    populated: set[int] = set()
-    for index in content_indexes:
-        for col, value in enumerate(rows[index]):
-            if value.strip():
-                populated.add(col)
-    note_col = _find_note_column(header_row, populated, languages, notes)
-    mapped = set(languages)
-    if note_col is not None:
-        mapped.add(note_col)
+populated: set[int] = set()
+for index in content_indexes:
+    for col, value in enumerate(rows[index]):
+        if value.strip():
+            populated.add(col)
+note_col = _find_note_column(header_row, populated, languages, notes)
+mapped = set(languages)
+if note_col is not None:
+    mapped.add(note_col)
 
-    ignored_cols: list[int] = []
-    for col in sorted(populated - mapped):
-        header_text = _cell(header_row, col)
-        if header_text.strip().casefold() in _IGNORABLE_HEADERS:
-            ignored_cols.append(col)
-            notes.append(
-                f"column {col + 1} ({header_text!r}) is a technical "
-                "identifier; not imported"
-            )
-            continue
-        msg = (
-            f"column {col + 1} ({header_text or f'column{col + 1}'!r}) holds "
-            "data but is not a recognised language column; rename the header "
-            "to a recognised term-note header, for example note, description, "
-            "comment, or explanation, or supply an explicit profile"
+ignored_cols: list[int] = []
+for col in sorted(populated - mapped):
+    header_text = _cell(header_row, col)
+    if header_text.strip().casefold() in _IGNORABLE_HEADERS:
+        ignored_cols.append(col)
+        notes.append(
+            f"column {col + 1} ({header_text!r}) is a technical "
+            "identifier; not imported"
         )
-        raise InferenceError(msg)
+        continue
+    msg = (
+        f"column {col + 1} ({header_text or f'column{col + 1}'!r}) holds "
+        "data but is not a recognised language column; rename the header "
+        "to a recognised term-note header, for example note, description, "
+        "comment, or explanation, or supply an explicit profile"
+    )
+    raise InferenceError(msg)
 ```
 
 Эмит grammar (`:770-775`):
 
 ```python
-    grammar: dict[str, Any] = {
-        "type": "record-map",
-        "skip_rows": sorted(index + 1 for index in skip_rows),
-        "regions": regions,
-        "term_row_offset": 0,
-    }
-    if ignored_cols:
-        grammar["ignored_columns"] = [
-            {"column": col + 1, "header": _cell(header_row, col)}
-            for col in ignored_cols
-        ]
+grammar: dict[str, Any] = {
+    "type": "record-map",
+    "skip_rows": sorted(index + 1 for index in skip_rows),
+    "regions": regions,
+    "term_row_offset": 0,
+}
+if ignored_cols:
+    grammar["ignored_columns"] = [
+        {"column": col + 1, "header": _cell(header_row, col)} for col in ignored_cols
+    ]
 ```
 
 **Step 4: прогнать — пройдёт**
@@ -1174,36 +1172,36 @@ Expected: FAIL — старый код дропает `ja` и отказывае
 ставит:
 
 ```python
-    target_langs: list[str] = []
-    allow_empty_targets = False
-    for col in sorted(languages):
-        if col == source_col:
-            continue
-        code = languages[col]
-        missing_rows = [
-            index + 1 for index in term_rows if not _cell(rows[index], col).strip()
-        ]
-        term_filled = len(term_rows) - len(missing_rows)
-        if not term_filled:
-            continue
-        share = 100.0 * term_filled / len(term_rows)
-        if share < min_fill:
-            msg = (
-                f"column {col + 1} ({_cell(header_row, col)!r} -> {code}) is "
-                f"filled in {term_filled}/{len(term_rows)} term rows "
-                f"({share:.1f}%); too sparse to map deterministically"
-            )
-            raise InferenceError(msg)
-        target_langs.append(code)
-        if missing_rows:
-            allow_empty_targets = True
-            shown = ", ".join(str(row) for row in missing_rows[:_MISSING_ROWS_SHOWN])
-            if len(missing_rows) > _MISSING_ROWS_SHOWN:
-                shown += f", +{len(missing_rows) - _MISSING_ROWS_SHOWN} more"
-            notes.append(
-                f"language {code} has no term on {len(missing_rows)} row(s) "
-                f"({shown}); imported untranslated"
-            )
+target_langs: list[str] = []
+allow_empty_targets = False
+for col in sorted(languages):
+    if col == source_col:
+        continue
+    code = languages[col]
+    missing_rows = [
+        index + 1 for index in term_rows if not _cell(rows[index], col).strip()
+    ]
+    term_filled = len(term_rows) - len(missing_rows)
+    if not term_filled:
+        continue
+    share = 100.0 * term_filled / len(term_rows)
+    if share < min_fill:
+        msg = (
+            f"column {col + 1} ({_cell(header_row, col)!r} -> {code}) is "
+            f"filled in {term_filled}/{len(term_rows)} term rows "
+            f"({share:.1f}%); too sparse to map deterministically"
+        )
+        raise InferenceError(msg)
+    target_langs.append(code)
+    if missing_rows:
+        allow_empty_targets = True
+        shown = ", ".join(str(row) for row in missing_rows[:_MISSING_ROWS_SHOWN])
+        if len(missing_rows) > _MISSING_ROWS_SHOWN:
+            shown += f", +{len(missing_rows) - _MISSING_ROWS_SHOWN} more"
+        notes.append(
+            f"language {code} has no term on {len(missing_rows)} row(s) "
+            f"({shown}); imported untranslated"
+        )
 ```
 
 После цикла сохранить существующий отказ при пустом `target_langs`. Он
@@ -1218,8 +1216,8 @@ description, он должен сохранить точный actionable refusa
 3. После блока `ignored_columns` из Task 7 добавить:
 
 ```python
-    if allow_empty_targets:
-        grammar["allow_empty_targets"] = True
+if allow_empty_targets:
+    grammar["allow_empty_targets"] = True
 ```
 
 4. Обновить docstring `infer_glossary_profile` (`:558-570`): target — это
@@ -1410,9 +1408,7 @@ uv run ./manage.py collectstatic --noinput
 # Temple kit shape: ';' delimiter, one target, a notes column with commas
 # inside quoted cells. Covers the reader's delimiter detection end to end.
 GLOSSARY_SEMICOLON_CSV = (
-    "ru;en;notes\n"
-    'Леон;Leon;"Имя собственное, мужской род."\n'
-    "Аки;Aki;Сестра Леона.\n"
+    'ru;en;notes\nЛеон;Leon;"Имя собственное, мужской род."\nАки;Aki;Сестра Леона.\n'
 )
 
 # Full kit shape: technical id column, a vendor Chinese code and target
@@ -1426,9 +1422,7 @@ GLOSSARY_ID_PARTIAL_CSV = (
 
 # Both at once: ';' delimiter plus a vendor code and partial targets.
 GLOSSARY_SEMICOLON_PARTIAL_CSV = (
-    "ru;en;ja;zh-TC;notes\n"
-    "Леон;Leon;レオン;;главный герой\n"
-    "Аки;Aki;;阿姬;\n"
+    "ru;en;ja;zh-TC;notes\nЛеон;Leon;レオン;;главный герой\nАки;Aki;;阿姬;\n"
 )
 ```
 
@@ -1438,9 +1432,7 @@ GLOSSARY_SEMICOLON_PARTIAL_CSV = (
 @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
 def test_semicolon_kit_gets_a_deterministic_preview(self) -> None:
     """Разделитель ';' - это формат экспорта, а не повод требовать профиль."""
-    self._start(
-        upload=self._csv("Temple.csv", GLOSSARY_SEMICOLON_CSV), slug=self.slug
-    )
+    self._start(upload=self._csv("Temple.csv", GLOSSARY_SEMICOLON_CSV), slug=self.slug)
     draft = self._draft()
     draft.refresh_from_db()
 
@@ -1469,9 +1461,7 @@ def test_semicolon_partial_kit_maps_the_vendor_code(self) -> None:
 @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
 def test_id_partial_kit_creates_a_component_with_untranslated_terms(self) -> None:
     """Полная форма реального кита доходит до живого компонента."""
-    self._start(
-        upload=self._csv("Terms.csv", GLOSSARY_ID_PARTIAL_CSV), slug=self.slug
-    )
+    self._start(upload=self._csv("Terms.csv", GLOSSARY_ID_PARTIAL_CSV), slug=self.slug)
     draft = self._draft()
     draft.refresh_from_db()
 

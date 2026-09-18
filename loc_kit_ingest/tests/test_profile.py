@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import copy
 import json
 
 import pytest
@@ -61,8 +62,6 @@ VALID_PROFILE = {"schema_version": 1, "components": [VALID_PO, VALID_TBX]}
 
 @pytest.fixture
 def valid_profile():
-    import copy
-
     return copy.deepcopy(VALID_PROFILE)
 
 

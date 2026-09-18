@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Build a deterministic en->fr golden set from the frozen need-for-greed/ui
-production dump for judge seat pair search.
+Build a deterministic en->fr golden set from the frozen need-for-greed/ui production dump for judge seat pair search.
 
 Mutation classes, all construction-provable on the French target:
   number-loss          remove a digit sequence from the target
@@ -29,10 +28,10 @@ Usage:
 from __future__ import annotations
 
 import json
-import operator
 import random
 import re
 from collections import Counter
+from operator import itemgetter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,51 +49,96 @@ MAX_MUTATIONS_PER_BASE = 2
 # ---------------------------------------------------------------------------
 
 SAFE_ANTONYMS = {
-    "toujours": "jamais", "jamais": "toujours",
-    "avant": "après", "après": "avant",
-    "vivant": "mort", "mort": "vivant",
-    "ouvrir": "fermer", "fermer": "ouvrir",
-    "monter": "descendre", "descendre": "monter",
-    "gauche": "droite", "droite": "gauche",
-    "vrai": "faux", "faux": "vrai",
-    "ami": "ennemi", "ennemi": "ami",
-    "jour": "nuit", "nuit": "jour",
-    "accepter": "refuser", "refuser": "accepter",
-    "bon": "mauvais", "mauvais": "bon",
-    "grand": "petit", "petit": "grand",
-    "haut": "bas", "bas": "haut",
-    "plein": "vide", "vide": "plein",
-    "chaud": "froid", "froid": "chaud",
-    "nouveau": "ancien", "ancien": "nouveau",
-    "premier": "dernier", "dernier": "premier",
-    "gagner": "perdre", "perdre": "gagner",
-    "acheter": "vendre", "vendre": "acheter",
-    "entrer": "sortir", "sortir": "entrer",
-    "allumer": "éteindre", "éteindre": "allumer",
-    "commencer": "terminer", "terminer": "commencer",
-    "trouver": "perdre", "retrouver": "perdre",
-    "donner": "prendre", "prendre": "donner",
-    "aimer": "détester", "détester": "aimer",
-    "possible": "impossible", "impossible": "possible",
-    "facile": "difficile", "difficile": "facile",
-    "rapide": "lent", "lent": "rapide",
-    "riche": "pauvre", "pauvre": "riche",
-    "fort": "faible", "faible": "fort",
-    "beau": "laid", "laid": "beau",
-    "jeune": "vieux", "vieux": "jeune",
-    "propre": "sale", "sale": "propre",
-    "heureux": "triste", "triste": "heureux",
-    "ensemble": "séparément", "séparément": "ensemble",
-    "tôt": "tard", "tard": "tôt",
-    "souvent": "rarement", "rarement": "souvent",
-    "beaucoup": "peu", "peu": "beaucoup",
-    "mieux": "pire", "pire": "mieux",
-    "plus": "moins", "moins": "plus",
-    "ici": "là-bas", "là-bas": "ici",
-    "partout": "nulle part", "nulle part": "partout",
-    "dedans": "dehors", "dehors": "dedans",
-    "dessus": "dessous", "dessous": "dessus",
-    "devant": "derrière", "derrière": "devant",
+    "toujours": "jamais",
+    "jamais": "toujours",
+    "avant": "après",
+    "après": "avant",
+    "vivant": "mort",
+    "mort": "vivant",
+    "ouvrir": "fermer",
+    "fermer": "ouvrir",
+    "monter": "descendre",
+    "descendre": "monter",
+    "gauche": "droite",
+    "droite": "gauche",
+    "vrai": "faux",
+    "faux": "vrai",
+    "ami": "ennemi",
+    "ennemi": "ami",
+    "jour": "nuit",
+    "nuit": "jour",
+    "accepter": "refuser",
+    "refuser": "accepter",
+    "bon": "mauvais",
+    "mauvais": "bon",
+    "grand": "petit",
+    "petit": "grand",
+    "haut": "bas",
+    "bas": "haut",
+    "plein": "vide",
+    "vide": "plein",
+    "chaud": "froid",
+    "froid": "chaud",
+    "nouveau": "ancien",
+    "ancien": "nouveau",
+    "premier": "dernier",
+    "dernier": "premier",
+    "gagner": "perdre",
+    "perdre": "gagner",
+    "acheter": "vendre",
+    "vendre": "acheter",
+    "entrer": "sortir",
+    "sortir": "entrer",
+    "allumer": "éteindre",
+    "éteindre": "allumer",
+    "commencer": "terminer",
+    "terminer": "commencer",
+    "trouver": "perdre",
+    "retrouver": "perdre",
+    "donner": "prendre",
+    "prendre": "donner",
+    "aimer": "détester",
+    "détester": "aimer",
+    "possible": "impossible",
+    "impossible": "possible",
+    "facile": "difficile",
+    "difficile": "facile",
+    "rapide": "lent",
+    "lent": "rapide",
+    "riche": "pauvre",
+    "pauvre": "riche",
+    "fort": "faible",
+    "faible": "fort",
+    "beau": "laid",
+    "laid": "beau",
+    "jeune": "vieux",
+    "vieux": "jeune",
+    "propre": "sale",
+    "sale": "propre",
+    "heureux": "triste",
+    "triste": "heureux",
+    "ensemble": "séparément",
+    "séparément": "ensemble",
+    "tôt": "tard",
+    "tard": "tôt",
+    "souvent": "rarement",
+    "rarement": "souvent",
+    "beaucoup": "peu",
+    "peu": "beaucoup",
+    "mieux": "pire",
+    "pire": "mieux",
+    "plus": "moins",
+    "moins": "plus",
+    "ici": "là-bas",
+    "là-bas": "ici",
+    "partout": "nulle part",
+    "nulle part": "partout",
+    "dedans": "dehors",
+    "dehors": "dedans",
+    "dessus": "dessous",
+    "dessous": "dessus",
+    "devant": "derrière",
+    "derrière": "devant",
 }
 
 VOWELS = tuple("aeiouyâàéèêëîïôöûüh")
@@ -111,8 +155,25 @@ SUBJECT_RE = re.compile(
 )
 RELATIVE_BEFORE_RE = re.compile(r"(?:qui|que|qu')\s*$", re.IGNORECASE)
 CLITICS = {
-    "le", "la", "les", "lui", "leur", "en", "se", "me", "te",
-    "ne", "une", "des", "ce", "cette", "ses", "mes", "tes", "que", "qui",
+    "le",
+    "la",
+    "les",
+    "lui",
+    "leur",
+    "en",
+    "se",
+    "me",
+    "te",
+    "ne",
+    "une",
+    "des",
+    "ce",
+    "cette",
+    "ses",
+    "mes",
+    "tes",
+    "que",
+    "qui",
 }
 INFINITIVE_RE = re.compile(r"^([A-ZÀ-Ÿ][a-zà-ÿ']*(?:er|ir|re|oir))\b")
 ARTICLE_RE = re.compile(
@@ -155,6 +216,7 @@ CLASS_ORDER = list(MUTATION_CAPS)
 # helpers
 # ---------------------------------------------------------------------------
 
+
 def keep_case(original: str, replacement: str) -> str:
     return replacement.capitalize() if original[:1].isupper() else replacement
 
@@ -162,6 +224,7 @@ def keep_case(original: str, replacement: str) -> str:
 # ---------------------------------------------------------------------------
 # mutators — each returns (mutated_text, kind) or (None, None)
 # ---------------------------------------------------------------------------
+
 
 def mutate_number_loss(target: str, _source: str, _rng: random.Random):
     """Remove the first digit sequence from the target."""
@@ -180,13 +243,15 @@ def mutate_placeholder_corrupt(target: str, _source: str, rng: random.Random):
     original = hit.group(0)
     # Pick a corruption that is visibly wrong but structurally similar
     corruptions = [
-        original.replace("{", ""),                     # value} — missing opening brace
-        original.replace("}", ""),                     # {value — missing closing brace
-        "{" + original[1:-1] + "x}",                   # {valuex} — typo
-        original[:-1] + "s}",                          # {values} — pluralised
+        original.replace("{", ""),  # value} — missing opening brace
+        original.replace("}", ""),  # {value — missing closing brace
+        "{" + original[1:-1] + "x}",  # {valuex} — typo
+        original[:-1] + "s}",  # {values} — pluralised
     ]
     corruption = rng.choice(corruptions)
-    return target[: hit.start()] + corruption + target[hit.end() :], "placeholder-corrupt"
+    return target[: hit.start()] + corruption + target[
+        hit.end() :
+    ], "placeholder-corrupt"
 
 
 def mutate_english_leakage(target: str, source: str, rng: random.Random):
@@ -196,34 +261,93 @@ def mutate_english_leakage(target: str, source: str, rng: random.Random):
     tgt_words_lower = {w.lower() for w in FRENCH_WORD_RE.findall(target)}
     tgt_words_lower.update(w.lower() for w in ENGLISH_WORD_RE.findall(target))
     src_words = [
-        w for w in ENGLISH_WORD_RE.findall(source)
-        if w.lower() not in {"this", "that", "with", "from", "your", "have",
-                              "will", "what", "when", "where", "which", "there",
-                              "their", "about", "would", "could", "should",
-                              "they", "them", "these", "those", "into", "over",
-                              "just", "more", "some", "only", "also", "very"}
+        w
+        for w in ENGLISH_WORD_RE.findall(source)
+        if w.lower()
+        not in {
+            "this",
+            "that",
+            "with",
+            "from",
+            "your",
+            "have",
+            "will",
+            "what",
+            "when",
+            "where",
+            "which",
+            "there",
+            "their",
+            "about",
+            "would",
+            "could",
+            "should",
+            "they",
+            "them",
+            "these",
+            "those",
+            "into",
+            "over",
+            "just",
+            "more",
+            "some",
+            "only",
+            "also",
+            "very",
+        }
         and w.lower() not in tgt_words_lower
     ]
     # French victim words: 4+ chars, not stopwords. Prefer accented.
     tgt_words = [
         (m.group(0), m.start(), m.end())
         for m in FRENCH_WORD_RE.finditer(target)
-        if m.group(0).lower() not in {"vous", "nous", "elle", "dans", "pour",
-                                        "avec", "mais", "plus", "tout", "sont",
-                                        "cette", "votre", "leur", "être", "cela",
-                                        "quoi", "fait", "très", "bien", "comme",
-                                        "peut", "aussi", "même", "alors", "dont",
-                                        "c'est", "est", "pas", "sur", "une", "ses",
-                                        "aux", "des", "nos"}
+        if m.group(0).lower()
+        not in {
+            "vous",
+            "nous",
+            "elle",
+            "dans",
+            "pour",
+            "avec",
+            "mais",
+            "plus",
+            "tout",
+            "sont",
+            "cette",
+            "votre",
+            "leur",
+            "être",
+            "cela",
+            "quoi",
+            "fait",
+            "très",
+            "bien",
+            "comme",
+            "peut",
+            "aussi",
+            "même",
+            "alors",
+            "dont",
+            "c'est",
+            "est",
+            "pas",
+            "sur",
+            "une",
+            "ses",
+            "aux",
+            "des",
+            "nos",
+        }
     ]
-    accented = [(w, s, e) for w, s, e in tgt_words
-                if any(c in "àâäéèêëîïôöùûüç" for c in w)]
-    victims = accented if accented else tgt_words
+    accented = [
+        (w, s, e) for w, s, e in tgt_words if any(c in "àâäéèêëîïôöùûüç" for c in w)
+    ]
+    victims = accented or tgt_words
     if not src_words or not victims:
         return None, None
     donor = rng.choice(src_words)
-    victim, start, end = rng.choice(victims)
-    replacement = donor if target[start:start+1].islower() else donor.capitalize()
+    _victim, start, end = rng.choice(victims)
+    replacement = donor if target[start : start + 1].islower() else donor.capitalize()
     return target[:start] + replacement + target[end:], "english-leakage"
 
 
@@ -232,14 +356,14 @@ def mutate_negation_antonym(target: str, _source: str, rng: random.Random):
     match = NEGATION_RE.search(target)
     if match:
         return (
-            target[: match.start()] + match.group(1) + target[match.end():],
+            target[: match.start()] + match.group(1) + target[match.end() :],
             "negation-dropped",
         )
     hits = list(ANTONYM_RE.finditer(target))
     if hits:
         hit = rng.choice(hits)
         swapped = keep_case(hit.group(1), SAFE_ANTONYMS[hit.group(1).lower()])
-        return target[: hit.start()] + swapped + target[hit.end():], "antonym-swapped"
+        return target[: hit.start()] + swapped + target[hit.end() :], "antonym-swapped"
     hits = [
         hit
         for hit in SUBJECT_RE.finditer(target)
@@ -253,7 +377,7 @@ def mutate_negation_antonym(target: str, _source: str, rng: random.Random):
         return (
             target[: hit.start()]
             + f"{subject} {particle}{verb} pas"
-            + target[hit.end():],
+            + target[hit.end() :],
             "negation-inserted",
         )
     if INFINITIVE_RE.match(target):
@@ -274,7 +398,9 @@ def mutate_omission(target: str, _source: str, _rng: random.Random):
 
 
 def mutate_glossary_wrong(
-    target: str, _source: str, rng: random.Random,
+    target: str,
+    _source: str,
+    rng: random.Random,
     glossary_map: dict[str, str],
 ):
     """Replace a glossary term's French rendering with its English source."""
@@ -304,7 +430,7 @@ def mutate_obscenity(target: str, _source: str, rng: random.Random):
     noun = hit.group(2)
     insert = "putain d'" if noun[:1].lower() in VOWELS else "putain de "
     return (
-        target[: hit.start()] + f"{hit.group(1)} {insert}{noun}" + target[hit.end():],
+        target[: hit.start()] + f"{hit.group(1)} {insert}{noun}" + target[hit.end() :],
         "obscenity-injected",
     )
 
@@ -334,9 +460,10 @@ MUTATORS = {
 # stratified slice selection
 # ---------------------------------------------------------------------------
 
+
 def select_slice(units: list[dict], size: int, seed: int) -> list[dict]:
     """Select a stratified slice by target length, deterministic."""
-    rng = random.Random(seed)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+    rng = random.Random(seed)
     sorted_units = sorted(units, key=lambda u: (len(u["target"]), u["id"]))
     # Systematic sampling: every Nth after shuffle within length strata
     # Group by length bucket (power-of-two)
@@ -357,19 +484,20 @@ def select_slice(units: list[dict], size: int, seed: int) -> list[dict]:
         selected.extend(bucket_units[:quota])
     # Trim to exact size
     rng.shuffle(selected)
-    return sorted(selected[:size], key=lambda u: u["id"])
+    return sorted(selected[:size], key=itemgetter("id"))
 
 
 # ---------------------------------------------------------------------------
 # mutation builder
 # ---------------------------------------------------------------------------
 
+
 def build_mutations(
     bases: list[dict],
     glossary_map: dict[str, str],
 ) -> list[dict]:
     """Inject mutations into eligible bases, respecting caps."""
-    rng = random.Random(MUTATION_SEED)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+    rng = random.Random(MUTATION_SEED)
     used: Counter[int] = Counter()
     made: Counter[str] = Counter()
     mutations: list[dict] = []
@@ -389,13 +517,15 @@ def build_mutations(
                 continue
             used[base["id"]] += 1
             made[name] += 1
-            mutations.append({
-                "base": base,
-                "mutation_class": name,
-                "mutation_kind": kind,
-                "target": mutated,
-                "severity": "critical" if kind in CRITICAL_KINDS else "major",
-            })
+            mutations.append(
+                {
+                    "base": base,
+                    "mutation_class": name,
+                    "mutation_kind": kind,
+                    "target": mutated,
+                    "severity": "critical" if kind in CRITICAL_KINDS else "major",
+                }
+            )
     return mutations
 
 
@@ -403,8 +533,11 @@ def build_mutations(
 # main
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
-    units = [json.loads(line) for line in UNITS_PATH.read_text(encoding="utf-8").splitlines()]
+    units = [
+        json.loads(line) for line in UNITS_PATH.read_text(encoding="utf-8").splitlines()
+    ]
     glossary_terms = json.loads(GLOSSARY_PATH.read_text(encoding="utf-8"))["terms"]
 
     # Exclude units that fail deterministic checks
@@ -428,12 +561,10 @@ def main() -> None:
     mutations = build_mutations(slice_units, glossary_map)
 
     # Build records
-    records: list[dict] = []
-
     # Clean passes: every unit in the 150-unit slice, including mutation bases.
     # The held-out confirmation population is the subset with no mutations.
-    for unit in slice_units:
-        records.append({
+    records = [
+        {
             "record_id": f"clean-{unit['id']}",
             "stratum": "clean",
             "unit_id": unit["id"],
@@ -445,25 +576,29 @@ def main() -> None:
             "severity": None,
             "label_origin": "construction",
             "annotator": "generator:nfg-ui-fr",
-        })
+        }
+        for unit in slice_units
+    ]
 
     # Mutated records
     for mutation in mutations:
         base = mutation["base"]
-        records.append({
-            "record_id": f"mut-{base['id']}-{mutation['mutation_kind']}",
-            "stratum": "mutation",
-            "unit_id": base["id"],
-            "context": base["context"],
-            "source": base["source"],
-            "target": mutation["target"],
-            "label": "defect",
-            "defect_class": mutation["mutation_kind"],
-            "severity": mutation["severity"],
-            "label_origin": "construction",
-            "annotator": f"generator:{MUTATION_SEED}",
-            "base_target": base["target"],
-        })
+        records.append(
+            {
+                "record_id": f"mut-{base['id']}-{mutation['mutation_kind']}",
+                "stratum": "mutation",
+                "unit_id": base["id"],
+                "context": base["context"],
+                "source": base["source"],
+                "target": mutation["target"],
+                "label": "defect",
+                "defect_class": mutation["mutation_kind"],
+                "severity": mutation["severity"],
+                "label_origin": "construction",
+                "annotator": f"generator:{MUTATION_SEED}",
+                "base_target": base["target"],
+            }
+        )
 
     payload = {
         "dataset": "need-for-greed/ui/fr — frozen production dump 2026-08-26",
@@ -487,9 +622,14 @@ def main() -> None:
     for sev in ("critical", "major"):
         rows = [r for r in records if r["severity"] == sev]
         print(f"  {sev}: {len(rows)}")
-    print("  mutation kinds:", dict(
-        Counter(r["defect_class"] for r in records if r["stratum"] == "mutation").most_common()
-    ))
+    print(
+        "  mutation kinds:",
+        dict(
+            Counter(
+                r["defect_class"] for r in records if r["stratum"] == "mutation"
+            ).most_common()
+        ),
+    )
     print(f"  pass: {sum(1 for r in records if r['label'] == 'pass')}")
     print(f"  defect: {sum(1 for r in records if r['label'] == 'defect')}")
 

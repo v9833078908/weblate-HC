@@ -2,6 +2,7 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[any-type, complex-structure, enumerate-for-loop, import-outside-top-level, print, suspicious-url-open-usage, too-many-positional-arguments, too-many-statements-in-try-clause, try-except-continue]
 """
 Weblate Component LQA Auditor & MQM-Core Scorecard Generator.
 
@@ -226,7 +227,7 @@ def _parse_po_fallback(file_path: Path) -> list[dict[str, Any]]:
 
         ctx = _extract_po_multiline("msgctxt", block) or f"entry_{idx}"
         msgid = _extract_po_multiline("msgid", block)
-        if msgid is None or (msgid == "" and idx == 1):  # skip header msgid ""
+        if msgid is None or (not msgid and idx == 1):  # skip header msgid ""
             continue
 
         msgid_plural = _extract_po_multiline("msgid_plural", block)
@@ -270,7 +271,7 @@ def load_units_from_file(
     units: list[dict[str, Any]] = []
 
     # 1. Tabular loc-kits (XLSX, CSV, TSV) via repository loc_kit_ingest.reader
-    if ext in (".xlsx", ".csv", ".tsv"):
+    if ext in {".xlsx", ".csv", ".tsv"}:
         try:
             from loc_kit_ingest.reader import read_sheets
         except ImportError:
@@ -289,7 +290,7 @@ def load_units_from_file(
                 (
                     i
                     for i, col in enumerate(header)
-                    if col in ("context", "key", "id", "string_id", "name")
+                    if col in {"context", "key", "id", "string_id", "name"}
                 ),
                 0,
             )
@@ -299,7 +300,7 @@ def load_units_from_file(
                 (
                     i
                     for i, col in enumerate(header)
-                    if col in ("source", "src", "ru", "en", "original")
+                    if col in {"source", "src", "ru", "en", "original"}
                 ),
                 1 if len(header) > 1 else 0,
             )
@@ -317,7 +318,7 @@ def load_units_from_file(
                         i
                         for i, col in enumerate(header)
                         if col
-                        in (
+                        in {
                             "target",
                             "tgt",
                             "translation",
@@ -326,7 +327,7 @@ def load_units_from_file(
                             "es",
                             "ja",
                             "zh",
-                        )
+                        }
                         and i != src_idx
                     ),
                     2 if len(header) > 2 else src_idx,
@@ -356,7 +357,8 @@ def load_units_from_file(
         try:
             from translate.storage.pypo import pofile
 
-            po = pofile(open(p, "rb"))
+            with open(p, "rb") as fh:
+                po = pofile(fh)
             idx = 1
             for unit in po.units:
                 if unit.isheader() or unit.isfuzzy():
@@ -451,7 +453,7 @@ def extract_candidates(
             )
 
             # 1. Acronym leak heuristic (English acronyms in non-EN targets)
-            if target_lang not in ("en", "ru"):
+            if target_lang not in {"en", "ru"}:
                 m = re.search(
                     r"\b(AT|HP|XP|DPS|LMB|RMB|Cancel|Exit|Damage|Heal)\b", tgt
                 )
@@ -472,20 +474,21 @@ def extract_candidates(
                     )
 
             # 2. Cyrillic leak heuristic (in Latin/CJK targets)
-            if target_lang not in ("ru", "uk", "be", "sr"):
-                if re.search(r"[\u0400-\u04FF]", tgt):
-                    candidates.append(
-                        {
-                            "unit_id": uid,
-                            "context": f"{ctx}[plural_{form_idx}]"
-                            if len(tgt_list) > 1
-                            else ctx,
-                            "source": src,
-                            "target": tgt,
-                            "candidate_type": "cyrillic_leak",
-                            "note": f"Cyrillic character detected in {target_lang.upper()} target.",
-                        }
-                    )
+            if target_lang not in {"ru", "uk", "be", "sr"} and re.search(
+                r"[\u0400-\u04FF]", tgt
+            ):
+                candidates.append(
+                    {
+                        "unit_id": uid,
+                        "context": f"{ctx}[plural_{form_idx}]"
+                        if len(tgt_list) > 1
+                        else ctx,
+                        "source": src,
+                        "target": tgt,
+                        "candidate_type": "cyrillic_leak",
+                        "note": f"Cyrillic character detected in {target_lang.upper()} target.",
+                    }
+                )
 
             # 3. Placeholder / bracket mismatch heuristic
             src_brackets = src.count("[") + src.count("]")
@@ -513,11 +516,12 @@ def resolve_review_scope(
     verdicts: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """
-    Resolve an explicit review_scope declaration to the exact set of units the MQM
-    denominator must be computed over. Never falls back to "all units" silently -
-    a partial review scored against the full component's word count is exactly the
-    bug this function exists to prevent (a partial-sample numerator divided by a
-    full-population denominator silently assumes the unreviewed rest is defect-free).
+    Resolve an explicit review_scope declaration to the exact set of units the MQM denominator must be computed over.
+
+    Never falls back to "all units" silently - a partial review scored against
+    the full component's word count is exactly the bug this function exists to
+    prevent (a partial-sample numerator divided by a full-population denominator
+    silently assumes the unreviewed rest is defect-free).
     """
     if not review_scope or not isinstance(review_scope, dict):
         msg = (
@@ -648,9 +652,10 @@ def compute_mqm_score(
     review_scope: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """
-    Calculate MQM penalty points and score based on reviewed verdicts, scoped strictly
-    to the declared review_scope. Raises ValueError if review_scope is missing/invalid,
-    if any verdict is unreviewed, or if any verdict references a unit outside scope.
+    Calculate MQM penalty points and score based on reviewed verdicts, scoped strictly to the declared review_scope.
+
+    Raises ValueError if review_scope is missing/invalid, if any verdict is
+    unreviewed, or if any verdict references a unit outside scope.
     """
     scope = resolve_review_scope(units, review_scope, verdicts)
 
@@ -659,7 +664,7 @@ def compute_mqm_score(
     total_penalty = 0
 
     for idx, v in enumerate(verdicts):
-        if not v.get("reviewed", True) or v.get("severity") in (None, "pending", ""):
+        if not v.get("reviewed", True) or v.get("severity") in {None, "pending", ""}:
             msg = (
                 f"Verdict #{idx + 1} (Unit {v.get('unit_id', 'N/A')}, context '{v.get('context', '')}') "
                 "is marked as pending or unreviewed. Every verdict must be explicitly reviewed with a "
@@ -745,11 +750,15 @@ def format_markdown_report(
 ) -> str:
     """Generate a clean markdown report."""
     md = []
-    md.append(f"# Weblate LQA Audit: {target_name} ({language.upper()})\n")
-    md.append(f"- **Target:** `{target_name}`")
-    md.append(f"- **Language:** `{language}`")
-    md.append(f"- **Total Units:** {total_units}")
-    md.append(f"- **Total Source Words (all plural forms):** {total_words}")
+    md.extend(
+        [
+            f"# Weblate LQA Audit: {target_name} ({language.upper()})\n",
+            f"- **Target:** `{target_name}`",
+            f"- **Language:** `{language}`",
+            f"- **Total Units:** {total_units}",
+            f"- **Total Source Words (all plural forms):** {total_words}",
+        ]
+    )
     advisory_checks = advisory_checks or set()
     total_check_units = sum(len(ulist) for ulist in failing_checks.values())
     advisory_units = sum(
@@ -777,18 +786,20 @@ def format_markdown_report(
             else 100.0
         )
 
-        md.append("## 1. MQM-Core Quality Scorecard (Reviewed Verdicts)\n")
-        md.append("### Review Coverage\n")
-        md.append("| Metric | Value |")
-        md.append("|---|---|")
-        md.append(
-            f"| **Coverage mode** | `{mqm_results['coverage_mode']}` ({'entire component reviewed' if mqm_results['is_full_coverage'] else 'PARTIAL - see release gate note'}) |"
+        md.extend(
+            [
+                "## 1. MQM-Core Quality Scorecard (Reviewed Verdicts)\n",
+                "### Review Coverage\n",
+                "| Metric | Value |",
+                "|---|---|",
+            ]
         )
-        md.append(
-            f"| **Units reviewed** | {mqm_results['reviewed_unit_count']} / {mqm_results['total_unit_count']} ({cov_pct:.1f}%) |"
-        )
-        md.append(
-            f"| **Words reviewed (MQM denominator)** | {mqm_results['reviewed_word_count']} / {mqm_results['total_word_count']} ({word_cov_pct:.1f}%) |\n"
+        md.extend(
+            [
+                f"| **Coverage mode** | `{mqm_results['coverage_mode']}` ({'entire component reviewed' if mqm_results['is_full_coverage'] else 'PARTIAL - see release gate note'}) |",
+                f"| **Units reviewed** | {mqm_results['reviewed_unit_count']} / {mqm_results['total_unit_count']} ({cov_pct:.1f}%) |",
+                f"| **Words reviewed (MQM denominator)** | {mqm_results['reviewed_word_count']} / {mqm_results['total_word_count']} ({word_cov_pct:.1f}%) |\n",
+            ]
         )
 
         score_label = (
@@ -796,25 +807,21 @@ def format_markdown_report(
             if mqm_results["is_full_coverage"]
             else "MQM Score (SAMPLE-SCOPED, non-projectable)"
         )
-        md.append("| Metric | Value | Status |")
-        md.append("|---|---|---|")
-        md.append(
-            f"| **{score_label}** | **{mqm_results['mqm_score']} / 100** | **{mqm_results['grade']}** |"
+        md.extend(
+            [
+                "| Metric | Value | Status |",
+                "|---|---|---|",
+                f"| **{score_label}** | **{mqm_results['mqm_score']} / 100** | **{mqm_results['grade']}** |",
+            ]
         )
-        md.append(
-            f"| **Release Gate** | {mqm_results['status']} | {'🔴 BLOCKED' if mqm_results['has_critical'] or not mqm_results['is_full_coverage'] or mqm_results['mqm_score'] < 85 else '🟢 PASS'} |"
-        )
-        md.append(
-            f"| **Critical Defects (25 pt)** | {mqm_results['counts']['critical']} | {'🔴 Requires immediate fix' if mqm_results['counts']['critical'] > 0 else 'None'} |"
-        )
-        md.append(
-            f"| **Major Defects (5 pt)** | {mqm_results['counts']['major']} | Terminology/mechanic issues |"
-        )
-        md.append(
-            f"| **Minor Defects (1 pt)** | {mqm_results['counts']['minor']} | Minor polish |"
-        )
-        md.append(
-            f"| **Total Penalty Points** | {mqm_results['total_penalties']} pt | Formula: $100 - (\\text{{Penalties}}/\\text{{Reviewed Words}}) \\times 100$ |\n"
+        md.extend(
+            [
+                f"| **Release Gate** | {mqm_results['status']} | {'🔴 BLOCKED' if mqm_results['has_critical'] or not mqm_results['is_full_coverage'] or mqm_results['mqm_score'] < 85 else '🟢 PASS'} |",
+                f"| **Critical Defects (25 pt)** | {mqm_results['counts']['critical']} | {'🔴 Requires immediate fix' if mqm_results['counts']['critical'] > 0 else 'None'} |",
+                f"| **Major Defects (5 pt)** | {mqm_results['counts']['major']} | Terminology/mechanic issues |",
+                f"| **Minor Defects (1 pt)** | {mqm_results['counts']['minor']} | Minor polish |",
+                f"| **Total Penalty Points** | {mqm_results['total_penalties']} pt | Formula: $100 - (\\text{{Penalties}}/\\text{{Reviewed Words}}) \\times 100$ |\n",
+            ]
         )
 
         md.append("### Reviewed Defect Log\n")
@@ -825,19 +832,21 @@ def format_markdown_report(
                 "minor": "🟡",
                 "neutral": "⚪",
             }.get(str(v.get("severity", "minor")).lower(), "🟡")
-            md.append(
-                f"- {sev_icon} **[{str(v.get('severity', 'minor')).upper()}]** `{v.get('context', 'unknown')}` (Unit {v.get('unit_id', 'N/A')}):"
+            md.extend(
+                [
+                    f"- {sev_icon} **[{str(v.get('severity', 'minor')).upper()}]** `{v.get('context', 'unknown')}` (Unit {v.get('unit_id', 'N/A')}):",
+                    f"  - **Source:** `{v.get('source', '')}`",
+                    f"  - **Target:** `{v.get('target', '')}`",
+                    f"  - **Category:** `{v.get('category', 'accuracy/mistranslation')}`",
+                    f"  - **Explanation:** {v.get('explanation', '')}\n",
+                ]
             )
-            md.append(f"  - **Source:** `{v.get('source', '')}`")
-            md.append(f"  - **Target:** `{v.get('target', '')}`")
-            md.append(
-                f"  - **Category:** `{v.get('category', 'accuracy/mistranslation')}`"
-            )
-            md.append(f"  - **Explanation:** {v.get('explanation', '')}\n")
     else:
-        md.append("## 1. MQM-Core Scorecard Status\n")
-        md.append(
-            "> ℹ️ **No reviewed verdicts file provided.** MQM Quality Score is reserved for human or LLM-judge reviewed verdicts. Run with `--verdicts <file.json>` to compute formal MQM metrics.\n"
+        md.extend(
+            [
+                "## 1. MQM-Core Scorecard Status\n",
+                "> ℹ️ **No reviewed verdicts file provided.** MQM Quality Score is reserved for human or LLM-judge reviewed verdicts. Run with `--verdicts <file.json>` to compute formal MQM metrics.\n",
+            ]
         )
 
     # Layer 0 Checks Section
@@ -861,12 +870,14 @@ def format_markdown_report(
     else:
         md.append(f"Found {len(candidates)} candidate items requiring verification:\n")
         for c in candidates:
-            md.append(
-                f"- **[{c['candidate_type']}]** `{c.get('context')}` (Unit {c.get('unit_id')}):"
+            md.extend(
+                [
+                    f"- **[{c['candidate_type']}]** `{c.get('context')}` (Unit {c.get('unit_id')}):",
+                    f"  - SRC: `{c.get('source')}`",
+                    f"  - TGT: `{c.get('target')}`",
+                    f"  - Note: {c.get('note')}\n",
+                ]
             )
-            md.append(f"  - SRC: `{c.get('source')}`")
-            md.append(f"  - TGT: `{c.get('target')}`")
-            md.append(f"  - Note: {c.get('note')}\n")
 
     return "\n".join(md)
 
@@ -962,20 +973,19 @@ def main():
 
     # Save draft verdicts template if requested
     if args.save_verdicts_draft:
-        draft = []
-        for c in candidates:
-            draft.append(
-                {
-                    "unit_id": c.get("unit_id"),
-                    "context": c.get("context"),
-                    "source": c.get("source"),
-                    "target": c.get("target"),
-                    "category": "pending",
-                    "severity": "pending",
-                    "explanation": f"[Candidate: {c.get('candidate_type')}] {c.get('note')}",
-                    "reviewed": False,
-                }
-            )
+        draft = [
+            {
+                "unit_id": c.get("unit_id"),
+                "context": c.get("context"),
+                "source": c.get("source"),
+                "target": c.get("target"),
+                "category": "pending",
+                "severity": "pending",
+                "explanation": f"[Candidate: {c.get('candidate_type')}] {c.get('note')}",
+                "reviewed": False,
+            }
+            for c in candidates
+        ]
         draft_payload = {
             "review_scope": {
                 "_instructions": (

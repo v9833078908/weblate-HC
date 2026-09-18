@@ -37,6 +37,7 @@ import pathlib
 import re
 from collections import defaultdict
 from itertools import pairwise
+from operator import itemgetter
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 DUMPS = ROOT / "analysis/data/hub1-remediation-2026-08-25"
@@ -191,11 +192,7 @@ def measure(lines: list[dict], lang: str) -> dict:
     flip_transitions = 0
     for (scene, speaker, number), entries in per_speaker.items():
         families_seen = [family for _context, family in entries]
-        transitions = sum(
-            1
-            for left, right in pairwise(families_seen)
-            if left != right
-        )
+        transitions = sum(1 for left, right in pairwise(families_seen) if left != right)
         if transitions:
             flip_scenes.add(scene)
             flip_transitions += transitions
@@ -226,7 +223,7 @@ def load_dump(lang: str, *, scenes: tuple[str, ...] | None = SCENES) -> list[dic
     units = json.loads(path.read_text(encoding="utf-8"))
     if scenes:
         units = [unit for unit in units if scene_of(unit["context"]) in scenes]
-    units.sort(key=lambda unit: unit["position"])
+    units.sort(key=itemgetter("position"))
     return [
         {
             "context": unit["context"],
@@ -255,12 +252,11 @@ def run_lines(path: pathlib.Path, dump: dict[str, dict]) -> list[dict]:
                     "target": text,
                 }
             )
-    lines.sort(key=lambda line: line["context"])
+    lines.sort(key=itemgetter("context"))
     return lines
 
-GOLD_PATH = (
-    ROOT / "analysis/data/mt-scene-context-2026-09-10/address-gold-hub1.json"
-)
+
+GOLD_PATH = ROOT / "analysis/data/mt-scene-context-2026-09-10/address-gold-hub1.json"
 
 
 def score_against_gold(lines: list[dict], lang: str, gold: dict) -> dict:
@@ -335,7 +331,9 @@ def main() -> None:
 
     if args.baseline:
         print("== baseline: current production targets ==")
-        print(f"{'scope':28} {'lines':>5} {'meas':>5} {'mism':>5} {'num':>4} {'formal':>6} {'flipT':>5} {'flipS':>5}")
+        print(
+            f"{'scope':28} {'lines':>5} {'meas':>5} {'mism':>5} {'num':>4} {'formal':>6} {'flipT':>5} {'flipS':>5}"
+        )
         for lang in ("de", "fr"):
             for label, scenes in (("hub-1 full", None), ("3 probe scenes", SCENES)):
                 lines = load_dump(lang, scenes=scenes)

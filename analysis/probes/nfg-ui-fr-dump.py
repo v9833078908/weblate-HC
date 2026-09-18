@@ -52,10 +52,8 @@ OUT_GLOSSARY = ROOT / "analysis/data/nfg-ui-fr-glossary.json"
 
 
 def get(url: str) -> dict:
-    request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage] - fixed https host above
-        url, headers={"Authorization": f"Token {TOKEN}"}
-    )
-    with urllib.request.urlopen(request, timeout=120) as response:  # ruff: ignore[suspicious-url-open-usage]
+    request = urllib.request.Request(url, headers={"Authorization": f"Token {TOKEN}"})
+    with urllib.request.urlopen(request, timeout=120) as response:
         return json.loads(response.read().decode())
 
 

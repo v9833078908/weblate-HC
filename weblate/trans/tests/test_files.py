@@ -10,6 +10,7 @@ import csv
 import json
 import os
 import tempfile
+from datetime import timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -22,6 +23,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
 from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from openpyxl import load_workbook
 
 from weblate.auth.data import SELECTION_ALL
@@ -40,8 +42,13 @@ from weblate.trans.models import (
     PendingUnitChange,
     Project,
     Translation,
+    Unit,
     WorkflowSetting,
 )
+from weblate.trans.models.multilingual_spreadsheet import (
+    ComponentSpreadsheetImportDraft,
+)
+from weblate.trans.multilingual_spreadsheet import export_component
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import get_optional_path, get_test_file
 from weblate.trans.util import check_upload_method_permissions
@@ -1692,21 +1699,12 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
         return self.create_json()
 
     def _baseline(self):
-        from weblate.trans.models import Unit
-
         return {
             str(unit.pk): [unit.target, unit.state]
             for unit in Unit.objects.filter(translation__component=self.component)
         }
 
     def _staged_draft(self):
-        from django.core.files.uploadedfile import SimpleUploadedFile
-
-        from weblate.trans.models.multilingual_spreadsheet import (
-            ComponentSpreadsheetImportDraft,
-        )
-        from weblate.trans.multilingual_spreadsheet import export_component
-
         if not self.client.session.session_key:
             self.client.session.save()
         content = export_component(self.component, "csv")
@@ -1741,15 +1739,6 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
         self.assertEqual(unit.target, baseline_target + " EDIT")
 
     def test_confirm_rejects_draft_expired_between_lookup_and_lock(self) -> None:
-        from datetime import timedelta
-        from unittest.mock import patch
-
-        from django.utils import timezone
-
-        from weblate.trans.models.multilingual_spreadsheet import (
-            ComponentSpreadsheetImportDraft,
-        )
-
         self.make_manager()
         self.user.clear_permissions_cache()
         draft = self._staged_draft()
@@ -1774,10 +1763,6 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
         self.assertEqual(self.get_unit().target, baseline_target)
 
     def test_confirm_rejects_locked_component(self) -> None:
-        from weblate.trans.models.multilingual_spreadsheet import (
-            ComponentSpreadsheetImportDraft,
-        )
-
         self.make_manager()
         self.user.clear_permissions_cache()
         draft = self._staged_draft()
@@ -1815,15 +1800,6 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
         )
 
         draft = self._staged_draft()
-        import csv
-        from io import StringIO
-
-        from django.core.files.uploadedfile import SimpleUploadedFile
-
-        from weblate.trans.models.multilingual_spreadsheet import (
-            ComponentSpreadsheetImportDraft,
-        )
-
         content = draft.uploaded.read().decode("utf-8")
 
         # Rewrite the Czech column for ctx-a and ctx-b to distinct new targets.

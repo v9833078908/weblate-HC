@@ -280,11 +280,11 @@ class LocKitDraftCleanupTest(ViewTestCase):
         self,
     ) -> None:
         """
-        A row-locked recheck, not a bulk delete of a previously-selected
-        set: a still-running task's heartbeat can extend ``expires_at``
-        between this scan's initial candidate query and its per-row
-        delete, and that draft's files must never be deleted out from
-        under it.
+        A row-locked recheck, not a bulk delete of a previously-selected set.
+
+        A still-running task's heartbeat can extend ``expires_at`` between
+        this scan's initial candidate query and its per-row delete, and that
+        draft's files must never be deleted out from under it.
         """
         active_task = make_draft(
             owner=self.user,

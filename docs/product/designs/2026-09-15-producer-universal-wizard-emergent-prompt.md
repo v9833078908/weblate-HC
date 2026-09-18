@@ -13,7 +13,7 @@
 
 ---
 
-# Follow-up: simplify «Сделать локализацию» and support store `.txt` files
+## Follow-up: simplify «Сделать локализацию» and support store `.txt` files
 
 Keep the visual system, Russian-only UI, project shell, native Weblate authentication, quality rules, glossary extraction flow and all backend safety invariants from the previous prompts. This prompt **supersedes the visible 8-step wizard structure** where it conflicts with prompt 2.
 
@@ -24,7 +24,7 @@ The current wizard is too heavy: it exposes the sequence of the expert skills in
 
 The producer should not have to know what a Weblate component, base-language directory, file mask, translation flag, language alias or `metadata/<locale>/<field>.txt` path is. The backend creates all of those.
 
-## 1. Interaction thesis: one happy path, conditional questions
+### 1. Interaction thesis: one happy path, conditional questions
 
 Replace the 8 visible steps with **4 stages**:
 
@@ -43,7 +43,7 @@ Happy-path target:
 
 The progress rail shows only the four stages. Conditional questions appear inside the current stage and disappear once resolved. Preserve answers and upload analysis across reloads and Back/Next navigation.
 
-## 2. Stage 1 «Файлы» — one universal upload surface
+### 2. Stage 1 «Файлы» — one universal upload surface
 
 Replace the loc-kit-only dropzone with:
 
@@ -66,37 +66,37 @@ Secondary actions below it:
 
 Do not force the user to choose «лок-кит» or «стор» before upload. Detect first. Ask only if content is genuinely ambiguous.
 
-### Detection rules and resulting cards
+#### Detection rules and resulting cards
 
-#### A. Table-like loc-kit detected
+##### A. Table-like loc-kit detected
 
 Show a compact success card:
 
-> **Лок-кит**  
-> `pirate-ships.xlsx` · 3 864 строки · 11 языковых колонок  
+> **Лок-кит**
+> `pirate-ships.xlsx` · 3 864 строки · 11 языковых колонок
 > 3 830 строк готовы · 34 будут вынесены отдельно
 
 Primary «Продолжить». Secondary «Посмотреть анализ» opens the existing detailed analysis from prompt 2 in a side sheet: columns, header mapping, duplicates, quarantine, import-gate result. Do not force the producer through those details when the backend has resolved everything safely.
 
-#### B. Store-text bundle detected
+##### B. Store-text bundle detected
 
 Show one card per detected store package:
 
-> **Steam**  
-> 3 текстовых поля · исходные файлы на русском  
-> `steam_short.txt` · `steam_about.txt` · `steam_legal.txt`  
+> **Steam**
+> 3 текстовых поля · исходные файлы на русском
+> `steam_short.txt` · `steam_about.txt` · `steam_legal.txt`
 > Разметка: BBCode · лимиты: из справочника Steamworks
 
 or:
 
-> **Google Play**  
-> 3 поля · `title.txt` · `short_description.txt` · `full_description.txt`  
+> **Google Play**
+> 3 поля · `title.txt` · `short_description.txt` · `full_description.txt`
 > Лимиты применятся автоматически
 
 or:
 
-> **App Store**  
-> 5 полей · `name.txt` · `subtitle.txt` · `description.txt` · `keywords.txt` · `promotional_text.txt`  
+> **App Store**
+> 5 полей · `name.txt` · `subtitle.txt` · `description.txt` · `keywords.txt` · `promotional_text.txt`
 > Лимиты применятся автоматически
 
 Actions: «Продолжить» and «Проверить поля».
@@ -111,7 +111,7 @@ Actions: «Продолжить» and «Проверить поля».
 
 The field label is primary; filename is muted monospace evidence. Never lead with a filename or path.
 
-#### C. One ambiguous `.txt` file
+##### C. One ambiguous `.txt` file
 
 Do not guess. Show one inline question:
 
@@ -130,7 +130,7 @@ If «Одно поле страницы стора» is chosen, ask in the same 
 
 No new wizard stage.
 
-#### D. Unknown or custom store files
+##### D. Unknown or custom store files
 
 Show a lightweight mapping card only for unrecognized names:
 
@@ -145,7 +145,7 @@ For a limit, show:
 
 Never invent a limit from memory.
 
-### Store-specific backend work that must stay invisible
+#### Store-specific backend work that must stay invisible
 
 The prototype should communicate the result, not ask the producer to perform these operations:
 
@@ -162,7 +162,7 @@ The prototype should communicate the result, not ask the producer to perform the
 
 The UI may show «Настроено автоматически» with a details popover; it must never expose raw Weblate flag names on the happy path.
 
-### Stage-1 loading state
+#### Stage-1 loading state
 
 Use one analysis card with content-specific stages.
 
@@ -176,7 +176,7 @@ For store text files:
 
 Never fabricate a percentage. Show the current completed stages and file count.
 
-### Stage-1 exception states to draw
+#### Stage-1 exception states to draw
 
 Build all of these as clickable fixtures and add them to `/dev/states`:
 
@@ -195,15 +195,15 @@ Build all of these as clickable fixtures and add them to `/dev/states`:
 13. field over its source-store limit — warning with count, source of the limit and «Заменить файл»; do not silently truncate;
 14. no store registry limit exists — ask only for that missing fact, not every field.
 
-## 3. Stage 2 «Языки» — shared screen, adaptive evidence
+### 3. Stage 2 «Языки» — shared screen, adaptive evidence
 
 The screen always asks the same two producer questions, regardless of input type.
 
-### Question 1: source
+#### Question 1: source
 
 Use the two equal Russian/English cards from prompt 2:
 
-> **Какой исходный язык?**  
+> **Какой исходный язык?**
 > Русский — проще ежедневный workflow. Английский — потенциально чуть лучше качество локализации на части языков, только если английский написан и вычитан как настоящий оригинал.
 
 Cards:
@@ -218,7 +218,7 @@ Neither is pre-selected. Both show input-specific evidence:
 
 If a language does not have a complete source set, keep the option visible but disabled with the exact reason and actions «Добавить недостающие файлы» / «Выбрать другой язык». The source is immutable after launch.
 
-### Question 2: targets
+#### Question 2: targets
 
 > **На какие языки делаем переводы?**
 
@@ -242,11 +242,11 @@ For Steam, English must resolve to the accepted regional locale (`en-US` in the 
 
 If uploaded target-language store files already exist, label those languages «В файлах уже есть перевод» and preserve them. The run fills only missing or source-changed fields.
 
-## 4. Stage 3 «Контекст и термины» — one calm page
+### 4. Stage 3 «Контекст и термины» — one calm page
 
 Keep the project-profile questions and glossary extraction mechanism from prompt 2, but combine them into progressive cards instead of separate permanent wizard steps.
 
-### Card A: project context
+#### Card A: project context
 
 If a BDHC card supplies a complete brief/voice profile, show a compact imported summary and no questionnaire by default. «Изменить ответы» expands it.
 
@@ -262,7 +262,7 @@ For store text input, evidence is field-aware:
 
 The backend-generated profile must tell the translator that a headline remains a headline, keywords remain keywords and legal text is not rewritten as marketing copy. Raw prompt fields remain Advanced-only.
 
-### Card B: glossary
+#### Card B: glossary
 
 Keep the complete extraction → suggestions → selection → publication flow added in prompt 2. It must work for **both** input types:
 
@@ -273,7 +273,7 @@ For store text, generic marketing words, CTAs, SEO filler, whole sentences and p
 
 Before extraction, show:
 
-> **Предложить термины из загруженных файлов**  
+> **Предложить термины из загруженных файлов**
 > AI найдёт названия и повторяющиеся игровые понятия. Ничего не добавится без вашего решения.
 
 Primary «Извлечь термины». Secondary «Пропустить».
@@ -282,7 +282,7 @@ The extraction uses the separate glossary-extraction model configured through Li
 
 The suggestions workspace, evidence side sheet, editing, «Добавить», «Не добавлять», «Добавить выбранные (N)», «Добавить все (N)», conflicts, existing-term protection, partial success and all states from prompt 2 remain binding. During the wizard, selected terms say «Выбрано — добавится при запуске», never «Добавлено в глоссарий».
 
-## 5. Conditional «Нужно уточнить» instead of permanent technical steps
+### 5. Conditional «Нужно уточнить» instead of permanent technical steps
 
 All safety logic from prompt 2 remains, but it appears only when needed.
 
@@ -311,11 +311,11 @@ Resolved attention items collapse to one success line, for example:
 
 No producer-facing screen should use the terms «монолингвальный базовый файл», «маска файла», `bbcode-text`, `max-length`, `metadata/*`, `state:empty` or «компонент» during the happy path. Those are backend/report details.
 
-## 6. Stage 4 «Проверка и запуск»
+### 6. Stage 4 «Проверка и запуск»
 
 Show a summary adapted to the detected content.
 
-### Loc-kit summary
+#### Loc-kit summary
 
 - «Лок-кит · 3 830 строк»;
 - source and targets;
@@ -324,7 +324,7 @@ Show a summary adapted to the detected content.
 - glossary term count or «пропущен»;
 - optional split summary only if enabled.
 
-### Store summary
+#### Store summary
 
 - «Steam · 3 текстовых поля» or «Google Play · 3 поля»;
 - source language and resolved target locales;
@@ -357,7 +357,7 @@ After completion, store content opens a result screen with:
 
 A blocked target remains present as an empty `.txt` file/value; never remove the field from the package.
 
-## 7. Store output contract represented in the prototype
+### 7. Store output contract represented in the prototype
 
 Draw the producer-facing outcome, while the mock data models these backend rules:
 
@@ -371,7 +371,7 @@ Draw the producer-facing outcome, while the mock data models these backend rules
 - Existing filled target files are preserved.
 - Source and target files are never truncated to satisfy a limit.
 
-## 8. Mock API additions
+### 8. Mock API additions
 
 Extend the existing typed API client; do not invent routes outside this list.
 
@@ -431,7 +431,7 @@ POST  projects/{slug}/localization/
 
 These are proposed prototype contracts, not claims that the current Weblate REST API already exposes them. Keep all calls behind `src/api/client.ts`; mock mode only.
 
-## 9. Fixtures and screens to draw
+### 9. Fixtures and screens to draw
 
 Add clickable fixtures for:
 
@@ -457,7 +457,7 @@ Add clickable fixtures for:
 
 Every fixture must be reachable through the UI without changing source code. Add all default/loading/success/attention/error states to `/dev/states`.
 
-## 10. Deliverables for this iteration
+### 10. Deliverables for this iteration
 
 1. Replace the current heavy wizard with the adaptive four-stage version.
 2. Make the same wizard accept loc-kits and store TXT/ZIP/folder input from one upload surface.
@@ -474,7 +474,7 @@ Every fixture must be reachable through the UI without changing source code. Add
    - how store locale ambiguity differs from a general language picker;
    - why glossary extraction remains optional but available for store texts.
 
-## Acceptance scenarios
+### Acceptance scenarios
 
 1. Producer drops `steam_short.txt`, `steam_about.txt`, `steam_legal.txt`; the wizard identifies Steam without questions, shows three Russian field labels, asks source/targets, optionally extracts terms, starts translation and returns a ZIP plus copyable fields.
 2. Producer drops `description.txt`; the wizard asks one inline question to resolve whether it is a table or a store field, then continues without introducing another permanent step.

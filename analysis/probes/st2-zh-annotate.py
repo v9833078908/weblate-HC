@@ -30,6 +30,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -124,11 +125,8 @@ def post(payload: dict[str, Any], api_key: str, timeout: int) -> dict[str, Any]:
 
 
 def load_units(path: Path) -> list[dict[str, Any]]:
-    out = []
     with path.open(encoding="utf-8") as f:
-        for line in f:
-            out.append(json.loads(line))
-    return out
+        return [json.loads(line) for line in f]
 
 
 def load_glossary(path: Path) -> list[tuple[str, str]]:
@@ -248,7 +246,7 @@ def main() -> None:
             for u in batch:
                 result[str(u["id"])] = {"severity": "unparsed", "reason": ""}
         else:
-            for u, s in zip(batch, segs):
+            for u, s in zip(batch, segs, strict=False):
                 result[str(u["id"])] = {
                     "severity": s.get("severity", "unparsed"),
                     "reason": s.get("reason", ""),
@@ -260,7 +258,6 @@ def main() -> None:
     Path(args.out).write_text(
         json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8"
     )
-    from collections import Counter
 
     dist = Counter(v["severity"] for v in result.values())
     print(f"severity dist: {dict(dist)}")

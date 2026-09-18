@@ -44,10 +44,10 @@ def token() -> str:
 
 
 def get(url: str, key: str) -> dict:
-    request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage]
+    request = urllib.request.Request(
         url, headers={"Authorization": f"Token {key}", "Accept": "application/json"}
     )
-    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # ruff: ignore[suspicious-url-open-usage]
+    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
         return json.loads(response.read().decode("utf-8"))
 
 

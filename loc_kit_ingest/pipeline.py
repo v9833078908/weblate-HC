@@ -1,6 +1,9 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[complex-structure, print, too-many-locals, too-many-statements-in-try-clause]
+# - print() is the CLI's output channel; run() and its try/except staging
+#   flow are deliberately linear and must report progress in order.
 
 from __future__ import annotations
 
@@ -14,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loc_kit_ingest.infer import DEFAULT_MIN_FILL, InferenceError, infer_profile
-from loc_kit_ingest.model import Severity
+from loc_kit_ingest.model import Diagnostic, Severity
 from loc_kit_ingest.parser import (
     SOURCE_MARKUP_SUPPRESSED_CODE,
     parse_component,
@@ -30,7 +33,6 @@ from loc_kit_ingest.source_markup import SOURCE_TAG_CLOSING_HAS_ATTRIBUTE
 from loc_kit_ingest.writer import render_component, validate_rendered_component
 
 if TYPE_CHECKING:
-    from loc_kit_ingest.model import Diagnostic
     from loc_kit_ingest.profile import Profile
 
 
@@ -40,12 +42,11 @@ if TYPE_CHECKING:
 
 
 def _format_diagnostics(diagnostics: tuple[Diagnostic, ...]) -> str:
-    lines: list[str] = []
-    for d in diagnostics:
-        lines.append(
-            f"  [{d.severity.value}] {d.component}:{d.sheet}!row {d.row} "
-            f"({d.code}): {d.message}"
-        )
+    lines = [
+        f"  [{d.severity.value}] {d.component}:{d.sheet}!row {d.row} "
+        f"({d.code}): {d.message}"
+        for d in diagnostics
+    ]
     return "\n".join(lines)
 
 
@@ -56,8 +57,12 @@ def _build_report(
     inference_notes: tuple[str, ...] = (),
 ) -> str:
     lines: list[str] = []
-    lines.append("Loc-kit ingest report")
-    lines.append(f"Components: {len(profile.components)}")
+    lines.extend(
+        [
+            "Loc-kit ingest report",
+            f"Components: {len(profile.components)}",
+        ]
+    )
     for comp in profile.components:
         result = parse_results.get(comp.component)
         if result is not None:
@@ -76,7 +81,7 @@ def _build_report(
     markup_defects = sum(
         1
         for d in diagnostics
-        if d.code in (SOURCE_TAG_CLOSING_HAS_ATTRIBUTE, SOURCE_MARKUP_SUPPRESSED_CODE)
+        if d.code in {SOURCE_TAG_CLOSING_HAS_ATTRIBUTE, SOURCE_MARKUP_SUPPRESSED_CODE}
     )
     if markup_defects:
         lines.append(f"Source markup diagnostics: {markup_defects}")
@@ -84,8 +89,7 @@ def _build_report(
         lines.append("Profile derived from the kit's own header row:")
         lines.extend(f"  * {note}" for note in inference_notes)
     if diagnostics:
-        lines.append("Diagnostics:")
-        lines.append(_format_diagnostics(diagnostics))
+        lines.extend(["Diagnostics:", _format_diagnostics(diagnostics)])
     else:
         lines.append("Diagnostics: none")
     return "\n".join(lines) + "\n"
@@ -289,6 +293,4 @@ def _make_diag(
     sheet: str = "",
     row: int = 0,
 ) -> Diagnostic:
-    from loc_kit_ingest.model import Diagnostic, Severity
-
     return Diagnostic(Severity.ERROR, code, component, sheet, row, message)

@@ -4,11 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Every weblate import must follow django.setup(), so it cannot sit at the top.
-# ruff: file-ignore[module-import-not-at-top-of-file]
 #
 # The probes deliberately reuse the judge's own private helpers: a measurement
 # of production parsing is only valid if it parses exactly like production.
-# ruff: file-ignore[private-member-access]
 
 """
 Live preflight for the LiteLLM provider and the configurable judge endpoint.
@@ -90,13 +88,13 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 
 def post(url: str, payload: dict, timeout: int = 120) -> tuple[int, dict | str]:
-    request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage]
+    request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),
         headers={"Authorization": f"Bearer {KEY}", "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # ruff: ignore[suspicious-url-open-usage]
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as error:
         return error.code, error.read()[:400].decode(errors="replace")

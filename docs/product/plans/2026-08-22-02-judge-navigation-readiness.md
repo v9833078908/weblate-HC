@@ -393,7 +393,10 @@ class Operation(models.TextChoices):
     TRANSLATION = "translation"
     JUDGE = "judge"
 
-operation = models.CharField(max_length=20, choices=Operation, blank=True, db_index=True)
+
+operation = models.CharField(
+    max_length=20, choices=Operation, blank=True, db_index=True
+)
 unit_count = models.PositiveIntegerField(null=True, blank=True)
 ```
 

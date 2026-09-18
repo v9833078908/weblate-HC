@@ -2,6 +2,7 @@
 # Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# ruff: file-ignore[print]
 """
 Offline detector for batch-misaligned machine translation.
 

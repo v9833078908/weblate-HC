@@ -7,8 +7,10 @@
 # We measure the real byte sizes and price them at gemini-2.5-flash rates.
 from __future__ import annotations
 
+import math
+
 from weblate.glossary.models import get_glossary_tuples
-from weblate.trans.models import Translation
+from weblate.trans.models import Translation, Unit
 from weblate.utils.state import STATE_TRANSLATED
 
 translation = Translation.objects.get(
@@ -27,7 +29,6 @@ BYTES_PER_TOKEN_RU = 3.0  # Cyrillic ~2-3 bytes/token in UTF-8 cl100k
 BYTES_PER_TOKEN_EN = 4.0  # prompt scaffolding + id output
 
 BATCH = 10  # batch_size default
-import math
 
 batches = math.ceil(n / BATCH)
 
@@ -39,8 +40,6 @@ avg_src = src_bytes / n
 # glossary volume (95 terms ru->id) sent with every batch
 gloss_tuples = list(get_glossary_tuples(units[:0]))
 # get_glossary_tuples needs units with glossary_terms; approximate via pairs
-from weblate.trans.models import Unit
-
 gloss_pairs = Unit.objects.filter(
     translation__component__project__slug="col4",
     translation__component__is_glossary=True,

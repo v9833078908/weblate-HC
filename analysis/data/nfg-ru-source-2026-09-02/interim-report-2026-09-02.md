@@ -3,12 +3,14 @@
 ## Сделано
 
 ### Фазы 0-2 (см. `phase2-report.md`, матрица Фазы 0 в плане)
+
 - Замер продa (`phase0.json`), свежий kit (`kit-original.zip`), подготовка
   `kit-ru-source/` (8 zip): 9 HelpInfo-ключей с русским текстом в
   `orders/ru.po`, два гомоглифа исправлены в `ui/en.po`, глоссарий
   пересобран из БД на ru-источник (17 tbx, омонимы разведены секциями).
 
 ### Фаза 3 - пересоздание компонентов на проде (DONE, verified)
+
 - Созданы через API (multipart с zipfile - тот же код, что и мастер;
   релей-браузер был недоступен): `buyers-ru, characterdialogue-ru, loot-ru,
   orders-ru, survey-ru, tutorial-ru, ui-ru, glossary-ru`.
@@ -25,6 +27,7 @@
   на новом компоненте не воспроизводится. Пробный юнит удалён.
 
 ### Фаза 4 - перенос состояния из БД (ПРИМЕНЕНО, errors: 0)
+
 - `phase4-applied.json`: explanations на исходных строках 9/9 (ui 7 +
   tutorial 2), флаги `not-applicable` на `Forge` (ныне «Кузница») в id/tr
   2/2, approved 20/20 (buyers/hu 10, loot/hu 1, ui/hu 8, ui/lv 1),

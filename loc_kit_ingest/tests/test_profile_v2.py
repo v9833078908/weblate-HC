@@ -33,7 +33,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _one_row_document(**overrides):
-    """A valid v2 one-row glossary with a per-record domain column."""
+    """Return a valid v2 one-row glossary with a per-record domain column."""
     document = {
         "schema_version": 2,
         "components": [
@@ -89,7 +89,7 @@ def _one_row_document(**overrides):
 
 
 def _stride_two_document(**grammar_overrides):
-    """A valid v2 stride-two glossary using region caption cells."""
+    """Return a valid v2 stride-two glossary using region caption cells."""
     document = {
         "schema_version": 2,
         "components": [
@@ -228,19 +228,19 @@ def test_v1_profile_still_loads_with_its_v1_interpretation():
 def test_unknown_v2_grammar_field_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["flags"] = [{"column": 6}]
-    with pytest.raises(ProfileError, match="profile.unknown_field"):
+    with pytest.raises(ProfileError, match=r"profile.unknown_field"):
         parse_profile(document)
 
 
 def test_unknown_v2_component_field_fails():
     document = _one_row_document(nonsense=1)
-    with pytest.raises(ProfileError, match="profile.unknown_field"):
+    with pytest.raises(ProfileError, match=r"profile.unknown_field"):
         parse_profile(document)
 
 
 def test_v2_rejects_the_v1_key_language_field():
     document = _one_row_document(key_language="en")
-    with pytest.raises(ProfileError, match="profile.unknown_field"):
+    with pytest.raises(ProfileError, match=r"profile.unknown_field"):
         parse_profile(document)
 
 
@@ -251,7 +251,7 @@ def test_v2_rejects_the_v1_pairs_grammar():
         "skip_rows": [],
         "regions": [{"section_row": 2, "first_term_row": 3, "last_description_row": 4}],
     }
-    with pytest.raises(ProfileError, match="profile.grammar_mismatch"):
+    with pytest.raises(ProfileError, match=r"profile.grammar_mismatch"):
         parse_profile(document)
 
 
@@ -260,14 +260,14 @@ def test_v1_rejects_the_v2_record_map_grammar():
     # never be reinterpreted as v1.
     document = _one_row_document()
     document["schema_version"] = 1
-    with pytest.raises(ProfileError, match="profile.missing"):
+    with pytest.raises(ProfileError, match=r"profile.missing"):
         parse_profile(document)
 
 
 def test_v3_rejects_tbx_record_map():
     document = _one_row_document()
     document["schema_version"] = 3
-    with pytest.raises(ProfileError, match="profile.schema_kind"):
+    with pytest.raises(ProfileError, match=r"profile.schema_kind"):
         parse_profile(document)
 
 
@@ -288,12 +288,12 @@ def test_both_section_styles_at_once_fails():
             "section_column": 1,
         }
     )
-    with pytest.raises(ProfileError, match="profile.section_conflict"):
+    with pytest.raises(ProfileError, match=r"profile.section_conflict"):
         parse_profile(document)
 
 
 def test_source_flags_rejects_missing_field():
-    with pytest.raises(ProfileError, match="profile.missing"):
+    with pytest.raises(ProfileError, match=r"profile.missing"):
         parse_profile(_one_row_document(grammar={"source_flags": {"column": 6}}))
 
 
@@ -308,7 +308,7 @@ def test_source_flags_rejects_offset_outside_stride():
         }
     )
 
-    with pytest.raises(ProfileError, match="profile.offset_out_of_range"):
+    with pytest.raises(ProfileError, match=r"profile.offset_out_of_range"):
         parse_profile(document)
 
 
@@ -323,20 +323,20 @@ def test_source_flags_rejects_language_cell_collision():
         }
     )
 
-    with pytest.raises(ProfileError, match="profile.duplicate_field_location"):
+    with pytest.raises(ProfileError, match=r"profile.duplicate_field_location"):
         parse_profile(document)
 
 
 def test_half_declared_section_cell_fails():
     document = _stride_two_document()
     del document["components"][0]["grammar"]["regions"][0]["section_column"]
-    with pytest.raises(ProfileError, match="profile.incomplete_section_cell"):
+    with pytest.raises(ProfileError, match=r"profile.incomplete_section_cell"):
         parse_profile(document)
 
 
 def test_term_row_offset_outside_stride_fails():
     document = _one_row_document(grammar={"term_row_offset": 1})
-    with pytest.raises(ProfileError, match="profile.offset_out_of_range"):
+    with pytest.raises(ProfileError, match=r"profile.offset_out_of_range"):
         parse_profile(document)
 
 
@@ -345,14 +345,14 @@ def test_skip_row_inside_a_region_fails():
     # was left out: the same row becomes both a term and a reported skip.
     document = _one_row_document()
     document["components"][0]["grammar"]["skip_rows"] = [4]
-    with pytest.raises(ProfileError, match="profile.skip_inside_region"):
+    with pytest.raises(ProfileError, match=r"profile.skip_inside_region"):
         parse_profile(document)
 
 
 def test_skip_row_on_a_region_caption_fails():
     document = _stride_two_document()
     document["components"][0]["grammar"]["skip_rows"] = [2]
-    with pytest.raises(ProfileError, match="profile.skip_inside_region"):
+    with pytest.raises(ProfileError, match=r"profile.skip_inside_region"):
         parse_profile(document)
 
 
@@ -366,28 +366,28 @@ def test_skip_row_outside_every_region_is_accepted():
 def test_note_row_offset_outside_stride_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["notes"][0]["row_offset"] = 3
-    with pytest.raises(ProfileError, match="profile.offset_out_of_range"):
+    with pytest.raises(ProfileError, match=r"profile.offset_out_of_range"):
         parse_profile(document)
 
 
 def test_section_field_row_offset_outside_stride_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["section_field"]["row_offset"] = 2
-    with pytest.raises(ProfileError, match="profile.offset_out_of_range"):
+    with pytest.raises(ProfileError, match=r"profile.offset_out_of_range"):
         parse_profile(document)
 
 
 def test_record_range_not_divisible_by_stride_fails():
     document = _stride_two_document()
     document["components"][0]["grammar"]["regions"][0]["last_record_row"] = 7
-    with pytest.raises(ProfileError, match="profile.record_span_not_divisible"):
+    with pytest.raises(ProfileError, match=r"profile.record_span_not_divisible"):
         parse_profile(document)
 
 
 def test_zero_stride_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["regions"][0]["record_stride"] = 0
-    with pytest.raises(ProfileError, match="profile.invalid_index"):
+    with pytest.raises(ProfileError, match=r"profile.invalid_index"):
         parse_profile(document)
 
 
@@ -397,7 +397,7 @@ def test_overlapping_regions_fail():
         {"first_record_row": 2, "last_record_row": 7, "record_stride": 1},
         {"first_record_row": 5, "last_record_row": 9, "record_stride": 1},
     ]
-    with pytest.raises(ProfileError, match="profile.region_overlap"):
+    with pytest.raises(ProfileError, match=r"profile.region_overlap"):
         parse_profile(document)
 
 
@@ -419,7 +419,7 @@ def test_caption_row_inside_previous_region_fails():
             "record_stride": 2,
         },
     ]
-    with pytest.raises(ProfileError, match="profile.region_overlap"):
+    with pytest.raises(ProfileError, match=r"profile.region_overlap"):
         parse_profile(document)
 
 
@@ -427,14 +427,14 @@ def test_duplicate_field_location_fails():
     # A source note reading the very cell the ru term occupies.
     document = _one_row_document()
     document["components"][0]["grammar"]["notes"][0]["column"] = 2
-    with pytest.raises(ProfileError, match="profile.duplicate_field_location"):
+    with pytest.raises(ProfileError, match=r"profile.duplicate_field_location"):
         parse_profile(document)
 
 
 def test_section_field_column_colliding_with_a_language_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["section_field"]["column"] = 3
-    with pytest.raises(ProfileError, match="profile.section_field_column_collision"):
+    with pytest.raises(ProfileError, match=r"profile.section_field_column_collision"):
         parse_profile(document)
 
 
@@ -446,33 +446,33 @@ def test_section_field_column_colliding_with_a_language_fails():
 def test_target_note_naming_a_non_target_language_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["notes"][1]["language"] = "ru"
-    with pytest.raises(ProfileError, match="profile.unknown_note_language"):
+    with pytest.raises(ProfileError, match=r"profile.unknown_note_language"):
         parse_profile(document)
 
 
 def test_source_note_declaring_a_language_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["notes"][0]["language"] = "ru"
-    with pytest.raises(ProfileError, match="profile.unexpected_note_language"):
+    with pytest.raises(ProfileError, match=r"profile.unexpected_note_language"):
         parse_profile(document)
 
 
 def test_invalid_note_scope_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["notes"][0]["scope"] = "flag"
-    with pytest.raises(ProfileError, match="profile.invalid_note_scope"):
+    with pytest.raises(ProfileError, match=r"profile.invalid_note_scope"):
         parse_profile(document)
 
 
 def test_omitted_target_languages_fail():
     document = _one_row_document(initial_target_languages=[])
-    with pytest.raises(ProfileError, match="profile.empty_target_languages"):
+    with pytest.raises(ProfileError, match=r"profile.empty_target_languages"):
         parse_profile(document)
 
 
 def test_source_language_in_targets_fails():
     document = _one_row_document(initial_target_languages=["ru", "en"])
-    with pytest.raises(ProfileError, match="profile.source_in_targets"):
+    with pytest.raises(ProfileError, match=r"profile.source_in_targets"):
         parse_profile(document)
 
 
@@ -497,7 +497,7 @@ def test_unnamed_note_and_section_columns_parse():
 def test_non_string_note_header_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["notes"][0]["header"] = 7
-    with pytest.raises(ProfileError, match="profile.invalid_header"):
+    with pytest.raises(ProfileError, match=r"profile.invalid_header"):
         parse_profile(document)
 
 
@@ -536,7 +536,7 @@ def test_ignored_column_colliding_with_a_declared_field_is_rejected(column, what
     document["components"][0]["grammar"]["ignored_columns"] = [
         {"column": column, "header": "x"}
     ]
-    with pytest.raises(ProfileError, match="profile.ignored_column_collision"):
+    with pytest.raises(ProfileError, match=r"profile.ignored_column_collision"):
         parse_profile(document)
 
 
@@ -545,7 +545,7 @@ def test_ignored_column_needs_a_positive_integer_column():
     document["components"][0]["grammar"]["ignored_columns"] = [
         {"column": 0, "header": "id"}
     ]
-    with pytest.raises(ProfileError, match="profile.invalid_index"):
+    with pytest.raises(ProfileError, match=r"profile.invalid_index"):
         parse_profile(document)
 
 
@@ -558,5 +558,5 @@ def test_allow_empty_targets_parses_as_bool():
 def test_allow_empty_targets_rejects_a_non_bool():
     document = _one_row_document()
     document["components"][0]["grammar"]["allow_empty_targets"] = "yes"
-    with pytest.raises(ProfileError, match="profile.invalid_value"):
+    with pytest.raises(ProfileError, match=r"profile.invalid_value"):
         parse_profile(document)

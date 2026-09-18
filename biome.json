@@ -10,6 +10,7 @@
       "**",
       "!**/*.svg",
       "!**/*.html",
+      "!analysis/data",
       "!weblate/trans/tests/data/**/*.ts",
       "!weblate/static/vendor",
       "!weblate/trans/tests/data/memory-broken.json",
@@ -42,7 +43,15 @@
       },
       "suspicious": {
         "noVar": "error",
-        "useGuardForIn": "error"
+        "useGuardForIn": "error",
+        "noUnknownAtRules": {
+          "level": "error",
+          "options": {
+            "ignore": [
+              "tailwind"
+            ]
+          }
+        }
       },
       "complexity": {
         "noImportantStyles": "off"
@@ -52,6 +61,11 @@
   "formatter": {
     "enabled": true,
     "indentStyle": "space"
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   },
   "javascript": {
     "globals": [

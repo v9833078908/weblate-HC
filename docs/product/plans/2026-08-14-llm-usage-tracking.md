@@ -178,25 +178,25 @@ def _sources_project_slug(sources: list[tuple[str, Unit | None]]) -> str:
 В `_fetch_llm_batch` заменить тело после `_prepare_llm_translation` на:
 
 ```python
-        project_token = llm_batch_project.set(_sources_project_slug(sources))
-        try:
-            translations_string = self.fetch_llm_translations(
-                prompt, content, previous_content, previous_response
-            )
-        finally:
-            llm_batch_project.reset(project_token)
+project_token = llm_batch_project.set(_sources_project_slug(sources))
+try:
+    translations_string = self.fetch_llm_translations(
+        prompt, content, previous_content, previous_response
+    )
+finally:
+    llm_batch_project.reset(project_token)
 ```
 
 В `_afetch_llm_batch` аналогично вокруг `await self.afetch_llm_translations(...)`:
 
 ```python
-        project_token = llm_batch_project.set(_sources_project_slug(sources))
-        try:
-            translations_string = await self.afetch_llm_translations(
-                prompt, content, previous_content, previous_response
-            )
-        finally:
-            llm_batch_project.reset(project_token)
+project_token = llm_batch_project.set(_sources_project_slug(sources))
+try:
+    translations_string = await self.afetch_llm_translations(
+        prompt, content, previous_content, previous_response
+    )
+finally:
+    llm_batch_project.reset(project_token)
 ```
 
 **Step 3: Verify no regressions**
@@ -225,110 +225,115 @@ git commit -m "feat(machinery): expose current batch project via context var"
 В `OpenAITranslationTest` добавить мок с полным `usage` и пять тестов:
 
 ```python
-    def mock_response_priced(self) -> None:
-        self.mock_models()
-        http_mock.register(
-            "POST",
-            "https://api.openai.com/v1/chat/completions",
-            json={
-                "id": "chatcmpl-123",
-                "object": "chat.completion",
-                "created": 1677652288,
-                "model": self.TRACE_MODEL,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": '["Ahoj světe"]'},
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": 9,
-                    "completion_tokens": 12,
-                    "total_tokens": 21,
-                    "cost": 0.00001234,
-                    "prompt_tokens_details": {
-                        "cached_tokens": 4,
-                        "cache_write_tokens": 0,
-                    },
-                    "completion_tokens_details": {"reasoning_tokens": 0},
+def mock_response_priced(self) -> None:
+    self.mock_models()
+    http_mock.register(
+        "POST",
+        "https://api.openai.com/v1/chat/completions",
+        json={
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": self.TRACE_MODEL,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": '["Ahoj světe"]'},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 9,
+                "completion_tokens": 12,
+                "total_tokens": 21,
+                "cost": 0.00001234,
+                "prompt_tokens_details": {
+                    "cached_tokens": 4,
+                    "cache_write_tokens": 0,
                 },
+                "completion_tokens_details": {"reasoning_tokens": 0},
             },
-        )
+        },
+    )
 
-    @http_mock.activate
-    def test_usage_recorded(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
 
-        self.mock_response_priced()
-        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
-        log = LLMUsageLog.objects.get()
-        self.assertEqual(log.model, self.TRACE_MODEL)
-        self.assertEqual(log.prompt_tokens, 9)
-        self.assertEqual(log.completion_tokens, 12)
-        self.assertEqual(log.total_tokens, 21)
-        self.assertEqual(log.cost_usd, Decimal("0.00001234"))
-        self.assertEqual(log.response_id, "chatcmpl-123")
-        self.assertEqual(log.cached_tokens, 4)
-        self.assertEqual(log.project_slug, "")
+@http_mock.activate
+def test_usage_recorded(self) -> None:
+    from weblate.trans.models.llm_usage import LLMUsageLog
 
-    @http_mock.activate
-    def test_usage_recorded_async(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
+    self.mock_response_priced()
+    self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+    log = LLMUsageLog.objects.get()
+    self.assertEqual(log.model, self.TRACE_MODEL)
+    self.assertEqual(log.prompt_tokens, 9)
+    self.assertEqual(log.completion_tokens, 12)
+    self.assertEqual(log.total_tokens, 21)
+    self.assertEqual(log.cost_usd, Decimal("0.00001234"))
+    self.assertEqual(log.response_id, "chatcmpl-123")
+    self.assertEqual(log.cached_tokens, 4)
+    self.assertEqual(log.project_slug, "")
 
-        self.mock_response_priced()
-        self.assert_async_translate(
+
+@http_mock.activate
+def test_usage_recorded_async(self) -> None:
+    from weblate.trans.models.llm_usage import LLMUsageLog
+
+    self.mock_response_priced()
+    self.assert_async_translate(
+        self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN
+    )
+    self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+
+@http_mock.activate
+def test_usage_cost_zero_is_unpriced(self) -> None:
+    from weblate.trans.models.llm_usage import LLMUsageLog
+
+    self.mock_response()  # usage without cost, see existing mock
+    self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+    log = LLMUsageLog.objects.get()
+    self.assertEqual(log.prompt_tokens, 9)
+    self.assertIsNone(log.cost_usd)
+
+
+@http_mock.activate
+def test_usage_missing_means_no_record(self) -> None:
+    from weblate.trans.models.llm_usage import LLMUsageLog
+
+    self.mock_models()
+    http_mock.register(
+        "POST",
+        "https://api.openai.com/v1/chat/completions",
+        json={
+            "id": "chatcmpl-err",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": '["Ahoj"]'},
+                    "finish_reason": "stop",
+                }
+            ],
+        },
+    )
+    self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+    self.assertEqual(LLMUsageLog.objects.count(), 0)
+
+
+@http_mock.activate
+def test_usage_record_failure_does_not_break_translation(self) -> None:
+    from weblate.trans.models.llm_usage import LLMUsageLog
+
+    self.mock_response_priced()
+    with patch.object(
+        LLMUsageLog._default_manager,  # ruff: ignore[private-member-access]
+        "create",
+        side_effect=DatabaseError("boom"),
+    ):
+        translation = self.assert_translate(
             self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN
         )
-        self.assertEqual(LLMUsageLog.objects.count(), 1)
-
-    @http_mock.activate
-    def test_usage_cost_zero_is_unpriced(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
-        self.mock_response()  # usage without cost, see existing mock
-        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
-        log = LLMUsageLog.objects.get()
-        self.assertEqual(log.prompt_tokens, 9)
-        self.assertIsNone(log.cost_usd)
-
-    @http_mock.activate
-    def test_usage_missing_means_no_record(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
-        self.mock_models()
-        http_mock.register(
-            "POST",
-            "https://api.openai.com/v1/chat/completions",
-            json={
-                "id": "chatcmpl-err",
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": '["Ahoj"]'},
-                        "finish_reason": "stop",
-                    }
-                ],
-            },
-        )
-        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
-        self.assertEqual(LLMUsageLog.objects.count(), 0)
-
-    @http_mock.activate
-    def test_usage_record_failure_does_not_break_translation(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
-        self.mock_response_priced()
-        with patch.object(
-            LLMUsageLog._default_manager,  # ruff: ignore[private-member-access]
-            "create",
-            side_effect=DatabaseError("boom"),
-        ):
-            translation = self.assert_translate(
-                self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN
-            )
-        self.assertTrue(translation)
-        self.assertEqual(LLMUsageLog.objects.count(), 0)
+    self.assertTrue(translation)
+    self.assertEqual(LLMUsageLog.objects.count(), 0)
 ```
 
 Импорты в начало тестовой секции файла (проверить наличие): `from decimal import Decimal`, `from django.db import DatabaseError`, `from unittest.mock import patch`.
@@ -346,82 +351,80 @@ Expected: FAIL (`AttributeError: ... no attribute 'record_llm_usage'` нет, н
 - заменить оба метода и добавить новый:
 
 ```python
-    def fetch_llm_translations(
-        self, prompt: str, content: str, previous_content: str, previous_response: str
-    ) -> str | None:
-        model = self.get_traced_model()
-        response = self.request(
-            "post",
-            self.get_chat_completions_url(),
-            json=self.get_chat_payload(
-                model, prompt, content, previous_content, previous_response
-            ),
+def fetch_llm_translations(
+    self, prompt: str, content: str, previous_content: str, previous_response: str
+) -> str | None:
+    model = self.get_traced_model()
+    response = self.request(
+        "post",
+        self.get_chat_completions_url(),
+        json=self.get_chat_payload(
+            model, prompt, content, previous_content, previous_response
+        ),
+    )
+    payload = response.json()
+    self.record_llm_usage(payload, model)
+    return self.parse_chat_response(payload)
+
+
+async def afetch_llm_translations(
+    self, prompt: str, content: str, previous_content: str, previous_response: str
+) -> str | None:
+    model = await self.aget_traced_model()
+    response = await self.arequest(
+        "post",
+        self.get_chat_completions_url(),
+        json=self.get_chat_payload(
+            model, prompt, content, previous_content, previous_response
+        ),
+    )
+    payload = response.json()
+    await sync_to_async(self.record_llm_usage, thread_sensitive=False)(payload, model)
+    return self.parse_chat_response(payload)
+
+
+def record_llm_usage(self, payload: dict[str, Any], model: str) -> None:
+    """
+    Persist the token usage and cost OpenRouter billed for this request.
+
+    Never raises: a broken accounting write must not break a translation,
+    and the exception is logged so a broken table is visible in the log.
+    """
+    try:
+        if not isinstance(payload, dict):
+            return
+        usage = payload.get("usage")
+        if not isinstance(usage, dict):
+            return
+        prompt_tokens = usage.get("prompt_tokens") or 0
+        completion_tokens = usage.get("completion_tokens") or 0
+        total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
+        if not prompt_tokens and not completion_tokens:
+            return
+        cost = usage.get("cost")
+        prompt_details = usage.get("prompt_tokens_details") or {}
+        completion_details = usage.get("completion_tokens_details") or {}
+        project = self.settings.get("_project")
+        if project is not None:
+            project_slug = project.slug
+        else:
+            project_slug = llm_batch_project.get()
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        LLMUsageLog.objects.create(
+            model=model,
+            project_slug=project_slug,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cost_usd=Decimal(str(cost)) if cost else None,
+            response_id=str(payload.get("id") or ""),
+            cached_tokens=prompt_details.get("cached_tokens") or 0,
+            reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
         )
-        payload = response.json()
-        self.record_llm_usage(payload, model)
-        return self.parse_chat_response(payload)
-
-    async def afetch_llm_translations(
-        self, prompt: str, content: str, previous_content: str, previous_response: str
-    ) -> str | None:
-        model = await self.aget_traced_model()
-        response = await self.arequest(
-            "post",
-            self.get_chat_completions_url(),
-            json=self.get_chat_payload(
-                model, prompt, content, previous_content, previous_response
-            ),
-        )
-        payload = response.json()
-        await sync_to_async(self.record_llm_usage, thread_sensitive=False)(
-            payload, model
-        )
-        return self.parse_chat_response(payload)
-
-    def record_llm_usage(self, payload: dict[str, Any], model: str) -> None:
-        """
-        Persist the token usage and cost OpenRouter billed for this request.
-
-        Never raises: a broken accounting write must not break a translation,
-        and the exception is logged so a broken table is visible in the log.
-        """
-        try:
-            if not isinstance(payload, dict):
-                return
-            usage = payload.get("usage")
-            if not isinstance(usage, dict):
-                return
-            prompt_tokens = usage.get("prompt_tokens") or 0
-            completion_tokens = usage.get("completion_tokens") or 0
-            total_tokens = usage.get("total_tokens") or (
-                prompt_tokens + completion_tokens
-            )
-            if not prompt_tokens and not completion_tokens:
-                return
-            cost = usage.get("cost")
-            prompt_details = usage.get("prompt_tokens_details") or {}
-            completion_details = usage.get("completion_tokens_details") or {}
-            project = self.settings.get("_project")
-            if project is not None:
-                project_slug = project.slug
-            else:
-                project_slug = llm_batch_project.get()
-            # ruff: ignore[import-outside-top-level]
-            from weblate.trans.models.llm_usage import LLMUsageLog
-
-            LLMUsageLog.objects.create(
-                model=model,
-                project_slug=project_slug,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-                cost_usd=Decimal(str(cost)) if cost else None,
-                response_id=str(payload.get("id") or ""),
-                cached_tokens=prompt_details.get("cached_tokens") or 0,
-                reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
-            )
-        except Exception:
-            LOGGER.exception("Failed to record LLM usage")
+    except Exception:
+        LOGGER.exception("Failed to record LLM usage")
 ```
 
 Импорт `LLMUsageLog` намеренно ленивый: `weblate.trans.models` тянет приложение trans, а machinery не должна получать цикл импортов на старте.
@@ -453,18 +456,18 @@ git commit -m "feat(machinery): record OpenRouter token usage and cost per reque
 В `RoutedDownloadTest` добавить:
 
 ```python
-    @http_mock.activate
-    def test_usage_recorded_through_inherited_seam(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
+@http_mock.activate
+def test_usage_recorded_through_inherited_seam(self) -> None:
+    from weblate.trans.models.llm_usage import LLMUsageLog
 
-        mock_chat()  # usage 9/2/11, no cost
-        self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
-        log = LLMUsageLog.objects.get()
-        self.assertEqual(log.model, DEEPSEEK)
-        self.assertEqual(log.prompt_tokens, 9)
-        self.assertEqual(log.completion_tokens, 2)
-        self.assertIsNone(log.cost_usd)
-        self.assertEqual(log.project_slug, "")
+    mock_chat()  # usage 9/2/11, no cost
+    self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
+    log = LLMUsageLog.objects.get()
+    self.assertEqual(log.model, DEEPSEEK)
+    self.assertEqual(log.prompt_tokens, 9)
+    self.assertEqual(log.completion_tokens, 2)
+    self.assertIsNone(log.cost_usd)
+    self.assertEqual(log.project_slug, "")
 ```
 
 Тест пройдёт сразу после Task 3 (шов унаследован); его ценность - детект будущей регрессии. Мутационная проверка: временно добавить в `RoutedLLMTranslation` пустое переопределение `fetch_llm_translations`, вернувшее `super()` без `record_llm_usage`, - тест обязан упасть; откатить мутацию.
@@ -512,12 +515,19 @@ class LLMUsageReportTest(TestCase):
             cost_usd=Decimal("0.001"),
         )
         LLMUsageLog.objects.create(
-            model="m1", project_slug="col4", prompt_tokens=4, completion_tokens=1,
+            model="m1",
+            project_slug="col4",
+            prompt_tokens=4,
+            completion_tokens=1,
             total_tokens=5,
         )
         LLMUsageLog.objects.create(
-            model="m2", project_slug="st2", prompt_tokens=7, completion_tokens=3,
-            total_tokens=10, cost_usd=Decimal("0.0000005"),
+            model="m2",
+            project_slug="st2",
+            prompt_tokens=7,
+            completion_tokens=3,
+            total_tokens=10,
+            cost_usd=Decimal("0.0000005"),
         )
 
     def test_table_report(self) -> None:
@@ -601,9 +611,7 @@ class Command(BaseCommand):
             "--days", type=int, default=None, help="only the last N days"
         )
         parser.add_argument("--model", default=None, help="only this model")
-        parser.add_argument(
-            "--project", default=None, help="only this project slug"
-        )
+        parser.add_argument("--project", default=None, help="only this project slug")
         parser.add_argument("--format", choices=["table", "csv"], default="table")
 
     def handle(self, *args, **options) -> None:

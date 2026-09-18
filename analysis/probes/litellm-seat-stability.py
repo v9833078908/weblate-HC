@@ -4,11 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Every weblate import must follow django.setup(), so it cannot sit at the top.
-# ruff: file-ignore[module-import-not-at-top-of-file]
 #
 # The probes deliberately reuse the judge's own private helpers: a measurement
 # of production parsing is only valid if it parses exactly like production.
-# ruff: file-ignore[private-member-access]
 
 """
 Measure the unparsed rate of judge seat candidates on the LiteLLM proxy.
@@ -133,7 +131,7 @@ for model in CANDIDATES:
     notes: list[str] = []
     for run in range(1, RUNS + 1):
         payload = build_payload(model)
-        request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage]
+        request = urllib.request.Request(
             f"{BASE}/chat/completions",
             data=json.dumps(payload).encode(),
             headers={
@@ -143,7 +141,7 @@ for model in CANDIDATES:
         )
         started = time.time()
         try:
-            with urllib.request.urlopen(request, timeout=180) as response:  # ruff: ignore[suspicious-url-open-usage]
+            with urllib.request.urlopen(request, timeout=180) as response:
                 body = json.loads(response.read())
         except urllib.error.HTTPError as error:
             transport += 1

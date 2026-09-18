@@ -58,9 +58,7 @@ STANDARD = [
 
 
 def test_standard_layout_infers_v2_record_map() -> None:
-    document, notes = infer_glossary_profile(
-        "Terms", STANDARD, component="terms"
-    )
+    document, notes = infer_glossary_profile("Terms", STANDARD, component="terms")
     assert document["schema_version"] == 2
     (comp,) = document["components"]
     assert comp["kind"] == "tbx"
@@ -80,9 +78,7 @@ def test_standard_layout_infers_v2_record_map() -> None:
 
 
 def test_partially_filled_language_is_not_an_initial_target() -> None:
-    document, notes = infer_glossary_profile(
-        "Terms", STANDARD, component="terms"
-    )
+    document, notes = infer_glossary_profile("Terms", STANDARD, component="terms")
     (comp,) = document["components"]
     # ja пуст в строке 6 -> распознан, но не импортируется.
     assert comp["initial_target_languages"] == ["en"]
@@ -117,9 +113,7 @@ def test_populated_non_language_column_is_refused() -> None:
 
 def test_no_language_header_is_refused() -> None:
     with pytest.raises(InferenceError):
-        infer_glossary_profile(
-            "S", [["key", "value"], ["a", "b"]], component="s"
-        )
+        infer_glossary_profile("S", [["key", "value"], ["a", "b"]], component="s")
 
 
 def test_no_fully_filled_target_is_refused() -> None:
@@ -203,9 +197,7 @@ def infer_glossary_profile(
         cursor += 1
 
     content_indexes = [
-        index
-        for index in range(cursor, len(rows))
-        if not _is_blank_row(rows[index])
+        index for index in range(cursor, len(rows)) if not _is_blank_row(rows[index])
     ]
     if not content_indexes:
         msg = f"sheet {sheet_name!r} has no data rows"
@@ -299,9 +291,7 @@ def infer_glossary_profile(
             continue
         code = languages[col]
         missing = [
-            index + 1
-            for index in record_rows
-            if not _cell(rows[index], col).strip()
+            index + 1 for index in record_rows if not _cell(rows[index], col).strip()
         ]
         if missing:
             shown = ", ".join(str(row) for row in missing[:10])
@@ -381,39 +371,34 @@ GLOSSARY_LANG_ONLY_CSV = "ru,en\nRussian,English\nГерой,Hero\nМеч,Sword\
 В `LocKitGlossaryUploadUITest` добавить (анализ выключен по умолчанию — `override_settings` не нужен, но ставим для явности):
 
 ```python
-    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
-    def test_language_only_sheet_gets_deterministic_preview(self) -> None:
-        """Языковая таблица даёт превью локально, без OpenRouter и без JSON."""
-        self._start(
-            upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
-        )
-        draft = self._draft()
+@override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+def test_language_only_sheet_gets_deterministic_preview(self) -> None:
+    """Языковая таблица даёт превью локально, без OpenRouter и без JSON."""
+    self._start(upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug)
+    draft = self._draft()
 
-        draft.refresh_from_db()
-        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
-        preview = json.loads(draft.preview_json)
-        self.assertEqual(preview["source_language"], "ru")
-        self.assertEqual(preview["target_languages"], ["en"])
-        self.assertEqual(preview["term_count"], 2)
+    draft.refresh_from_db()
+    self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+    preview = json.loads(draft.preview_json)
+    self.assertEqual(preview["source_language"], "ru")
+    self.assertEqual(preview["target_languages"], ["en"])
+    self.assertEqual(preview["term_count"], 2)
 
-        page = self.client.get(
-            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
-        )
-        self.assertContains(page, "Герой")
+    page = self.client.get(
+        reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+    )
+    self.assertContains(page, "Герой")
 
-    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
-    def test_deterministic_preview_confirms_into_live_component(self) -> None:
-        self._start(
-            upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
-        )
-        response = self._confirm()
-        component = Component.objects.get(slug=self.slug)
-        self.assertTrue(component.is_glossary)
-        self.assertEqual(component.source_language.code, "ru")
-        codes = set(
-            component.translation_set.values_list("language__code", flat=True)
-        )
-        self.assertIn("en", codes)
+
+@override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+def test_deterministic_preview_confirms_into_live_component(self) -> None:
+    self._start(upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug)
+    response = self._confirm()
+    component = Component.objects.get(slug=self.slug)
+    self.assertTrue(component.is_glossary)
+    self.assertEqual(component.source_language.code, "ru")
+    codes = set(component.translation_set.values_list("language__code", flat=True))
+    self.assertIn("en", codes)
 ```
 
 ВАЖНО: эти тесты предполагают auto-skip выбора листа (Task 4-5): `_start` сразу даёт превью. Пишутся до реализации — падают.
@@ -435,6 +420,7 @@ Expected: FAIL — `draft.state == UPLOADED`, превью пустое (дет�
 
 Сигнатура: `def _store_validated_profile(draft, document, rows, extra_warnings=()):`
 В `draft.preview_json` строку warnings заменить на:
+<!--- skip doccmd[all]: next --><!-- dict-entry fragment, not standalone code -->
 
 ```python
             "warnings": [*extra_warnings, *preview.warnings],
@@ -446,30 +432,33 @@ Expected: FAIL — `draft.state == UPLOADED`, превью пустое (дет�
 `LOC_KIT_PROFILE_ANALYSIS_ENABLED`):
 
 ```python
-    # ruff: ignore[import-outside-top-level]
-    from loc_kit_ingest.infer import InferenceError, infer_glossary_profile
+# ruff: ignore[import-outside-top-level]
+from loc_kit_ingest.infer import InferenceError, infer_glossary_profile
 
-    # Deterministic first: local, free, offline. The analyzer is a fallback
-    # for layouts the header-driven inference refuses.
-    try:
-        document, notes = infer_glossary_profile(
-            draft.sheet, [list(row) for row in rows], component=draft.slug
-        )
-    except InferenceError as error:
-        infer_reason = str(error)
-    else:
-        error_message = _store_validated_profile(
-            draft, document, rows, extra_warnings=notes
-        )
-        if error_message is None:
-            return None
-        infer_reason = error_message
+# Deterministic first: local, free, offline. The analyzer is a fallback
+# for layouts the header-driven inference refuses.
+try:
+    document, notes = infer_glossary_profile(
+        draft.sheet, [list(row) for row in rows], component=draft.slug
+    )
+except InferenceError as error:
+    infer_reason = str(error)
+else:
+    error_message = _store_validated_profile(
+        draft, document, rows, extra_warnings=notes
+    )
+    if error_message is None:
+        return None
+    infer_reason = error_message
 
-    if not settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED:
-        return gettext(
+if not settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED:
+    return (
+        gettext(
             "Automatic mapping did not recognize this sheet (%s) "
             "and analysis is disabled. Upload a profile to continue."
-        ) % infer_reason
+        )
+        % infer_reason
+    )
 ```
 
 Остальной код функции (rate limit, sample, OpenRouter) — без изменений.
@@ -501,20 +490,20 @@ git commit -m "feat(loc-kit): try deterministic glossary inference before the an
 Заменить финальный `return redirect("loc-kit-sheet-select", token=draft.token)` на:
 
 ```python
-        if len(sheets) == 1:
-            # A CSV/TSV always has exactly one sheet; the selection screen
-            # is noise. Only the deterministic step may run here: this POST
-            # is atomic, a provider call inside it would hold a transaction
-            # open for the whole network timeout.
-            name, rows = next(iter(sheets.items()))
-            draft.sheet = name
-            draft.state = LocKitImportDraft.State.SHEET_SELECTED
-            draft.save(update_fields=["sheet", "state"])
-            error = _infer_draft_profile(draft, rows)
-            if error is None:
-                return redirect("loc-kit-glossary-preview", token=draft.token)
-            messages.info(self.request, error)
-        return redirect("loc-kit-sheet-select", token=draft.token)
+if len(sheets) == 1:
+    # A CSV/TSV always has exactly one sheet; the selection screen
+    # is noise. Only the deterministic step may run here: this POST
+    # is atomic, a provider call inside it would hold a transaction
+    # open for the whole network timeout.
+    name, rows = next(iter(sheets.items()))
+    draft.sheet = name
+    draft.state = LocKitImportDraft.State.SHEET_SELECTED
+    draft.save(update_fields=["sheet", "state"])
+    error = _infer_draft_profile(draft, rows)
+    if error is None:
+        return redirect("loc-kit-glossary-preview", token=draft.token)
+    messages.info(self.request, error)
+return redirect("loc-kit-sheet-select", token=draft.token)
 ```
 
 И выделить детерминированный шаг из Task 4 в хелпер, чтобы не дублировать
