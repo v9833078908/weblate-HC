@@ -4,8 +4,7 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from django.conf import settings
@@ -145,6 +144,18 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
         run.refresh_from_db()
         self.assertIsNotNone(run.dispatch_published_at)
 
+    def test_drain_does_not_republish_an_already_published_continuation(self) -> None:
+        run = self._make_run(
+            status=ProducerRun.Status.RUNNING,
+            execution_version=1,
+            dispatch_published_at=timezone.now(),
+        )
+        with patch("weblate.trans.tasks.auto_translate.apply_async") as mock_apply:
+            drain_producer_run_dispatches()
+            mock_apply.assert_not_called()
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.RUNNING)
+
     def test_drain_finalizes_cancel_requested(self) -> None:
         run = self._make_run(
             status=ProducerRun.Status.CANCEL_REQUESTED,
@@ -155,7 +166,6 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
         self.assertIsNotNone(run.finished)
 
     def test_drain_finalizes_cancel_requested_with_results_to_partial(self) -> None:
-
         run = self._make_run(
             status=ProducerRun.Status.CANCEL_REQUESTED,
         )
@@ -167,6 +177,8 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
             component_id=self.component.pk,
             project_id=self.project.pk,
             outcome=JudgeRunUnit.Outcome.PASSED,
+            input_target_hash="0" * 64,
+            context_hash="0" * 64,
         )
         drain_producer_run_dispatches()
         run.refresh_from_db()
@@ -318,27 +330,20 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
             execution_version=1,
         )
 
-        def fail_perform(*args, **kwargs):
-            batch._finish_translation(  # ruff: ignore[private-member-access]
-                auto_translate=SimpleNamespace(
-                    judge_units_processed=1,
-                    failure_message="Provider quota exceeded",
-                    updated=0,
-                    get_warnings=list,
-                    judge_summary=None,
-                ),
-                judge_remaining=None,
-            )
-
         with (
             patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
             patch("weblate.trans.autotranslate.current_task") as mock_task,
             patch("weblate.trans.tasks.publish_producer_run_dispatch") as mock_pub,
-            patch(
-                "weblate.trans.autotranslate.AutoTranslate.perform",
-                side_effect=fail_perform,
-            ),
+            patch("weblate.trans.autotranslate.AutoTranslate") as mock_auto_cls,
         ):
+            engine = MagicMock()
+            engine.failure_message = "Provider quota exceeded"
+            engine.judge_summary = None
+            engine.updated = 0
+            engine.judge_units_processed = 1
+            engine.get_warnings.return_value = []
+            engine.preview_judge_scope.return_value = (MagicMock(), [])
+            mock_auto_cls.side_effect = lambda **_kwargs: engine
             mock_task.request.id = task_id
             batch = BatchAutoTranslate(
                 self.project,
