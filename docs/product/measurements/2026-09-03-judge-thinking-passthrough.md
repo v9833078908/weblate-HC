@@ -46,6 +46,20 @@ seat 1, against a first-byte time of about 2 s. Batch width therefore cannot
 buy anything here - a wider batch emits the same total tokens - which is why
 the tempting `JUDGE_BATCH_SIZE_SEAT_2` change is not the lever.
 
+> **Superseded 2026-09-21 on the batch-width part.** The measured runs of
+> 2026-09-17/18 overturned this: the `real-main` A0/A2/A5 sweep
+> (`docs/product/plans/2026-09-17-judge-batching-and-latency-experiments.md:506-509`)
+> showed Qwen batch 1→5 cutting seat-2 cost −42.2% (prompt tokens
+> 15879→5499) with identical verdicts, and the B1 pair
+> (`docs/product/measurements/2026-09-18-judge-seat1-quality-and-bundle.md`)
+> cut the pair's wall clock −81.1% and POST count −33.3%. A wider batch buys
+> prompt-token amortisation and fewer round trips, which this run could not
+> see because seat 2's latency was dominated by decode of reasoning tokens at
+> batch 1. The decode-latency argument itself still holds for seat 1, whose
+> batch-2 POSTs were the pair's long pole until `enable_thinking=false`
+> removed the reasoning tail (p95 42.5 s → 6.0 s). Do not cite this paragraph
+> to justify reverting `JUDGE_BATCH_SIZE_SEAT_2`.
+
 ## Why "off" was not off
 
 The configuration read as if reasoning were already suppressed:

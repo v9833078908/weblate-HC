@@ -223,15 +223,25 @@ WEBLATE_JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS=90
 WEBLATE_JUDGE_REQUEST_ATTEMPT_RETENTION_DAYS=90
 # Availability fallback: one alternate endpoint, tried once per batch after
 # the primary's own retries are spent. Empty by default; the seven fields
-# below must be set together with the base URL (the two reasoning-effort
-# fields may legitimately be blank). Before repointing the primary at this
-# same endpoint, clear all eight fallback settings first.
+# below must be set together with the base URL. Before repointing the primary
+# at this same endpoint, clear all eight fallback settings first.
+# Reasoning control here is OpenRouter's own protocol, not the LiteLLM
+# passthrough: a non-empty value is sent verbatim as
+# {"reasoning": {"effort": <value>, "exclude": true}}, so the primary's
+# `extra_body.enable_thinking=false` must NOT be reused on this path (it would
+# be sent as a literal effort level). "none" is a documented OpenRouter effort
+# value that disables reasoning tokens; it aligns the fallback with the B1
+# profile. The model IDs are OpenRouter-native and were checked against the
+# public `/api/v1/models` list on 2026-09-21 (`deepseek/deepseek-v4-pro`,
+# `qwen/qwen3.8-max-0902`): the bare `atlas/...` proxy aliases do not exist
+# there, and the non-LiteLLM resolver does not validate model names, so a
+# wrong ID would only surface when the fallback actually fires.
 WEBLATE_JUDGE_FALLBACK_BASE_URL=
 WEBLATE_JUDGE_FALLBACK_API_KEY=
-WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_1=
-WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_2=
-WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1=
-WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2=
+WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_1=deepseek/deepseek-v4-pro
+WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_2=qwen/qwen3.8-max-0902
+WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1=none
+WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2=none
 WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1=
 WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2=
 WEBLATE_LLM_USAGE_LOG_RETENTION_DAYS=90

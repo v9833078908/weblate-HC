@@ -57,16 +57,58 @@ recall 12/12 против 12/12 у контроля, ложных флагов �
 `LLMUsageLog`) появится на первом же реальном прогоне судьи после правки:
 платных запросов ради проверки не делалось.
 
+## Fallback (OpenRouter) — выровнен тем же решением
+
+Fallback-профиль живой (25 запросов за 14 дней до правки) и уходил на модели
+фазы 0 с reasoning on. По решению владельца выровнен с B1
+(`/srv/hcgameloc/deploy/.env`, бэкап `.bak-2026-09-21-judge-fallback`):
+
+    WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_1=deepseek/deepseek-v4-pro
+    WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_2=qwen/qwen3.8-max-0902
+    WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1=none
+    WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2=none
+
+Протокол OpenRouter другой: не-LiteLLM-профиль шлёт
+`{"reasoning": {"effort": <value>, "exclude": true}}`, и «none» —
+документированное значение, выключающее reasoning-токены (проверено по
+докам OpenRouter 2026-09-21). Значение primary
+`extra_body.enable_thinking=false` на этот путь переносить нельзя — ушло бы
+буквальным effort-уровнем.
+
+Имена моделей — нативные ID OpenRouter: проверены по публичному
+`GET https://openrouter.ai/api/v1/models` (446 моделей), где есть
+`deepseek/deepseek-v4-pro` и `qwen/qwen3.8-max-0902`, но **нет** ни
+`atlas/qwen3.8-max`, ни `qwen/qwen3.8-max` (первая версия правки несла
+именно их и была бы сломана при первом же отказе primary: не-LiteLLM
+резолвер имена моделей не валидирует). Прошлый fallback
+(`qwen/qwen3-235b-a22b-2507`, `deepseek/deepseek-v4-pro`) был проверен
+365+12 запросами за 14 дней; новый профиль замеров не имеет — он
+выравнивается по требованию владельца и остаётся untested до первого
+падения primary.
+
+Оба изменения вступят в силу при ближайшем пересоздании контейнера
+(вместе со сменой fallback-ключа, см. ниже).
+
+**Инцидент: ключ fallback скомпрометирован при выкладке.** При проверке
+`.env` значение `WEBLATE_JUDGE_FALLBACK_API_KEY` (OpenRouter,
+`sk-or-v1-…`) попало в лог сессии. Требуется ротация владельцем в
+OpenRouter dashboard и обновление `.env` + пересоздание контейнера.
+
 ## Открытые риски
 
-1. **Fallback не трогали.** `WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_1=deepseek/deepseek-v4-pro`
-   и `..._SEAT_2=qwen/qwen3-235b-a22b-2507` на OpenRouter, обе с пустым
-   reasoning-контролем. Это модели фазы 0, и путь живой: за 14 дней 13 и 12
-   запросов. При отказе прокси судья уедет на другой профиль с reasoning on,
-   к которому замеры B1 неприменимы.
-2. **Verdict cache.** Смена профиля меняет его отпечаток, поэтому первая
-   переоценка ранее судимого scope пройдёт мимо кэша и будет дороже
-   steady-state.
+1. **Verdict cache.** Смена профиля меняет его отпечаток
+   (`profile_fingerprint` включает reasoning/batch/response_format/stream,
+   `weblate/trans/judge.py`), поэтому старые вердикты автоматически не
+   переиспользуются: **первый полный judge-прогон переоплатит все строки,
+   сужённые под старую пару** (в usage за 14 дней ~14.7 тыс. запросов; при
+   cap 2000 строк это заметная сумма). Запускать большой прогон стоит
+   осознанно, а не «заодно».
+2. **Предпросмотр цены завышен вдвое.** `recent_cost_range`
+   (`weblate/trans/views/edit.py`) берёт историю по модели без учёта
+   `profile_fingerprint`, а она набрана на C0 (reasoning on, ~47%
+   completion-токенов — размышления). Пока не наберётся ≥5 ценовых строк
+   нового профиля, оценка перед прогоном будет завышена примерно вдвое.
 3. **Внешняя валидность B1** держится на agent-seeded фикстурах (16 и 8
    строк). Корпус с экспертной разметкой подготовлен —
-   `docs/product/measurements/2026-09-21-judge-expert-labeled-corpus.md`.
+   `docs/product/measurements/2026-09-21-judge-expert-labeled-corpus.md`;
+   платный прогон на нём требует отдельного подтверждения бюджета.
