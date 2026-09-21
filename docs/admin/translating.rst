@@ -88,6 +88,8 @@ Customization of quality checks and other Weblate behavior, see
 
 The string flags are also inherited from the :ref:`component-check_flags` at
 :ref:`component` and flags from the translation file (see :doc:`/formats`).
+Removing ``read-only`` from the source string also removes any per-language
+``read-only`` overrides and restores every language of that string at once.
 
 
 .. seealso::

@@ -22,7 +22,7 @@ from django.core import mail
 from django.core.cache import cache
 from django.core.management import call_command
 from django.core.paginator import Paginator
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Max
 from django.template.loader import render_to_string
 from django.test.client import RequestFactory
@@ -41,9 +41,12 @@ from weblate.auth.models import (
     TeamMembership,
     setup_project_groups,
 )
+from weblate.checks.flags import Flags
 from weblate.lang.models import Language
+from weblate.trans.actions import ActionEvents
 from weblate.trans.models import (
     Category,
+    Change,
     Component,
     ComponentLink,
     ComponentList,
@@ -59,7 +62,7 @@ from weblate.trans.tests.utils import (
     wait_for_celery,
 )
 from weblate.utils.hash import calculate_hash, hash_to_checksum
-from weblate.utils.state import STATE_TRANSLATED
+from weblate.utils.state import STATE_EMPTY, STATE_READONLY, STATE_TRANSLATED
 from weblate.utils.stats import CategoryLanguage, ProjectLanguage
 from weblate.utils.views import zip_download
 from weblate.utils.xml import parse_xml
@@ -1677,3 +1680,181 @@ class SourceStringsTest(ViewTestCase):
 
         unit = self.get_unit()
         self.assertNotIn("read-only", unit.all_flags)
+
+    def test_unmark_read_only_parked_override(self) -> None:
+        """Unmark read-only on parked source strips target override."""
+        self.user.is_superuser = True
+        self.user.save()
+        unit = self.get_unit()
+        source = unit.source_unit
+        # Parked: target has per-unit read-only but source does not
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        with transaction.atomic():
+            unlocked = source.unmark_string_read_only(self.user)
+        self.assertEqual(unlocked, 1)
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertEqual(unit.extra_flags, "")
+        self.assertEqual(unit.state, STATE_EMPTY)
+        self.assertNotIn("read-only", unit.all_flags)
+        # Verify a Change was recorded
+        self.assertTrue(
+            Change.objects.filter(unit=unit, action=ActionEvents.EXTRA_FLAGS).exists()
+        )
+
+    def test_unmark_read_only_preserves_other_flags(self) -> None:
+        """Unmark read-only keeps other per-unit flags intact."""
+        self.user.is_superuser = True
+        self.user.save()
+        unit = self.get_unit()
+        source = unit.source_unit
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only, ignore-max-length",
+            state=STATE_READONLY,
+            original_state=STATE_EMPTY,
+        )
+        with transaction.atomic():
+            unlocked = source.unmark_string_read_only(self.user)
+        self.assertEqual(unlocked, 1)
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertIn("ignore-max-length", unit.all_flags)
+        self.assertNotIn("read-only", unit.all_flags)
+
+    def test_unmark_read_only_source_flag_and_overrides(self) -> None:
+        """Unmark returns precomputed count even when source flag also present."""
+        self.user.is_superuser = True
+        self.user.save()
+        unit = self.get_unit()
+        source = unit.source_unit
+        source.update_extra_flags("read-only", self.user)
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        # Fresh instance: old_unit must reflect the persisted flag (as any real
+        # writer's request-loaded object does)
+        source = Unit.objects.get(pk=source.pk)
+        with transaction.atomic():
+            unlocked = source.unmark_string_read_only(self.user)
+        self.assertEqual(unlocked, 1)
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertEqual(unit.extra_flags, "")
+        self.assertNotEqual(unit.state, STATE_READONLY)
+        source = Unit.objects.get(pk=source.pk)
+        self.assertEqual(source.extra_flags, "")
+
+    def test_unmark_read_only_no_overrides(self) -> None:
+        """Unmark on source with flag but no overrides returns 0 and is idempotent."""
+        self.user.is_superuser = True
+        self.user.save()
+        unit = self.get_unit()
+        source = unit.source_unit
+        source.update_extra_flags("read-only", self.user)
+        # Fresh instance so old_unit reflects the persisted flag
+        source = Unit.objects.get(pk=source.pk)
+        with transaction.atomic():
+            unlocked = source.unmark_string_read_only(self.user)
+        self.assertEqual(unlocked, 0)
+        source = Unit.objects.get(pk=source.pk)
+        self.assertEqual(source.extra_flags, "")
+        # Idempotent: second call returns 0 without errors
+        with transaction.atomic():
+            unlocked = source.unmark_string_read_only(self.user)
+        self.assertEqual(unlocked, 0)
+
+    def test_get_flag_actions_parked_menu(self) -> None:
+        """Parked source shows Unmark, not Mark; inherited flag shows nothing."""
+        self.user.is_superuser = True
+        self.user.save()
+        unit = self.get_unit()
+        source = unit.source_unit
+        # The fixture component has no template, so its source translation
+        # auto-manages read-only in check_flags (source editing disabled).
+        # Clear it to model a component whose source strings are editable,
+        # the state a parked string has on production.
+        translation = source.translation
+        flags = Flags(translation.check_flags)
+        flags.remove("read-only")
+        translation.check_flags = flags.format()
+        translation.save(update_fields=["check_flags"])
+        # No flags anywhere: Mark as read-only
+        actions = source.get_flag_actions()
+        self.assertIn(("addflag", "read-only", "Mark as read-only"), actions)
+        self.assertNotIn(("removeflag", "read-only", "Unmark as read-only"), actions)
+        # Parked: target has override, source does not -> Unmark as read-only
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        source = Unit.objects.get(pk=source.pk)
+        actions = source.get_flag_actions()
+        self.assertIn(("removeflag", "read-only", "Unmark as read-only"), actions)
+        self.assertNotIn(("addflag", "read-only", "Mark as read-only"), actions)
+        # Inherited from component.check_flags: nothing
+        source.translation.component.check_flags = "read-only"
+        source.translation.component.save()
+        source = Unit.objects.get(pk=source.pk)
+        actions = source.get_flag_actions()
+        self.assertNotIn(("removeflag", "read-only", "Unmark as read-only"), actions)
+        self.assertNotIn(("addflag", "read-only", "Mark as read-only"), actions)
+
+    def test_unmark_read_only_cascade_ui(self) -> None:
+        """POST removeflag=read-only on source page unlocks parked targets."""
+        self.user.is_superuser = True
+        self.user.save()
+        unit = self.get_unit()
+        source = unit.source_unit
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("edit_context", kwargs={"pk": source.pk}),
+                {"removeflag": "read-only"},
+                follow=True,
+            )
+        self.assertRedirects(response, source.get_absolute_url())
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertEqual(unit.state, STATE_EMPTY)
+        self.assertNotIn("read-only", unit.all_flags)
+        self.assertContains(response, "Unlocked the string in one language.")
+
+    def test_edit_readonly_context_form_cascade(self) -> None:
+        """ContextForm clearing read-only from source also strips target overrides."""
+        self.user.is_superuser = True
+        self.user.save()
+        unit = self.get_unit()
+        source = unit.source_unit
+        source.update_extra_flags("read-only", self.user)
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("edit_context", kwargs={"pk": source.pk}),
+                {"extra_flags": ""},
+                follow=True,
+            )
+        self.assertRedirects(response, source.get_absolute_url())
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertNotIn("read-only", unit.all_flags)
+        self.assertNotEqual(unit.state, STATE_READONLY)
+        source = Unit.objects.get(pk=source.pk)
+        # The fixture component has no template, so the source translation
+        # auto-manages read-only; the contract is the per-unit flag only.
+        self.assertEqual(source.extra_flags, "")
+
+    def test_unmark_read_only_no_message(self) -> None:
+        """No message shown when no targets were unlocked."""
+        self.user.is_superuser = True
+        self.user.save()
+        unit = self.get_unit()
+        source = unit.source_unit
+        # Source has flag but no overrides
+        source.update_extra_flags("read-only", self.user)
+        response = self.client.post(
+            reverse("edit_context", kwargs={"pk": source.pk}),
+            {"removeflag": "read-only"},
+            follow=True,
+        )
+        self.assertRedirects(response, source.get_absolute_url())
+        self.assertNotContains(response, "Unlocked the string")

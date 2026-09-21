@@ -13396,6 +13396,55 @@ class UnitAPITest(APIBaseTest):
         self.assertIn("user", first_comment)
         self.assertIn("timestamp", first_comment)
 
+    def test_patch_source_extra_flags_cascades_read_only(self) -> None:
+        """PATCH removing read-only from a source unit cascades to targets."""
+        unit = Unit.objects.get(
+            translation__language_code="cs", source="Hello, world!\n"
+        )
+        source = unit.source_unit
+        # Source carries read-only, target has a per-unit override
+        source.update_extra_flags("read-only", self.user)
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertEqual(unit.state, STATE_READONLY)
+
+        self.do_request(
+            "api:unit-detail",
+            kwargs={"pk": source.pk},
+            method="patch",
+            code=200,
+            superuser=True,
+            request={"extra_flags": ""},
+        )
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertEqual(unit.extra_flags, "")
+        self.assertNotEqual(unit.state, STATE_READONLY)
+        self.assertEqual(unit.state, STATE_EMPTY)
+
+    def test_patch_flagless_source_keeps_parked_override(self) -> None:
+        """PATCH on a source without read-only does not unlock parked targets."""
+        unit = Unit.objects.get(
+            translation__language_code="cs", source="Hello, world!\n"
+        )
+        source = unit.source_unit
+        # Parked: target has per-unit read-only but source does not
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        self.do_request(
+            "api:unit-detail",
+            kwargs={"pk": source.pk},
+            method="patch",
+            code=200,
+            superuser=True,
+            request={"extra_flags": ""},
+        )
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertEqual(unit.extra_flags, "read-only")
+        self.assertEqual(unit.state, STATE_READONLY)
+
 
 class SuggestionAPITest(APIBaseTest):
     def _get_unit(self):

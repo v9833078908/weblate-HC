@@ -2785,11 +2785,17 @@ class Unit(models.Model, LoggerMixin):
         component = translation.component
         result = []
         if self.is_source:
-            if "read-only" in flags:
-                if (
-                    "read-only" not in translation.all_flags
-                    and "read-only" not in component.all_flags
-                ):
+            inherited = (
+                "read-only" in translation.all_flags
+                or "read-only" in component.all_flags
+            )
+            overrides = (
+                0
+                if inherited or "read-only" in flags
+                else self.count_read_only_overrides()
+            )
+            if "read-only" in flags or overrides:
+                if overrides or not inherited:
                     result.append(
                         ("removeflag", "read-only", gettext("Unmark as read-only"))
                     )
@@ -2929,12 +2935,17 @@ class Unit(models.Model, LoggerMixin):
 
     def update_extra_flags(
         self, extra_flags: str, user: User, save: bool = True
-    ) -> None:
-        """Update unit extra flags."""
+    ) -> int:
+        """
+        Update unit extra flags.
+
+        Returns the number of target units whose read-only override was
+        stripped as a result of removing read-only from a source unit.
+        """
         verify_in_transaction()
         old = self.old_unit["extra_flags"]
         if old == extra_flags:
-            return
+            return 0
         self.extra_flags = extra_flags
         units: Iterable[Unit] = []
         if self.is_source:
@@ -2954,6 +2965,80 @@ class Unit(models.Model, LoggerMixin):
                 old=old,
                 target=self.extra_flags,
             )
+
+        stripped = 0
+        if (
+            self.is_source
+            and "read-only" in Flags(old)
+            and "read-only" not in Flags(extra_flags)
+        ):
+            stripped = self._strip_read_only_overrides(user)
+        return stripped
+
+    def count_read_only_overrides(self) -> int:
+        """Number of target units carrying ``read-only`` in their own extra_flags."""
+        if not self.is_source:
+            return 0
+        return sum(
+            1
+            for ef in self.unit_set.exclude(pk=self.pk).values_list(
+                "extra_flags", flat=True
+            )
+            if "read-only" in Flags(ef)
+        )
+
+    def _strip_read_only_overrides(self, user: User) -> int:
+        """
+        Strip ``read-only`` from every target unit's own extra_flags.
+
+        The single executor of cross-language unlocking; call only on a source
+        unit, inside the caller's transaction. For each target (excluding self)
+        whose own ``Flags`` contain ``read-only``: remove the flag via
+        ``update_extra_flags`` (records an ``EXTRA_FLAGS`` change for that unit),
+        then restore the pre-parking state and re-run checks. Shares the
+        in-memory source and component with every target so that state
+        recomputation sees the caller's already-mutated source flags even when
+        the source row has not been persisted yet (``save=False`` writers).
+        Returns the number of target units changed.
+        """
+        changed = 0
+        for unit in self.unit_set.select_for_update().exclude(pk=self.pk):
+            unit.source_unit = self
+            unit.translation.component = self.translation.component
+            flags = Flags(unit.extra_flags)
+            if "read-only" not in flags:
+                continue
+            flags.remove("read-only")
+            unit.update_extra_flags(flags.format(), user)
+            unit.update_state()
+            unit.run_checks()
+            changed += 1
+        if changed and not self.is_batch_update:
+            self.translation.component.invalidate_cache()
+        return changed
+
+    def unmark_string_read_only(self, user: User) -> int:
+        """
+        Remove ``read-only`` from this string in every language.
+
+        Strips the flag from the source unit's own extra_flags (if present) and
+        from every translation unit that carries it in its own extra_flags,
+        then restores states and re-runs checks. Works when called on any unit
+        of the string. Returns the number of unlocked target units (excluding
+        the source itself).
+        """
+        verify_in_transaction()
+        source = self if self.is_source else self.source_unit
+        count = source.count_read_only_overrides()
+        own = Flags(source.extra_flags)
+        if "read-only" in own:
+            own.remove("read-only")
+            # update_extra_flags cascades: _strip runs exactly once inside it.
+            source.update_extra_flags(own.format(), user)
+        elif count:
+            # Parked case: the source carries no flag, only the overrides lock.
+            source._strip_read_only_overrides(user)
+        return count
 
     @cached_property
     def glossary_sort_key(self):
