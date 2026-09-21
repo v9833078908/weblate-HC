@@ -86,8 +86,17 @@ Fallback-профиль живой (25 запросов за 14 дней до п
 выравнивается по требованию владельца и остаётся untested до первого
 падения primary.
 
-Оба изменения вступят в силу при ближайшем пересоздании контейнера
-(вместе со сменой fallback-ключа, см. ниже).
+Правка применена и **активна**: контейнер пересоздан
+(`2026-09-21T08:41:11Z`, `healthy`), резолвнутые профили:
+
+    PRIMARY  seat 1 deepseek-v4-pro   'extra_body.enable_thinking=false' batch 2
+    PRIMARY  seat 2 atlas/qwen3.8-max 'extra_body.enable_thinking=false' batch 5
+    FALLBACK seat 1 deepseek/deepseek-v4-pro 'none' openrouter
+    FALLBACK seat 2 qwen/qwen3.8-max-0902     'none' openrouter
+
+Перед пересозданием: активных задач `auto_translate*` нет, очередь
+`translate` пуста (13 сообщений в очереди `celery` переживают рестарт и
+деплой не блокируют).
 
 **Инцидент: ключ fallback скомпрометирован при выкладке.** При проверке
 `.env` значение `WEBLATE_JUDGE_FALLBACK_API_KEY` (OpenRouter,
