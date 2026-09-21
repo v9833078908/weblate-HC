@@ -11,7 +11,7 @@ from django.db import transaction
 from django.http import Http404
 from django.http.response import HttpResponseServerError
 from django.shortcuts import get_object_or_404
-from django.utils.translation import gettext
+from django.utils.translation import gettext, ngettext
 from django.views.decorators.http import require_POST
 
 from weblate.checks.flags import GLOSSARY_LANGUAGE_SCOPED_FLAGS, Flags
@@ -61,11 +61,26 @@ def edit_context(request: AuthenticatedHttpRequest, pk):
             return redirect_next(request.POST.get("next"), unit.get_absolute_url())
         if do_add:
             flags.merge(flag)
+            new_flags = flags.format()
+            if new_flags != unit.extra_flags:
+                unit.update_extra_flags(new_flags, request.user)
+        elif flag == "read-only":
+            unlocked = unit.unmark_string_read_only(request.user)
+            if unlocked:
+                messages.success(
+                    request,
+                    ngettext(
+                        "Unlocked the string in one language.",
+                        "Unlocked the string in %(count)d languages.",
+                        unlocked,
+                    )
+                    % {"count": unlocked},
+                )
         else:
             flags.remove(flag)
-        new_flags = flags.format()
-        if new_flags != unit.extra_flags:
-            unit.update_extra_flags(new_flags, request.user)
+            new_flags = flags.format()
+            if new_flags != unit.extra_flags:
+                unit.update_extra_flags(new_flags, request.user)
     else:
         if not request.user.has_perm("source.edit", unit.translation):
             raise PermissionDenied

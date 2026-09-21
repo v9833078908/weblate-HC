@@ -31,6 +31,7 @@ from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.ratelimit import reset_rate_limit
 from weblate.utils.state import (
     STATE_APPROVED,
+    STATE_EMPTY,
     STATE_FUZZY,
     STATE_NEEDS_CHECKING,
     STATE_NEEDS_REWRITING,
@@ -1115,6 +1116,48 @@ class BulkEditTest(ViewTestCase):
         self.assertContains(response, "Bulk edit completed, 4 strings were updated.")
         unit = self.get_unit()
         self.assertNotIn("read-only", unit.all_flags)
+
+    def test_bulk_read_only_cascade(self) -> None:
+        """Bulk remove read-only cascades to per-unit overrides when source had it."""
+        unit = self.get_unit()
+        source = unit.source_unit
+        # Source carries read-only, target has a per-unit override
+        source.update_extra_flags("read-only", self.user)
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "language:en", "state": -1, "remove_flags": "read-only"},
+            follow=True,
+        )
+        # Only the one source that actually carried read-only is updated; the
+        # other three already had no flag (bulk.py:170 skips no-op writes).
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        unit = Unit.objects.get(pk=unit.pk)
+        self.assertNotIn("read-only", unit.all_flags)
+        self.assertEqual(unit.extra_flags, "")
+        self.assertNotEqual(unit.state, STATE_READONLY)
+        self.assertEqual(unit.state, STATE_EMPTY)
+
+    def test_bulk_read_only_parked_no_cascade(self) -> None:
+        """Bulk remove read-only does NOT unlock parked targets (source lacks flag)."""
+        unit = self.get_unit()
+        # Parked: target has per-unit read-only but source does not
+        Unit.objects.filter(pk=unit.pk).update(
+            extra_flags="read-only", state=STATE_READONLY, original_state=STATE_EMPTY
+        )
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "language:en", "state": -1, "remove_flags": "read-only"},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, no strings were updated.")
+        unit = Unit.objects.get(pk=unit.pk)
+        # Parked override remains: source had no read-only, so no transition,
+        # so the cascade in update_extra_flags never fires (bulk.py:170).
+        self.assertEqual(unit.extra_flags, "read-only")
+        self.assertEqual(unit.state, STATE_READONLY)
 
     def test_bulk_labels(self) -> None:
         label = self.project.label_set.create(name="Test label", color="black")
