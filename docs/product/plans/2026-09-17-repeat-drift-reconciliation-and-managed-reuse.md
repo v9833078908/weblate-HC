@@ -297,7 +297,11 @@ makemigrations --check --dry-run` не находит несохранённых
 ### Задача 3. Нативная очередь групп и редакторские решения
 
 **Зависимости:** 1–2. **Результат:** одна строка очереди на группу, а не на
-каждый чек; все вхождения доступны без скрытых замен.
+каждый чек; все вхождения доступны без скрытых замен. Иерархия экрана очереди
+зафиксирована отдельным документом:
+`docs/product/plans/2026-09-21-repeat-queue-ui-variant.md` (выбранный прототип
+`analysis/prototypes/repeat-queue/queue-variant-a.html`); задача реализует её,
+а не изобретает экран заново.
 
 **Файлы:** новые `weblate/trans/views/repeats.py`,
 `weblate/templates/repeat_queue.html`, `weblate/templates/repeat_detail.html`;
