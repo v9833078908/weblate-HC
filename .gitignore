@@ -63,3 +63,6 @@ weblate-*.tar.*
 # measurement ledgers; only this README and the manifest template are tracked
 # (see analysis/data/judge-cost-latency-ab/README.md).
 /analysis/data/judge-cost-latency-ab/*/
+
+# Impeccable design-agent artifacts (critique snapshots, prototypes, review captures)
+.impeccable/
