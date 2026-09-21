@@ -391,14 +391,14 @@ if self.is_source:
 
 **Actions.**
 
-- [ ] Через `./deploy/vps.sh ssh` + `docker exec hcgameloc-weblate-1 weblate
+- [x] Через `./deploy/vps.sh ssh` + `docker exec hcgameloc-weblate-1 weblate
       shell` (база внутри контейнера `http://127.0.0.1:8080`), idempotent
       скрипт, который всегда выходит 0 и печатает traceback вместо assert
       (ssh_retry повторяет падающие команды — урок из памяти проекта): по
       контекстам `%RANK_PROMOTION%`, `%NEW_RANK%`, `%WEEKLY%`, `%FOR_WINS%`
       вывести для каждого юнита `language, state, original_state,
       bool(target), extra_flags`.
-- [ ] Записать вывод в этот план (раздел «Результат проба»). Никаких записей
+- [x] Записать вывод в этот план (раздел «Результат проба»). Никаких записей
       в БД, никаких `save()`.
 
 **Acceptance.** Список юнитов с аномальным `original_state` пуст либо его
@@ -438,20 +438,20 @@ if self.is_source:
 
 **Actions.**
 
-- [ ] `count_read_only_overrides` (запрос + `Flags`-парсинг).
-- [ ] `_strip_read_only_overrides(user)`: `select_for_update().exclude(pk)`,
+- [x] `count_read_only_overrides` (запрос + `Flags`-парсинг).
+- [x] `_strip_read_only_overrides(user)`: `select_for_update().exclude(pk)`,
       шардинг `unit.source_unit = self` и `unit.translation.component`,
       для каждого с оверрайдом → `update_extra_flags` → `update_state` →
       `run_checks`; в конце `invalidate_cache` при `changed and not
       is_batch_update`; вернуть счётчик.
-- [ ] `unmark_string_read_only(user)`: `verify_in_transaction`; локальная
+- [x] `unmark_string_read_only(user)`: `verify_in_transaction`; локальная
       `source`; **сначала** `count = count_read_only_overrides()`; далее ровно
       одна ветка — `update_extra_flags` (каскад) или `_strip` напрямую (parked);
       вернуть `count`.
-- [ ] Каскад в `update_extra_flags`: после цикла `generate_change`, условие
+- [x] Каскад в `update_extra_flags`: после цикла `generate_change`, условие
       `is_source and "read-only" in Flags(old) and "read-only" not in
       Flags(extra_flags)`; docstring фиксирует новый побочный эффект и `-> int`.
-- [ ] `get_flag_actions` по матрице; `overrides` не считается при `inherited`.
+- [x] `get_flag_actions` по матрице; `overrides` не считается при `inherited`.
 
 **Verification.**
 
@@ -501,9 +501,9 @@ if self.is_source:
 
 **Actions.**
 
-- [ ] Ветка `elif flag == "read-only":` в снятии → `unmark_string_read_only` +
+- [x] Ветка `elif flag == "read-only":` в снятии → `unmark_string_read_only` +
       условный `messages.success` (`ngettext`).
-- [ ] `do_add` и generic-снятие других флагов — как есть.
+- [x] `do_add` и generic-снятие других флагов — как есть.
 
 **Verification.**
 
@@ -542,11 +542,11 @@ no-op: оверрайды остаются (закреплённое огран�
 
 **Actions.**
 
-- [ ] `test_patch_source_extra_flags_cascades_read_only`: источник с
+- [x] `test_patch_source_extra_flags_cascades_read_only`: источник с
       `read-only`, cs с пер-юнитным оверрайдом (ORM-сборка parked-поля state,
       ре-фетч) → PATCH источника `{"extra_flags": ""}` → у cs пусто и
       `state != STATE_READONLY`.
-- [ ] `test_patch_flagless_source_keeps_parked_override`: источник без флага,
+- [x] `test_patch_flagless_source_keeps_parked_override`: источник без флага,
       cs с оверрайдом → PATCH источника `{"extra_flags": ""}` → 200, у cs
       оверрайд **цел** (документирует ранний возврат `unit.py:2936`).
 
@@ -576,13 +576,13 @@ unpark остаётся скриптом (`squadrons.md:77-93`).
 
 **Actions.**
 
-- [ ] Расширить `test_bulk_read_only`: после существующего add→remove цикла —
+- [x] Расширить `test_bulk_read_only`: после существующего add→remove цикла —
       сценарий «источник с `read-only` + оверрайд на cs» (ORM-сборка) →
       `remove_flags=read-only` → оверрайд cs снят, state восстановлен.
-- [ ] Негативный кейс: parked (источник без флага, оверрайд на cs) →
+- [x] Негативный кейс: parked (источник без флага, оверрайд на cs) →
       `remove_flags=read-only` с `q`, накрывающим cs → оверрайд **остался**;
       в комментарии теста — почему (гейт `bulk.py:170`, см. «Ограничения», п. 1).
-- [ ] Убедиться, что счётчик «N strings were updated» не меняется из-за
+- [x] Убедиться, что счётчик «N strings were updated» не меняется из-за
       каскада (он считает единицы bulk-цикла, `_strip` на него не влияет).
 
 **Verification.**
@@ -603,13 +603,13 @@ unpark остаётся скриптом (`squadrons.md:77-93`).
 
 **Actions.**
 
-- [ ] Запись в changelog: «Unmarking a string as read-only on the source
+- [x] Запись в changelog: «Unmarking a string as read-only on the source
       string page now also removes per-language read-only overrides and
       restores the translations in every language at once; bulk edit and the
       API do the same when the source string itself carried the flag» (одна
       строка, без «without a script» — массовый снятие остаётся скриптом).
-- [ ] Предложение в `docs/admin/translating.rst` про кросс-языковое снятие.
-- [ ] Здесь же, в плане: «Результат проба» (задача 0).
+- [x] Предложение в `docs/admin/translating.rst` про кросс-языковое снятие.
+- [x] Здесь же, в плане: «Результат проба» (задача 0).
 
 **Verification.**
 
