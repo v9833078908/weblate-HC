@@ -16,13 +16,14 @@ from django.db import transaction
 from django.utils import timezone
 
 from weblate.trans.actions import ActionEvents
+from weblate.trans.models import Unit
 from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from weblate.auth.models import User
-    from weblate.trans.models import Component, Label, Unit
+    from weblate.trans.models import Component, Label
     from weblate.trans.models.repeat import RepeatGroup, RepeatMembership, RepeatPolicy
 
 
@@ -371,9 +372,6 @@ def _load_preview(token: str, actor: User) -> dict[str, Any]:
 def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = None):
     """Apply a fresh preview atomically through Unit.translate without propagation."""
     # ruff: ignore[import-outside-top-level]
-    from weblate.trans.models import Unit
-
-    # ruff: ignore[import-outside-top-level]
     from weblate.trans.models.repeat import RepeatDecisionEvent, RepeatGroup
 
     snapshot = _load_preview(token, actor)
@@ -453,6 +451,58 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
         group.revision += 1
         group.save()
         event.result = result
+        event.save(update_fields=["result"])
+    return event
+
+
+def keep_group_independent(*, group: RepeatGroup, actor: User):
+    """Record an explicit no-target decision for every visible group member."""
+    # ruff: ignore[import-outside-top-level]
+
+    from weblate.trans.models.repeat import RepeatDecisionEvent, RepeatGroup
+
+    if not actor.has_perm("project.edit", group.policy.project):
+        msg = "You cannot change this repeat policy."
+        raise ValidationError(msg)
+    with transaction.atomic():
+        group = (
+            RepeatGroup.objects.select_for_update()
+            .select_related("policy")
+            .get(pk=group.pk)
+        )
+        units = list(
+            policy_units(group.policy)
+            .filter_access(actor)
+            .filter(source=group.source_forms[0])
+            .select_related("translation__component", "translation__plural")
+            .order_by("pk")
+        )
+        event = RepeatDecisionEvent.objects.create(
+            group=group,
+            action=RepeatDecisionEvent.Action.INDEPENDENT,
+            actor=actor,
+            group_revision=group.revision,
+            policy_revision=group.policy.revision,
+            snapshot={"unit_ids": [unit.pk for unit in units]},
+        )
+        independent = []
+        for unit in units:
+            if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
+                continue
+            create_membership(
+                group=group,
+                unit=unit,
+                mode="independent",
+                reason="keep-different",
+            )
+            independent.append(unit.pk)
+        group.shared_target = []
+        group.decision_origin = "independent"
+        group.decision_author = actor
+        group.decided_at = timezone.now()
+        group.revision += 1
+        group.save()
+        event.result = {"independent": independent}
         event.save(update_fields=["result"])
     return event
 
