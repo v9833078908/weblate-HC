@@ -14,6 +14,7 @@ from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models import Unit
@@ -72,11 +73,12 @@ def policy_units(policy: RepeatPolicy):
     result = Unit.objects.filter(
         translation__component__project=policy.project,
         translation__component__in=policy.components.all(),
+        translation__component__source_language=policy.source_language,
         translation__language=policy.target_language,
         translation__component__allow_translation_propagation=True,
         translation__component__is_glossary=False,
         state__lt=STATE_READONLY,
-    ).exclude(translation__language=policy.source_language)
+    )
     label_ids = list(policy.source_labels.values_list("id", flat=True))
     if label_ids:
         result = result.filter(source_unit__labels__in=label_ids).distinct()
@@ -367,6 +369,7 @@ class RepeatPreview:
     token: str
     group_id: int
     members: tuple[RepeatPreviewMember, ...]
+    action: str = "apply"
 
 
 def preview_group(
@@ -419,6 +422,41 @@ def preview_group(
     )
 
 
+def preview_keep_group(*, group: RepeatGroup, actor: User) -> RepeatPreview:
+    """Create a signed no-write preview for an independent-group decision."""
+    members = tuple(
+        RepeatPreviewMember(
+            unit_id=unit.pk,
+            fingerprint=unit_fingerprint(unit),
+            target=tuple(unit.get_target_plurals()),
+            eligible=True,
+            reason="",
+        )
+        for unit in policy_units(group.policy)
+        .filter_access(actor)
+        .filter(source=group.source_forms[0])
+        .order_by("pk")
+        if tuple(unit.get_source_plurals()) == tuple(group.source_forms)
+    )
+    payload = {
+        "actor": actor.pk,
+        "action": "keep",
+        "group": group.pk,
+        "group_revision": group.revision,
+        "policy_revision": group.policy.revision,
+        "members": [
+            {"id": member.unit_id, "fingerprint": member.fingerprint}
+            for member in members
+        ],
+    }
+    return RepeatPreview(
+        token=signing.dumps(payload, salt="weblate.repeat-preview", compress=True),
+        group_id=group.pk,
+        members=members,
+        action="keep",
+    )
+
+
 def _load_preview(token: str, actor: User) -> dict[str, Any]:
     """Validate the signed operation snapshot and its actor binding."""
     try:
@@ -438,6 +476,10 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
     from weblate.trans.models.repeat import RepeatDecisionEvent, RepeatGroup
 
     snapshot = _load_preview(token, actor)
+    if snapshot.get("action") == "keep":
+        return keep_group_independent(
+            group_id=snapshot["group"], actor=actor, snapshot=snapshot
+        )
     selected = set(unit_ids) if unit_ids is not None else None
     with transaction.atomic():
         group = (
@@ -525,12 +567,26 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
     return event
 
 
-def keep_group_independent(*, group: RepeatGroup, actor: User):
+def keep_group_independent(
+    *,
+    actor: User,
+    group: RepeatGroup | None = None,
+    group_id: int | None = None,
+    snapshot: dict[str, Any] | None = None,
+):
     """Record an explicit no-target decision for every visible group member."""
     # ruff: ignore[import-outside-top-level]
 
     from weblate.trans.models.repeat import RepeatDecisionEvent, RepeatGroup
 
+    if group is None:
+        if group_id is None:
+            msg = "A repeat group is required."
+            raise ValueError(msg)
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.repeat import RepeatGroup
+
+        group = RepeatGroup.objects.select_related("policy").get(pk=group_id)
     if not actor.has_perm("project.edit", group.policy.project):
         msg = "You cannot change this repeat policy."
         raise ValidationError(msg)
@@ -547,13 +603,31 @@ def keep_group_independent(*, group: RepeatGroup, actor: User):
             .select_related("translation__component", "translation__plural")
             .order_by("pk")
         )
+        if snapshot is not None:
+            if (
+                group.revision != snapshot["group_revision"]
+                or group.policy.revision != snapshot["policy_revision"]
+            ):
+                raise ValidationError(
+                    gettext("The repeat group changed; refresh the preview.")
+                )
+            expected = {item["id"]: item["fingerprint"] for item in snapshot["members"]}
+            current = {
+                unit.pk: unit_fingerprint(unit)
+                for unit in units
+                if tuple(unit.get_source_plurals()) == tuple(group.source_forms)
+            }
+            if current != expected:
+                raise ValidationError(
+                    gettext("A repeat recipient changed; refresh the preview.")
+                )
         event = RepeatDecisionEvent.objects.create(
             group=group,
             action=RepeatDecisionEvent.Action.INDEPENDENT,
             actor=actor,
             group_revision=group.revision,
             policy_revision=group.policy.revision,
-            snapshot={"unit_ids": [unit.pk for unit in units]},
+            snapshot=snapshot or {"unit_ids": [unit.pk for unit in units]},
         )
         independent = []
         for unit in units:

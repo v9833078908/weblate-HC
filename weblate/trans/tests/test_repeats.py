@@ -260,17 +260,57 @@ class RepeatModelTest(ViewTestCase):
             prompt_fingerprint="c" * 64,
             request_cap=1,
         )
+        target = ", ".join('"X"' for _ in range(group.plural_number))
         result = parse_results(
             run=run,
             content=(
-                f'{{"results":[{{"group":{group.pk},"action":"propose_new","target":["X"]}},'
+                f'{{"results":[{{"group":{group.pk},"action":"propose_new","target":[{target}]}},'
                 '{"group":999,"action":"needs_human"},'
                 f'{{"group":{group.pk},"action":"needs_human","extra":true}}]}}'
             ),
         )
         self.assertEqual(
-            result, [{"group": group.pk, "action": "propose_new", "target": ["X"]}]
+            result,
+            [
+                {
+                    "group": group.pk,
+                    "action": "propose_new",
+                    "target": ["X"] * group.plural_number,
+                }
+            ],
         )
+
+    def test_recommendation_parser_rejects_incomplete_plural_target(self) -> None:
+        first = self.add_repeat("first", "One")
+        policy = self.make_policy()
+        group = get_or_create_group(policy, first)
+        run = RepeatRecommendationRun.objects.create(
+            policy=policy,
+            actor=self.user,
+            snapshot={
+                "groups": [
+                    {
+                        "group": group.pk,
+                        "group_revision": group.revision,
+                        "unit_ids": [first.pk],
+                    }
+                ]
+            },
+            snapshot_fingerprint="a" * 64,
+            profile_fingerprint="b" * 64,
+            prompt_fingerprint="c" * 64,
+            request_cap=1,
+        )
+
+        result = parse_results(
+            run=run,
+            content=(
+                f'{{"results":[{{"group":{group.pk},"action":"propose_new",'
+                '"target":["X"]}]}'
+            ),
+        )
+
+        self.assertEqual(result, [])
 
     def test_recommendation_send_exception_is_unknown_and_not_replayed(self) -> None:
         """A lost response consumes its reservation without leaving a sent run."""

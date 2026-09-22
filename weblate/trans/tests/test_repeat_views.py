@@ -11,7 +11,7 @@ from unittest.mock import patch
 from django.urls import reverse
 
 from weblate.trans.models import RepeatPolicy
-from weblate.trans.repeats import save_policy
+from weblate.trans.repeats import get_or_create_group, save_policy
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_TRANSLATED
@@ -98,6 +98,62 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertEqual(preview.status_code, 200)
         self.assertContains(preview, "Nothing has been saved yet")
         self.assertContains(preview, 'name="unit"')
+
+    def test_keep_different_requires_a_preview_before_recording_decision(self) -> None:
+        """Keeping variants independent must not mutate the group from the queue."""
+        self.make_manager()
+        translation = self.component.translation_set.get(language_code="cs")
+        source = "A repeat that remains different"
+        first = None
+        for position, context in enumerate(("dialogue", "menu"), start=1100):
+            source_unit = self.component.source_translation.unit_set.create(
+                id_hash=calculate_hash(source, context),
+                position=position,
+                context=context,
+                source=source,
+                target=source,
+                state=STATE_TRANSLATED,
+            )
+            unit = translation.unit_set.create(
+                id_hash=calculate_hash(source, context),
+                position=position,
+                source_unit=source_unit,
+                context=context,
+                source=source,
+                target=context,
+                state=STATE_TRANSLATED,
+            )
+            if first is None:
+                first = unit
+        policy = save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=translation.language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+        group = get_or_create_group(policy, first)
+
+        preview = self.client.post(
+            reverse("repeat-preview", kwargs={"group_id": group.pk}),
+            {"choice": "keep"},
+        )
+
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, "Nothing has been saved yet")
+        group.refresh_from_db()
+        self.assertEqual(group.decision_origin, "")
+
+        applied = self.client.post(
+            reverse("repeat-apply"),
+            {"token": preview.context["preview"].token},
+        )
+        self.assertEqual(applied.status_code, 200)
+        group.refresh_from_db()
+        self.assertEqual(group.decision_origin, "independent")
 
     def test_recommendation_paid_trigger_has_free_confirmation(self) -> None:
         self.make_manager()

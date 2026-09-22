@@ -44,19 +44,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const updateDecision = () => {
       const checked = form.querySelector("input[type='radio']:checked");
       const customSelected = checked?.dataset.choice === "custom";
-      custom.hidden = !customSelected;
+      if (custom) custom.hidden = !customSelected;
       preview.setAttribute("aria-disabled", String(!checked));
       hint.textContent = checked
         ? checked.dataset.choice === "keep"
-          ? "Translations are not changed; the occurrences become independent."
-          : "Review the affected occurrences before writing."
-        : "Choose an option to continue.";
+          ? hint.dataset.hintKeep
+          : hint.dataset.hintPreview
+        : hint.dataset.hintDefault;
     };
     form.addEventListener("change", updateDecision);
     form.addEventListener("submit", (event) => {
       if (preview.getAttribute("aria-disabled") === "true") {
         event.preventDefault();
-        hint.textContent = "Choose an option first.";
+        hint.textContent = hint.dataset.hintRequired;
       }
     });
   });

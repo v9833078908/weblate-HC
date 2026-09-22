@@ -20,6 +20,7 @@ from weblate.trans.judge import (
 )
 from weblate.trans.models import (
     LLMUsageLog,
+    RepeatGroup,
     RepeatRecommendationAttempt,
     RepeatRecommendationResult,
     RepeatRecommendationRun,
@@ -266,7 +267,20 @@ def parse_results(*, run: RepeatRecommendationRun, content: str) -> list[dict]:
             continue
         if any(member not in groups[group_id]["unit_ids"] for member in exclusions):
             continue
-        if action == "propose_new" and not target:
+        group = (
+            RepeatGroup.objects.filter(
+                pk=group_id,
+                policy=run.policy,
+                revision=groups[group_id]["group_revision"],
+            )
+            .only("plural_number")
+            .first()
+        )
+        if group is None:
+            continue
+        if action == "propose_new" and (
+            not target or len(target) != group.plural_number
+        ):
             continue
         accepted.append(result)
         seen.add(group_id)
@@ -291,6 +305,32 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
     ):
         attempt.status = RepeatRecommendationAttempt.Status.FAILED
         attempt.failure = "permission-changed"
+        attempt.save(update_fields=["status", "failure"])
+        run.status = RepeatRecommendationRun.Status.FAILED
+        run.finished_at = timezone.now()
+        run.failure = attempt.failure
+        run.save(update_fields=["status", "finished_at", "failure"])
+        return
+    visible_unit_ids = set(
+        policy_units(run.policy)
+        .filter_access(run.actor)
+        .filter(
+            pk__in=[
+                unit_id
+                for group in attempt.request_snapshot.get("groups", [])
+                for unit_id in group["unit_ids"]
+            ]
+        )
+        .values_list("pk", flat=True)
+    )
+    requested_unit_ids = {
+        unit_id
+        for group in attempt.request_snapshot.get("groups", [])
+        for unit_id in group["unit_ids"]
+    }
+    if visible_unit_ids != requested_unit_ids:
+        attempt.status = RepeatRecommendationAttempt.Status.FAILED
+        attempt.failure = "access-changed"
         attempt.save(update_fields=["status", "failure"])
         run.status = RepeatRecommendationRun.Status.FAILED
         run.finished_at = timezone.now()

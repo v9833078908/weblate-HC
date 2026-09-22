@@ -723,6 +723,24 @@ class RepeatPolicyForm(forms.ModelForm):
             actor=self.actor,
         )
 
+    def clean(self):
+        cleaned_data = super().clean()
+        source_language = cleaned_data.get("source_language")
+        components = cleaned_data.get("components")
+        if (
+            source_language is not None
+            and components is not None
+            and any(
+                component.source_language_id != source_language.pk
+                for component in components
+            )
+        ):
+            self.add_error(
+                "components",
+                gettext("Every component must use the selected source language."),
+            )
+        return cleaned_data
+
 
 class TranslationForm(UnitForm):
     """Form used for translation of single string."""

@@ -37,10 +37,10 @@ from weblate.trans.repeats import (
     apply_preview,
     detect_policy_groups,
     get_or_create_group,
-    keep_group_independent,
     policy_overlaps,
     policy_units,
     preview_group,
+    preview_keep_group,
 )
 from weblate.utils.state import STATE_APPROVED
 
@@ -208,10 +208,34 @@ def repeat_preview(request, group_id: int):
     group = get_object_or_404(RepeatGroup, pk=group_id)
     if not request.user.can_access_project(group.policy.project):
         raise PermissionDenied
+    visible_members = (
+        policy_units(group.policy)
+        .filter_access(request.user)
+        .filter(source=group.source_forms[0])
+    )
+    if not any(
+        tuple(unit.get_source_plurals()) == tuple(group.source_forms)
+        for unit in visible_members
+    ):
+        raise PermissionDenied
     choice = request.POST.get("choice", "")
     if choice == "keep":
-        event = keep_group_independent(group=group, actor=request.user)
-        return render(request, "repeat_report.html", {"event": event})
+        preview = preview_keep_group(group=group, actor=request.user)
+        return render(
+            request,
+            "repeat_preview.html",
+            {
+                "group": group,
+                "preview": preview,
+                "queue_url": reverse(
+                    "repeat-queue",
+                    kwargs={
+                        "project": group.policy.project.slug,
+                        "language": group.policy.target_language.code,
+                    },
+                ),
+            },
+        )
     target = request.POST.getlist("target")
     if choice == "custom":
         target = request.POST.getlist("custom_target")
