@@ -6,7 +6,16 @@
 > на выбранный датасет, платный прогон или изменения production.
 
 **Дата:** 2026-09-16. **Версия протокола:** 1.2, draft.
-**Статус:** подготовлен для передачи; ожидает решения по датасету и запуску.
+**Текущий статус на 2026-09-17:** малый прогон v3 прошёл; полный завершился
+с сохранением данных, но неполным покрытием оценок. По просьбе владельца
+ассистент отдельно оценил 480 переводов A–D. Итог — ограниченный exploratory
+screening, H1–H3 остаются открытыми. G0–G2 выполнены для проведённых запусков;
+G3–G5 не закрыты. Синтез:
+`docs/product/measurements/2026-09-17-dual-reference-zh-assistant-assessment.md`.
+v1 неполный, результаты v2 утрачены. Протокол исполнения и результаты v3:
+`docs/product/measurements/2026-09-17-dual-reference-zh-v3.md`.
+Нижележащие записи прежних разрешений и остановки сохранены как история;
+они не отменяют это решение владельца.
 **Цель:** установить, улучшает ли готовый вычитанный EN и дополнительная RU/EN
 опора качество локализации игр HeroCraft на упрощённый китайский.
 **Архитектура исследования:** парный эксперимент на замороженных данных вне
@@ -575,7 +584,62 @@ API-вызовов, но не количество оцениваемых output
 перечнем недостающих доказательств. «Неопределённо» — допустимый научный
 результат, не причина скрывать данные или подбирать новый промпт на holdout.
 
-Текущий checklist: G0–G5 открыты; research, candidate inventory и локальная
-выгрузка с предложением 120 строк выполнены. Структурная часть задачи 1
-проверена; согласование, review provenance и смысловая сверка остаются открытыми.
-Первое действие следующего агента — задача 0, а не запуск генерации.
+Текущий checklist: G0 закрыт для утверждённого screening-корпуса; G1 закрыт
+в структурной части для этого же screening-корпуса; G2–G5 открыты. Research,
+candidate inventory и локальная выгрузка с предложением 120 строк выполнены.
+Confirmatory clean stratum остаётся пустым: review provenance, язык авторства
+и смысловая сверка не подтверждены. Первое действие следующего агента —
+закрыть G2 без обращения к production до этого gate, а не запускать генерацию.
+
+## Запись выполнения 2026-09-16
+
+Владелец утвердил для screening 120 строк: Need For Greed UI, Tutorial и Loot
+по 30, а также Heart Abyss hub-1 dialogue 30. Внешняя локальная папка study
+`/Users/eli/Downloads/dual-reference-zh-2026-09-16/study/2026-09-16-screening-v1/`
+содержит snapshot, eligibility, splits, jobs, dry-run и decisions.
+
+Офлайн-валидатор подтвердил 29 хешей, 120 уникальных строк, четыре квоты по
+30 и 1113 выровненных кандидатов. Новый offline dry-run построил 1 200
+операций: 480 generation, 480 review и 240 edit, при нуле сетевых запросов.
+Весь корпус включён только в screening; все 120 строк исключены из
+confirmatory stratum. `metadata-audit.json` фиксирует, что `human_review_status`
+у всех строк `unverified`, `authoring_language` — `unknown`,
+`semantic_alignment_review` — `pending`, а 47 EN строк отмечены как
+automatically translated.
+
+G2 не закрыт: точные Gemini/OpenRouter и LiteLLM seat profiles не получены из
+разрешённого безопасного источника, расходный лимит не утверждён и конкретный
+pilot inference не зарегистрирован. До этого момента запрещены model calls и
+production access.
+
+The later screening G2 registration used explicit `google/gemini-3.7-flash`.
+The single pilot was incomplete because OpenRouter returned `403` for D and
+E/F editor batches and LiteLLM returned some `504` responses. G3--G5 stay
+open; H1--H3 are not confirmed. See
+`docs/product/measurements/2026-09-16-dual-reference-zh-offline-preflight.md`.
+
+### Amendment: recovery protocol v2 (2026-09-16)
+
+The v1 execution order was A, then B, then C, then D, which violated task 3's
+mixed-block requirement. Its failures were also under-instrumented. A
+synthetic no-corpus smoke identified the OpenRouter `403` as the configured
+key's exhausted monthly limit; the two LiteLLM seats both completed the small
+smoke successfully, so the historical `504` is not yet attributed. Historical
+JSON failures do not include `finish_reason`, so they are not attributed to the
+generation cap.
+
+Before any replacement inference, v2 uses paired randomized blocks, a fixed
+two-attempt retry policy, and a safe per-attempt journal. The owner must provide
+and register an explicit Gemini route with available quota; then the full 120
+records are rerun from the beginning under v2. v1 is retained as an incomplete
+technical incident and is not pooled with v2. See
+`docs/product/measurements/2026-09-16-dual-reference-zh-offline-preflight.md`.
+
+### Stop record (2026-09-17)
+
+The owner stopped inference after v2 terminated during final JSON serialization.
+No v2 result artifact exists, so the process supplied no outcomes for analysis.
+The study remains an incomplete technical screening: H1, H2 and H3 are not
+confirmed; G3--G5 remain open; no product rollout follows. The final synthesis
+is recorded in
+`docs/product/measurements/2026-09-16-dual-reference-zh-offline-preflight.md`.
