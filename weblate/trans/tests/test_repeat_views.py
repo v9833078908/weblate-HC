@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from django.urls import reverse
 
 from weblate.trans.models import RepeatPolicy
@@ -95,3 +98,42 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertEqual(preview.status_code, 200)
         self.assertContains(preview, "Nothing has been saved yet")
         self.assertContains(preview, 'name="unit"')
+
+    def test_recommendation_paid_trigger_has_free_confirmation(self) -> None:
+        self.make_manager()
+        translation = self.component.translation_set.get(language_code="cs")
+        save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=translation.language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+        profile = SimpleNamespace(
+            model="test-model", provider="test", profile_fingerprint="p" * 64
+        )
+
+        with (
+            patch(
+                "weblate.trans.views.repeats.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.views.repeats.resolve_judge_seat_profile",
+                return_value=profile,
+            ),
+        ):
+            response = self.client.get(
+                reverse(
+                    "repeat-recommend",
+                    kwargs={"project": self.project.slug, "language": "cs"},
+                )
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Estimated cost")
+        self.assertContains(response, "Unknown")
+        self.assertContains(response, "Maximum paid requests")

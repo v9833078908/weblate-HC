@@ -74,18 +74,8 @@
           <a {% if status == 'resolved' %} aria-current="page"{% endif %}
              href="?status=resolved">{% translate "Resolved" %} <span class="badge text-bg-secondary">{{ status_counts.resolved }}</span></a>
         </nav>
-        <form method="post"
-              action="{% url 'repeat-recommend' project=project.slug language=language.code %}">
-          {% csrf_token %}
-          <label class="visually-hidden" for="repeat-request-cap">{% translate "Maximum paid requests" %}</label>
-          <input id="repeat-request-cap"
-                 name="request_cap"
-                 type="number"
-                 min="1"
-                 value="1"
-                 required />
-          <button class="btn btn-outline-primary" type="submit">{% translate "Prepare recommendations" %} <span class="badge text-bg-warning">{% translate "Paid" %}</span></button>
-        </form>
+        <a class="btn btn-outline-primary"
+           href="{% url 'repeat-recommend' project=project.slug language=language.code %}">{% translate "Prepare recommendations" %} <span class="badge text-bg-warning">{% translate "Paid" %}</span></a>
       </div>
     {% endif %}
 

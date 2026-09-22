@@ -109,6 +109,10 @@
           <a class="btn-inline" href="{{ browse_url }}?q={{ item.query }}">{% translate "Browse" %}</a>
           <a class="btn-inline" href="{{ edit_url }}?q={{ item.query }}">{% translate "Translate" %}</a>
           <a class="btn-inline" href="{{ zen_url }}?q={{ item.query }}">{% translate "Zen" %}</a>
+          {% if item.check_id == "repeat-drift" and object.component %}
+            <a class="btn-inline"
+               href="{% url 'repeat-queue' project=object.component.project.slug language=object.language.code %}">{% translate "Open repeat queue" %}</a>
+          {% endif %}
           {% comment %}
             `allow_fix_check` is set only where `object` is exactly a
             Translation (`templates/translation.html`). The aggregate

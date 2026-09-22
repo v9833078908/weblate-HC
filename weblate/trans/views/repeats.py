@@ -14,6 +14,11 @@ from django.views.decorators.http import require_POST
 
 from weblate.lang.models import Language
 from weblate.trans.forms import RepeatPolicyForm
+from weblate.trans.judge import (
+    JudgeError,
+    judge_primary_endpoint,
+    resolve_judge_seat_profile,
+)
 from weblate.trans.models import (
     Component,
     Label,
@@ -22,6 +27,7 @@ from weblate.trans.models import (
     RepeatPolicy,
     RepeatRecommendationResult,
 )
+from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.repeat_recommendations import (
     prepare_run,
     queue_attempt,
@@ -242,15 +248,42 @@ def repeat_apply(request):
 
 
 @login_required
-@require_POST
 def repeat_recommend(request, project: str, language: str):
-    """Explicitly reserve and queue a bounded recommendation request."""
+    """Preview, then explicitly reserve a bounded recommendation request."""
     policy = get_object_or_404(
         RepeatPolicy,
         project__slug=project,
         target_language__code=language,
         enabled=True,
     )
+    if not request.user.has_perm("project.edit", policy.project):
+        raise PermissionDenied
+    if request.method == "GET":
+        group_count = len(detect_policy_groups(policy, user=request.user))
+        profile = None
+        cost_range = None
+        unavailable = ""
+        try:
+            profile = resolve_judge_seat_profile(1, endpoint=judge_primary_endpoint())
+            cost_range = recent_cost_range(
+                policy.project_id,
+                profile.provider,
+                profile.model,
+                LLMUsageLog.Operation.REPEAT_RECOMMEND,
+            )
+        except JudgeError as error:
+            unavailable = str(error)
+        return render(
+            request,
+            "repeat_recommend.html",
+            {
+                "policy": policy,
+                "group_count": group_count,
+                "profile": profile,
+                "cost_range": cost_range,
+                "unavailable": unavailable,
+            },
+        )
     try:
         request_cap = int(request.POST["request_cap"])
     except (KeyError, TypeError, ValueError) as error:
