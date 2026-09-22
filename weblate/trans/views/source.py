@@ -116,7 +116,7 @@ def rename_key(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
     unit = _get_structural_source(request, pk)
     source = unit.translation
     if source.component.locked:
-        return JsonResponse({"error": "This component is locked."}, status=409)
+        return JsonResponse({"error": gettext("This component is locked.")}, status=409)
     # ruff: ignore[too-many-statements-in-try-clause]
     try:
         if not source.component.file_format_supports_key_rename:
@@ -137,7 +137,9 @@ def rename_key(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
         renamed = source.rename_unit_key(
             change=ConfirmedRename(**payload), user=request.user
         )
-    except (KeyError, signing.BadSignature, ValueError, PermissionError) as error:
+    except PermissionError as error:
+        return JsonResponse({"error": str(error)}, status=403)
+    except (KeyError, signing.BadSignature, ValueError) as error:
         return JsonResponse({"error": str(error)}, status=400)
     except ValidationError as error:
         return JsonResponse({"error": error.messages[0]}, status=409)
@@ -151,7 +153,7 @@ def move_string(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
     unit = _get_structural_source(request, pk)
     source = unit.translation
     if source.component.locked:
-        return JsonResponse({"error": "This component is locked."}, status=409)
+        return JsonResponse({"error": gettext("This component is locked.")}, status=409)
     if not source.component.file_format_supports_key_order:
         raise Http404
     if request.method == "GET":
@@ -179,7 +181,7 @@ def move_string(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
         if request.POST.get("stage") == "preview":
             placement = request.POST.get("placement")
             if placement not in {"before", "after"}:
-                msg = "Invalid string placement."
+                msg = gettext("Invalid string placement.")
                 # ruff: ignore[raise-within-try]
                 raise ValueError(msg)
             preview = source.get_move_preview(
@@ -197,7 +199,9 @@ def move_string(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
             request.POST["token"], salt="move-string", max_age=15 * 60
         )
         moved = source.move_unit(change=ConfirmedMove(**payload), user=request.user)
-    except (KeyError, signing.BadSignature, ValueError, PermissionError) as error:
+    except PermissionError as error:
+        return JsonResponse({"error": str(error)}, status=403)
+    except (KeyError, signing.BadSignature, ValueError) as error:
         return JsonResponse({"error": str(error)}, status=400)
     except ValidationError as error:
         return JsonResponse({"error": error.messages[0]}, status=409)

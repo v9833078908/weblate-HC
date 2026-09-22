@@ -1209,6 +1209,11 @@ class EditJSONMonoTest(EditTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn("token", response.json())
         self.assertLess(len(response.json()["token"]), 4096)
+        self.assertEqual(
+            response.json()["preview"]["affected_translation_count"],
+            self.component.translation_set.count(),
+        )
+        self.assertGreater(response.json()["preview"]["affected_file_count"], 0)
 
     def test_structural_rename_confirm_updates_the_existing_unit(self) -> None:
         self.make_manager()
@@ -1244,6 +1249,8 @@ class EditJSONMonoTest(EditTest):
             url, {"stage": "preview", "anchor": anchor.pk, "placement": "after"}
         )
         self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.json()["preview"]["old_position"], unit.position)
+        self.assertEqual(preview.json()["preview"]["previous_context"], anchor.context)
         response = self.client.post(url, {"token": preview.json()["token"]})
         self.assertEqual(response.status_code, 200)
         self.assertIn("sort_by=position", response.json()["url"])
@@ -1290,6 +1297,7 @@ class EditJSONMonoTest(EditTest):
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
         self.assertEqual(len(tree.xpath('//*[@id="source-unit-structure-modal"]')), 1)
+        self.assertEqual(len(tree.xpath('//*[@role="listbox"]')), 0)
         self.assertEqual(len(tree.xpath('//*[@id="source-unit-structure-form"]')), 1)
         self.assertEqual(
             len(tree.xpath('//button[contains(@class, "js-rename-key")]')), 1

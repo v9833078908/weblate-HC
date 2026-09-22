@@ -76,7 +76,6 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "list-group-item list-group-item-action";
-      button.setAttribute("role", "option");
       button.textContent = `${item.key} — ${item.source}`;
       button.addEventListener("click", () => {
         selectedAnchor = item;
@@ -171,15 +170,38 @@
             };
       const payload = await request(operation.url, data);
       token = payload.token;
-      preview.textContent =
-        operation.kind === "rename"
-          ? `${payload.preview.old_context} → ${payload.preview.new_context}`
-          : translate("The server has calculated the new string position.");
+      if (operation.kind === "rename") {
+        preview.textContent = translate(
+          "Rename %(old)s to %(new)s in %(translations)s translations and %(files)s files.",
+        )
+          .replace("%(old)s", payload.preview.old_context)
+          .replace("%(new)s", payload.preview.new_context)
+          .replace("%(translations)s", payload.preview.affected_translation_count)
+          .replace("%(files)s", payload.preview.affected_file_count);
+      } else {
+        const before = payload.preview.previous_context || translate("start");
+        const after = payload.preview.next_context || translate("end");
+        preview.textContent = translate(
+          "Move from position %(old)s to %(new)s, between %(before)s and %(after)s.",
+        )
+          .replace("%(old)s", payload.preview.old_position)
+          .replace("%(new)s", payload.preview.new_position)
+          .replace("%(before)s", before)
+          .replace("%(after)s", after);
+      }
       preview.hidden = false;
       previewButton.hidden = true;
-      confirmButton.hidden = false;
-      setStatus(translate("Review the change and confirm it."));
-      confirmButton.focus();
+      const noChange =
+        operation.kind === "rename"
+          ? payload.preview.old_context === payload.preview.new_context
+          : payload.preview.old_position === payload.preview.new_position;
+      confirmButton.hidden = noChange;
+      if (noChange) {
+        setStatus(translate("This operation would not change the string."));
+      } else {
+        setStatus(translate("Review the change and confirm it."));
+        confirmButton.focus();
+      }
     } catch (error) {
       setStatus(error.message, true);
     } finally {
