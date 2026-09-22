@@ -98,6 +98,15 @@ class StaleProducerTaskError(JudgeExecutionGuardError):
     """Raised when a task delivery has already been superseded by a newer UUID."""
 
 
+@app.task(trail=False)
+def reconcile_repeat_unit(unit_id: int) -> None:
+    """Reconcile durable repeat decisions after a Unit-affecting commit."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.repeats import reconcile_unit
+
+    reconcile_unit(unit_id)
+
+
 @contextmanager
 def producer_execution_guard(*, producer_run_id: str | None, task_id: str):
     """Acquire a file-only guard for one Celery delivery's producer run."""
