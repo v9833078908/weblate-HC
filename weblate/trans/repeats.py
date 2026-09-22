@@ -248,6 +248,37 @@ def schedule_unit_reconciliation(unit_id: int) -> None:
     reconcile_repeat_unit.delay_on_commit(unit_id)
 
 
+def current_shared_membership(unit: Unit):
+    """Return a current explicit shared decision for one Unit, if any."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.repeat import RepeatMembership
+
+    membership = (
+        RepeatMembership.objects.filter(
+            unit=unit,
+            mode=RepeatMembership.Mode.SHARED,
+            stale_at__isnull=True,
+        )
+        .select_related("group__policy")
+        .first()
+    )
+    if membership is not None and not reconcile_membership(membership):
+        return None
+    return membership
+
+
+def make_membership_independent(*, unit: Unit, reason: str) -> bool:
+    """Convert the current shared decision to an explicit independent exception."""
+    membership = current_shared_membership(unit)
+    if membership is None:
+        return False
+    membership.mode = "independent"
+    membership.reason = reason
+    membership.revision += 1
+    membership.save(update_fields=["mode", "reason", "revision", "updated"])
+    return True
+
+
 @dataclass(frozen=True)
 class RepeatCandidate:
     """A live detection group, with durable state looked up separately."""
@@ -432,15 +463,19 @@ def undo_event(*, token: str, actor: User):
     from weblate.trans.models.repeat import RepeatDecisionEvent
 
     with transaction.atomic():
-        event = RepeatDecisionEvent.objects.select_for_update().select_related(
-            "group__policy"
-        ).get(token=token, action=RepeatDecisionEvent.Action.APPLY)
+        event = (
+            RepeatDecisionEvent.objects.select_for_update()
+            .select_related("group__policy")
+            .get(token=token, action=RepeatDecisionEvent.Action.APPLY)
+        )
         if not actor.has_perm("project.edit", event.group.policy.project):
-            raise ValidationError("You cannot undo this repeat decision.")
+            msg = "You cannot undo this repeat decision."
+            raise ValidationError(msg)
         group = event.group
         expected_revision = event.group_revision + 1
         if group.revision != expected_revision:
-            raise ValidationError("A later repeat decision prevents this undo.")
+            msg = "A later repeat decision prevents this undo."
+            raise ValidationError(msg)
         written = event.result.get("written", [])
         units = {
             unit.pk: unit
@@ -453,7 +488,9 @@ def undo_event(*, token: str, actor: User):
         for item in written:
             unit = units.get(item["unit"])
             if unit is None or unit.state == STATE_APPROVED:
-                outcome["conflicts"].append({"unit": item["unit"], "reason": "missing-or-approved"})
+                outcome["conflicts"].append(
+                    {"unit": item["unit"], "reason": "missing-or-approved"}
+                )
                 continue
             if unit.get_target_plurals() != item["new"]:
                 outcome["conflicts"].append({"unit": item["unit"], "reason": "changed"})

@@ -1047,6 +1047,27 @@ def handle_translate(
         else:
             show_unit_edit_denied(request, edit_permission)
     else:
+        # A shared target may only change through the repeat preview flow.
+        # The one exception is an explicit choice to sever this occurrence
+        # before storing the ordinary editor change.
+        if form.cleaned_data["target"] != unit.get_target_plurals():
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.repeats import (
+                current_shared_membership,
+                make_membership_independent,
+            )
+
+            membership = current_shared_membership(unit)
+            if membership is not None:
+                if request.POST.get("repeat_decision") != "independent":
+                    messages.error(
+                        request,
+                        gettext(
+                            "Choose whether to update the shared repeat in its queue or keep this occurrence independent."
+                        ),
+                    )
+                    return HttpResponseRedirect(this_unit_url)
+                make_membership_independent(unit=unit, reason="editor")
         go_next = perform_translation(unit, form, request)
 
     # Redirect to next entry
