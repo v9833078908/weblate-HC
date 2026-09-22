@@ -2790,7 +2790,6 @@ table.table-simple tbody#glossary-terms .alert-info {
 .source-unit-structure-preview {
   margin-top: 1rem;
   padding: 0.75rem;
-  border-left: 3px solid var(--bs-primary);
   background: var(--bs-tertiary-bg);
 }
 
