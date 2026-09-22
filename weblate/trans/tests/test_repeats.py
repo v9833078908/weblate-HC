@@ -7,16 +7,17 @@ from __future__ import annotations
 
 from django.core.exceptions import ValidationError
 
+from weblate.checks.consistency import RepeatDriftCheck
 from weblate.trans.models import RepeatMembership, RepeatPolicy, RepeatRecommendationRun
-from weblate.trans.repeat_recommendations import reserve_attempt
+from weblate.trans.repeat_recommendations import parse_results, reserve_attempt
 from weblate.trans.repeats import (
     apply_preview,
     create_membership,
     detect_policy_groups,
     get_or_create_group,
+    preview_group,
     reconcile_unit,
     save_policy,
-    preview_group,
     undo_event,
 )
 from weblate.trans.tests.test_views import ViewTestCase
@@ -118,7 +119,9 @@ class RepeatModelTest(ViewTestCase):
         second.refresh_from_db()
         self.assertEqual(first.target, "Later")
         self.assertEqual(second.target, "Other")
-        self.assertEqual(undo.result["conflicts"], [{"unit": first.pk, "reason": "changed"}])
+        self.assertEqual(
+            undo.result["conflicts"], [{"unit": first.pk, "reason": "changed"}]
+        )
 
     def test_independent_membership_is_excluded_from_repeat_check(self) -> None:
         first = self.add_repeat("first", "One")
@@ -130,8 +133,6 @@ class RepeatModelTest(ViewTestCase):
             mode=RepeatMembership.Mode.INDEPENDENT,
             reason="intentional",
         )
-        from weblate.checks.consistency import RepeatDriftCheck
-
         remaining = RepeatDriftCheck().get_repeat_members(second.repeat_units)
         self.assertEqual(remaining, [])
 
@@ -149,3 +150,36 @@ class RepeatModelTest(ViewTestCase):
         self.assertEqual(attempt.ordinal, 1)
         with self.assertRaisesMessage(ValidationError, "request cap"):
             reserve_attempt(run=run, request_snapshot={"groups": []})
+
+    def test_recommendation_parser_rejects_unknown_group_and_extra_fields(self) -> None:
+        first = self.add_repeat("first", "One")
+        policy = self.make_policy()
+        group = get_or_create_group(policy, first)
+        run = RepeatRecommendationRun.objects.create(
+            policy=policy,
+            actor=self.user,
+            snapshot={
+                "groups": [
+                    {
+                        "group": group.pk,
+                        "group_revision": group.revision,
+                        "unit_ids": [first.pk],
+                    }
+                ]
+            },
+            snapshot_fingerprint="a" * 64,
+            profile_fingerprint="b" * 64,
+            prompt_fingerprint="c" * 64,
+            request_cap=1,
+        )
+        result = parse_results(
+            run=run,
+            content=(
+                f'{{"results":[{{"group":{group.pk},"action":"propose_new","target":["X"]}},'
+                '{"group":999,"action":"needs_human"},'
+                f'{{"group":{group.pk},"action":"needs_human","extra":true}}]}}'
+            ),
+        )
+        self.assertEqual(
+            result, [{"group": group.pk, "action": "propose_new", "target": ["X"]}]
+        )
