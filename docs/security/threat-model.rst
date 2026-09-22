@@ -770,6 +770,12 @@ Size and rate assumptions:
   to that configured repository once a portion is committed; this is not a
   new outbound integration class.
   *(maintainer)*
+* Source-key rename and source-order move are session-authenticated,
+  CSRF-protected UI POST operations. They require ``component.edit`` on the
+  actual component, revalidate the preview under repository and component
+  locks, and accept no user-controlled filename, shell command, REST token, or
+  outbound endpoint. A successful action rewrites only files already owned by
+  the component through its existing VCS commit/push path. *(maintainer)*
 
 
 Adversary model

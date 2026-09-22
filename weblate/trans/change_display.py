@@ -94,6 +94,32 @@ class RenderEmptyDetails(BaseDetailsRenderStrategy):
 
 
 @register_details_display_strategy
+class RenderStructuralStringDetails(BaseDetailsRenderStrategy):
+    """Render structural source-string changes from their bounded audit details."""
+
+    actions: ClassVar[set[ActionEvents]] = {
+        ActionEvents.RENAME_STRING,
+        ActionEvents.MOVE_STRING,
+    }
+    details_required = True
+
+    def render_details(self, change: Change) -> StrOrPromise:
+        if change.action == ActionEvents.RENAME_STRING:
+            return format_html(
+                gettext("Key renamed from <code>{}</code> to <code>{}</code>."),
+                change.details.get("old_context", ""),
+                change.details.get("new_context", ""),
+            )
+        return format_html(
+            gettext("String moved from position {} {} <code>{}</code> to position {}."),
+            change.details.get("old_position", ""),
+            change.details.get("placement", ""),
+            change.details.get("anchor", ""),
+            change.details.get("new_position", ""),
+        )
+
+
+@register_details_display_strategy
 class RenderFileUploadDetails(BaseDetailsRenderStrategy):
     actions: ClassVar[set[ActionEvents]] = {ActionEvents.FILE_UPLOAD}
 

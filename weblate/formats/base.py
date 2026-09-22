@@ -435,6 +435,16 @@ class TranslationFormat[S: InnerStore, U: InnerUnit, T: TranslationUnit]:
         return cls.supports_plural
 
     @classmethod
+    def supports_key_rename(cls, _params: FileFormatParams) -> bool:
+        """Whether this format can rename a key without recreating its unit."""
+        return False
+
+    @classmethod
+    def supports_key_order(cls, _params: FileFormatParams) -> bool:
+        """Whether this format can persist an explicit order of its keys."""
+        return False
+
+    @classmethod
     def get_identifier(cls):
         return cls.format_id
 
@@ -635,6 +645,16 @@ class TranslationFormat[S: InnerStore, U: InnerUnit, T: TranslationUnit]:
     def add_unit(self, unit: T) -> None:
         """Add new unit to underlying store."""
         raise NotImplementedError
+
+    def rename_key(self, old_context: str, new_context: str) -> bool:
+        """Rename a store key while preserving its underlying unit."""
+        msg = "This format does not support renaming keys."
+        raise NotImplementedError(msg)
+
+    def apply_key_order(self, contexts: Sequence[str]) -> bool:
+        """Persist the relative order of existing store keys."""
+        msg = "This format does not support ordering keys."
+        raise NotImplementedError(msg)
 
     def update_header(self, file_format_params: FileFormatParams, **kwargs) -> None:
         """Update store header if available."""

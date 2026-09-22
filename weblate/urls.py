@@ -145,6 +145,16 @@ real_patterns = [
         weblate.trans.views.source.edit_context,
         name="edit_context",
     ),
+    path(
+        "source/<int:pk>/rename-key/",
+        weblate.trans.views.source.rename_key,
+        name="rename-key",
+    ),
+    path(
+        "source/<int:pk>/move/",
+        weblate.trans.views.source.move_string,
+        name="move-string",
+    ),
     # Translation pages
     path(
         "component-list/<name:name>/",

@@ -66,6 +66,7 @@ from weblate.formats.base import (
     MissingTemplateError,
     TranslationFormat,
     TranslationUnit,
+    UnitNotFoundError,
     UpdateError,
 )
 from weblate.formats.helpers import (
@@ -106,7 +107,7 @@ from weblate.utils.state import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Iterable
+    from collections.abc import Callable, Generator, Iterable, Sequence
 
     from translate.storage.aresource import AndroidResourceUnit
     from translate.storage.base import TranslationUnit as TranslateToolkitUnit
@@ -2483,6 +2484,97 @@ class JSONFormat[S: JsonFile, U: BaseJsonUnit, T: JSONUnit](DictStoreFormat[S, U
     def extension() -> str:
         """Return most common file extension for format."""
         return "json"
+
+    @classmethod
+    def supports_key_rename(cls, params: FileFormatParams) -> bool:
+        """Allow structural edits only for the proven flat JSON representation."""
+        return cls.format_id == "json" and not params.get("json_sort_keys", False)
+
+    @classmethod
+    def supports_key_order(cls, params: FileFormatParams) -> bool:
+        """Allow structural edits only for the proven flat JSON representation."""
+        return cls.format_id == "json" and not params.get("json_sort_keys", False)
+
+    def _require_structural_editing(self, operation: str) -> None:
+        if self.supports_key_rename(
+            self.file_format_params
+        ) and self.supports_key_order(self.file_format_params):
+            return
+        msg = f"This format does not support {operation}."
+        raise NotImplementedError(msg)
+
+    def _get_raw_unit(self, context: str) -> U | None:
+        for unit in self.all_store_units:
+            if self.unit_class(self, None, unit).context == context:
+                return unit
+        return None
+
+    @staticmethod
+    def _validate_structural_key(context: str) -> None:
+        if not context or any(
+            ord(character) < 32 or ord(character) == 127 for character in context
+        ):
+            msg = "A key must not be blank or contain control characters."
+            raise ValueError(msg)
+
+    def rename_key(self, old_context: str, new_context: str) -> bool:
+        """Rename a flat JSON key without replacing its raw unit or list slot."""
+        self._require_structural_editing("renaming keys")
+        if old_context == new_context:
+            return False
+        self._validate_structural_key(new_context)
+
+        raw_unit = self._get_raw_unit(old_context)
+        if raw_unit is None:
+            raise UnitNotFoundError(old_context)
+        if self._get_raw_unit(new_context) is not None:
+            msg = "The new key already exists."
+            raise ValueError(msg)
+
+        old_id = raw_unit.getid()
+        self.store.remove_unit_from_index(raw_unit)
+        self.store.id_index.pop(old_id, None)
+        raw_unit.setid(new_context)
+        self.store.add_unit_to_index(raw_unit)
+        self._invalidate_units()
+        return True
+
+    def apply_key_order(self, contexts: Sequence[str]) -> bool:
+        """Reorder known flat JSON units while keeping unknown raw slots intact."""
+        self._require_structural_editing("ordering keys")
+        if len(contexts) != len(set(contexts)):
+            msg = "A key order must not contain duplicate keys."
+            raise ValueError(msg)
+
+        units_by_context = {
+            self.unit_class(self, None, unit).context: unit
+            for unit in self.all_store_units
+        }
+        ordered_units = [
+            units_by_context[context]
+            for context in contexts
+            if context in units_by_context
+        ]
+        ordered_contexts = set(contexts)
+        slots = [
+            index
+            for index, unit in enumerate(self.store.units)
+            if self.unit_class(self, None, unit).context in ordered_contexts
+        ]
+
+        if len(slots) != len(ordered_units):
+            msg = "The requested key order does not match the JSON store."
+            raise ValueError(msg)
+        if all(
+            self.store.units[index] is unit
+            for index, unit in zip(slots, ordered_units, strict=True)
+        ):
+            return False
+
+        for index, unit in zip(slots, ordered_units, strict=True):
+            self.store.units[index] = unit
+        self._invalidate_units()
+        return True
 
 
 class JSONNestedFormat(JSONFormat):

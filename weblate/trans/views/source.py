@@ -3,12 +3,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core import signing
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.http.response import HttpResponseServerError
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext, ngettext
@@ -17,6 +19,7 @@ from django.views.decorators.http import require_POST
 from weblate.checks.flags import GLOSSARY_LANGUAGE_SCOPED_FLAGS, Flags
 from weblate.trans.forms import ContextForm, MatrixLanguageForm
 from weblate.trans.models import Component, Unit
+from weblate.trans.models.translation import ConfirmedMove, ConfirmedRename
 from weblate.trans.util import redirect_next, render
 from weblate.utils import messages
 from weblate.utils.views import parse_path, show_form_errors
@@ -94,6 +97,100 @@ def edit_context(request: AuthenticatedHttpRequest, pk):
             show_form_errors(request, form)
 
     return redirect_next(request.POST.get("next"), unit.get_absolute_url())
+
+
+def _get_structural_source(request: AuthenticatedHttpRequest, pk: int) -> Unit:
+    unit = get_object_or_404(Unit.objects.filter_access(request.user), pk=pk)
+    component = unit.translation.component
+    if not unit.is_source or not request.user.has_perm("component.edit", component):
+        raise Http404
+    return unit
+
+
+@require_POST
+@login_required
+def rename_key(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
+    """Preview or apply a source-key rename through a signed UI payload."""
+    unit = _get_structural_source(request, pk)
+    source = unit.translation
+    try:
+        if request.POST.get("stage") == "preview":
+            preview = source.get_rename_preview(
+                unit.pk, request.POST.get("new_key", "")
+            )
+            return JsonResponse(
+                {
+                    "preview": asdict(preview),
+                    "token": signing.dumps(asdict(preview), salt="rename-key"),
+                }
+            )
+        payload = signing.loads(
+            request.POST["token"], salt="rename-key", max_age=15 * 60
+        )
+        renamed = source.rename_unit_key(
+            change=ConfirmedRename(**payload), user=request.user
+        )
+    except (KeyError, signing.BadSignature, ValueError, PermissionError) as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    except ValidationError as error:
+        return JsonResponse({"error": error.messages[0]}, status=409)
+    return JsonResponse({"url": renamed.get_absolute_url(), "unit_id": renamed.pk})
+
+
+@login_required
+def move_string(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
+    """Autocomplete, preview or apply a source-string move."""
+    unit = _get_structural_source(request, pk)
+    source = unit.translation
+    if request.method == "GET":
+        query = request.GET.get("q", "")
+        matches = (
+            source.unit_set.exclude(pk=unit.pk)
+            .filter(context__icontains=query)
+            .order_by("position")[:20]
+        )
+        return JsonResponse(
+            {
+                "results": [
+                    {"id": match.pk, "key": match.context, "position": match.position}
+                    for match in matches
+                ]
+            }
+        )
+    # ruff: ignore[too-many-statements-in-try-clause]
+    try:
+        if request.POST.get("stage") == "preview":
+            placement = request.POST.get("placement")
+            if placement not in {"before", "after"}:
+                msg = "Invalid string placement."
+                # ruff: ignore[raise-within-try]
+                raise ValueError(msg)
+            preview = source.get_move_preview(
+                unit.pk,
+                int(request.POST["anchor"]),
+                placement,  # type: ignore[arg-type]
+            )
+            return JsonResponse(
+                {
+                    "preview": asdict(preview),
+                    "token": signing.dumps(asdict(preview), salt="move-string"),
+                }
+            )
+        payload = signing.loads(
+            request.POST["token"], salt="move-string", max_age=15 * 60
+        )
+        moved = source.move_unit(change=ConfirmedMove(**payload), user=request.user)
+    except (KeyError, signing.BadSignature, ValueError, PermissionError) as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    except ValidationError as error:
+        return JsonResponse({"error": error.messages[0]}, status=409)
+    return JsonResponse(
+        {
+            "unit_id": moved.unit_id,
+            "changed": moved.changed,
+            "position": moved.new_position,
+        }
+    )
 
 
 @login_required
