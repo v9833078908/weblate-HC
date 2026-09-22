@@ -2814,7 +2814,8 @@ class Translation(
                     context=change.new_context, id_hash=new_hash
                 )
             source_unit.refresh_from_db()
-            if database_changed:
+            operation_changed = state == "before" or database_changed
+            if operation_changed:
                 details: dict[str, str | bool] = {
                     "old_context": change.old_context,
                     "new_context": change.new_context,
@@ -2882,6 +2883,7 @@ class Translation(
                     previous_revision=previous_revision,
                 )
             database_changed = False
+            position_updates: list[Unit] = []
             for translation in translations:
                 contexts = desired[translation.pk]
                 positions = {
@@ -2890,10 +2892,16 @@ class Translation(
                 for sibling in translation.unit_set.select_for_update():
                     position = positions.get(sibling.context)
                     if position is not None and sibling.position != position:
-                        Unit.objects.filter(pk=sibling.pk).update(position=position)
+                        sibling.position = position
+                        position_updates.append(sibling)
                         database_changed = True
+            if position_updates:
+                Unit.objects.bulk_update(
+                    position_updates, ["position"], batch_size=1000
+                )
             unit.refresh_from_db()
-            if database_changed:
+            operation_changed = state == "before" or database_changed
+            if operation_changed:
                 details: dict[str, int | str | bool] = {
                     "old_position": old_position,
                     "new_position": new_position,
@@ -2912,7 +2920,7 @@ class Translation(
                     lambda: source.finish_structural_operation(component, translations)
                 )
             return UnitMoveResult(
-                changed=True,
+                changed=operation_changed,
                 unit_id=unit.pk,
                 old_position=old_position,
                 new_position=new_position,
