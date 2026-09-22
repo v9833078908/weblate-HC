@@ -98,6 +98,14 @@ def reserve_attempt(*, run: RepeatRecommendationRun, request_snapshot: dict):
         )
 
 
+def queue_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
+    """Publish a pre-reserved attempt only after its transaction commits."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.tasks import execute_repeat_recommendation_attempt
+
+    execute_repeat_recommendation_attempt.delay_on_commit(attempt.pk)
+
+
 def cancel_run(*, run: RepeatRecommendationRun, actor: User) -> None:
     """Prevent future requests while preserving every durable attempt/result."""
     if not actor.has_perm("project.edit", run.policy.project):

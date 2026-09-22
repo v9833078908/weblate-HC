@@ -107,6 +107,20 @@ def reconcile_repeat_unit(unit_id: int) -> None:
     reconcile_unit(unit_id)
 
 
+@app.task(trail=False, acks_late=True, reject_on_worker_lost=True)
+def execute_repeat_recommendation_attempt(attempt_id: int) -> None:
+    """Execute one already-reserved repeat recommendation request."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import RepeatRecommendationAttempt
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.repeat_recommendations import execute_attempt
+
+    attempt = RepeatRecommendationAttempt.objects.filter(pk=attempt_id).first()
+    if attempt is not None:
+        execute_attempt(attempt=attempt)
+
+
 @contextmanager
 def producer_execution_guard(*, producer_run_id: str | None, task_id: str):
     """Acquire a file-only guard for one Celery delivery's producer run."""
