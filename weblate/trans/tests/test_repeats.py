@@ -28,6 +28,10 @@ from weblate.utils.state import STATE_TRANSLATED
 class RepeatModelTest(ViewTestCase):
     """Exercise live scope detection and stale identity protection."""
 
+    def create_component(self):
+        """Use the current branch of the archived bare Git fixture."""
+        return self.create_po(branch="main")
+
     def setUp(self) -> None:
         super().setUp()
         self.translation = self.component.translation_set.get(language_code="cs")
