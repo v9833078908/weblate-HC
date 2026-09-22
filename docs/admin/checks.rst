@@ -141,6 +141,13 @@ including the translation that is already correct, so a reviewer can choose
 the intended rendering. Use ``ignore-repeat-drift`` on a string when the
 variation is intentional.
 
+Projects using the managed repeat queue can instead record an explicit
+independent decision for one occurrence. A current independent decision is
+scoped to the exact source, context, target language, and constraints captured
+when it was made; changing any of those makes it stale, so it no longer hides a
+new divergence. An independent decision is not a check dismissal and does not
+affect strings outside its selected repeat policy.
+
 Do not add this check to :ref:`component-enforced_checks`. Enforcing it would
 mark every divergent member as needing editing, including the correct
 translation.
