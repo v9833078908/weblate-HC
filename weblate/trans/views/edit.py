@@ -2509,6 +2509,12 @@ def save_zen(request: AuthenticatedHttpRequest, path):
 
     unit = checksum_form.cleaned_data["unit"]
     translationsum = ""
+    repeat_decision_required = False
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.repeats import current_shared_membership
+
+    shared_membership = current_shared_membership(unit)
 
     form = TranslationForm(request.user, unit, request.POST)
     if not form.is_valid():
@@ -2519,7 +2525,27 @@ def save_zen(request: AuthenticatedHttpRequest, path):
         else:
             show_unit_edit_denied(request, edit_permission)
     else:
-        perform_translation(unit, form, request)
+        target_changed = form.cleaned_data["target"] != unit.get_target_plurals()
+        if target_changed and shared_membership is not None:
+            decision = form.cleaned_data.get("repeat_decision")
+            if decision == "shared":
+                repeat_decision_required = True
+                messages.info(
+                    request,
+                    gettext(
+                        "Choose the shared translation from the repeat queue preview."
+                    ),
+                )
+            elif decision == "independent":
+                # ruff: ignore[import-outside-top-level]
+                from weblate.trans.repeats import make_membership_independent
+
+                make_membership_independent(unit=unit, reason="zen")
+                perform_translation(unit, form, request)
+            else:
+                repeat_decision_required = True
+        else:
+            perform_translation(unit, form, request)
 
         translationsum = hash_to_checksum(unit.get_target_hash())
 
@@ -2529,6 +2555,10 @@ def save_zen(request: AuthenticatedHttpRequest, path):
         "translationsum": translationsum,
         "unit_state_class": unit_state_class(unit) if unit else "",
         "unit_state_title": unit_state_title(unit) if unit else "",
+        "repeat_decision_required": repeat_decision_required,
+        "repeat_decision_choices": (
+            ["shared", "independent"] if shared_membership is not None else []
+        ),
     }
 
     storage = get_messages(request)

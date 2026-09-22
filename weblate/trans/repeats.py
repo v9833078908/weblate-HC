@@ -282,6 +282,52 @@ def current_shared_membership(unit: Unit):
     return membership
 
 
+def accepted_shared_group(unit: Unit):
+    """Resolve an accepted group for an existing or newly imported occurrence."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.repeat import RepeatGroup, RepeatMembership, RepeatPolicy
+
+    explicit = (
+        RepeatMembership.objects.filter(unit=unit, stale_at__isnull=True)
+        .select_related("group__policy")
+        .first()
+    )
+    if explicit is not None:
+        if not reconcile_membership(explicit):
+            return None
+        if explicit.mode == RepeatMembership.Mode.INDEPENDENT:
+            return None
+        if explicit.group.shared_target and not unit_has_policy_conflict(
+            unit, explicit.group.policy
+        ):
+            return explicit.group
+        return None
+
+    policies = RepeatPolicy.objects.filter(
+        project=unit.translation.component.project,
+        target_language=unit.translation.language,
+        components=unit.translation.component,
+        enabled=True,
+    ).prefetch_related("components", "source_labels")
+    matching = [policy for policy in policies if unit_matches_policy(unit, policy)]
+    if len(matching) != 1:
+        return None
+    policy = matching[0]
+    if unit_has_policy_conflict(unit, policy):
+        return None
+    return (
+        RepeatGroup.objects.filter(
+            policy=policy,
+            source_hash=source_fingerprint(
+                unit.get_source_plurals(), unit.translation.plural.number
+            ),
+            plural_number=unit.translation.plural.number,
+        )
+        .exclude(shared_target=[])
+        .first()
+    )
+
+
 def make_membership_independent(*, unit: Unit, reason: str) -> bool:
     """Convert the current shared decision to an explicit independent exception."""
     membership = current_shared_membership(unit)

@@ -3500,6 +3500,9 @@ class UnitWriteSerializer(serializers.ModelSerializer[Unit]):
 
     target = PluralField()
     labels = UnitFlatLabelsSerializer(many=True)
+    repeat_decision = serializers.ChoiceField(
+        choices=("independent",), required=False, write_only=True
+    )
 
     class Meta:
         model = Unit
@@ -3509,6 +3512,7 @@ class UnitWriteSerializer(serializers.ModelSerializer[Unit]):
             "explanation",
             "extra_flags",
             "labels",
+            "repeat_decision",
         )
 
     def to_internal_value(self, data):

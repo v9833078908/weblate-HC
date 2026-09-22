@@ -779,18 +779,19 @@ class AutoTranslate(BaseAutoTranslate):
         # selected, then remove those units before machinery forms batches.
         # This deliberately does not pull siblings from outside the scope.
         # ruff: ignore[import-outside-top-level]
-        from weblate.trans.repeats import current_shared_membership
+        from weblate.trans.repeats import accepted_shared_group, create_membership
 
         pending: list[Unit] = []
         for unit in units:
-            membership = current_shared_membership(unit)
-            if membership is None or not membership.group.shared_target:
+            group = accepted_shared_group(unit)
+            if group is None:
                 pending.append(unit)
                 continue
-            target = membership.group.shared_target
+            target = group.shared_target
             if unit.get_target_plurals() != target:
                 self.update(unit, self.target_state, target)
                 self.reused.add(unit.pk)
+            create_membership(group=group, unit=unit, mode="shared", reason="mt-reuse")
         units = pending
         num_units = len(units)
         if not num_units:

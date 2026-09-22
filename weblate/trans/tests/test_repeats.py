@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 
 from weblate.checks.consistency import RepeatDriftCheck
 from weblate.trans.autotranslate import AutoTranslate
@@ -35,7 +36,7 @@ from weblate.trans.repeats import (
     undo_event,
 )
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.hash import calculate_hash
+from weblate.utils.hash import calculate_hash, hash_to_checksum
 from weblate.utils.state import STATE_TRANSLATED
 
 
@@ -301,3 +302,94 @@ class RepeatModelTest(ViewTestCase):
         unit.refresh_from_db()
         self.assertEqual(unit.target, "Shared")
         fetch.assert_not_called()
+
+    def test_mt_reuses_decision_for_occurrence_imported_later(self) -> None:
+        first = self.add_repeat("first", "One")
+        self.add_repeat("second", "Two")
+        policy = self.make_policy()
+        group = get_or_create_group(policy, first)
+        apply_preview(
+            token=preview_group(group=group, target=["Shared"], actor=self.user).token,
+            actor=self.user,
+        )
+        imported = self.add_repeat("imported-later", "")
+        auto = AutoTranslate(
+            translation=self.translation,
+            user=self.user,
+            q=f"id:{imported.pk}",
+            mode="translate",
+        )
+
+        with patch("weblate.trans.autotranslate.fetch_machinery_matches") as fetch:
+            auto.fetch_mt(["missing"], 0)
+
+        imported.refresh_from_db()
+        self.assertEqual(imported.target, "Shared")
+        self.assertEqual(
+            imported.repeat_memberships.get().mode, RepeatMembership.Mode.SHARED
+        )
+        fetch.assert_not_called()
+
+    def test_api_requires_and_accepts_explicit_independent_decision(self) -> None:
+        self.make_manager()
+        unit = self.add_repeat("first", "Old")
+        policy = self.make_policy()
+        create_membership(
+            group=get_or_create_group(policy, unit),
+            unit=unit,
+            mode=RepeatMembership.Mode.SHARED,
+        )
+        url = reverse("api:unit-detail", kwargs={"pk": unit.pk})
+
+        response = self.client.patch(
+            url,
+            {"state": STATE_TRANSLATED, "target": ["New"]},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+
+        response = self.client.patch(
+            url,
+            {
+                "state": STATE_TRANSLATED,
+                "target": ["New"],
+                "repeat_decision": "independent",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "New")
+        self.assertEqual(
+            unit.repeat_memberships.get().mode, RepeatMembership.Mode.INDEPENDENT
+        )
+
+    def test_zen_returns_repeat_choice_without_saving_shared_edit(self) -> None:
+        unit = self.add_repeat("first", "Old")
+        policy = self.make_policy()
+        create_membership(
+            group=get_or_create_group(policy, unit),
+            unit=unit,
+            mode=RepeatMembership.Mode.SHARED,
+        )
+        params = {
+            "checksum": unit.checksum,
+            "contentsum": hash_to_checksum(unit.content_hash),
+            "translationsum": hash_to_checksum(unit.get_target_hash()),
+            "target_0": "New",
+            "review": str(STATE_TRANSLATED),
+            "repeat_decision": "shared",
+        }
+
+        response = self.client.post(
+            reverse("save_zen", kwargs={"path": self.translation.get_url_path()}),
+            params,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["repeat_decision_required"])
+        self.assertEqual(
+            response.json()["repeat_decision_choices"], ["shared", "independent"]
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Old")

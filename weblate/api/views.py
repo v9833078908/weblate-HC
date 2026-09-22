@@ -4052,7 +4052,7 @@ class UnitViewSet(viewsets.ReadOnlyModelViewSet, UpdateModelMixin, DestroyModelM
                 )
 
                 if current_shared_membership(unit) is not None:
-                    if request.data.get("repeat_decision") != "independent":
+                    if data.get("repeat_decision") != "independent":
                         raise RepeatDecisionRequired
                     make_membership_independent(unit=unit, reason="api")
             new_target_copy = new_target[:]
