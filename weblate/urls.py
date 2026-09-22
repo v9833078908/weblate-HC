@@ -48,6 +48,7 @@ import weblate.trans.views.js
 import weblate.trans.views.judge
 import weblate.trans.views.labels
 import weblate.trans.views.lock
+import weblate.trans.views.repeats
 import weblate.trans.views.reports
 import weblate.trans.views.search
 import weblate.trans.views.settings
@@ -87,6 +88,21 @@ if URL_PREFIX:
     URL_PREFIX = f"{URL_PREFIX.strip('/')}/"
 
 real_patterns = [
+    path(
+        "repeats/<slug:project>/<slug:language>/",
+        weblate.trans.views.repeats.repeat_queue,
+        name="repeat-queue",
+    ),
+    path(
+        "repeats/group/<int:group_id>/preview/",
+        weblate.trans.views.repeats.repeat_preview,
+        name="repeat-preview",
+    ),
+    path(
+        "repeats/apply/",
+        weblate.trans.views.repeats.repeat_apply,
+        name="repeat-apply",
+    ),
     path("", weblate.trans.views.dashboard.home, name="home"),
     path("dashboard/", weblate.trans.views.dashboard.dashboard, name="dashboard"),
     path("projects/", weblate.trans.views.basic.list_projects, name="projects"),

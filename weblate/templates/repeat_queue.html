@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% load i18n static %}
+
+{% block extra_styles %}
+  <link rel="stylesheet" href="{% static 'styles/repeat-queue.css' %}" />
+{% endblock %}
+
+
+{% block extra_script %}
+  <script defer src="{% static 'js/repeat-queue.js' %}"></script>
+{% endblock %}
+
+
+{% block breadcrumbs %}<li class="breadcrumb-item"><a href="{{ project.get_absolute_url }}">{{ project }}</a></li><li class="breadcrumb-item active" aria-current="page">{% translate "Repeats" %}</li>{% endblock %}
+
+
+{% block content %}<main class="rq"><h1>{% translate "Repeat queue" %}: {{ language }}</h1>{% if not policy %}<p class="alert alert-info">{% translate "No active repeat rule exists for this language." %}</p>{% endif %}<p>{% blocktranslate count counter=groups|length %}{{ counter }} group requires a decision.{% plural %}{{ counter }} groups require a decision.{% endblocktranslate %}</p><ul class="rq-groups">{% for item in groups %}{% include "snippets/repeat_group.html" with item=item %}{% empty %}<li>{% translate "There are no exact repeats in the selected scope." %}</li>{% endfor %}</ul></main>{% endblock %}

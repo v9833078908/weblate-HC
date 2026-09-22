@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}<main class="rq"><h1>{% translate "What will change" %}</h1><p>{% translate "Nothing has been saved yet." %}</p><form method="post" action="{% url 'repeat-apply' %}">{% csrf_token %}<input type="hidden" name="token" value="{{ preview.token }}" /><ul>{% for member in preview.members %}<li>{{ member.unit_id }} — {% if member.eligible %}{% translate "will be written" %}{% else %}{{ member.reason }}{% endif %}</li>{% endfor %}</ul><button class="btn btn-primary">{% translate "Apply decision" %}</button></form></main>{% endblock %}

@@ -1,0 +1,8 @@
+{% load i18n %}
+<li id="g-{{ item.group.pk }}" class="rq-group"><h2><button type="button"
+        class="rq-toggle"
+        aria-expanded="false"
+        aria-controls="group-{{ item.group.pk }}">{{ item.group.source_forms.0 }} <span class="badge text-bg-secondary">{{ item.units|length }}</span></button></h2><section id="group-{{ item.group.pk }}"
+         class="rq-panel"
+         hidden
+         aria-label="{% translate 'Repeat group' %}"><form method="post" action="{% url 'repeat-preview' group_id=item.group.pk %}">{% csrf_token %}<fieldset><legend>{% translate "What should happen to this group?" %}</legend>{% for variant in item.variants %}<label class="rq-option"><input type="radio" name="target" value="{{ variant }}" required /> <code>{{ variant }}</code></label>{% endfor %}</fieldset><button class="btn btn-primary" type="submit">{% translate "Preview changes" %}</button><p class="text-muted">{% translate "Nothing is saved before preview. Approved translations are not changed." %}</p></form><details><summary>{% blocktranslate count counter=item.units|length %}{{ counter }} occurrence{% plural %}{{ counter }} occurrences{% endblocktranslate %}</summary><ul>{% for unit in item.units %}<li><code>{{ unit.context }}</code> — {{ unit.target }}</li>{% endfor %}</ul></details></section></li>

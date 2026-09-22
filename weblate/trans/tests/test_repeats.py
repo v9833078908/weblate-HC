@@ -7,11 +7,13 @@ from __future__ import annotations
 
 from weblate.trans.models import RepeatMembership, RepeatPolicy
 from weblate.trans.repeats import (
+    apply_preview,
     create_membership,
     detect_policy_groups,
     get_or_create_group,
     reconcile_unit,
     save_policy,
+    preview_group,
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
@@ -80,3 +82,18 @@ class RepeatModelTest(ViewTestCase):
         reconcile_unit(first.pk)
         membership.refresh_from_db()
         self.assertTrue(membership.is_stale)
+
+    def test_preview_applies_only_nonapproved_recipients(self) -> None:
+        first = self.add_repeat("first", "Old")
+        second = self.add_repeat("second", "Approved")
+        second.state = 30
+        second.save(update_fields=["state"])
+        policy = self.make_policy()
+        group = get_or_create_group(policy, first)
+        preview = preview_group(group=group, target=["Shared"], actor=self.user)
+        event = apply_preview(token=preview.token, actor=self.user)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.target, "Shared")
+        self.assertEqual(second.target, "Approved")
+        self.assertEqual(len(event.result["written"]), 1)

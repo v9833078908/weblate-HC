@@ -8,13 +8,15 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
+from weblate.trans.actions import ActionEvents
+from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -253,6 +255,172 @@ class RepeatCandidate:
     source_forms: tuple[str, ...]
     plural_number: int
     unit_ids: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class RepeatPreviewMember:
+    """One server-derived recipient in a signed repeat-operation preview."""
+
+    unit_id: int
+    fingerprint: str
+    target: tuple[str, ...]
+    eligible: bool
+    reason: str
+
+
+@dataclass(frozen=True)
+class RepeatPreview:
+    """A short-lived scope token with no browser-controlled recipient list."""
+
+    token: str
+    group_id: int
+    members: tuple[RepeatPreviewMember, ...]
+
+
+def preview_group(
+    *, group: RepeatGroup, target: list[str], actor: User
+) -> RepeatPreview:
+    """Create a signed, current snapshot for an explicit shared target."""
+    members: list[RepeatPreviewMember] = []
+    for unit in (
+        policy_units(group.policy).filter(source=group.source_forms[0]).order_by("pk")
+    ):
+        if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
+            continue
+        reason = ""
+        if unit.state == STATE_APPROVED and unit.get_target_plurals() != target:
+            reason = "approved"
+        elif unit.translation.component.locked:
+            reason = "locked"
+        elif any(len(value) > unit.get_max_length() for value in target):
+            reason = "max-length"
+        members.append(
+            RepeatPreviewMember(
+                unit_id=unit.pk,
+                fingerprint=unit_fingerprint(unit),
+                target=tuple(target),
+                eligible=not reason and unit.get_target_plurals() != target,
+                reason=reason or "already-matches",
+            )
+        )
+    payload = {
+        "actor": actor.pk,
+        "group": group.pk,
+        "group_revision": group.revision,
+        "policy_revision": group.policy.revision,
+        "target": target,
+        "members": [
+            {"id": member.unit_id, "fingerprint": member.fingerprint}
+            for member in members
+        ],
+    }
+    return RepeatPreview(
+        token=signing.dumps(payload, salt="weblate.repeat-preview", compress=True),
+        group_id=group.pk,
+        members=tuple(members),
+    )
+
+
+def _load_preview(token: str, actor: User) -> dict[str, Any]:
+    """Validate the signed operation snapshot and its actor binding."""
+    try:
+        preview = signing.loads(token, salt="weblate.repeat-preview", max_age=900)
+    except signing.BadSignature as error:
+        msg = "The repeat preview has expired."
+        raise ValidationError(msg) from error
+    if preview["actor"] != actor.pk:
+        msg = "The repeat preview belongs to another user."
+        raise ValidationError(msg)
+    return preview
+
+
+def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = None):
+    """Apply a fresh preview atomically through Unit.translate without propagation."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import Unit
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.repeat import RepeatDecisionEvent, RepeatGroup
+
+    snapshot = _load_preview(token, actor)
+    selected = set(unit_ids) if unit_ids is not None else None
+    with transaction.atomic():
+        group = (
+            RepeatGroup.objects.select_for_update()
+            .select_related("policy")
+            .get(pk=snapshot["group"])
+        )
+        if (
+            group.revision != snapshot["group_revision"]
+            or group.policy.revision != snapshot["policy_revision"]
+        ):
+            msg = "The repeat group changed; refresh the preview."
+            raise ValidationError(msg)
+        expected = {item["id"]: item["fingerprint"] for item in snapshot["members"]}
+        units = list(
+            Unit.objects.select_for_update()
+            .filter(pk__in=expected)
+            .select_related("translation__component", "translation__plural")
+            .order_by("pk")
+        )
+        if set(expected) != {unit.pk for unit in units} or any(
+            unit_fingerprint(unit) != expected[unit.pk] for unit in units
+        ):
+            msg = "A repeat recipient changed; refresh the preview."
+            raise ValidationError(msg)
+        event = RepeatDecisionEvent.objects.create(
+            group=group,
+            action="apply",
+            actor=actor,
+            group_revision=group.revision,
+            policy_revision=group.policy.revision,
+            snapshot=snapshot,
+        )
+        result: dict[str, list[dict[str, object]]] = {"written": [], "skipped": []}
+        translations = {}
+        for unit in units:
+            if selected is not None and unit.pk not in selected:
+                result["skipped"].append({"unit": unit.pk, "reason": "not-selected"})
+            elif (
+                unit.state == STATE_APPROVED
+                and unit.get_target_plurals() != snapshot["target"]
+            ):
+                result["skipped"].append({"unit": unit.pk, "reason": "approved"})
+            elif unit.translation.component.locked or not actor.has_perm(
+                "unit.edit", unit
+            ):
+                result["skipped"].append({"unit": unit.pk, "reason": "protected"})
+            else:
+                old = unit.get_target_plurals()
+                translations[unit.translation_id] = unit.translation
+                unit.is_batch_update = True
+                unit.translate(
+                    actor,
+                    snapshot["target"],
+                    STATE_TRANSLATED,
+                    change_action=ActionEvents.REPEAT_APPLY,
+                    propagate=False,
+                    select_for_update=False,
+                    change_details={"repeat_event": str(event.token)},
+                )
+                create_membership(
+                    group=group, unit=unit, mode="shared", reason="applied"
+                )
+                result["written"].append(
+                    {"unit": unit.pk, "old": old, "new": unit.get_target_plurals()}
+                )
+        for translation in translations.values():
+            translation.store_update_changes()
+            translation.invalidate_cache()
+        group.shared_target = snapshot["target"]
+        group.decision_origin = "manual"
+        group.decision_author = actor
+        group.decided_at = timezone.now()
+        group.revision += 1
+        group.save()
+        event.result = result
+        event.save(update_fields=["result"])
+    return event
 
 
 def detect_policy_groups(policy: RepeatPolicy) -> list[RepeatCandidate]:

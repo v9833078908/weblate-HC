@@ -1,0 +1,30 @@
+/* Copyright © HCGameLoc
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+.rq {
+  max-width: 1120px;
+  margin-inline: auto;
+}
+.rq-groups {
+  list-style: none;
+  padding: 0;
+}
+.rq-group {
+  border-block: 1px solid var(--bs-border-color);
+  padding: 1rem 0;
+}
+.rq-toggle {
+  width: 100%;
+  text-align: start;
+  border: 0;
+  background: transparent;
+  font: inherit;
+}
+.rq-panel {
+  padding: 1rem 0 0 1rem;
+  border-inline-start: 2px solid var(--bs-primary);
+}
+.rq-option {
+  display: block;
+  margin-block: 0.5rem;
+}
