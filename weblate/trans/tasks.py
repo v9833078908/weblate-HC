@@ -544,6 +544,7 @@ def bulk_accept_user_suggestions(
     )
     accepted = 0
     failed = 0
+    skipped: list[dict[str, int | str]] = []
     processed = 0
 
     report_bulk_accept_user_suggestions_progress(processed, total)
@@ -553,12 +554,24 @@ def bulk_accept_user_suggestions(
             continue
         processed += 1
 
-        if (
+        # A bulk acceptance cannot supply the per-string decision demanded by
+        # a current shared repeat. It therefore leaves that suggestion alone
+        # and reports why instead of silently creating a divergent target.
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.repeats import current_shared_membership
+
+        if current_shared_membership(suggestion.unit) is not None:
+            failed += 1
+            skipped.append({"unit": suggestion.unit_id, "reason": "repeat-decision"})
+        elif (
             not user.has_perm("suggestion.accept", suggestion.unit)
             or (approve and not user.has_perm("unit.review", suggestion.unit))
             or list(suggestion.get_checks())
         ):
             failed += 1
+            skipped.append(
+                {"unit": suggestion.unit_id, "reason": "permission-or-check"}
+            )
         else:
             suggestion.accept(
                 request,
@@ -587,6 +600,7 @@ def bulk_accept_user_suggestions(
             "level": message_level,
             "text": message,
         },
+        "skipped": skipped,
     }
     if return_url:
         result["url"] = return_url
