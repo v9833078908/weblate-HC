@@ -183,3 +183,26 @@ class RepeatModelTest(ViewTestCase):
         self.assertEqual(
             result, [{"group": group.pk, "action": "propose_new", "target": ["X"]}]
         )
+
+    def test_mt_fetch_reuses_accepted_target_before_machinery(self) -> None:
+        from unittest.mock import patch
+
+        from weblate.trans.autotranslate import AutoTranslate
+
+        unit = self.add_repeat("first", "Old")
+        policy = self.make_policy()
+        group = get_or_create_group(policy, unit)
+        group.shared_target = ["Shared"]
+        group.save(update_fields=["shared_target"])
+        create_membership(group=group, unit=unit, mode=RepeatMembership.Mode.SHARED)
+        auto = AutoTranslate(
+            translation=self.translation,
+            user=self.user,
+            q=f"id:{unit.pk}",
+            mode="translate",
+        )
+        with patch("weblate.trans.autotranslate.fetch_machinery_matches") as fetch:
+            auto.fetch_mt(["missing"], 0)
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Shared")
+        fetch.assert_not_called()
