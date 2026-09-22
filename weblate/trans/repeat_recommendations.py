@@ -213,9 +213,9 @@ def parse_results(*, run: RepeatRecommendationRun, content: str) -> list[dict]:
 
 def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
     """Send one explicit request and persist only validated, read-only results."""
-    attempt = RepeatRecommendationAttempt.objects.select_related("run__policy").get(
-        pk=attempt.pk
-    )
+    attempt = RepeatRecommendationAttempt.objects.select_related(
+        "run__policy__project", "run__actor"
+    ).get(pk=attempt.pk)
     if attempt.status != RepeatRecommendationAttempt.Status.RESERVED:
         return
     run = attempt.run
@@ -223,6 +223,17 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
         attempt.status = RepeatRecommendationAttempt.Status.FAILED
         attempt.failure = "cancelled"
         attempt.save(update_fields=["status", "failure"])
+        return
+    if run.actor is None or not bool(
+        run.actor.has_perm("project.edit", run.policy.project)
+    ):
+        attempt.status = RepeatRecommendationAttempt.Status.FAILED
+        attempt.failure = "permission-changed"
+        attempt.save(update_fields=["status", "failure"])
+        run.status = RepeatRecommendationRun.Status.FAILED
+        run.finished_at = timezone.now()
+        run.failure = attempt.failure
+        run.save(update_fields=["status", "finished_at", "failure"])
         return
     profile = resolve_judge_seat_profile(1, endpoint=judge_primary_endpoint())
     if profile.profile_fingerprint != run.profile_fingerprint:
@@ -269,9 +280,22 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
     payload.update(reasoning_payload(profile))
     attempt.status = RepeatRecommendationAttempt.Status.SENT
     attempt.save(update_fields=["status"])
-    response = post_chat_completion(
-        payload, profile, title="HCGameLoc Weblate - Repeat recommendations"
-    )
+    try:
+        response = post_chat_completion(
+            payload, profile, title="HCGameLoc Weblate - Repeat recommendations"
+        )
+    except Exception as error:
+        # The provider may have received the request even though the worker did
+        # not obtain a response. Its reservation is intentionally not replayed.
+        attempt.status = RepeatRecommendationAttempt.Status.UNKNOWN
+        attempt.failure = type(error).__name__
+        attempt.completed_at = timezone.now()
+        attempt.save(update_fields=["status", "failure", "completed_at"])
+        run.status = RepeatRecommendationRun.Status.UNKNOWN
+        run.finished_at = timezone.now()
+        run.failure = attempt.failure
+        run.save(update_fields=["status", "finished_at", "failure"])
+        return
     usage = (response.payload or {}).get("usage", {})
     usage = usage if isinstance(usage, dict) else {}
     LLMUsageLog.objects.create(
@@ -329,6 +353,20 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
                 "target": result.get("target", []),
                 "exclusions": result.get("exclusions", []),
                 "rationale": result.get("rationale", ""),
+            },
+        )
+    returned = {result["group"] for result in accepted}
+    for group_item in run.snapshot["groups"]:
+        if group_item["group"] in returned:
+            continue
+        RepeatRecommendationResult.objects.update_or_create(
+            run=run,
+            group_id=group_item["group"],
+            defaults={
+                "group_revision": group_item["group_revision"],
+                "snapshot_fingerprint": run.snapshot_fingerprint,
+                "action": "needs_human",
+                "rationale": "The recommendation response did not include this group.",
             },
         )
     attempt.status = RepeatRecommendationAttempt.Status.COMPLETED

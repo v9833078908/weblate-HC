@@ -275,7 +275,9 @@ def current_shared_membership(unit: Unit):
     )
     if membership is not None and not reconcile_membership(membership):
         return None
-    if membership is not None and unit_has_policy_conflict(unit, membership.group.policy):
+    if membership is not None and unit_has_policy_conflict(
+        unit, membership.group.policy
+    ):
         return None
     return membership
 

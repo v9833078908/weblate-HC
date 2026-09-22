@@ -5,16 +5,24 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from django.core.exceptions import ValidationError
 
 from weblate.checks.consistency import RepeatDriftCheck
+from weblate.trans.autotranslate import AutoTranslate
 from weblate.trans.models import (
     Label,
     RepeatMembership,
     RepeatPolicy,
     RepeatRecommendationRun,
 )
-from weblate.trans.repeat_recommendations import parse_results, reserve_attempt
+from weblate.trans.repeat_recommendations import (
+    execute_attempt,
+    parse_results,
+    reserve_attempt,
+)
 from weblate.trans.repeats import (
     apply_preview,
     create_membership,
@@ -149,7 +157,6 @@ class RepeatModelTest(ViewTestCase):
     def test_later_label_overlap_disables_existing_shared_reuse(self) -> None:
         """Selector changes must never choose a winner between active rules."""
         first = self.add_repeat("first", "One")
-        second = self.add_repeat("second", "Two")
         first_label = Label.objects.create(
             project=self.project, name="first", color="blue"
         )
@@ -236,11 +243,51 @@ class RepeatModelTest(ViewTestCase):
             result, [{"group": group.pk, "action": "propose_new", "target": ["X"]}]
         )
 
+    def test_recommendation_send_exception_is_unknown_and_not_replayed(self) -> None:
+        """A lost response consumes its reservation without leaving a sent run."""
+        self.make_manager()
+        run = RepeatRecommendationRun.objects.create(
+            policy=self.make_policy(),
+            actor=self.user,
+            snapshot={"groups": []},
+            snapshot_fingerprint="a" * 64,
+            profile_fingerprint="b" * 64,
+            prompt_fingerprint="c" * 64,
+            request_cap=1,
+        )
+        attempt = reserve_attempt(run=run, request_snapshot={"groups": []})
+        profile = SimpleNamespace(
+            profile_fingerprint="b" * 64,
+            model="test-model",
+            temperature=0,
+            response_format="json_object",
+            provider="test",
+            reasoning="",
+        )
+        with (
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=profile,
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.post_chat_completion",
+                side_effect=RuntimeError("connection dropped"),
+            ),
+        ):
+            execute_attempt(attempt=attempt)
+
+        attempt.refresh_from_db()
+        run.refresh_from_db()
+        self.assertEqual(attempt.status, attempt.Status.UNKNOWN)
+        self.assertEqual(run.status, run.Status.UNKNOWN)
+        execute_attempt(attempt=attempt)
+        self.assertEqual(attempt.status, attempt.Status.UNKNOWN)
+
     def test_mt_fetch_reuses_accepted_target_before_machinery(self) -> None:
-        from unittest.mock import patch
-
-        from weblate.trans.autotranslate import AutoTranslate
-
         unit = self.add_repeat("first", "Old")
         policy = self.make_policy()
         group = get_or_create_group(policy, unit)
