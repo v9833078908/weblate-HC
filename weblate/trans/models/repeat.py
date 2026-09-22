@@ -206,6 +206,7 @@ class RepeatRecommendationRun(models.Model):
         QUEUED = "queued", gettext_lazy("Queued")
         RUNNING = "running", gettext_lazy("Running")
         COMPLETED = "completed", gettext_lazy("Completed")
+        UNKNOWN = "unknown", gettext_lazy("Unknown")
         CANCELLED = "cancelled", gettext_lazy("Cancelled")
         FAILED = "failed", gettext_lazy("Failed")
 
@@ -225,7 +226,9 @@ class RepeatRecommendationRun(models.Model):
     prompt_fingerprint = models.CharField(max_length=64)
     request_cap = models.PositiveIntegerField()
     requests_reserved = models.PositiveIntegerField(default=0)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.QUEUED
+    )
     cancelled_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
@@ -255,7 +258,9 @@ class RepeatRecommendationAttempt(models.Model):
     )
     ordinal = models.PositiveIntegerField()
     request_snapshot = models.JSONField(default=dict)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.RESERVED)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.RESERVED
+    )
     response = models.JSONField(default=dict)
     failure = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

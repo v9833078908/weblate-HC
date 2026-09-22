@@ -229,6 +229,10 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
         attempt.status = RepeatRecommendationAttempt.Status.FAILED
         attempt.failure = "profile-changed"
         attempt.save(update_fields=["status", "failure"])
+        run.status = RepeatRecommendationRun.Status.FAILED
+        run.finished_at = timezone.now()
+        run.failure = "profile-changed"
+        run.save(update_fields=["status", "finished_at", "failure"])
         return
     response_format: dict[str, Any] = {"type": "json_object"}
     if profile.response_format == "json_schema":
@@ -293,6 +297,10 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
         attempt.status = RepeatRecommendationAttempt.Status.UNKNOWN
         attempt.failure = response.failure_kind or "transport"
         attempt.save(update_fields=["status", "failure"])
+        run.status = RepeatRecommendationRun.Status.UNKNOWN
+        run.finished_at = timezone.now()
+        run.failure = attempt.failure
+        run.save(update_fields=["status", "finished_at", "failure"])
         return
     try:
         accepted = parse_results(
@@ -302,6 +310,10 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
         attempt.status = RepeatRecommendationAttempt.Status.FAILED
         attempt.failure = str(error)
         attempt.save(update_fields=["status", "failure"])
+        run.status = RepeatRecommendationRun.Status.FAILED
+        run.finished_at = timezone.now()
+        run.failure = attempt.failure
+        run.save(update_fields=["status", "finished_at", "failure"])
         return
     for result in accepted:
         group_item = next(
@@ -323,3 +335,6 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
     attempt.response = {"accepted": len(accepted)}
     attempt.completed_at = timezone.now()
     attempt.save(update_fields=["status", "response", "completed_at"])
+    run.status = RepeatRecommendationRun.Status.COMPLETED
+    run.finished_at = timezone.now()
+    run.save(update_fields=["status", "finished_at"])
