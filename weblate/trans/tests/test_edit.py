@@ -1189,6 +1189,26 @@ class EditJSONMonoTest(EditTest):
     def create_component(self):
         return self.create_json_mono()
 
+    def test_structural_preview_requires_admin_and_returns_signed_token(self) -> None:
+        source = self.component.source_translation
+        unit = source.unit_set.order_by("pk").first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        url = reverse("rename-key", kwargs={"pk": unit.pk})
+
+        self.client.login(username="testuser", password="testpassword")
+        self.assertEqual(
+            self.client.post(
+                url, {"stage": "preview", "new_key": "renamed"}
+            ).status_code,
+            404,
+        )
+
+        self.make_manager()
+        response = self.client.post(url, {"stage": "preview", "new_key": "renamed"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("token", response.json())
+
     def enable_nested_unit_management(self) -> None:
         self.component.manage_units = True
         self.component.file_format = "json-nested"

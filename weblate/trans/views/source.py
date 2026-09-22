@@ -102,7 +102,13 @@ def edit_context(request: AuthenticatedHttpRequest, pk):
 def _get_structural_source(request: AuthenticatedHttpRequest, pk: int) -> Unit:
     unit = get_object_or_404(Unit.objects.filter_access(request.user), pk=pk)
     component = unit.translation.component
-    if not unit.is_source or not request.user.has_perm("component.edit", component):
+    if (
+        not unit.is_source
+        or not request.user.has_perm("component.edit", component)
+        or not component.has_template()
+        or component.is_glossary
+        or component.locked
+    ):
         raise Http404
     return unit
 
