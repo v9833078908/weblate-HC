@@ -242,7 +242,7 @@
                                data-bs-target="#add-unit-form">{% translate "Add variant of this string" %}</a>
                           </li>
                         {% endif %}
-                        {% if unit.is_source and user_can_edit_component and unit.translation.component.file_format_supports_key_rename and not locked %}
+                        {% if unit.is_source and user_can_edit_component and unit.translation.component.manage_units and unit.translation.component.edit_template and unit.translation.component.file_format_supports_key_rename and not locked %}
                           <li>
                             <button type="button"
                                     class="dropdown-item js-rename-key"

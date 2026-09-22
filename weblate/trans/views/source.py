@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from django.contrib.auth.decorators import login_required
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.http import Http404, JsonResponse
 from django.http.response import HttpResponseServerError
 from django.shortcuts import get_object_or_404
@@ -102,7 +102,13 @@ def edit_context(request: AuthenticatedHttpRequest, pk):
 def _get_structural_source(request: AuthenticatedHttpRequest, pk: int) -> Unit:
     unit = get_object_or_404(Unit.objects.filter_access(request.user), pk=pk)
     component = unit.translation.component
-    if not unit.is_source or not component.has_template() or component.is_glossary:
+    if (
+        not unit.is_source
+        or not component.has_template()
+        or component.is_glossary
+        or not component.manage_units
+        or not component.edit_template
+    ):
         raise Http404
     if not request.user.has_perm("component.edit", component):
         raise PermissionDenied
@@ -134,9 +140,22 @@ def rename_key(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
         payload = signing.loads(
             request.POST["token"], salt="rename-key", max_age=15 * 60
         )
-        renamed = source.rename_unit_key(
-            change=ConfirmedRename(**payload), user=request.user
-        )
+        change = ConfirmedRename(**payload)
+        try:
+            renamed = source.rename_unit_key(change=change, user=request.user)
+        except DatabaseError:
+            try:
+                renamed = source.rename_unit_key(change=change, user=request.user)
+            except DatabaseError:
+                return JsonResponse(
+                    {
+                        "error": gettext(
+                            "The key was committed to the repository, but could not "
+                            "be synchronized. Create a new preview and try again."
+                        )
+                    },
+                    status=409,
+                )
     except PermissionError as error:
         return JsonResponse({"error": str(error)}, status=403)
     except (KeyError, signing.BadSignature, ValueError) as error:
@@ -198,7 +217,23 @@ def move_string(request: AuthenticatedHttpRequest, pk: int) -> JsonResponse:
         payload = signing.loads(
             request.POST["token"], salt="move-string", max_age=15 * 60
         )
-        moved = source.move_unit(change=ConfirmedMove(**payload), user=request.user)
+        change = ConfirmedMove(**payload)
+        try:
+            moved = source.move_unit(change=change, user=request.user)
+        except DatabaseError:
+            try:
+                moved = source.move_unit(change=change, user=request.user)
+            except DatabaseError:
+                return JsonResponse(
+                    {
+                        "error": gettext(
+                            "The string order was committed to the repository, but "
+                            "could not be synchronized. Create a new preview and try "
+                            "again."
+                        )
+                    },
+                    status=409,
+                )
     except PermissionError as error:
         return JsonResponse({"error": str(error)}, status=403)
     except (KeyError, signing.BadSignature, ValueError) as error:

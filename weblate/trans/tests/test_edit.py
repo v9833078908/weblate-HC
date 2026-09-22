@@ -1215,6 +1215,33 @@ class EditJSONMonoTest(EditTest):
         )
         self.assertGreater(response.json()["preview"]["affected_file_count"], 0)
 
+    def test_structural_preview_requires_unit_and_template_management(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation
+        unit = source.unit_set.order_by("pk").first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        url = reverse("rename-key", kwargs={"pk": unit.pk})
+
+        self.component.manage_units = False
+        self.component.save(update_fields=["manage_units"])
+        self.assertEqual(
+            self.client.post(
+                url, {"stage": "preview", "new_key": "renamed"}
+            ).status_code,
+            404,
+        )
+
+        self.component.manage_units = True
+        self.component.edit_template = False
+        self.component.save(update_fields=["manage_units", "edit_template"])
+        self.assertEqual(
+            self.client.post(
+                url, {"stage": "preview", "new_key": "renamed"}
+            ).status_code,
+            404,
+        )
+
     def test_structural_rename_confirm_updates_the_existing_unit(self) -> None:
         self.make_manager()
         source = self.component.source_translation
