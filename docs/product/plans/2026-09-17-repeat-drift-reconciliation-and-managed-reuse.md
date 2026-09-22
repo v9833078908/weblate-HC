@@ -1,7 +1,9 @@
 # Согласование повторов и управляемое повторное использование
 
 Дата: 2026-09-17.
-Статус: полный план на утверждение; реализация не начата.
+Статус: реализовано в ветке ``feat/repeat-drift-reconciliation``; ожидает
+review и merge через pull request. Фактические доказательства и ограничения
+проверок записаны в конце документа.
 
 ## Цель, основания и границы
 
@@ -140,6 +142,22 @@ reconcile, что и остальные изменения selector.
 (пустой набор меток означает все строки выбранных компонентов). По замеру
 фиксируется стратегия: строка membership на каждое вхождение повторяющегося
 в scope source или только на решения и исключения с вычислением остальных.
+
+### Замер membership перед задачей 1 (2026-09-22)
+
+Для воспроизводимого консервативного предела использован сохранённый
+read-only снимок `analysis/data/anvil-saga-fr-repeat-drift-2026-09-17.json`:
+`anvil-saga` / `locale_v1-02-import-explained-3` / `fr`, точное группирование
+исходника, состояние не ниже translated, без глоссария. В нём 748 повторных
+групп и 2 156 вхождений; среди 387 расходящихся групп крупнейшая содержит 26
+вхождений (1 096 вхождений). Снимок не покрывает все языки и потому не
+служит оценкой production-wide; он достаточен, чтобы не выбирать дизайн,
+который создаёт запрос на каждый экранный элемент.
+
+Выбрана строка `RepeatMembership` только для уже принятых решений и явных
+исключений. Нерешённые повторные группы вычисляются из живых Unit в scope
+правила. Это сохраняет долговечность решения/независимости и актуальность,
+не материализуя до 2 156 строк на одно правило уже при первом его просмотре.
 
 ### 3.2. Актуальность и применение
 
@@ -287,6 +305,10 @@ MT и отображается отдельным итогом. Без opt-in п
 
 ### Задача 1. Долговечные правила, членство и актуальность
 
+**Статус: завершена.** Созданы policy/group/membership-модели, миграции и
+проверка актуальности после unit/label/delete событий; покрыты точные группы,
+stale identity, динамическое пересечение меток и импорт/loc-kit.
+
 **Результат:** решения переживают reload/retry, но не применяются к изменившемуся
 контексту; вне правил поведение продукта прежнее.
 
@@ -296,12 +318,12 @@ MT и отображается отдельным итогом. Без opt-in п
 `weblate/trans/models/unit.py`, `weblate/trans/models/translation.py`,
 `weblate/trans/loc_kit.py`, `weblate/trans/forms.py`.
 
-- [ ] Реализовать §3.1 и fingerprints §3.2, ограничения БД и project scoping.
-- [ ] Обрабатывать import, удаление, source/context/flags/labels/Explanation
+- [x] Реализовать §3.1 и fingerprints §3.2, ограничения БД и project scoping.
+- [x] Обрабатывать import, удаление, source/context/flags/labels/Explanation
   изменения; изменения selector не приводят к записи targets.
-- [ ] Свести invalidate/reconcile в общий сервис; фоновые задачи после commit.
+- [x] Свести invalidate/reconcile в общий сервис; фоновые задачи после commit.
   При pending reconciliation чтение проверяет актуальность и запрещает reuse.
-- [ ] Сохранить контракты append-only loc-kit и обычного VCS import.
+- [x] Сохранить контракты append-only loc-kit и обычного VCS import.
 
 **Проверка:** новый `weblate/trans/tests/test_repeats.py` покрывает два проекта,
 два языка, пересечение правил при сохранении и после добавления метки к
@@ -314,6 +336,10 @@ source, закрытый компонент, source смену при прежн
 
 ### Задача 2. Preview, применение, история и undo
 
+**Статус: завершена.** Реализованы подписанный preview, частичное применение,
+история, guarded undo и запись через существующий Unit primitive без native
+propagation за пределы snapshot.
+
 **Зависимость:** 1. **Результат:** явная запись в разрешённые вхождения с
 точным отчётом; approved и конкурентные правки защищены.
 
@@ -321,14 +347,14 @@ source, закрытый компонент, source смену при прежн
 `weblate/trans/models/unit.py`, `weblate/trans/actions.py`;
 новый `weblate/trans/tests/test_repeat_apply.py`.
 
-- [ ] Реализовать §3.2: запись каждого получателя существующим примитивом
+- [x] Реализовать §3.2: запись каждого получателя существующим примитивом
   `Unit.translate(user, new_target, new_state, ..., propagate=False)`
   (параметр доходит до `Unit.save_backend`); методов `unit.edit`/
   `unit.bulk_edit` на модели нет (`bulk_edit` - это view
   `weblate/trans/views/search.py:bulk_edit`, меняющий state/flags/labels, не
   target), тонкий пакетный wrapper ввести в `repeats.py`, не на Unit.
   Изменение правил - `project.edit`, не доступ только к одной translation.
-- [ ] Писать с `is_batch_update=True`. Путь с `False` не использовать:
+- [x] Писать с `is_batch_update=True`. Путь с `False` не использовать:
   `Unit.schedule_repeat_drift_recheck` через `on_commit` синхронно выполняет
   `_recheck_repeat_drift_group` -> `run_checks()` под `project.checks_lock`, а
   чек с `propagates="repeat"` перепроверяет все `repeat_units`; на N
@@ -339,7 +365,7 @@ source, закрытый компонент, source смену при прежн
   `AutoTranslate.update` присваивает `unit.translation = self.translation`) и
   внутри транзакции вызывает `store_update_changes()` и `invalidate_cache()`
   для каждой. После commit - одна scoped-перепроверка группы.
-- [ ] Сохранять provenance и событие для пакетного применения/исключений:
+- [x] Сохранять provenance и событие для пакетного применения/исключений:
   новые члены `ActionEvents` (`weblate/trans/actions.py:ActionEvents`), каждый
   с AlterField-миграцией состояния `change.action` (репозиторный паттерн
   `alter_change_action`, например 0027-0031, 0055, 0056, 0105);
@@ -348,8 +374,8 @@ source, закрытый компонент, source смену при прежн
   `ACTIONS_LOG`, `ACTIONS_REVERTABLE` и `ACTIONS_SHOW_CONTENT`; пометка
   «независимое» и изменение правила без target - только в `ACTIONS_LOG`
   (`TranslatedCheck` читает `change.target` из `ACTIONS_REVERTABLE`).
-- [ ] Реализовать guarded undo и результаты по группам, включая partial.
-- [ ] Проверить отсутствие обходного native propagation за пределы snapshot.
+- [x] Реализовать guarded undo и результаты по группам, включая partial.
+- [x] Проверить отсутствие обходного native propagation за пределы snapshot.
 
 **Проверка:** `./rundev.sh test weblate/trans/tests/test_repeat_apply.py`:
 approved conflict остаётся, остальные разрешённые получают target; stale,
@@ -363,6 +389,9 @@ preview показывает его итог, undo сравнивает с со�
 makemigrations --check --dry-run` не находит несохранённых изменений.
 
 ### Задача 3. Нативная очередь групп и редакторские решения
+
+**Статус: завершена.** Реализованы очередь Variant C, фильтры, статусы,
+preview, check-link и editor/Zen/API/bulk-suggestion guards.
 
 **Зависимости:** 1–2. **Результат:** одна строка очереди на группу, а не на
 каждый чек; все вхождения доступны без скрытых замен. Иерархия экрана очереди
@@ -386,26 +415,26 @@ makemigrations --check --dry-run` не находит несохранённых
 `weblate/trans/tasks.py`, `weblate/api/views.py`, `weblate/api/serializers.py`,
 `weblate/locale/ru/LC_MESSAGES/django.po`.
 
-- [ ] Добавить переход от `repeat-drift` к проектно-языковой очереди;
+- [x] Добавить переход от `repeat-drift` к проектно-языковой очереди;
   фильтры component, source labels, статус; конфликтующие approved сверху.
   Очередь строится собственным detection и живёт независимо от состояния чека:
   `RepeatDriftCheck.default_disabled = True`, поэтому вход через чек - только
   дополнительная ссылка там, где чек включён, не единственный путь.
-- [ ] Очередь - собственный view с синхронным применением §3.2 и отчётом по
+- [x] Очередь - собственный view с синхронным применением §3.2 и отчётом по
   группам; НЕ наследовать `fix_check` (`weblate/trans/views/search.py:fix_check`:
   тот требует `unit.bulk_edit`+`unit.edit` и уходит в Celery
   `fix_failing_checks`, частичный результат по группам некому показать).
   Права: `unit.edit` на получателях, `project.edit` для правил.
-- [ ] В панели группы показать описание, варианты с «где стоит», состояния,
+- [x] В панели группы показать описание, варианты с «где стоит», состояния,
   происхождение, общий вариант и примечания; список вхождений до 10 строк с
   догрузкой (контракт экрана, раздел 2.5).
-- [ ] Выбор существующего/нового варианта или «оставить разные» - один
+- [x] Выбор существующего/нового варианта или «оставить разные» - один
   radiogroup без преселекта, ведёт через preview §3.2; получатель
   исключается галочкой в preview (контракт, разделы 2.5-2.7).
-- [ ] Различать статусы группы (требует решения, конфликт одобренных,
+- [x] Различать статусы группы (требует решения, конфликт одобренных,
   конфликт правил, решена) и примечания (устаревшая связь, замок, нет прав,
   ограничение длины); не объявлять весь пакет успешным после частичной записи.
-- [ ] Подключить диалог общего/независимого изменения к обычному editor, Zen
+- [x] Подключить диалог общего/независимого изменения к обычному editor, Zen
   и принятию suggestion. Zen сохраняется отдельным JSON POST
   `weblate/trans/views/edit.py:save_zen` мимо `handle_translate` - решение там
   входит в JSON-ответ, а не в HTML-диалог. REST получает явное поле решения;
@@ -416,7 +445,7 @@ makemigrations --check --dry-run` не находит несохранённых
   `translate`), поэтому перед решением о 409 он явно делает
   `select_for_update` для Unit и его membership. Обычный PATCH без
   shared-строк не затрагивается; 409 - новый публичный контракт core API.
-- [ ] Bulk suggestion acceptance также использует защиту: без явного решения
+- [x] Bulk suggestion acceptance также использует защиту: без явного решения
   shared-строки пропускаются с причиной, не получают тихий propagation;
   per-unit причины расширяют result-контракт воркера
   `weblate/trans/tasks.py:bulk_accept_user_suggestions` (сейчас только
@@ -434,6 +463,10 @@ stale во второй вкладке, reload, undo. Проверить labels,
 
 ### Задача 4. Пакетная подготовка LLM-рекомендаций
 
+**Статус: завершена.** Есть durable run/attempt/result ledger, cap, strict
+parser, usage, неизвестная доставка, бесплатный scope/cost preview и
+ограничение полного payload без непредставительной обрезки.
+
 **Зависимость:** 1; UI-интеграция после 3. **Результат:** вся подтверждённая
 очередь обработана в пределах cap, результаты durable, ни один target не
 изменён до человеческого подтверждения.
@@ -445,19 +478,19 @@ stale во второй вкладке, reload, undo. Проверить labels,
 `weblate/trans/views/repeats.py`, новые шаблоны задачи 3;
 новые `test_repeat_recommendations.py`, `test_repeat_recommendation_tasks.py`.
 
-- [ ] Реализовать отдельную операцию §3.3, strict schema, bounded payloads,
+- [x] Реализовать отдельную операцию §3.3, strict schema, bounded payloads,
   attempt ledger, liveness, cancellation, повторную проверку прав worker-ом.
   Транспорт - только публичные `judge.post_chat_completion` и
   `judge.reasoning_payload` из §3.3; не звать `request_verdicts`/`_run_batch`
   (fallback-риск из §3.3). `test_judge_client.py` подтверждает, что судья
   после выноса seam шлёт те же payload и заголовки.
-- [ ] Добавить бесплатный preview запуска, подтверждение known/unknown cost
+- [x] Добавить бесплатный preview запуска, подтверждение known/unknown cost
   и конечного cap; изменение snapshot требует обновить preview.
-- [ ] Добавить команду «Подготовить рекомендации» для всей фильтрованной
+- [x] Добавить команду «Подготовить рекомендации» для всей фильтрованной
   очереди, не только страницы; показать точный snapshot scope.
-- [ ] Хранить предложение отдельно, показать основания и stale; выбор пакета
+- [x] Хранить предложение отдельно, показать основания и stale; выбор пакета
   запускает новый preview применения задачи 2, а не автоaccept.
-- [ ] Расширить usage и историю runs без подмены judge-результатов: новый
+- [x] Расширить usage и историю runs без подмены judge-результатов: новый
   член `LLMUsageLog.Operation` `repeat_recommend` с AlterField-миграцией
   состояния поля `operation` и FK `LLMUsageLog.repeat_recommendation_run`,
   см. §3.3.
@@ -474,6 +507,10 @@ makemigrations --check --dry-run` не находит несохранённых
 
 ### Задача 5. Reuse до MT и один кандидат разрешённой группы
 
+**Статус: завершена.** Принятый shared target, включая новое вхождение после
+импорта, переиспользуется до machinery lookup; обычный неразрешённый повтор
+не получает скрытый fan-out.
+
 **Зависимости:** 1–2; opt-in после 4. **Результат:** разрешённые одинаковые
 вхождения не генерируются независимо; контекстные исключения не объединяются.
 
@@ -483,17 +520,17 @@ makemigrations --check --dry-run` не находит несохранённых
 `weblate/trans/repeat_recommendations.py`;
 `weblate/trans/tests/test_autotranslate.py`, `weblate/machinery/tests.py`.
 
-- [ ] Реализовать §3.4 до исходящих MT requests; durable group reservation
+- [x] Реализовать §3.4 до исходящих MT requests; durable group reservation
   защищает от двух параллельных запусков и разных кандидатов одной revision.
   Точка отсечения: юниты с принятым общим target исключаются из списка units
   при сборке батча в `weblate/trans/machinery.py`, ДО `_translate_sources`
   (`weblate/machinery/base.py:batch_translate` вызывает LLM для всего батча и лишь потом
   сравнивает с `quality >= max_score` по `unit.machinery`).
-- [ ] Сохранять cap исходного scope; fan-out не расширяет набор Unit.
-- [ ] Проверять каждого получателя; несовместимый не меняется и виден в отчёте.
-- [ ] Добавить отдельный opt-in рекомендаций с лимитом; после MT создавать
+- [x] Сохранять cap исходного scope; fan-out не расширяет набор Unit.
+- [x] Проверять каждого получателя; несовместимый не меняется и виден в отчёте.
+- [x] Добавить отдельный opt-in рекомендаций с лимитом; после MT создавать
   только read-only run задачи 4, если opt-in подтверждён.
-- [ ] Отчёт различает reused Units, generated groups, independent Units,
+- [x] Отчёт различает reused Units, generated groups, independent Units,
   skipped/stale/conflicts, HTTP requests и неизвестную стоимость.
 
 **Проверка:** `./rundev.sh test weblate/trans/tests/test_autotranslate.py` и
@@ -506,6 +543,10 @@ approved, одновременную ручную правку, новые пу�
 
 ### Задача 6. Check, сквозной сценарий и документация
 
+**Статус: завершена.** Fresh independent membership исключается из advisory
+check, stale membership не скрывает расхождение; документация, threat model и
+changelog обновлены, результаты приёмки записаны ниже.
+
 **Зависимости:** 1–5. **Результат:** намеренные исключения не выдаются за
 ошибки, реальные конфликты видны; поведение документировано и проверено целиком.
 
@@ -516,21 +557,21 @@ approved, одновременную ручную правку, новые пу�
 `docs/admin/machine.rst`, `docs/security/threat-model.rst`,
 `docs/changes.rst`, текущий план и Producer roadmap.
 
-- [ ] Check использует свежие explicit independent decisions для исключения
+- [x] Check использует свежие explicit independent decisions для исключения
   сравнений, но сохраняет advisory-семантику и detection вне правил.
   Stale exception не скрывает новое расхождение. Конфликтующие shared approved
   остаются видны; dismissal не создаёт policy. Консультация с membership на
   read-пути — prefetch через reverse-relation или денормализованный флаг,
   не N+1 на участника; замерить время проверки.
-- [ ] Изменение policy/member/target планирует ограниченный recheck всей
+- [x] Изменение policy/member/target планирует ограниченный recheck всей
   затронутой группы; никаких project-wide пересчётов на каждое чтение.
   Все пути записи пишут с `is_batch_update=True`, поэтому
   `Unit.schedule_repeat_drift_recheck` сам не сработает; каждый явно
   планирует одну scoped-перепроверку на группу после commit. Владельцы:
   применение и undo (§3.2, задача 2), MT-reuse (задача 5), import (задача 1).
-- [ ] Обновить пользовательскую документацию, threat model для новой платной
+- [x] Обновить пользовательскую документацию, threat model для новой платной
   операции/permission boundary и unreleased changelog по правилам репозитория.
-- [ ] Выполнить сквозной smoke ниже, убрать временные smoke-скрипты и fixtures,
+- [x] Выполнить сквозной smoke ниже, убрать временные smoke-скрипты и fixtures,
   зафиксировать фактическое доказательство и ограничения в этом плане.
 
 **Проверка:** `./rundev.sh test weblate/checks/tests/test_consistency_checks.py`
@@ -611,5 +652,30 @@ suites одним итоговым запуском. Scoped lint через `uv 
 | Producer Console позже над теми же данными | Roadmap, волна 2, пункт 2.6 |
 | Безопасность, измерения, rollout | Задача 6, §6–7 |
 
-План готов к рассмотрению и утверждению. Все задачи реализации пока не
-выполнены; результаты тестов продукта и пилота появятся только при исполнении.
+## 9. Фактическая приёмка реализации (2026-09-22)
+
+Docker dev stack применил миграции ``trans.0138``–``trans.0142`` и отвечал на
+healthcheck. Выполнены следующие автоматические прогоны:
+
+- repeat queue/model suites: 17 passed;
+- consistency и fix-check: 119 passed;
+- repeats, labels и loc-kit import contract: 188 passed;
+- AutoTranslation/MT основной контур: 67 passed;
+- bulk suggestions и LLM usage: 52 passed;
+- judge transport: 168 passed;
+- REST Unit translate subset: 4 passed;
+- machinery: 1436 passed, 53 skipped; шесть существующих custom
+  OpenAI/Mistral тестов остановились на DNS-проверке ``custom.example.com`` до
+  HTTP mock, один xdist worker был завершён по ресурсам;
+- ``manage.py makemigrations --check --dry-run``: no changes detected;
+- ``./rundev.sh check``: no issues (one repository-wide silenced check).
+
+Scoped ``prek`` проходит для изменённых Python/JavaScript/templates/docs,
+кроме общего REUSE hook: он перечисляет уже существующие файлы
+``frontend-wizard`` и корневые ``PRODUCT.md``/``DESIGN.md`` без licensing
+metadata. Эти файлы данным планом не изменялись.
+
+В текущей сессии browser provider недоступен, поэтому keyboard-only smoke не
+выдаётся за выполненный реальным браузером. Его поведение покрыто server-side
+view tests и lint правил доступности шаблонов; визуальная проверка остаётся
+review-шагом перед merge, не условием сохранности данных.

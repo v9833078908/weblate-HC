@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% load i18n static %}
+
+{% block extra_styles %}
+  <link rel="stylesheet" href="{% static 'styles/repeat-queue.css' %}" />
+{% endblock extra_styles %}
+
+{% block extra_script %}
+  <script defer src="{% static 'js/repeat-queue.js' %}"></script>
+{% endblock extra_script %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item"><a href="{{ project.get_absolute_url }}">{{ project }}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Repeats" %}</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+  <main class="rq">
+    <div class="rq-heading">
+      <div>
+        <h1>{% translate "Repeat queue" %}: {{ language }}</h1>
+        <p class="text-muted">{% translate "Choose a group decision, then review every affected occurrence before writing." %}</p>
+      </div>
+      <a class="btn btn-outline-secondary"
+         href="{% url 'repeat-rule' project=project.slug language=language.code %}">{% translate "Scope rule" %}</a>
+    </div>
+
+    {% if not policy %}
+      <p class="alert alert-info">{% translate "No active repeat rule exists for this language." %}</p>
+    {% else %}
+      <form class="rq-filters"
+            method="get"
+            aria-label="{% translate 'Repeat queue filters' %}">
+        <div>
+          <span class="form-label">{% translate "Components" %}</span>
+          {% for component in components %}
+            <label class="form-check form-check-inline">
+              <input class="form-check-input"
+                     type="checkbox"
+                     name="component"
+                     value="{{ component.pk }}"
+                     {% if component.pk in selected_components %} checked{% endif %} />
+              <span class="form-check-label">{{ component }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        {% if labels %}
+          <div>
+            <span class="form-label">{% translate "Source labels" %}</span>
+            {% for label in labels %}
+              <label class="form-check form-check-inline">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="label"
+                       value="{{ label.pk }}"
+                       {% if label.pk in selected_labels %} checked{% endif %} />
+                <span class="form-check-label">{{ label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <noscript>
+          <button class="btn btn-outline-secondary" type="submit">{% translate "Show" %}</button>
+        </noscript>
+      </form>
+
+      <div class="rq-toolbar">
+        <nav aria-label="{% translate 'Repeat queue status' %}">
+          <a{% if status == 'all' %} aria-current="page"{% endif %} href="?status=all">{% translate "All" %} <span class="badge text-bg-secondary">{{ status_counts.all }}</span></a>
+          <a{% if status == 'open' %} aria-current="page"{% endif %} href="?status=open">{% translate "Needs a decision" %} <span class="badge text-bg-secondary">{{ status_counts.open }}</span></a>
+          <a {% if status == 'conflict' %} aria-current="page"{% endif %}
+             href="?status=conflict">{% translate "Conflicts" %} <span class="badge text-bg-secondary">{{ status_counts.conflict }}</span></a>
+          <a {% if status == 'resolved' %} aria-current="page"{% endif %}
+             href="?status=resolved">{% translate "Resolved" %} <span class="badge text-bg-secondary">{{ status_counts.resolved }}</span></a>
+        </nav>
+        <a class="btn btn-outline-primary"
+           href="{% url 'repeat-recommend' project=project.slug language=language.code %}">{% translate "Prepare recommendations" %} <span class="badge text-bg-warning">{% translate "Paid" %}</span></a>
+      </div>
+    {% endif %}
+
+    <p class="rq-summary">{% blocktranslate count counter=shown_count %}Showing {{ counter }} group of {{ total_count }}. Conflicts are shown first.{% plural %}Showing {{ counter }} groups of {{ total_count }}. Conflicts are shown first.{% endblocktranslate %} <span class="text-muted"><kbd>↑</kbd> <kbd>↓</kbd> {% translate "move between groups; Enter opens a group." %}</span></p>
+
+    <ul class="rq-groups">
+      {% for item in groups %}
+        {% include "snippets/repeat_group.html" with item=item %}
+      {% empty %}
+        <li class="alert alert-info">{% translate "There are no exact repeats in the selected scope." %}</li>
+      {% endfor %}
+    </ul>
+    {% if page_obj %}
+      {% include "paginator.html" %}
+    {% endif %}
+  </main>
+{% endblock content %}

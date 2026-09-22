@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags i18n %}
+
+{% block content %}
+  <main class="rq">
+    <h1>{% translate "Repeat rule" %}: {{ language }}</h1>
+    <form method="post">
+      {% csrf_token %}
+      {% crispy form %}
+      <button class="btn btn-primary" type="submit">{% translate "Save repeat rule" %}</button>
+    </form>
+  </main>
+{% endblock content %}

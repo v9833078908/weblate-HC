@@ -57,6 +57,7 @@ from rest_framework.status import (
     HTTP_202_ACCEPTED,
     HTTP_204_NO_CONTENT,
     HTTP_400_BAD_REQUEST,
+    HTTP_409_CONFLICT,
     HTTP_423_LOCKED,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
@@ -547,6 +548,14 @@ class NotSourceUnit(APIException):
     status_code = HTTP_400_BAD_REQUEST
     default_detail = gettext_lazy("Specified unit id is not a translation source unit.")
     default_code = "not-a-source-unit"
+
+
+class RepeatDecisionRequired(APIException):
+    status_code = HTTP_409_CONFLICT
+    default_detail = gettext_lazy(
+        "This shared repeat requires an explicit repeat_decision before editing."
+    )
+    default_code = "repeat-decision-required"
 
 
 class WeblateExceptionHandler(ExceptionHandler):
@@ -4031,6 +4040,21 @@ class UnitViewSet(viewsets.ReadOnlyModelViewSet, UpdateModelMixin, DestroyModelM
             )
 
         if do_translate:
+            # Lock before deciding whether the target is shared.  Serializer
+            # validation deliberately stays pure so a concurrent membership
+            # change cannot slip between validation and Unit.translate().
+            unit = Unit.objects.select_for_update().get(pk=unit.pk)
+            if new_target != unit.get_target_plurals():
+                # ruff: ignore[import-outside-top-level]
+                from weblate.trans.repeats import (
+                    current_shared_membership,
+                    make_membership_independent,
+                )
+
+                if current_shared_membership(unit) is not None:
+                    if data.get("repeat_decision") != "independent":
+                        raise RepeatDecisionRequired
+                    make_membership_independent(unit=unit, reason="api")
             new_target_copy = new_target[:]
             if new_target_copy != unit.adjust_plurals(new_target):
                 raise ValidationError({"target": "Number of plurals does not match"})

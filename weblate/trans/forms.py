@@ -89,6 +89,7 @@ from weblate.trans.models import (
     JudgeVerdict,
     Label,
     Project,
+    RepeatPolicy,
     Unit,
     WorkflowSetting,
 )
@@ -688,6 +689,59 @@ class FuzzyField(forms.BooleanField):
         self.widget.attrs["class"] = "fuzzy_checkbox"
 
 
+class RepeatPolicyForm(forms.ModelForm):
+    """Project-scoped selector for an explicit managed repeat policy."""
+
+    class Meta:
+        model = RepeatPolicy
+        fields = ("source_language", "target_language", "components", "source_labels")
+
+    def __init__(self, *, project: Project, actor, **kwargs) -> None:
+        self.project = project
+        self.actor = actor
+        super().__init__(**kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_tag = False
+        self.fields["components"].queryset = Component.objects.filter(
+            project=project
+        ).filter_access(actor)
+        self.fields["source_labels"].queryset = Label.objects.filter(project=project)
+
+    def save(self, commit: bool = True) -> RepeatPolicy:
+        if not commit:
+            msg = "Repeat policies must be saved through their scope validator."
+            raise ValueError(msg)
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.repeats import save_policy
+
+        policy = super().save(commit=False)
+        policy.project = self.project
+        return save_policy(
+            policy=policy,
+            components=self.cleaned_data["components"],
+            labels=self.cleaned_data["source_labels"],
+            actor=self.actor,
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        source_language = cleaned_data.get("source_language")
+        components = cleaned_data.get("components")
+        if (
+            source_language is not None
+            and components is not None
+            and any(
+                component.source_language_id != source_language.pk
+                for component in components
+            )
+        ):
+            self.add_error(
+                "components",
+                gettext("Every component must use the selected source language."),
+            )
+        return cleaned_data
+
+
 class TranslationForm(UnitForm):
     """Form used for translation of single string."""
 
@@ -788,6 +842,31 @@ class TranslationForm(UnitForm):
             InlineRadios("review", css_class="review_radio"),
             Field("explanation"),
         )
+        # A shared repeat never silently becomes a divergent ordinary edit.
+        # The editor offers the local choice; changing the group remains the
+        # previewed operation in the repeat queue.
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.repeats import current_shared_membership
+
+        if current_shared_membership(unit) is not None:
+            self.fields["repeat_decision"] = forms.ChoiceField(
+                label=gettext_lazy("Repeat decision"),
+                choices=[
+                    ("", gettext_lazy("Choose how to handle this repeat")),
+                    (
+                        "shared",
+                        gettext_lazy(
+                            "Update the shared translation in the repeat queue"
+                        ),
+                    ),
+                    (
+                        "independent",
+                        gettext_lazy("Keep this occurrence independent"),
+                    ),
+                ],
+                required=True,
+            )
+            self.helper.layout.append(InlineRadios("repeat_decision"))
         if user_can_review or not user_can_edit:
             self.fields["fuzzy"].widget = forms.HiddenInput()
         else:

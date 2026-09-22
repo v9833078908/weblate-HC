@@ -1160,6 +1160,18 @@ records contain only redacted metadata and keyed digests, and are not an API
 or report confirmation oracle for a source or translation supplied by a
 user. *(maintainer)*
 
+Managed repeat recommendations are a separate, explicit outbound operation.
+They use the primary judge endpoint and its site-wide credential, never accept
+an endpoint, model, or key from the browser, and never fall back to the second
+judge seat. The policy scope, profile fingerprint, prompt fingerprint, and a
+finite request cap are stored before the request is published. Each attempt is
+reserved before I/O; a timeout or transport uncertainty is retained as
+``unknown`` rather than replayed automatically. Provider data is treated as
+untrusted structured input and can only create a read-only recommendation for
+a group already present in that frozen scope. It cannot modify a translation,
+state, membership, or check; applying a recommendation is a later local,
+permission-checked repeat-decision preview. *(maintainer)*
+
 Microsoft Clarity session recording (see :setting:`CLARITY_PROJECT_ID`) is the
 reviewed instance of a new outbound integration class: once a project ID is
 configured, page markup, URLs, and the signed-in username are sent to

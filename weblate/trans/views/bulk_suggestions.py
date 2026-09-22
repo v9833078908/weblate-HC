@@ -60,6 +60,23 @@ def add_bulk_accept_result_message(
         messages.info(request, message)
     else:
         messages.success(request, message)
+    skipped = result.get("skipped", [])
+    if isinstance(skipped, list):
+        repeat_skipped = sum(
+            1
+            for item in skipped
+            if isinstance(item, dict) and item.get("reason") == "repeat-decision"
+        )
+        if repeat_skipped:
+            messages.warning(
+                request,
+                ngettext(
+                    "%(count)d suggestion was skipped because its repeat requires a decision.",
+                    "%(count)d suggestions were skipped because their repeats require a decision.",
+                    repeat_skipped,
+                )
+                % {"count": repeat_skipped},
+            )
 
 
 def get_bulk_accept_return_url(

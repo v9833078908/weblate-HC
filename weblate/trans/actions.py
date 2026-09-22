@@ -678,6 +678,24 @@ class ActionEvents(IntegerChoices):
         gettext_lazy("A source string was moved in source order."),
         gettext_lazy("String moved"),
     )
+    # Translators: Name and description of event in the history
+    REPEAT_APPLY = (
+        110,
+        gettext_lazy("A managed repeat decision was applied."),
+        gettext_lazy("Repeat decision applied"),
+    )
+    # Translators: Name and description of event in the history
+    REPEAT_INDEPENDENT = (
+        111,
+        gettext_lazy("A repeat was explicitly kept independent."),
+        gettext_lazy("Repeat kept independent"),
+    )
+    # Translators: Name and description of event in the history
+    REPEAT_UNDO = (
+        112,
+        gettext_lazy("A managed repeat decision was undone."),
+        gettext_lazy("Repeat decision undone"),
+    )
 
 
 # Actions which are logged
@@ -709,6 +727,9 @@ ACTIONS_LOG = {
     ActionEvents.MOVE_PROJECT,
     ActionEvents.ALERT_DISMISSED,
     ActionEvents.ALERT_REOPENED,
+    ActionEvents.REPEAT_APPLY,
+    ActionEvents.REPEAT_INDEPENDENT,
+    ActionEvents.REPEAT_UNDO,
 }
 
 
@@ -727,6 +748,8 @@ ACTIONS_REVERTABLE = {
     ActionEvents.STRING_REPO_UPDATE,
     ActionEvents.STRING_UPLOAD_UPDATE,
     ActionEvents.USER_REVERT,
+    ActionEvents.REPEAT_APPLY,
+    ActionEvents.REPEAT_UNDO,
 }
 
 # Content changes considered when looking for last author
@@ -750,6 +773,8 @@ ACTIONS_CONTENT = {
     ActionEvents.USER_REVERT,
     ActionEvents.FIX_FAILING_CHECK,
     ActionEvents.JUDGE_UNDO,
+    ActionEvents.REPEAT_APPLY,
+    ActionEvents.REPEAT_UNDO,
 }
 
 # Actions shown on the repository management page

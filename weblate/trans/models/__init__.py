@@ -46,6 +46,15 @@ from weblate.trans.models.multilingual_spreadsheet import (
 )
 from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.models.project import CommitPolicyChoices, Project
+from weblate.trans.models.repeat import (
+    RepeatDecisionEvent,
+    RepeatGroup,
+    RepeatMembership,
+    RepeatPolicy,
+    RepeatRecommendationAttempt,
+    RepeatRecommendationResult,
+    RepeatRecommendationRun,
+)
 from weblate.trans.models.report import Report
 from weblate.trans.models.suggestion import Suggestion, SuggestionAddResult, Vote
 from weblate.trans.models.translation import Translation
@@ -84,6 +93,13 @@ __all__ = [
     "PendingUnitChange",
     "ProducerRun",
     "Project",
+    "RepeatDecisionEvent",
+    "RepeatGroup",
+    "RepeatMembership",
+    "RepeatPolicy",
+    "RepeatRecommendationAttempt",
+    "RepeatRecommendationResult",
+    "RepeatRecommendationRun",
     "Report",
     "Suggestion",
     "SuggestionAddResult",
@@ -381,6 +397,23 @@ def change_labels(sender, instance, action, pk_set, **kwargs) -> None:
         return
     if not instance.is_batch_update:
         instance.translation.component.invalidate_cache()
+    # Some callers manipulate the many-to-many relation directly rather than
+    # using Unit.save_labels(). Reconcile all target-language identities in
+    # either case; a label is a repeat-policy selector, never a target edit.
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.repeats import schedule_unit_reconciliation
+
+    for unit_id in instance.unit_set.values_list("pk", flat=True):
+        schedule_unit_reconciliation(unit_id)
+
+
+@receiver(pre_delete, sender=Unit)
+def repeat_membership_before_unit_delete(sender, instance: Unit, **kwargs) -> None:
+    """Do not let an FK cascade make a deleted identity look reusable."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.repeats import mark_unit_deleted
+
+    mark_unit_deleted(instance.pk)
 
 
 @receiver(pre_delete, sender=Label)

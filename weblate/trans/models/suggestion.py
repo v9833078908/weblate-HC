@@ -299,6 +299,19 @@ class Suggestion(models.Model, UserDisplayMixin):
             messages.error(request, gettext("Could not accept suggestion!"))
             return
 
+        # Suggestions cannot carry the per-occurrence decision required to
+        # change a managed shared repeat. The editor and repeat queue provide
+        # that explicit choice before a target can be written.
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.repeats import current_shared_membership
+
+        if current_shared_membership(self.unit) is not None:
+            messages.error(
+                request,
+                gettext("Choose the repeat decision before accepting this suggestion."),
+            )
+            return
+
         # Skip if there is no change
         if self.unit.target != self.target or self.unit.state < STATE_TRANSLATED:
             if self.user and not self.user.is_anonymous:

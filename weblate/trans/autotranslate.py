@@ -490,6 +490,7 @@ class AutoTranslate(BaseAutoTranslate):
         translation.component.start_batched_checks()
         self.progress_base = 0
         self.written: set[int] = set()
+        self.reused: set[int] = set()
         self.target_state = STATE_TRANSLATED
         self.overwrite_existing = overwrite_existing
         self.judge_limit = judge_limit
@@ -773,6 +774,25 @@ class AutoTranslate(BaseAutoTranslate):
     ) -> dict[int, UnitMemoryResultDict]:
         """Get the translations."""
         units: list[Unit] = list(self.get_units().select_related("source_unit"))
+        # An accepted explicit repeat decision is a stronger source than a
+        # fresh machinery candidate. Apply it only to units the caller already
+        # selected, then remove those units before machinery forms batches.
+        # This deliberately does not pull siblings from outside the scope.
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.repeats import accepted_shared_group, create_membership
+
+        pending: list[Unit] = []
+        for unit in units:
+            group = accepted_shared_group(unit)
+            if group is None:
+                pending.append(unit)
+                continue
+            target = group.shared_target
+            if unit.get_target_plurals() != target:
+                self.update(unit, self.target_state, target)
+                self.reused.add(unit.pk)
+            create_membership(group=group, unit=unit, mode="shared", reason="mt-reuse")
+        units = pending
         num_units = len(units)
         if not num_units:
             return {}

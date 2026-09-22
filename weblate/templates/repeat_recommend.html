@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block content %}
+
+  <h1>{% translate "Prepare repeat recommendations" %}</h1>
+  <p>
+    {% blocktranslate count counter=group_count %}The model will receive the complete context of {{ counter }} repeat group and return a read-only recommendation.{% plural %}The model will receive the complete context of {{ counter }} repeat groups and return read-only recommendations.{% endblocktranslate %}
+  </p>
+  {% if unavailable %}<p class="alert alert-warning">{% translate "Recommendations are unavailable:" %} {{ unavailable }}</p>{% endif %}
+  <dl>
+    <dt>{% translate "Model" %}</dt>
+    <dd>
+      {{ profile.model|default:"—" }}
+    </dd>
+    <dt>{% translate "Estimated cost" %}</dt>
+    <dd>
+      {% if cost_range %}
+        {% blocktranslate with low=cost_range.0 high=cost_range.1 %}Observed cost per group: USD {{ low }} to {{ high }}.{% endblocktranslate %}
+      {% else %}
+        {% translate "Unknown. No reliable priced history exists for this model and operation." %}
+      {% endif %}
+    </dd>
+  </dl>
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="repeat-request-cap">{% translate "Maximum paid requests" %}</label>
+      <input id="repeat-request-cap"
+             class="form-control"
+             name="request_cap"
+             type="number"
+             min="1"
+             value="1"
+             required />
+      <p class="help-block">{% translate "The run stops before sending more requests than this limit." %}</p>
+    </div>
+    <button class="btn btn-primary" type="submit"{% if unavailable %} disabled{% endif %}>{% translate "Start paid recommendation run" %}</button>
+  </form>
+
+{% endblock content %}

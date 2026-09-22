@@ -613,6 +613,7 @@ class OldUnit(TypedDict):
     target: str
     context: str
     extra_flags: str
+    flags: str
     explanation: str
     automatically_translated: bool
 
@@ -853,6 +854,26 @@ class Unit(models.Model, LoggerMixin):
             update_fields=update_fields,
         )
 
+        # Repeat membership is an identity/constraint snapshot, not a best
+        # effort link. Imports reach this save path as well, so reconcile only
+        # after the transaction is committed and never change a target here.
+        if not was_created and any(
+            getattr(self, field) != self.old_unit[field]
+            for field in (
+                "source",
+                "target",
+                "state",
+                "context",
+                "flags",
+                "extra_flags",
+                "explanation",
+            )
+        ):
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.repeats import schedule_unit_reconciliation
+
+            schedule_unit_reconciliation(self.pk)
+
         # Set source_unit for source units, this needs to be done after
         # having a primary key
         if self.is_source and not self.source_unit_id:
@@ -940,6 +961,16 @@ class Unit(models.Model, LoggerMixin):
                 target=f"Removed label {label.name}",
             )
 
+        if new_labels != old_labels:
+            # Labels live on source Units. A target Unit can therefore enter
+            # or leave policy scope without its own fields changing.
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.repeats import schedule_unit_reconciliation
+
+            source = self if self.is_source else self.source_unit
+            for unit_id in source.unit_set.values_list("pk", flat=True):
+                schedule_unit_reconciliation(unit_id)
+
     def store_old_unit(self, unit) -> None:
         self.old_unit = {
             "state": unit.state,
@@ -947,6 +978,7 @@ class Unit(models.Model, LoggerMixin):
             "target": unit.target,
             "context": unit.context,
             "extra_flags": unit.extra_flags,
+            "flags": unit.flags,
             "explanation": unit.explanation,
             "automatically_translated": unit.automatically_translated,
         }

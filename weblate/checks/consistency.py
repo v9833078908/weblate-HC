@@ -317,7 +317,12 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
     advisory = True
 
     def get_repeat_members(self, units: Iterable[Unit]) -> list[Unit]:
-        """Exclude only members which explicitly ignore the check."""
+        """Exclude current independent decisions and members ignoring the check."""
+        if hasattr(units, "exclude"):
+            units = units.exclude(
+                repeat_memberships__mode="independent",
+                repeat_memberships__stale_at__isnull=True,
+            )
         return [unit for unit in units if not self.is_ignored(unit.all_flags)]
 
     def check_target_unit(

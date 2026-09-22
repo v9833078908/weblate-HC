@@ -48,6 +48,7 @@ class LLMUsageLog(models.Model):
     class Operation(models.TextChoices):
         TRANSLATION = "translation"
         JUDGE = "judge"
+        REPEAT_RECOMMEND = "repeat_recommend"
 
     class Outcome(models.TextChoices):
         APPLIED = "applied", "applied"
@@ -110,6 +111,13 @@ class LLMUsageLog(models.Model):
     )
     run = models.ForeignKey(
         "trans.ProducerRun",
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usage_logs",
+    )
+    repeat_recommendation_run = models.ForeignKey(
+        "trans.RepeatRecommendationRun",
         on_delete=models.deletion.SET_NULL,
         null=True,
         blank=True,
