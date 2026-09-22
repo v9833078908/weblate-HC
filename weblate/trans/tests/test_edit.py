@@ -1189,6 +1189,156 @@ class EditJSONMonoTest(EditTest):
     def create_component(self):
         return self.create_json_mono()
 
+    def test_structural_preview_requires_admin_and_returns_signed_token(self) -> None:
+        source = self.component.source_translation
+        unit = source.unit_set.order_by("pk").first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        url = reverse("rename-key", kwargs={"pk": unit.pk})
+
+        self.client.login(username="testuser", password="testpassword")
+        self.assertEqual(
+            self.client.post(
+                url, {"stage": "preview", "new_key": "renamed"}
+            ).status_code,
+            403,
+        )
+
+        self.make_manager()
+        response = self.client.post(url, {"stage": "preview", "new_key": "renamed"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("token", response.json())
+        self.assertLess(len(response.json()["token"]), 4096)
+        self.assertEqual(
+            response.json()["preview"]["affected_translation_count"],
+            self.component.translation_set.count(),
+        )
+        self.assertGreater(response.json()["preview"]["affected_file_count"], 0)
+
+    def test_structural_preview_requires_unit_and_template_management(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation
+        unit = source.unit_set.order_by("pk").first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        url = reverse("rename-key", kwargs={"pk": unit.pk})
+
+        self.component.manage_units = False
+        self.component.save(update_fields=["manage_units"])
+        self.assertEqual(
+            self.client.post(
+                url, {"stage": "preview", "new_key": "renamed"}
+            ).status_code,
+            404,
+        )
+
+        self.component.manage_units = True
+        self.component.edit_template = False
+        self.component.save(update_fields=["manage_units", "edit_template"])
+        self.assertEqual(
+            self.client.post(
+                url, {"stage": "preview", "new_key": "renamed"}
+            ).status_code,
+            404,
+        )
+
+    def test_structural_rename_confirm_updates_the_existing_unit(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation
+        unit = source.unit_set.order_by("position", "pk").first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        url = reverse("rename-key", kwargs={"pk": unit.pk})
+
+        preview = self.client.post(url, {"stage": "preview", "new_key": "renamed"})
+        self.assertEqual(preview.status_code, 200)
+        response = self.client.post(url, {"token": preview.json()["token"]})
+        self.assertEqual(response.status_code, 200)
+        unit.refresh_from_db()
+        self.assertEqual(unit.context, "renamed")
+        self.assertEqual(response.json()["unit_id"], unit.pk)
+        change_count = unit.change_set.filter(action=ActionEvents.RENAME_STRING).count()
+
+        repeated = self.client.post(url, {"token": preview.json()["token"]})
+        self.assertEqual(repeated.status_code, 200)
+        self.assertEqual(
+            unit.change_set.filter(action=ActionEvents.RENAME_STRING).count(),
+            change_count,
+        )
+
+    def test_structural_move_confirm_returns_position_redirect(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation
+        unit, anchor = source.unit_set.order_by("position", "pk")[:2]
+        url = reverse("move-string", kwargs={"pk": unit.pk})
+
+        preview = self.client.post(
+            url, {"stage": "preview", "anchor": anchor.pk, "placement": "after"}
+        )
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.json()["preview"]["old_position"], unit.position)
+        self.assertEqual(preview.json()["preview"]["previous_context"], anchor.context)
+        response = self.client.post(url, {"token": preview.json()["token"]})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("sort_by=position", response.json()["url"])
+        change_count = unit.change_set.filter(action=ActionEvents.MOVE_STRING).count()
+
+        repeated = self.client.post(url, {"token": preview.json()["token"]})
+        self.assertEqual(repeated.status_code, 200)
+        self.assertFalse(repeated.json()["changed"])
+        self.assertEqual(
+            unit.change_set.filter(action=ActionEvents.MOVE_STRING).count(),
+            change_count,
+        )
+
+    def test_structural_rename_reconciles_clean_desired_files(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation
+        unit = source.unit_set.order_by("position", "pk").first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        old_context = unit.context
+        old_hash = unit.id_hash
+        url = reverse("rename-key", kwargs={"pk": unit.pk})
+        preview = self.client.post(url, {"stage": "preview", "new_key": "renamed"})
+        token = preview.json()["token"]
+
+        self.assertEqual(self.client.post(url, {"token": token}).status_code, 200)
+        unit.change_set.filter(action=ActionEvents.RENAME_STRING).delete()
+        Unit.objects.filter(pk=unit.pk).update(context=old_context, id_hash=old_hash)
+
+        reconciled = self.client.post(url, {"token": token})
+        self.assertEqual(reconciled.status_code, 200)
+        unit.refresh_from_db()
+        self.assertEqual(unit.context, "renamed")
+        change = unit.change_set.get(action=ActionEvents.RENAME_STRING)
+        self.assertTrue(change.details["reconciled_existing_file_state"])
+
+    def test_structural_actions_render_one_accessible_modal(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation
+        unit = source.unit_set.order_by("position", "pk").first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(len(tree.xpath('//*[@id="source-unit-structure-modal"]')), 1)
+        self.assertEqual(len(tree.xpath('//*[@role="listbox"]')), 0)
+        self.assertEqual(len(tree.xpath('//*[@id="source-unit-structure-form"]')), 1)
+        self.assertEqual(
+            len(tree.xpath('//button[contains(@class, "js-rename-key")]')), 1
+        )
+
+        response = self.client.get(
+            reverse("browse", kwargs={"path": source.get_url_path()})
+        )
+        tree = html.fromstring(response.content)
+        self.assertEqual(len(tree.xpath('//*[@id="source-unit-structure-modal"]')), 1)
+        self.assertGreater(
+            len(tree.xpath('//button[contains(@class, "js-move-string")]')), 0
+        )
+
     def enable_nested_unit_management(self) -> None:
         self.component.manage_units = True
         self.component.file_format = "json-nested"

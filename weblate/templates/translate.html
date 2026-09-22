@@ -5,6 +5,7 @@
 {% block extra_script %}
   <script defer src="{% static 'editor/base.js' %}"></script>
   <script defer src="{% static 'editor/full.js' %}"></script>
+  <script defer src="{% static 'editor/source-unit-structure.js' %}"></script>
   <script defer src="{% static 'js/screenshots/clipboard-paste.js' %}"></script>
   {# Bulk accept suggestions feature #}
   <script defer src="{% static 'js/bulk-accept-suggestions.js' %}"></script>
@@ -45,6 +46,7 @@
   {% perm 'screenshot.add' unit.translation as user_can_add_screenshot %}
   {% perm 'comment.add' unit.translation as user_can_add_comment %}
   {% perm 'unit.add' unit.translation as user_can_add_unit %}
+  {% perm 'component.edit' unit.translation.component as user_can_edit_component %}
 
   <div class="btn-group float-end btn-group-settings" role="group">
     <a href="{% url 'zen' path=object.get_url_path %}?offset={{ offset }}&amp;{{ search_url }}"
@@ -238,6 +240,14 @@
                                href="#"
                                data-bs-toggle="modal"
                                data-bs-target="#add-unit-form">{% translate "Add variant of this string" %}</a>
+                          </li>
+                        {% endif %}
+                        {% if unit.is_source and user_can_edit_component and unit.translation.component.manage_units and unit.translation.component.edit_template and unit.translation.component.file_format_supports_key_rename and not locked %}
+                          <li>
+                            <button type="button"
+                                    class="dropdown-item js-rename-key"
+                                    data-url="{% url 'rename-key' pk=unit.pk %}"
+                                    data-key="{{ unit.context }}">{% translate "Rename key" %}</button>
                           </li>
                         {% endif %}
                         {% if user_can_translate and unit.translation.component.is_multivalue %}
@@ -1215,5 +1225,7 @@
       <!-- /.modal -->
     </form>
   {% endif %}
+
+  {% include "snippets/source-unit-structure-modal.html" %}
 
 {% endblock content %}

@@ -7,6 +7,8 @@ Weblate 2026.8.1
 
 .. rubric:: New features
 
+* Project administrators can rename a key or move a source string in flat JSON components without recreating its translations or metadata; both operations are previewed, audited, and write the resulting source order to the component files.
+
 * Added an optional :ref:`LLM judge <llm-judge>` automatic translation mode, where two independently configured language models review each string in a filter and record a per-string verdict; a rejected string is held in the existing :guilabel:`Needs editing` queue for a human decision instead of shipping automatically.
 * An unresolved LLM-judge critical or major on a writable string now gets one stored, previewable repair candidate instead of an automatic rewrite; a major still ships as translated with advisory ``judge-flag`` evidence attached, and a critical still holds automatically until a reviewer records an audited decision, see :ref:`llm-judge`.
 * The LLM-judge verdict card embedded on the string page is now a full producer triage surface: it previews a stored candidate's diff and provenance, offers :guilabel:`Use suggested fix`, :guilabel:`Generate another`, and a one-string :guilabel:`Re-check this string`, and a reviewer can accept a fresh major as-is directly without first escalating it, see :ref:`llm-judge`.

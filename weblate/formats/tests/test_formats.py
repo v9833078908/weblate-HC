@@ -28,7 +28,12 @@ from translate.storage.pypo import pofile
 
 from weblate.checks.flags import Flags
 from weblate.formats.auto import AutodetectFormat, detect_filename, try_load
-from weblate.formats.base import BilingualUpdateMixin, TranslationFormat, UpdateError
+from weblate.formats.base import (
+    BilingualUpdateMixin,
+    TranslationFormat,
+    UnitNotFoundError,
+    UpdateError,
+)
 from weblate.formats.convert import MDXFormat
 from weblate.formats.external import XlsxFormat
 from weblate.formats.helpers import NamedBytesIO, format_csv_id_hash
@@ -1686,6 +1691,87 @@ class JSONFormatTest(BaseFormatTest):
 
     def assert_same(self, newdata, testdata) -> None:
         self.assertJSONEqual(newdata.decode(), testdata.decode())
+
+    def test_rename_key(self) -> None:
+        if self.format_class is not JSONFormat:
+            self.skipTest("Structural mutations are proven only for flat JSON.")
+        testfile = Path(self.tempdir) / "rename.json"
+        testfile.write_text('{"a": "A", "b": "B", "c": "C"}\n', encoding="utf-8")
+
+        storage = self.parse_file(testfile)
+        self.assertTrue(storage.rename_key("b", "x"))
+        storage.save()
+
+        self.assertEqual(
+            testfile.read_text(encoding="utf-8"),
+            '{\n    "a": "A",\n    "x": "B",\n    "c": "C"\n}\n',
+        )
+        reloaded = self.parse_file(testfile)
+        self.assertEqual(reloaded.find_unit("x", "")[0].target, "B")
+        with self.assertRaises(UnitNotFoundError):
+            reloaded.find_unit("b", "")
+
+    def test_rename_key_rejects_collision_and_blank(self) -> None:
+        if self.format_class is not JSONFormat:
+            self.skipTest("Structural mutations are proven only for flat JSON.")
+        testfile = Path(self.tempdir) / "invalid-rename.json"
+        testfile.write_text('{"a": "A", "b": "B"}\n', encoding="utf-8")
+        storage = self.parse_file(testfile)
+        before = self.format_class.serialize(storage.store)
+
+        self.assertFalse(storage.rename_key("a", "a"))
+        with self.assertRaises(ValueError):
+            storage.rename_key("b", "a")
+        with self.assertRaises(ValueError):
+            storage.rename_key("a", "")
+
+        self.assertEqual(self.format_class.serialize(storage.store), before)
+
+    def test_apply_key_order(self) -> None:
+        if self.format_class is not JSONFormat:
+            self.skipTest("Structural mutations are proven only for flat JSON.")
+        testfile = Path(self.tempdir) / "order.json"
+        testfile.write_text('{"a": "A", "b": "B", "c": "C"}\n', encoding="utf-8")
+
+        storage = self.parse_file(testfile)
+        self.assertTrue(storage.apply_key_order(("a", "c", "b")))
+        storage.save()
+
+        self.assertEqual(
+            testfile.read_text(encoding="utf-8"),
+            '{\n    "a": "A",\n    "c": "C",\n    "b": "B"\n}\n',
+        )
+        self.assertEqual(
+            [unit.getid() for unit in self.parse_file(testfile).all_store_units],
+            [".a", ".c", ".b"],
+        )
+
+    def test_apply_key_order_keeps_unknown_slots_and_target_subset(self) -> None:
+        if self.format_class is not JSONFormat:
+            self.skipTest("Structural mutations are proven only for flat JSON.")
+        testfile = Path(self.tempdir) / "subset.json"
+        testfile.write_text('{"a": "A", "raw": "Raw", "c": "C"}\n', encoding="utf-8")
+
+        storage = self.parse_file(testfile)
+        self.assertTrue(storage.apply_key_order(("c", "a", "b")))
+        storage.save()
+
+        self.assertEqual(
+            testfile.read_text(encoding="utf-8"),
+            '{\n    "c": "C",\n    "raw": "Raw",\n    "a": "A"\n}\n',
+        )
+
+    def test_structural_capabilities_are_limited_to_unsorted_flat_json(self) -> None:
+        if self.format_class is not JSONFormat:
+            self.skipTest("Capabilities are asserted once for flat JSON.")
+        self.assertTrue(JSONFormat.supports_key_rename({}))
+        self.assertTrue(JSONFormat.supports_key_order({}))
+        self.assertFalse(JSONFormat.supports_key_rename({"json_sort_keys": True}))
+        self.assertFalse(JSONFormat.supports_key_order({"json_sort_keys": True}))
+        self.assertFalse(JSONNestedFormat.supports_key_rename({}))
+        self.assertFalse(JSONNestedFormat.supports_key_order({}))
+        self.assertFalse(I18NextFormat.supports_key_rename({}))
+        self.assertFalse(I18NextFormat.supports_key_order({}))
 
 
 class JSONNestedFormatTest(JSONFormatTest):

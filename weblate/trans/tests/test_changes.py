@@ -104,6 +104,39 @@ class ChangesTest(ViewTestCase):
         response = self.client.get(reverse("changes"))
         self.assertContains(response, "Resource update")
 
+    def test_rename_string_details_are_escaped(self) -> None:
+        unit = self.get_unit().source_unit
+        change = unit.change_set.create(
+            action=ActionEvents.RENAME_STRING,
+            user=self.user,
+            author=self.user,
+            details={"old_context": "old<script>", "new_context": "new&key"},
+        )
+
+        rendered = str(change.get_details_display())
+        self.assertIn("old&lt;script&gt;", rendered)
+        self.assertIn("new&amp;key", rendered)
+        self.assertNotIn("<script>", rendered)
+
+    def test_move_string_details_include_anchor_and_positions(self) -> None:
+        unit = self.get_unit().source_unit
+        change = unit.change_set.create(
+            action=ActionEvents.MOVE_STRING,
+            user=self.user,
+            author=self.user,
+            details={
+                "old_position": 10,
+                "new_position": 3,
+                "anchor": "anchor<key>",
+                "placement": "before",
+            },
+        )
+
+        rendered = str(change.get_details_display())
+        self.assertIn("position 10", rendered)
+        self.assertIn("position 3", rendered)
+        self.assertIn("anchor&lt;key&gt;", rendered)
+
     def test_basic_rss(self) -> None:
         response = self.client.get(reverse("changes-rss"))
         self.assert_rss_response(response)
