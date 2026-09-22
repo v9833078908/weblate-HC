@@ -24,3 +24,15 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Repeat queue")
         self.assertContains(response, "No active repeat rule exists")
+
+    def test_project_manager_can_open_repeat_rule_form(self) -> None:
+        self.make_manager()
+        response = self.client.get(
+            reverse(
+                "repeat-rule",
+                kwargs={"project": self.project.slug, "language": "cs"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Save repeat rule")
