@@ -8,11 +8,17 @@ from __future__ import annotations
 from django.core.exceptions import ValidationError
 
 from weblate.checks.consistency import RepeatDriftCheck
-from weblate.trans.models import RepeatMembership, RepeatPolicy, RepeatRecommendationRun
+from weblate.trans.models import (
+    Label,
+    RepeatMembership,
+    RepeatPolicy,
+    RepeatRecommendationRun,
+)
 from weblate.trans.repeat_recommendations import parse_results, reserve_attempt
 from weblate.trans.repeats import (
     apply_preview,
     create_membership,
+    current_shared_membership,
     detect_policy_groups,
     get_or_create_group,
     preview_group,
@@ -139,6 +145,48 @@ class RepeatModelTest(ViewTestCase):
         )
         remaining = RepeatDriftCheck().get_repeat_members(second.repeat_units)
         self.assertEqual(remaining, [])
+
+    def test_later_label_overlap_disables_existing_shared_reuse(self) -> None:
+        """Selector changes must never choose a winner between active rules."""
+        first = self.add_repeat("first", "One")
+        second = self.add_repeat("second", "Two")
+        first_label = Label.objects.create(
+            project=self.project, name="first", color="blue"
+        )
+        second_label = Label.objects.create(
+            project=self.project, name="second", color="green"
+        )
+        first.source_unit.save_labels([first_label], self.user)
+        policy = RepeatPolicy(
+            project=self.project,
+            source_language=self.component.source_language,
+            target_language=self.translation.language,
+        )
+        policy = save_policy(
+            policy=policy,
+            components=[self.component],
+            labels=[first_label],
+            actor=self.user,
+        )
+        save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=self.translation.language,
+            ),
+            components=[self.component],
+            labels=[second_label],
+            actor=self.user,
+        )
+        create_membership(
+            group=get_or_create_group(policy, first),
+            unit=first,
+            mode=RepeatMembership.Mode.SHARED,
+        )
+
+        first.source_unit.save_labels([first_label, second_label], self.user)
+
+        self.assertIsNone(current_shared_membership(first))
 
     def test_recommendation_attempt_cap_is_reserved_before_send(self) -> None:
         run = RepeatRecommendationRun.objects.create(

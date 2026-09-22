@@ -115,6 +115,16 @@ def policy_overlaps(policy: RepeatPolicy, *, exclude_policy_id: int | None = Non
     ]
 
 
+def unit_has_policy_conflict(unit: Unit, policy: RepeatPolicy) -> bool:
+    """Tell whether selector edits have made a formerly valid scope ambiguous."""
+    # Rules are dynamic: a later source-label edit can overlap two policies
+    # without either policy itself being saved again.
+    return any(
+        unit_matches_policy(unit, other)
+        for other in policy_overlaps(policy, exclude_policy_id=policy.pk)
+    )
+
+
 def save_policy(
     *,
     policy: RepeatPolicy,
@@ -265,6 +275,8 @@ def current_shared_membership(unit: Unit):
     )
     if membership is not None and not reconcile_membership(membership):
         return None
+    if membership is not None and unit_has_policy_conflict(unit, membership.group.policy):
+        return None
     return membership
 
 
@@ -314,6 +326,7 @@ def preview_group(
 ) -> RepeatPreview:
     """Create a signed, current snapshot for an explicit shared target."""
     members: list[RepeatPreviewMember] = []
+    target = list(target)
     for unit in (
         policy_units(group.policy)
         .filter_access(actor)
@@ -323,7 +336,9 @@ def preview_group(
         if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
             continue
         reason = ""
-        if unit.state == STATE_APPROVED and unit.get_target_plurals() != target:
+        if unit_has_policy_conflict(unit, group.policy):
+            reason = "rule-conflict"
+        elif unit.state == STATE_APPROVED and unit.get_target_plurals() != target:
             reason = "approved"
         elif unit.translation.component.locked:
             reason = "locked"
@@ -399,6 +414,13 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
             unit_fingerprint(unit) != expected[unit.pk] for unit in units
         ):
             msg = "A repeat recipient changed; refresh the preview."
+            raise ValidationError(msg)
+        if any(
+            not unit_matches_policy(unit, group.policy)
+            or unit_has_policy_conflict(unit, group.policy)
+            for unit in units
+        ):
+            msg = "The repeat policy scope changed; refresh the preview."
             raise ValidationError(msg)
         event = RepeatDecisionEvent.objects.create(
             group=group,

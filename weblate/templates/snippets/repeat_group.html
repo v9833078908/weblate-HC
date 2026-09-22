@@ -1,8 +1,101 @@
 {% load i18n %}
-<li id="g-{{ item.group.pk }}" class="rq-group"><h2><button type="button"
-        class="rq-toggle"
-        aria-expanded="false"
-        aria-controls="group-{{ item.group.pk }}">{{ item.group.source_forms.0 }} <span class="badge text-bg-secondary">{{ item.units|length }}</span></button></h2><section id="group-{{ item.group.pk }}"
-         class="rq-panel"
-         hidden
-         aria-label="{% translate 'Repeat group' %}"><form method="post" action="{% url 'repeat-preview' group_id=item.group.pk %}">{% csrf_token %}<fieldset><legend>{% translate "What should happen to this group?" %}</legend>{% for variant in item.variants %}<label class="rq-option"><input type="radio" name="target" value="{{ variant }}" required /> <code>{{ variant }}</code></label>{% endfor %}</fieldset><button class="btn btn-primary" type="submit">{% translate "Preview changes" %}</button><p class="text-muted">{% translate "Nothing is saved before preview. Approved translations are not changed." %}</p></form><details><summary>{% blocktranslate count counter=item.units|length %}{{ counter }} occurrence{% plural %}{{ counter }} occurrences{% endblocktranslate %}</summary><ul>{% for unit in item.units %}<li><code>{{ unit.context }}</code> — {{ unit.target }}</li>{% endfor %}</ul></details></section></li>
+
+<li id="g-{{ item.group.pk }}" class="rq-group rq-{{ item.status }}">
+  <h2>
+    <button class="rq-toggle"
+            type="button"
+            aria-expanded="{% if open_group == item.group.pk|stringformat:'s' or not open_group and forloop.first %}true{% else %}false{% endif %}"
+            aria-controls="group-{{ item.group.pk }}">
+      <span class="rq-source">{{ item.group.source_forms.0 }}</span>
+      <span class="rq-group-summary">{% blocktranslate count counter=item.units|length %}{{ counter }} occurrence{% plural %}{{ counter }} occurrences{% endblocktranslate %} · {% blocktranslate count counter=item.variants|length %}{{ counter }} translation{% plural %}{{ counter }} translations{% endblocktranslate %}</span>
+      {% if item.status == 'approved-conflict' %}
+        <span class="badge text-bg-warning">{% translate "Approved conflict" %}</span>
+      {% elif item.status == 'rule-conflict' %}
+        <span class="badge text-bg-danger">{% translate "Rule conflict" %}</span>
+      {% elif item.status == 'resolved' %}
+        <span class="badge text-bg-success">{% translate "Resolved" %}</span>
+      {% else %}
+        <span class="badge text-bg-secondary">{% translate "Needs a decision" %}</span>
+      {% endif %}
+    </button>
+  </h2>
+  <section id="group-{{ item.group.pk }}"
+           class="rq-panel"
+           role="region"
+           aria-labelledby="g-{{ item.group.pk }}"
+           {% if open_group != item.group.pk|stringformat:'s' and open_group or open_group and open_group != item.group.pk|stringformat:'s' or not open_group and not forloop.first %} hidden{% endif %}>
+    {% if item.approved_conflict %}
+      <p class="alert alert-warning">{% translate "Approved translations differ. They remain unchanged; you can still write a selected translation to eligible non-approved occurrences." %}</p>
+    {% endif %}
+    {% if item.group.shared_target %}<p class="text-muted">{% translate "Current shared translation:" %} <code>{{ item.group.shared_target.0 }}</code></p>{% endif %}
+    {% if item.recommendation %}<p class="rq-recommendation"><span class="badge text-bg-info">{% translate "Model recommendation" %}</span> {% if item.recommendation.rationale %}{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}{% endif %}</p>{% endif %}
+
+    <form method="post"
+          action="{% url 'repeat-preview' group_id=item.group.pk %}"
+          class="rq-decision">
+      {% csrf_token %}
+      <fieldset>
+        <legend>{% translate "What to do with this group?" %}</legend>
+        {% if not item.all_approved %}
+          {% for variant in item.variants %}
+            <label class="rq-option form-check">
+              <input class="form-check-input"
+                     type="radio"
+                     name="target"
+                     value="{{ variant.target.0 }}"
+                     data-choice="variant" />
+              <span class="form-check-label"><code>{{ variant.target.0 }}</code> — {% blocktranslate count counter=variant.units|length %}used by {{ counter }} occurrence{% plural %}used by {{ counter }} occurrences{% endblocktranslate %}</span>
+            </label>
+          {% endfor %}
+          <label class="rq-option form-check">
+            <input class="form-check-input"
+                   type="radio"
+                   name="choice"
+                   value="custom"
+                   data-choice="custom" />
+            <span class="form-check-label">{% translate "Own translation" %}</span>
+          </label>
+          <input class="form-control rq-custom"
+                 name="custom_target"
+                 aria-label="{% translate 'Own translation' %}"
+                 hidden />
+        {% endif %}
+        <label class="rq-option form-check">
+          <input class="form-check-input"
+                 type="radio"
+                 name="choice"
+                 value="keep"
+                 data-choice="keep" />
+          <span class="form-check-label">{% translate "Keep different translations" %}</span>
+        </label>
+      </fieldset>
+      <input type="hidden" name="choice" value="variant" class="rq-choice" />
+      <button class="btn btn-primary rq-preview" type="submit" aria-disabled="true">{% translate "Preview changes" %}</button>
+      <p class="rq-hint" aria-live="polite">{% translate "Choose an option to continue." %}</p>
+      <p class="text-muted">{% translate "Nothing is written before the preview. Approved translations are never changed." %}</p>
+    </form>
+
+    <details>
+      <summary>{% blocktranslate count counter=item.units|length %}Occurrences ({{ counter }}){% plural %}Occurrences ({{ counter }}){% endblocktranslate %}</summary>
+      <div class="table-scroll"
+           role="region"
+           tabindex="0"
+           aria-label="{% translate 'Repeat occurrences' %}">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>{% translate "Key" %}</th>
+              <th>{% translate "Component" %}</th>
+              <th>{% translate "Current translation" %}</th>
+              <th>{% translate "State" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for unit in item.units|slice:':10' %}<tr><td><a href="{{ unit.get_absolute_url }}"><code>{{ unit.context }}</code></a></td><td>{{ unit.translation.component }}</td><td><code>{{ unit.target }}</code></td><td>{{ unit.get_state_display }}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if item.units|length > 10 %}<a href="?group={{ item.group.pk }}&members=all#g-{{ item.group.pk }}">{% blocktranslate with count=item.units|length|add:'-10' %}Show the remaining {{ count }}{% endblocktranslate %}</a>{% endif %}
+    </details>
+  </section>
+</li>

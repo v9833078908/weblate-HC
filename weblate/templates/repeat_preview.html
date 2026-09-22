@@ -1,3 +1,49 @@
 {% extends "base.html" %}
+
 {% load i18n %}
-{% block content %}<main class="rq"><h1>{% translate "What will change" %}</h1><p>{% translate "Nothing has been saved yet." %}</p><form method="post" action="{% url 'repeat-apply' %}">{% csrf_token %}<input type="hidden" name="token" value="{{ preview.token }}" /><ul>{% for member in preview.members %}<li>{{ member.unit_id }} — {% if member.eligible %}{% translate "will be written" %}{% else %}{{ member.reason }}{% endif %}</li>{% endfor %}</ul><button class="btn btn-primary">{% translate "Apply decision" %}</button></form></main>{% endblock %}
+
+{% block content %}
+
+  <p>
+    <a href="{{ queue_url }}">{% translate "Back to the group" %}: <code>{{ group.source_forms.0 }}</code></a>
+  </p>
+  <h1>{% translate "What will change" %}</h1>
+  <p>{% translate "Nothing has been saved yet. Only checked eligible occurrences will be written; approved translations are not changed." %}</p>
+  <form method="post" action="{% url 'repeat-apply' %}>{% csrf_token %}
+    <input type="hidden" name="token" value="{{ preview.token }}" />
+    <div class="table-scroll"
+      role="region"
+      tabindex="0"
+      aria-label="{% translate 'Changes by occurrence' %}">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{% translate "Write" %}</th>
+            <th>{% translate "Occurrence" %}</th>
+            <th>{% translate "Result" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member in preview.members %}
+            <tr>
+              <td>
+                {% if member.eligible %}
+                  <input type="checkbox"
+                    name="unit"
+                    value="{{ member.unit_id }}"
+                    checked
+                    aria-label="{% translate 'Write this occurrence' %}" />
+                {% else %}
+                  <span aria-label="{{ member.reason }}">—</span>
+                {% endif %}
+              </td>
+              <td>{{ member.unit_id }}</td>
+              <td>{% if member.eligible %}<code>{{ member.target|join:' / ' }}</code>{% else %}{{ member.reason }}{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button class="btn btn-primary" type="submit">{% translate "Apply decision" %}</button>
+  </form>
+{% endblock content %}

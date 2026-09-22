@@ -1,3 +1,18 @@
 {% extends "base.html" %}
+
 {% load i18n %}
-{% block content %}<main class="rq"><h1>{% translate "Repeat decision result" %}</h1><p>{% blocktranslate count counter=event.result.written|length %}{{ counter }} occurrence was updated.{% plural %}{{ counter }} occurrences were updated.{% endblocktranslate %}</p><ul>{% for item in event.result.skipped %}<li>{{ item.unit }} — {{ item.reason }}</li>{% endfor %}</ul></main>{% endblock %}
+
+{% block content %}
+  <main class="rq">
+    <h1>{% translate "Repeat decision result" %}</h1>
+    {% if event.action == 'independent' %}
+      <p>{% blocktranslate count counter=event.result.independent|length %}{{ counter }} occurrence was marked different on purpose.{% plural %}{{ counter }} occurrences were marked different on purpose.{% endblocktranslate %}</p>
+    {% else %}
+      <p>{% blocktranslate count counter=event.result.written|length %}{{ counter }} occurrence was updated.{% plural %}{{ counter }} occurrences were updated.{% endblocktranslate %}</p>
+      {% if event.result.skipped %}
+        <h2>{% translate "Not written" %}</h2>
+        <ul>{% for item in event.result.skipped %}<li>{{ item.unit }} — {{ item.reason }}</li>{% endfor %}</ul>
+      {% endif %}
+    {% endif %}
+  </main>
+{% endblock content %}

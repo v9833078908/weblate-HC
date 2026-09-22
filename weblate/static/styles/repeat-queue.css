@@ -5,26 +5,144 @@
   max-width: 1120px;
   margin-inline: auto;
 }
+
+.rq-heading,
+.rq-toolbar {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.rq-filters,
+.rq-toolbar {
+  border-block: 1px solid var(--bs-border-color);
+  padding-block: 1rem;
+}
+
+.rq-filters > div + div {
+  margin-top: 0.5rem;
+}
+
+.rq-toolbar nav {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.rq-toolbar nav a[aria-current="page"] {
+  font-weight: 700;
+  text-decoration-thickness: 2px;
+}
+
+.rq-summary {
+  margin-block: 1rem;
+}
+
 .rq-groups {
   list-style: none;
   padding: 0;
 }
+
 .rq-group {
-  border-block: 1px solid var(--bs-border-color);
-  padding: 1rem 0;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 4px;
+  margin-block: 0.75rem;
 }
+
 .rq-toggle {
+  display: grid;
   width: 100%;
-  text-align: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 1rem;
+  padding: 0.9rem 1rem;
   border: 0;
-  background: transparent;
-  font: inherit;
+  background: var(--bs-body-bg);
+  color: inherit;
+  text-align: start;
 }
+
+.rq-source {
+  overflow: hidden;
+  font-family: var(--bs-font-monospace);
+  font-size: 1rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-group-summary {
+  color: var(--bs-secondary-color);
+  font-size: 0.875rem;
+}
+
+.rq-toggle .badge {
+  grid-row: span 2;
+  align-self: center;
+  font-size: 0.75rem;
+}
+
 .rq-panel {
-  padding: 1rem 0 0 1rem;
   border-inline-start: 2px solid var(--bs-primary);
+  margin: 0 1rem 1rem;
+  padding: 1rem;
 }
+
 .rq-option {
   display: block;
   margin-block: 0.5rem;
+}
+
+.rq-custom {
+  margin: 0.5rem 0 0.75rem 1.5rem;
+  max-width: 44rem;
+}
+
+.rq-hint {
+  display: inline;
+  margin-inline-start: 0.75rem;
+}
+
+.rq .btn {
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.rq [aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.rq :focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 576px) {
+  .rq-panel {
+    margin-inline: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .rq-toggle {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-toggle .badge {
+    grid-row: auto;
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rq-panel {
+    transition: opacity 0.2s ease;
+  }
 }
