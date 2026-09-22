@@ -314,7 +314,10 @@ def preview_group(
     """Create a signed, current snapshot for an explicit shared target."""
     members: list[RepeatPreviewMember] = []
     for unit in (
-        policy_units(group.policy).filter(source=group.source_forms[0]).order_by("pk")
+        policy_units(group.policy)
+        .filter_access(actor)
+        .filter(source=group.source_forms[0])
+        .order_by("pk")
     ):
         if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
             continue
@@ -528,10 +531,15 @@ def undo_event(*, token: str, actor: User):
     return undo
 
 
-def detect_policy_groups(policy: RepeatPolicy) -> list[RepeatCandidate]:
+def detect_policy_groups(
+    policy: RepeatPolicy, *, user: User | None = None
+) -> list[RepeatCandidate]:
     """Build exact repeat groups from live scope; no normalization is applied."""
     grouped: dict[tuple[tuple[str, ...], int], list[int]] = {}
-    for unit in policy_units(policy).filter(state__gte=STATE_TRANSLATED):
+    units = policy_units(policy)
+    if user is not None:
+        units = units.filter_access(user)
+    for unit in units.filter(state__gte=STATE_TRANSLATED):
         key = (tuple(unit.get_source_plurals()), unit.translation.plural.number)
         grouped.setdefault(key, []).append(unit.pk)
     return [

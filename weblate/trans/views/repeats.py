@@ -11,7 +11,7 @@ from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
 from weblate.lang.models import Language
-from weblate.trans.models import Project, RepeatGroup, RepeatPolicy, Unit
+from weblate.trans.models import Project, RepeatGroup, RepeatPolicy
 from weblate.trans.repeat_recommendations import (
     prepare_run,
     queue_attempt,
@@ -38,10 +38,11 @@ def repeat_queue(request, project: str, language: str):
     ).first()
     groups = []
     if policy is not None:
-        for candidate in detect_policy_groups(policy):
-            unit = policy_units(policy).get(pk=candidate.unit_ids[0])
+        visible_units = policy_units(policy).filter_access(request.user)
+        for candidate in detect_policy_groups(policy, user=request.user):
+            unit = visible_units.get(pk=candidate.unit_ids[0])
             group = get_or_create_group(policy, unit)
-            units = list(Unit.objects.filter(pk__in=candidate.unit_ids).order_by("pk"))
+            units = list(visible_units.filter(pk__in=candidate.unit_ids).order_by("pk"))
             variants = sorted({unit.target for unit in units})
             groups.append({"group": group, "units": units, "variants": variants})
     return render(

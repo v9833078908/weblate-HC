@@ -81,7 +81,7 @@ def prepare_run(*, policy: RepeatPolicy, actor: User, request_cap: int):
     # pair-wide validation and therefore never consults/falls back to seat 2.
     profile = resolve_judge_seat_profile(1, endpoint=judge_primary_endpoint())
     groups = []
-    for candidate in detect_policy_groups(policy):
+    for candidate in detect_policy_groups(policy, user=actor):
         unit = policy_units(policy).get(pk=candidate.unit_ids[0])
         group = get_or_create_group(policy, unit)
         groups.append(
