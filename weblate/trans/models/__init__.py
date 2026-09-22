@@ -51,6 +51,9 @@ from weblate.trans.models.repeat import (
     RepeatGroup,
     RepeatMembership,
     RepeatPolicy,
+    RepeatRecommendationAttempt,
+    RepeatRecommendationResult,
+    RepeatRecommendationRun,
 )
 from weblate.trans.models.report import Report
 from weblate.trans.models.suggestion import Suggestion, SuggestionAddResult, Vote
@@ -94,6 +97,9 @@ __all__ = [
     "RepeatGroup",
     "RepeatMembership",
     "RepeatPolicy",
+    "RepeatRecommendationAttempt",
+    "RepeatRecommendationResult",
+    "RepeatRecommendationRun",
     "Report",
     "Suggestion",
     "SuggestionAddResult",

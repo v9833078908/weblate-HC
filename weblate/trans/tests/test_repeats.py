@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
-from weblate.trans.models import RepeatMembership, RepeatPolicy
+from django.core.exceptions import ValidationError
+
+from weblate.trans.models import RepeatMembership, RepeatPolicy, RepeatRecommendationRun
+from weblate.trans.repeat_recommendations import reserve_attempt
 from weblate.trans.repeats import (
     apply_preview,
     create_membership,
@@ -131,3 +134,18 @@ class RepeatModelTest(ViewTestCase):
 
         remaining = RepeatDriftCheck().get_repeat_members(second.repeat_units)
         self.assertEqual(remaining, [])
+
+    def test_recommendation_attempt_cap_is_reserved_before_send(self) -> None:
+        run = RepeatRecommendationRun.objects.create(
+            policy=self.make_policy(),
+            actor=self.user,
+            snapshot={},
+            snapshot_fingerprint="a" * 64,
+            profile_fingerprint="b" * 64,
+            prompt_fingerprint="c" * 64,
+            request_cap=1,
+        )
+        attempt = reserve_attempt(run=run, request_snapshot={"groups": []})
+        self.assertEqual(attempt.ordinal, 1)
+        with self.assertRaisesMessage(ValidationError, "request cap"):
+            reserve_attempt(run=run, request_snapshot={"groups": []})

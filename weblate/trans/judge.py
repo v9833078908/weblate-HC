@@ -1343,14 +1343,14 @@ def _decode_non_stream(
 
 
 def _post_response(
-    payload: dict, profile: JudgeSeatProfile, started: float
+    payload: dict, profile: JudgeSeatProfile, started: float, *, title: str
 ) -> _BatchResponse:
     headers = {
         "Authorization": f"Bearer {profile.api_key}",
         "Content-Type": "application/json",
     }
-    if profile.provider == "openrouter":
-        headers["X-OpenRouter-Title"] = OPENROUTER_JUDGE_TITLE
+    if profile.provider == "openrouter" and title:
+        headers["X-OpenRouter-Title"] = title
     with stream_validated_url(
         "POST",
         f"{profile.base_url.rstrip('/')}/chat/completions",
@@ -1397,10 +1397,12 @@ def _request_timeout(profile: JudgeSeatProfile) -> httpx2.Timeout:
     )
 
 
-def _post_batch(payload: dict, profile: JudgeSeatProfile) -> _BatchResponse:
+def _post_batch(
+    payload: dict, profile: JudgeSeatProfile, *, title: str = OPENROUTER_JUDGE_TITLE
+) -> _BatchResponse:
     started = time.monotonic()
     try:
-        return _post_response(payload, profile, started)
+        return _post_response(payload, profile, started, title=title)
     except Exception as error:
         return _BatchResponse(
             None,
@@ -1655,6 +1657,18 @@ def _reasoning_payload(profile: JudgeSeatProfile) -> dict:
     if profile.reasoning:
         return {"reasoning": {"effort": profile.reasoning, "exclude": True}}
     return {}
+
+
+def reasoning_payload(profile: JudgeSeatProfile) -> dict:
+    """Return the approved provider-specific reasoning controls for a profile."""
+    return _reasoning_payload(profile)
+
+
+def post_chat_completion(
+    payload: dict, profile: JudgeSeatProfile, *, title: str
+) -> _BatchResponse:
+    """Post one bounded OpenAI-compatible request without judge semantics."""
+    return _post_batch(payload, profile, title=title)
 
 
 def _payload(

@@ -197,3 +197,108 @@ class RepeatDecisionEvent(models.Model):
 
     def __str__(self) -> str:
         return f"Repeat decision event {self.token}"
+
+
+class RepeatRecommendationRun(models.Model):
+    """A durable, read-only recommendation job for one policy snapshot."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", gettext_lazy("Queued")
+        RUNNING = "running", gettext_lazy("Running")
+        COMPLETED = "completed", gettext_lazy("Completed")
+        CANCELLED = "cancelled", gettext_lazy("Cancelled")
+        FAILED = "failed", gettext_lazy("Failed")
+
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    policy = models.ForeignKey(
+        RepeatPolicy, on_delete=models.CASCADE, related_name="recommendation_runs"
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="repeat_recommendation_runs",
+    )
+    snapshot = models.JSONField(default=dict)
+    snapshot_fingerprint = models.CharField(max_length=64)
+    profile_fingerprint = models.CharField(max_length=64)
+    prompt_fingerprint = models.CharField(max_length=64)
+    request_cap = models.PositiveIntegerField()
+    requests_reserved = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    failure = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "trans"
+        required_db_vendor = "postgresql"
+
+    def __str__(self) -> str:
+        return f"Repeat recommendation run {self.token}"
+
+
+class RepeatRecommendationAttempt(models.Model):
+    """One reserved external request; an unknown delivery is never replayed."""
+
+    class Status(models.TextChoices):
+        RESERVED = "reserved", gettext_lazy("Reserved")
+        SENT = "sent", gettext_lazy("Sent")
+        COMPLETED = "completed", gettext_lazy("Completed")
+        UNKNOWN = "unknown", gettext_lazy("Unknown")
+        FAILED = "failed", gettext_lazy("Failed")
+
+    run = models.ForeignKey(
+        RepeatRecommendationRun, on_delete=models.CASCADE, related_name="attempts"
+    )
+    ordinal = models.PositiveIntegerField()
+    request_snapshot = models.JSONField(default=dict)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.RESERVED)
+    response = models.JSONField(default=dict)
+    failure = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        app_label = "trans"
+        required_db_vendor = "postgresql"
+        constraints = [  # ruff: ignore[mutable-class-default]
+            models.UniqueConstraint(
+                fields=["run", "ordinal"], name="repeat_recommendation_attempt_unique"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Repeat recommendation attempt {self.run_id}:{self.ordinal}"
+
+
+class RepeatRecommendationResult(models.Model):
+    """A validated read-only recommendation for one exact repeat group."""
+
+    run = models.ForeignKey(
+        RepeatRecommendationRun, on_delete=models.CASCADE, related_name="results"
+    )
+    group = models.ForeignKey(
+        RepeatGroup, on_delete=models.CASCADE, related_name="recommendations"
+    )
+    group_revision = models.PositiveBigIntegerField()
+    snapshot_fingerprint = models.CharField(max_length=64)
+    action = models.CharField(max_length=30)
+    target = models.JSONField(default=list, blank=True)
+    exclusions = models.JSONField(default=list, blank=True)
+    rationale = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "trans"
+        required_db_vendor = "postgresql"
+        constraints = [  # ruff: ignore[mutable-class-default]
+            models.UniqueConstraint(
+                fields=["run", "group"], name="repeat_recommendation_result_unique"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Repeat recommendation result {self.run_id}:{self.group_id}"
