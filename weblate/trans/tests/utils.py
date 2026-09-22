@@ -261,6 +261,11 @@ class RepoTestMixin:
         if branch is None:
             if repo.startswith("weblate://"):
                 branch = ""
+            elif vcs == "git":
+                # The bundled bare Git fixture has HEAD on ``main``.  Avoid
+                # routing this known local test repository through remote
+                # branch discovery, whose conservative fallback is ``master``.
+                branch = "main"
             elif vcs == "subversion":
                 branch = "master"
             else:

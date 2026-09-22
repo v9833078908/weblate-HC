@@ -17,10 +17,6 @@ from weblate.utils.state import STATE_TRANSLATED
 class RepeatQueueViewTest(ViewTestCase):
     """The queue remains project/language scoped even without a policy."""
 
-    def create_component(self):
-        """Use the current branch of the archived bare Git fixture."""
-        return self.create_po(branch="main")
-
     def test_queue_requires_project_access_and_renders_empty_scope(self) -> None:
         response = self.client.get(
             reverse(
