@@ -19,6 +19,7 @@ from weblate.trans.judge import (
     resolve_judge_seat_profile,
 )
 from weblate.trans.models import (
+    LLMUsageLog,
     RepeatRecommendationAttempt,
     RepeatRecommendationResult,
     RepeatRecommendationRun,
@@ -208,6 +209,27 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
     attempt.save(update_fields=["status"])
     response = post_chat_completion(
         payload, profile, title="HCGameLoc Weblate - Repeat recommendations"
+    )
+    usage = (response.payload or {}).get("usage", {})
+    usage = usage if isinstance(usage, dict) else {}
+    LLMUsageLog.objects.create(
+        model=profile.model,
+        service=profile.provider,
+        project_slug=run.policy.project.slug,
+        project_id_snapshot=run.policy.project_id,
+        target_language_code=run.policy.target_language.code,
+        prompt_tokens=int(usage.get("prompt_tokens", 0) or 0),
+        completion_tokens=int(usage.get("completion_tokens", 0) or 0),
+        total_tokens=int(usage.get("total_tokens", 0) or 0),
+        cost_usd=response.provider_cost,
+        operation=LLMUsageLog.Operation.REPEAT_RECOMMEND,
+        batch_size=len(attempt.request_snapshot.get("groups", [])),
+        repeat_recommendation_run=run,
+        outcome=(
+            LLMUsageLog.Outcome.APPLIED
+            if response.transport_succeeded
+            else LLMUsageLog.Outcome.REFUSED
+        ),
     )
     if not response.transport_succeeded:
         attempt.status = RepeatRecommendationAttempt.Status.UNKNOWN
