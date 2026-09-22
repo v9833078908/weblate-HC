@@ -103,6 +103,11 @@ real_patterns = [
         weblate.trans.views.repeats.repeat_apply,
         name="repeat-apply",
     ),
+    path(
+        "repeats/<slug:project>/<slug:language>/recommend/",
+        weblate.trans.views.repeats.repeat_recommend,
+        name="repeat-recommend",
+    ),
     path("", weblate.trans.views.dashboard.home, name="home"),
     path("dashboard/", weblate.trans.views.dashboard.dashboard, name="dashboard"),
     path("projects/", weblate.trans.views.basic.list_projects, name="projects"),
