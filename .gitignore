@@ -66,3 +66,6 @@ weblate-*.tar.*
 
 # Impeccable design-agent artifacts (critique snapshots, prototypes, review captures)
 .impeccable/
+
+# Local symlink into the weblate_fonts package (see analysis/prototypes/repeat-queue/README.md)
+/analysis/prototypes/repeat-queue/weblate_fonts

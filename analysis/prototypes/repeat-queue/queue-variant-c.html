@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+
+<html lang="ru" dir="ltr">
+  <!--
+    PROTOTYPE, вариант C (выбранный) - очередь повторов: «список + одно решение в фокусе».
+    Контракт экрана: docs/product/plans/2026-09-21-repeat-queue-ui-variant.md.
+    Ревью предыдущего варианта B: docs/product/reviews/2026-09-22-repeat-queue-ui-variant-review.md.
+    Запуск: из корня репозитория `python3 -m http.server 8777 --bind 127.0.0.1`, затем
+    http://127.0.0.1:8777/analysis/prototypes/repeat-queue/queue-variant-c.html (см. README.md).
+
+    Что изменилось относительно proto-v2 (по ревью 2026-09-22):
+    - Очередь стала компактным списком (accordion, WAI-ARIA disclosure): открыта одна
+      группа, у неё одно решение и одна главная кнопка. Раньше каждая карточка несла
+      свой вопрос, три кнопки и поле ввода.
+    - Решение - один radiogroup: варианты перевода, «Свой вариант», «Оставить разные».
+      Заранее ничего не выбрано; главная кнопка «Посмотреть, что изменится»
+      недоступна, пока выбора нет. Подпись под кнопкой заранее говорит, сколько
+      вхождений запишется и что одобренное не тронется.
+    - Рекомендация модели - бейдж и русское основание у варианта, а не значение
+      по умолчанию на кнопке.
+    - Первым продюсер видит то, что может прочитать: описание строки, где стоит
+      каждый вариант (ключ, компонент, ограничение). Различия между вариантами
+      подчёркнуты.
+    - Отдельного per-строчного «сделать независимым» на карточке нет: исключить
+      получателя можно в предпросмотре (галочка «записать»).
+    - Клавиатура: Tab по заголовкам групп, стрелки/Home/End между ними (J/K как
+      псевдонимы), Enter/Space раскрывает. Одиночных страничных клавиш (P, /) нет.
+    - Кнопки: primary в этом экране - 4px радиус, 14/600, 36px (DESIGN.md:
+      капсульная .btn-primary остаётся на публичных страницах). Бейджи - 12px.
+
+    Состояния: ?state=queue|preview|report|paid|editor|rule|states, ?bare=1 прячет панель.
+  -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Повторы - Anvil Saga / French - HCGameLoc (prototype v3)</title>
+    <link rel="stylesheet" href="../../../weblate/static/styles/vendor/bootstrap5.css" />
+    <link rel="stylesheet" href="weblate_fonts/source-code-pro.css" />
+    <link rel="stylesheet" href="weblate_fonts/source-sans-3.css" />
+    <link rel="stylesheet" href="../../../weblate/static/styles/variables.css" />
+    <link rel="stylesheet" href="../../../weblate/static/styles/main.css" />
+    <link rel="stylesheet" href="../../../weblate/static/style-dark.css" media="(prefers-color-scheme: dark)" />
+    <script defer src="../../../weblate/static/js/vendor/bootstrap5.js"></script>
+    <style>
+      /* --- прототип: панель состояний --- */
+      .proto-bar { position: fixed; inset: auto 0 0 0; z-index: 1080; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 6px 12px; background: var(--wl-color-bg); border-top: 1px solid var(--wl-color-border); }
+      .proto-bar .proto-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--wl-color-text-muted); margin-right: 8px; }
+      body { padding-bottom: 56px; }
+      body[data-bare="1"] .proto-bar { display: none; }
+      body[data-bare="1"] { padding-bottom: 0; }
+      .proto-state { display: none; }
+      .proto-state.is-active { display: block; }
+
+      /* --- экран очереди (rq = repeat queue) --- */
+      .rq { max-width: 1120px; }
+      .rq ::selection { background: color-mix(in srgb, var(--wl-color-primary) 18%, white); color: var(--wl-color-text); }
+      .rq :focus-visible { outline: 2px solid var(--wl-color-primary); outline-offset: 2px; box-shadow: none; }
+      .rq .btn-primary { border-radius: 4px; font-size: 14px; font-weight: 600; line-height: 20px; padding: 7px 16px; min-height: 36px; }
+      .rq .btn-primary[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+      .rq .btn-secondary, .rq .btn-sm { border-radius: 4px; }
+      .rq .badge { font-size: 12px; font-weight: 600; line-height: 16px; margin: 0; }
+      .rq .badge.rq-rec { color: var(--wl-color-primary); background: transparent; border: 1px solid var(--wl-color-primary); }
+      .rq .badge.rq-paid { color: var(--wl-color-warning-text); background: var(--wl-color-warning-bg-soft); }
+      .rq code, .rq .rq-mono { font-family: var(--wl-font-monospace, "Source Code Pro", monospace); font-size: 14px; color: inherit; background: none; padding: 0; }
+      .rq h2.rq-h2 { font-size: 18px; font-weight: 600; line-height: 24px; margin: 0 0 12px; }
+      .rq p { max-width: 72ch; }
+      .rq .rq-num { font-variant-numeric: tabular-nums; }
+      .rq kbd { font-size: 12px; padding: 1px 5px; border: 1px solid var(--wl-color-border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--wl-color-surface); color: var(--wl-color-text); }
+
+      /* панель фильтров */
+      .rq-toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; margin: 4px 0 16px; }
+      .rq-field { margin: 0; padding: 0; border: 0; min-width: 0; }
+      .rq-field .form-label, .rq-field legend { display: block; float: none; width: auto; font-size: 14px; font-weight: 600; line-height: 20px; margin: 0 0 4px; padding: 0; }
+      .rq-field .form-select { min-height: 36px; padding-block: 5px; font-size: 14px; }
+      .rq-field .form-check { margin: 0; min-height: 36px; display: inline-flex; align-items: center; }
+      .rq-field .form-check-input { margin-top: 0; }
+      .rq-field .form-check-label { font-size: 14px; }
+      .rq-field .btn { min-height: 36px; font-size: 14px; }
+      .rq .form-check-input:checked { background-color: var(--wl-color-primary); border-color: var(--wl-color-primary); }
+      .rq .form-check-input:focus { border-color: var(--wl-color-primary); box-shadow: none; }
+      .rq .table-scroll { overflow-x: auto; }
+      .rq-toolbar-aside { margin-inline-start: auto; display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+      .rq-toolbar-aside .btn-sm { min-height: 36px; font-size: 14px; }
+      .rq-toolbar .dropdown-menu { padding: 8px 12px; }
+      .rq-toolbar .dropdown-menu .form-check { display: flex; min-height: 28px; }
+
+      /* вкладки статусов */
+      .rq-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0; margin: 0 0 8px; list-style: none; border-bottom: 1px solid var(--wl-color-border); }
+      .rq-tabs a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 14px; line-height: 20px; color: var(--wl-color-text); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+      .rq-tabs a:hover { background: var(--wl-color-surface); }
+      .rq-tabs a[aria-current="page"] { border-bottom-color: var(--wl-color-primary); font-weight: 600; }
+      .rq-listhint { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; color: var(--wl-color-text-muted); margin: 0 0 8px; }
+
+      /* список групп */
+      .rq-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--wl-color-border); }
+      .rq-group { border-bottom: 1px solid var(--wl-color-border); }
+      .rq-head { margin: 0; font-size: inherit; font-weight: inherit; line-height: inherit; }
+      .rq-toggle { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; grid-template-areas: "chev source status" "chev meta status"; column-gap: 12px; row-gap: 2px; align-items: center; width: 100%; min-height: 44px; padding: 10px 12px 10px 10px; margin: 0; text-align: start; color: inherit; background: none; border: 0; border-inline-start: 2px solid transparent; }
+      .rq-toggle:hover { background: var(--wl-color-surface); }
+      .rq-group[data-open] > .rq-head > .rq-toggle { background: var(--wl-color-surface); border-inline-start-color: var(--wl-color-primary); }
+      .rq-chev { grid-area: chev; width: 16px; height: 16px; color: var(--wl-color-text-muted); transition: transform 200ms cubic-bezier(.2, .7, .2, 1); }
+      .rq-toggle[aria-expanded="true"] .rq-chev { transform: rotate(90deg); }
+      .rq-source { grid-area: source; font-family: var(--wl-font-monospace, "Source Code Pro", monospace); font-size: 16px; font-weight: 600; line-height: 24px; overflow-wrap: anywhere; }
+      .rq-meta { grid-area: meta; font-size: 14px; line-height: 20px; color: var(--wl-color-text-muted); font-variant-numeric: tabular-nums; }
+      .rq-status { grid-area: status; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+      @media (max-width: 575.98px) {
+        .rq-toggle { grid-template-columns: 20px minmax(0, 1fr); grid-template-areas: "chev source" "chev meta" "chev status"; }
+        .rq-status { justify-content: flex-start; }
+      }
+
+      /* раскрытая группа */
+      .rq-panel-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 200ms cubic-bezier(.2, .7, .2, 1); }
+      .rq-panel-wrap[data-open] { grid-template-rows: 1fr; }
+      .rq-panel { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s 200ms; border-inline-start: 2px solid var(--wl-color-primary); }
+      .rq-panel-wrap[data-open] > .rq-panel { visibility: visible; transition-delay: 0s; }
+      .rq-panel-inner { padding: 8px 16px 24px 44px; }
+      .rq-panel-inner > :not(:first-child) { margin-top: 16px; }
+      @media (max-width: 575.98px) {
+        .rq-panel-inner { padding-inline: 16px; }
+        .rq-option { grid-template-columns: 20px minmax(0, 1fr); }
+        .rq-side { grid-column: 2; justify-content: flex-start; }
+        .rq-side:empty { display: none; }
+        .rq-custom { grid-column: 2; }
+      }
+      @media (prefers-reduced-motion: reduce) { .rq-panel-wrap, .rq-panel, .rq-chev { transition: none; } }
+
+      .rq-explain { font-size: 14px; line-height: 20px; margin: 0; }
+      .rq-k { font-weight: 600; margin-inline-end: 6px; }
+      .rq-note { font-size: 14px; line-height: 20px; margin: 0; padding: 8px 12px; background: var(--wl-color-surface-alt); border-radius: 4px; }
+      .rq-choice { margin: 0; padding: 0; border: 0; min-width: 0; }
+      .rq-choice > legend { float: none; width: auto; font-size: 14px; font-weight: 600; line-height: 20px; margin: 0 0 8px; padding: 0; }
+      .rq-options { border: 1px solid var(--wl-color-border); border-radius: 4px; overflow: hidden; }
+      .rq-option { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 8px; align-items: start; padding: 10px 12px; margin: 0; cursor: pointer; }
+      .rq-option + .rq-option, .rq-reason + .rq-option, .rq-option + .rq-reason + .rq-option, .rq-sep { border-top: 1px solid var(--wl-color-border); }
+      .rq-option:hover { background: var(--wl-color-surface); }
+      .rq-option:has(input:checked) { background: var(--wl-color-surface-alt); }
+      .rq-option.is-locked { cursor: default; }
+      .rq-option.is-locked:hover { background: none; }
+      .rq-option .form-check-input { margin: 2px 0 0; float: none; flex: none; }
+      .rq-option-body { min-width: 0; display: grid; gap: 2px; }
+      .rq-target { font-family: var(--wl-font-monospace, "Source Code Pro", monospace); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+      .rq-forms { display: grid; gap: 2px; }
+      .rq-forms .rq-formlabel { color: var(--wl-color-text-muted); font-family: var(--wl-font-primary, "Source Sans 3", sans-serif); margin-inline-end: 6px; }
+      .rq-where, .rq-origin { font-size: 14px; line-height: 20px; color: var(--wl-color-text-muted); }
+      .rq-side { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+      .rq-reason { display: grid; grid-template-columns: minmax(0, 72ch); max-width: none; font-size: 14px; line-height: 20px; color: var(--wl-color-text); margin: 0; padding: 0 12px 10px 44px; background: var(--wl-color-surface-alt); }
+      .rq-reason:not(.is-active) { background: none; }
+      .rq-option:has(input:checked) + .rq-reason { background: var(--wl-color-surface-alt); }
+      mark.diff { background: none; color: inherit; padding: 0; font-weight: 700; text-decoration: underline; text-decoration-color: var(--wl-color-primary); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+      .rq-custom { grid-column: 2 / -1; display: none; gap: 8px; }
+      .rq-option:has(input:checked) .rq-custom { display: grid; }
+      .rq-custom .form-control { max-width: 48ch; min-height: 36px; font-family: var(--wl-font-monospace, "Source Code Pro", monospace); font-size: 14px; }
+      .rq-custom .form-text { margin: 0; font-size: 14px; }
+      .rq-actions { display: flex; gap: 12px 16px; align-items: center; flex-wrap: wrap; }
+      .rq-hint { font-size: 14px; line-height: 20px; }
+      .rq-safe { font-size: 14px; line-height: 20px; color: var(--wl-color-text-muted); margin: 8px 0 0 !important; }
+      .rq-members > summary { font-size: 14px; font-weight: 600; cursor: pointer; width: fit-content; }
+      .rq-members .table-scroll { margin-top: 8px; }
+      .rq-members table { margin: 0; font-size: 14px; }
+      .rq-members td, .rq-members th, .rq-preview td, .rq-preview th, .rq-report td, .rq-report th { vertical-align: top; }
+      .rq-members .table-listing th, .rq-preview .table-listing th { font-weight: 600; }
+      .rq-members .btn-inline { padding: 0; }
+      .rq-actions-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: 14px; }
+      .rq-more { margin-top: 16px; }
+
+      /* предпросмотр, отчёт и прочие состояния */
+      .rq-back { font-size: 14px; margin: 0 0 8px; }
+      .rq-preview .form-check { margin: 0; min-height: 0; }
+      .rq-preview .form-check-input { margin: 2px 0 0; float: none; }
+      .rq-preview .table-listing, .rq-report .table-listing { margin-bottom: 12px; }
+      .rq-muted { color: var(--wl-color-text-muted); }
+      .rq-block { border: 1px solid var(--wl-color-border); border-radius: 4px; padding: 16px; }
+      .rq-block + .rq-block { margin-top: 16px; }
+      .rq-block h3 { font-size: 16px; font-weight: 600; line-height: 24px; margin: 0 0 8px; }
+      .rq-block .form-check-label { font-size: 14px; }
+      .rq-check-item h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+    </style>
+  </head>
+  <body data-state="queue">
+    <nav class="navbar navbar-expand-lg bg-dark" aria-label="Основная навигация">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">HCGameLoc</a>
+        <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#wl-navbar-main" aria-controls="wl-navbar-main" aria-expanded="false" data-bs-theme="dark">
+          <span class="visually-hidden">Переключить навигацию</span>
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="wl-navbar-main">
+          <ul class="navbar-nav">
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">Проекты</a>
+              <ul class="dropdown-menu shadow">
+                <li><a class="dropdown-item" href="#">Anvil Saga</a></li>
+                <li><a class="dropdown-item" href="#">Choice of Life: Samosbor</a></li>
+                <li><hr class="dropdown-divider" /></li>
+                <li><a class="dropdown-item" href="#">Просмотреть все проекты</a></li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">Языки</a>
+              <ul class="dropdown-menu shadow">
+                <li><a class="dropdown-item" href="#">French</a></li>
+                <li><a class="dropdown-item" href="#">German</a></li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">Проверки</a>
+              <ul class="dropdown-menu shadow">
+                <li><a class="dropdown-item" href="#">Неудачные проверки в Anvil Saga - French</a></li>
+                <li><a class="dropdown-item" href="#">Обзор проверок</a></li>
+              </ul>
+            </li>
+          </ul>
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">admin</a>
+              <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li><a class="dropdown-item" href="#">Профиль</a></li>
+                <li><a class="dropdown-item" href="#">Администрирование</a></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <header>
+      <h1>
+        <ol class="breadcrumb">
+          <li class="bread-icon">
+            <svg class="icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v4H3zM3 11h18v4H3zM3 17h18v4H3z" fill="currentColor" opacity="0.6"/></svg>
+          </li>
+          <li class="breadcrumb-item"><a href="#">Проекты</a></li>
+          <li class="breadcrumb-item"><a href="#">Anvil Saga</a></li>
+          <li class="breadcrumb-item"><a href="#">French</a></li>
+          <li class="breadcrumb-item">Повторы</li>
+        </ol>
+        <div class="clearfix"></div>
+      </h1>
+    </header>
+
+    <main class="main-content">
+
+      <!-- ============================ 1. ОЧЕРЕДЬ ============================ -->
+      <section class="proto-state is-active rq" data-state="queue" aria-labelledby="rq-title">
+        <h2 id="rq-title" class="visually-hidden">Очередь групп повторов</h2>
+
+        <form class="rq-toolbar" aria-label="Фильтр очереди">
+          <div class="rq-field">
+            <label class="form-label" for="f-language">Язык</label>
+            <select class="form-select" id="f-language"><option>French</option><option>German</option></select>
+          </div>
+          <fieldset class="rq-field">
+            <legend>Компоненты</legend>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="c-dialogs" checked /><label class="form-check-label" for="c-dialogs">dialogs</label></div>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="c-ui" checked /><label class="form-check-label" for="c-ui">ui</label></div>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="c-items" /><label class="form-check-label" for="c-items">items</label></div>
+          </fieldset>
+          <div class="rq-field">
+            <span class="form-label" id="f-labels-label">Метки исходника</span>
+            <div class="dropdown">
+              <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-labelledby="f-labels-label f-labels-btn" id="f-labels-btn">ui, quest</button>
+              <div class="dropdown-menu">
+                <div class="form-check"><input class="form-check-input" type="checkbox" id="l-ui" checked /><label class="form-check-label" for="l-ui">ui</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" id="l-quest" checked /><label class="form-check-label" for="l-quest">quest</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" id="l-items" /><label class="form-check-label" for="l-items">items</label></div>
+              </div>
+            </div>
+          </div>
+          <div class="rq-toolbar-aside">
+            <span class="rq-muted">Рекомендации модели готовы для 9 из 14 групп, 12.09 14:20.</span>
+            <button class="btn btn-secondary btn-sm" type="button" data-jump="paid">Обновить рекомендации <span class="badge rq-paid">платно</span></button>
+            <a href="#" data-jump="rule">Правило области</a>
+          </div>
+        </form>
+
+        <nav aria-label="Статус групп">
+          <ul class="rq-tabs">
+            <li><a href="#" aria-current="page">Все <span class="badge text-bg-secondary rq-num">37</span></a></li>
+            <li><a href="#">Требуют решения <span class="badge text-bg-secondary rq-num">12</span></a></li>
+            <li><a href="#">Конфликт одобренных <span class="badge text-bg-secondary rq-num">2</span></a></li>
+            <li><a href="#">Решены <span class="badge text-bg-secondary rq-num">23</span></a></li>
+          </ul>
+        </nav>
+
+        <p class="rq-listhint">
+          <span>Показаны 6 групп из 37. Сначала конфликты одобренных, затем нерешённые.</span>
+          <span><kbd>↑</kbd> <kbd>↓</kbd> между группами, <kbd>Enter</kbd> раскрыть.</span>
+        </p>
+
+        <ol class="rq-list">
+
+          <!-- Конфликт одобренных -->
+          <li class="rq-group" data-status="conflict">
+            <h3 class="rq-head">
+              <button class="rq-toggle" type="button" aria-expanded="false" aria-controls="g-base" id="g-base-btn">
+                <svg class="rq-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="rq-source">Основание</span>
+                <span class="rq-meta">2 вхождения · 2 перевода · оба одобрены</span>
+                <span class="rq-status"><span class="badge text-bg-danger">Конфликт одобренных</span></span>
+              </button>
+            </h3>
+            <div class="rq-panel-wrap">
+              <div class="rq-panel" id="g-base" role="region" aria-labelledby="g-base-btn">
+                <div class="rq-panel-inner">
+                  <p class="rq-explain"><span class="rq-k">Описание</span><span class="rq-muted">не задано ни у одного вхождения</span></p>
+                  <p class="rq-note">Оба вхождения одобрены, поэтому общий перевод здесь записать нельзя: одобренный перевод меняет рецензент в редакторе. Здесь можно только подтвердить, что переводы разные намеренно.</p>
+                  <fieldset class="rq-choice">
+                    <legend>Что сделать с этой группой?</legend>
+                    <div class="rq-options">
+                      <div class="rq-option is-locked">
+                        <span aria-hidden="true"></span>
+                        <span class="rq-option-body">
+                          <span class="rq-target">Base</span>
+                          <span class="rq-where">1 × - <code>ui.build_menu_foundation</code> кнопка меню строительства (ui)</span>
+                          <span class="rq-origin">вручную, одобрил admin · <a class="btn-inline" href="#">Открыть в редакторе</a></span>
+                        </span>
+                        <span class="rq-side"><span class="badge text-bg-success">Одобрено</span></span>
+                      </div>
+                      <div class="rq-option is-locked">
+                        <span aria-hidden="true"></span>
+                        <span class="rq-option-body">
+                          <span class="rq-target">Armature</span>
+                          <span class="rq-where">1 × - <code>item_anvil_base_desc</code> описание детали предмета (items)</span>
+                          <span class="rq-origin">вручную, одобрил A. Leroy · <a class="btn-inline" href="#">Открыть в редакторе</a></span>
+                        </span>
+                        <span class="rq-side"><span class="badge text-bg-success">Одобрено</span></span>
+                      </div>
+                      <label class="rq-option rq-sep" for="base-keep">
+                        <input class="form-check-input" type="radio" name="g-base" id="base-keep" value="keep" aria-describedby="base-keep-why" data-hint="Переводы не меняются. 2 вхождения станут независимыми, конфликт снимется." />
+                        <span class="rq-option-body">
+                          <span>Оставить разные переводы</span>
+                          <span class="rq-where">Переводы не меняются. Вхождения станут независимыми, проверка «Непоследовательный повтор» перестанет их сравнивать.</span>
+                        </span>
+                        <span class="rq-side"><span class="badge rq-rec">Рекомендация модели</span></span>
+                      </label>
+                      <p class="rq-reason" id="base-keep-why">Основание модели: «постройка» и «деталь предмета» - разные смыслы, общий перевод здесь не нужен.</p>
+                    </div>
+                  </fieldset>
+                  <div class="rq-actions">
+                    <button class="btn btn-primary" type="button" aria-disabled="true" data-preview>Посмотреть, что изменится</button>
+                    <span class="rq-hint" aria-live="polite">Выберите, что сделать, чтобы продолжить.</span>
+                  </div>
+                  <p class="rq-safe">До предпросмотра ничего не записывается. Одобренные переводы не меняются.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <!-- Требует решения: раскрыта -->
+          <li class="rq-group" data-status="open" data-open>
+            <h3 class="rq-head">
+              <button class="rq-toggle" type="button" aria-expanded="true" aria-controls="g-north" id="g-north-btn">
+                <svg class="rq-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="rq-source">Угроза с севера</span>
+                <span class="rq-meta">5 вхождений · 3 перевода · dialogs, ui · 1 ограничение длины</span>
+                <span class="rq-status"><span class="badge text-bg-warning">Требует решения</span></span>
+              </button>
+            </h3>
+            <div class="rq-panel-wrap" data-open>
+              <div class="rq-panel" id="g-north" role="region" aria-labelledby="g-north-btn">
+                <div class="rq-panel-inner">
+                  <p class="rq-explain"><span class="rq-k">Описание</span>Предупреждение о нападении с севера. Звучит в диалогах квеста и стоит на кнопке тревоги.</p>
+                  <fieldset class="rq-choice">
+                    <legend>Что сделать с этой группой?</legend>
+                    <div class="rq-options">
+                      <label class="rq-option" for="north-v2">
+                        <input class="form-check-input" type="radio" name="g-north" id="north-v2" value="v2" aria-describedby="north-v2-why" data-hint="Запишется в 4 вхождения. Одобренное уже совпадает, конфликта не будет." />
+                        <span class="rq-option-body">
+                          <span class="rq-target">Menace <mark class="diff">venue</mark> du nord</span>
+                          <span class="rq-where">1 × - <code>quest_north_warning</code> реплика стражника в квесте (dialogs)</span>
+                          <span class="rq-origin">перевод модели, одобрил admin</span>
+                        </span>
+                        <span class="rq-side"><span class="badge text-bg-success">Одобрено</span><span class="badge rq-rec">Рекомендация модели</span></span>
+                      </label>
+                      <p class="rq-reason" id="north-v2-why">Основание модели: уже одобрен рецензентом; подходит и реплике, и кнопке - 20 символов при лимите 24.</p>
+                      <label class="rq-option" for="north-v1">
+                        <input class="form-check-input" type="radio" name="g-north" id="north-v1" value="v1" data-hint="Запишется в 2 вхождения. Одобренное останется другим: группа сохранит конфликт одобренных." />
+                        <span class="rq-option-body">
+                          <span class="rq-target"><mark class="diff">La</mark> menace du nord</span>
+                          <span class="rq-where">2 × - <code>ui_warning_north</code> кнопка тревоги, до 24 символов (ui); <code>EVENT_602_TITLE</code> заголовок события (dialogs)</span>
+                          <span class="rq-origin">вручную, A. Leroy</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                      <label class="rq-option" for="north-v3">
+                        <input class="form-check-input" type="radio" name="g-north" id="north-v3" value="v3" data-hint="Запишется в 2 вхождения. Одобренное останется другим: группа сохранит конфликт одобренных." />
+                        <span class="rq-option-body">
+                          <span class="rq-target">Menace du nord</span>
+                          <span class="rq-where">2 × - <code>EVENT_601_ANSWER_12</code>, <code>EVENT_601_ANSWER_13</code> ответы игрока в диалоге (dialogs)</span>
+                          <span class="rq-origin">вручную</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                      <label class="rq-option rq-sep" for="north-custom">
+                        <input class="form-check-input" type="radio" name="g-north" id="north-custom" value="custom" data-hint="Запишется в 4 вхождения. Одобренное останется другим: группа сохранит конфликт одобренных." />
+                        <span class="rq-option-body">
+                          <span>Свой вариант</span>
+                        </span>
+                        <span class="rq-side"></span>
+                        <span class="rq-custom">
+                          <label class="visually-hidden" for="north-custom-text">Свой вариант перевода</label>
+                          <input class="form-control" id="north-custom-text" type="text" autocomplete="off" />
+                          <span class="form-text">Плейсхолдеры, разметку и длину проверим в предпросмотре, для каждого вхождения отдельно.</span>
+                        </span>
+                      </label>
+                      <label class="rq-option" for="north-keep">
+                        <input class="form-check-input" type="radio" name="g-north" id="north-keep" value="keep" data-hint="Переводы не меняются. 5 вхождений станут независимыми." />
+                        <span class="rq-option-body">
+                          <span>Оставить разные переводы</span>
+                          <span class="rq-where">Переводы не меняются. Вхождения станут независимыми, проверка «Непоследовательный повтор» перестанет их сравнивать.</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                    </div>
+                  </fieldset>
+                  <div class="rq-actions">
+                    <button class="btn btn-primary" type="button" aria-disabled="true" data-preview>Посмотреть, что изменится</button>
+                    <span class="rq-hint" aria-live="polite">Выберите вариант, чтобы продолжить.</span>
+                  </div>
+                  <p class="rq-safe">До предпросмотра ничего не записывается. Одобренные переводы не меняются.</p>
+                  <details class="rq-members">
+                    <summary>Вхождения (5)</summary>
+                    <div class="table-scroll" tabindex="0" role="region" aria-label="Вхождения группы «Угроза с севера»"><table class="table table-listing">
+                      <thead><tr><th>Ключ</th><th>Где</th><th>Сейчас</th><th>Состояние</th><th>Примечание</th><th><span class="visually-hidden">Действия</span></th></tr></thead>
+                      <tbody>
+                        <tr><td><code>ui_warning_north</code></td><td>ui · кнопка тревоги</td><td class="rq-mono">La menace du nord</td><td>Переведено</td><td>до 24 символов</td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>EVENT_602_TITLE</code></td><td>dialogs · заголовок события</td><td class="rq-mono">La menace du nord</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>quest_north_warning</code></td><td>dialogs · реплика стражника</td><td class="rq-mono">Menace venue du nord</td><td><span class="badge text-bg-success">Одобрено</span></td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>EVENT_601_ANSWER_12</code></td><td>dialogs · ответ игрока</td><td class="rq-mono">Menace du nord</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>EVENT_601_ANSWER_13</code></td><td>dialogs · ответ игрока</td><td class="rq-mono">Menace du nord</td><td>Переведено</td><td>сейчас правит A. Leroy</td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                      </tbody>
+                    </table></div>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <!-- Требует решения: устаревшая связь -->
+          <li class="rq-group" data-status="open">
+            <h3 class="rq-head">
+              <button class="rq-toggle" type="button" aria-expanded="false" aria-controls="g-cell" id="g-cell-btn">
+                <svg class="rq-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="rq-source">Ячейка</span>
+                <span class="rq-meta">5 вхождений · 2 перевода · ui, items · 1 связь устарела</span>
+                <span class="rq-status"><span class="badge text-bg-warning">Требует решения</span></span>
+              </button>
+            </h3>
+            <div class="rq-panel-wrap">
+              <div class="rq-panel" id="g-cell" role="region" aria-labelledby="g-cell-btn">
+                <div class="rq-panel-inner">
+                  <p class="rq-explain"><span class="rq-k">Описание</span>Ячейка инвентаря и сетки крафта.</p>
+                  <p class="rq-note">У вхождения <code>inv_cell_tooltip</code> исходник изменился после прошлого решения, поэтому прежняя связь сброшена: оно снова участвует в выборе.</p>
+                  <fieldset class="rq-choice">
+                    <legend>Что сделать с этой группой?</legend>
+                    <div class="rq-options">
+                      <label class="rq-option" for="cell-v1">
+                        <input class="form-check-input" type="radio" name="g-cell" id="cell-v1" value="v1" aria-describedby="cell-v1-why" data-hint="Запишется в 2 вхождения. 3 уже совпадают." />
+                        <span class="rq-option-body">
+                          <span class="rq-target">Cellule</span>
+                          <span class="rq-where">3 × - <code>inv_cell_tooltip</code>, <code>craft_grid_cell</code>, <code>inv_cell_empty</code> подсказки инвентаря и крафта (ui)</span>
+                          <span class="rq-origin">перевод модели</span>
+                        </span>
+                        <span class="rq-side"><span class="badge rq-rec">Рекомендация модели</span></span>
+                      </label>
+                      <p class="rq-reason" id="cell-v1-why">Основание модели: «Cellule» - ячейка; «Cellulaire» значит «сотовый», для инвентаря не подходит.</p>
+                      <label class="rq-option" for="cell-v2">
+                        <input class="form-check-input" type="radio" name="g-cell" id="cell-v2" value="v2" data-hint="Запишется в 3 вхождения. 2 уже совпадают." />
+                        <span class="rq-option-body">
+                          <span class="rq-target">Cellul<mark class="diff">aire</mark></span>
+                          <span class="rq-where">2 × - <code>item_cell_battery</code>, <code>item_cell_battery_desc</code> предмет «батарея» (items)</span>
+                          <span class="rq-origin">вручную</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                      <label class="rq-option rq-sep" for="cell-custom">
+                        <input class="form-check-input" type="radio" name="g-cell" id="cell-custom" value="custom" data-hint="Запишется в 5 вхождений." />
+                        <span class="rq-option-body"><span>Свой вариант</span></span>
+                        <span class="rq-side"></span>
+                        <span class="rq-custom">
+                          <label class="visually-hidden" for="cell-custom-text">Свой вариант перевода</label>
+                          <input class="form-control" id="cell-custom-text" type="text" autocomplete="off" />
+                          <span class="form-text">Плейсхолдеры, разметку и длину проверим в предпросмотре, для каждого вхождения отдельно.</span>
+                        </span>
+                      </label>
+                      <label class="rq-option" for="cell-keep">
+                        <input class="form-check-input" type="radio" name="g-cell" id="cell-keep" value="keep" data-hint="Переводы не меняются. 5 вхождений станут независимыми." />
+                        <span class="rq-option-body">
+                          <span>Оставить разные переводы</span>
+                          <span class="rq-where">Переводы не меняются. Вхождения станут независимыми, проверка «Непоследовательный повтор» перестанет их сравнивать.</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                    </div>
+                  </fieldset>
+                  <div class="rq-actions">
+                    <button class="btn btn-primary" type="button" aria-disabled="true" data-preview>Посмотреть, что изменится</button>
+                    <span class="rq-hint" aria-live="polite">Выберите вариант, чтобы продолжить.</span>
+                  </div>
+                  <p class="rq-safe">До предпросмотра ничего не записывается. Одобренные переводы не меняются.</p>
+                  <details class="rq-members">
+                    <summary>Вхождения (5)</summary>
+                    <div class="table-scroll" tabindex="0" role="region" aria-label="Вхождения группы «Ячейка»"><table class="table table-listing">
+                      <thead><tr><th>Ключ</th><th>Где</th><th>Сейчас</th><th>Состояние</th><th>Примечание</th><th><span class="visually-hidden">Действия</span></th></tr></thead>
+                      <tbody>
+                        <tr><td><code>inv_cell_tooltip</code></td><td>ui · подсказка инвентаря</td><td class="rq-mono">Cellule</td><td>Переведено</td><td>исходник изменился 18.09, связь сброшена</td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>craft_grid_cell</code></td><td>ui · сетка крафта</td><td class="rq-mono">Cellule</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>inv_cell_empty</code></td><td>ui · пустая ячейка</td><td class="rq-mono">Cellule</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>item_cell_battery</code></td><td>items · название предмета</td><td class="rq-mono">Cellulaire</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>item_cell_battery_desc</code></td><td>items · описание предмета</td><td class="rq-mono">Cellulaire</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                      </tbody>
+                    </table></div>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <!-- Требует решения: много вхождений, часть вне прав -->
+          <li class="rq-group" data-status="open">
+            <h3 class="rq-head">
+              <button class="rq-toggle" type="button" aria-expanded="false" aria-controls="g-done" id="g-done-btn">
+                <svg class="rq-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="rq-source">Готово</span>
+                <span class="rq-meta">27 вхождений · 2 перевода · dialogs, ui · 2 вне ваших прав</span>
+                <span class="rq-status"><span class="badge text-bg-warning">Требует решения</span></span>
+              </button>
+            </h3>
+            <div class="rq-panel-wrap">
+              <div class="rq-panel" id="g-done" role="region" aria-labelledby="g-done-btn">
+                <div class="rq-panel-inner">
+                  <p class="rq-explain"><span class="rq-k">Описание</span>Подпись кнопки подтверждения и реплика «готово» в диалогах.</p>
+                  <p class="rq-note">2 вхождения в компоненте <code>ui</code> вне ваших прав на правку: они останутся как есть, остальные можно записать.</p>
+                  <fieldset class="rq-choice">
+                    <legend>Что сделать с этой группой?</legend>
+                    <div class="rq-options">
+                      <label class="rq-option" for="done-v1">
+                        <input class="form-check-input" type="radio" name="g-done" id="done-v1" value="v1" aria-describedby="done-v1-why" data-hint="Запишется в 2 вхождения. 25 уже совпадают." />
+                        <span class="rq-option-body">
+                          <span class="rq-target">Terminé</span>
+                          <span class="rq-where">25 × - кнопки подтверждения и реплики в диалогах (dialogs, ui)</span>
+                          <span class="rq-origin">вручную и перевод модели, 3 одобрены</span>
+                        </span>
+                        <span class="rq-side"><span class="badge text-bg-success">3 одобрены</span><span class="badge rq-rec">Рекомендация модели</span></span>
+                      </label>
+                      <p class="rq-reason" id="done-v1-why">Основание модели: вариант уже стоит в 25 вхождениях, среди них 3 одобренных; «Fini» разговорнее и не подходит кнопке.</p>
+                      <label class="rq-option" for="done-v2">
+                        <input class="form-check-input" type="radio" name="g-done" id="done-v2" value="v2" data-hint="Запишется в 22 вхождения. 3 одобренных останутся другими: группа сохранит конфликт одобренных." />
+                        <span class="rq-option-body">
+                          <span class="rq-target">Fini</span>
+                          <span class="rq-where">2 × - <code>EVENT_144_LINE_3</code>, <code>EVENT_201_LINE_8</code> реплики в диалогах (dialogs)</span>
+                          <span class="rq-origin">вручную</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                      <label class="rq-option rq-sep" for="done-custom">
+                        <input class="form-check-input" type="radio" name="g-done" id="done-custom" value="custom" data-hint="Запишется в 22 вхождения. 3 одобренных останутся другими: группа сохранит конфликт одобренных." />
+                        <span class="rq-option-body"><span>Свой вариант</span></span>
+                        <span class="rq-side"></span>
+                        <span class="rq-custom">
+                          <label class="visually-hidden" for="done-custom-text">Свой вариант перевода</label>
+                          <input class="form-control" id="done-custom-text" type="text" autocomplete="off" />
+                          <span class="form-text">Плейсхолдеры, разметку и длину проверим в предпросмотре, для каждого вхождения отдельно.</span>
+                        </span>
+                      </label>
+                      <label class="rq-option" for="done-keep">
+                        <input class="form-check-input" type="radio" name="g-done" id="done-keep" value="keep" data-hint="Переводы не меняются. 27 вхождений станут независимыми." />
+                        <span class="rq-option-body">
+                          <span>Оставить разные переводы</span>
+                          <span class="rq-where">Переводы не меняются. Вхождения станут независимыми, проверка «Непоследовательный повтор» перестанет их сравнивать.</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                    </div>
+                  </fieldset>
+                  <div class="rq-actions">
+                    <button class="btn btn-primary" type="button" aria-disabled="true" data-preview>Посмотреть, что изменится</button>
+                    <span class="rq-hint" aria-live="polite">Выберите вариант, чтобы продолжить.</span>
+                  </div>
+                  <p class="rq-safe">До предпросмотра ничего не записывается. Одобренные переводы не меняются.</p>
+                  <details class="rq-members">
+                    <summary>Вхождения (27)</summary>
+                    <div class="table-scroll" tabindex="0" role="region" aria-label="Вхождения группы «Готово»"><table class="table table-listing">
+                      <thead><tr><th>Ключ</th><th>Где</th><th>Сейчас</th><th>Состояние</th><th>Примечание</th><th><span class="visually-hidden">Действия</span></th></tr></thead>
+                      <tbody>
+                        <tr><td><code>ui_confirm_done</code></td><td>ui · кнопка подтверждения</td><td class="rq-mono">Terminé</td><td><span class="badge text-bg-success">Одобрено</span></td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>ui_tutorial_done</code></td><td>ui · кнопка обучения</td><td class="rq-mono">Terminé</td><td>Переведено</td><td>нет прав на правку</td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>ui_settings_done</code></td><td>ui · кнопка настроек</td><td class="rq-mono">Terminé</td><td>Переведено</td><td>нет прав на правку</td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>EVENT_144_LINE_3</code></td><td>dialogs · реплика</td><td class="rq-mono">Fini</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>EVENT_201_LINE_8</code></td><td>dialogs · реплика</td><td class="rq-mono">Fini</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>EVENT_012_LINE_1</code></td><td>dialogs · реплика</td><td class="rq-mono">Terminé</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                      </tbody>
+                    </table></div>
+                    <div class="rq-actions-row"><button class="btn btn-secondary btn-sm" type="button">Показать остальные 21</button><span class="rq-muted">Показаны 6 из 27.</span></div>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <!-- Требует решения: формы множественного числа -->
+          <li class="rq-group" data-status="open">
+            <h3 class="rq-head">
+              <button class="rq-toggle" type="button" aria-expanded="false" aria-controls="g-days" id="g-days-btn">
+                <svg class="rq-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="rq-source">{0} день</span>
+                <span class="rq-meta">4 вхождения · 2 перевода · ui · 2 формы числа</span>
+                <span class="rq-status"><span class="badge text-bg-warning">Требует решения</span></span>
+              </button>
+            </h3>
+            <div class="rq-panel-wrap">
+              <div class="rq-panel" id="g-days" role="region" aria-labelledby="g-days-btn">
+                <div class="rq-panel-inner">
+                  <p class="rq-explain"><span class="rq-k">Описание</span>Срок в днях: таймеры заданий и ускорения построек. <code>{0}</code> - число, подставляет движок.</p>
+                  <fieldset class="rq-choice">
+                    <legend>Что сделать с этой группой?</legend>
+                    <div class="rq-options">
+                      <label class="rq-option" for="days-v1">
+                        <input class="form-check-input" type="radio" name="g-days" id="days-v1" value="v1" aria-describedby="days-v1-why" data-hint="Запишется в 1 вхождение. 3 уже совпадают." />
+                        <span class="rq-option-body">
+                          <span class="rq-target rq-forms"><span><span class="rq-formlabel">1</span>{0} jour</span><span><span class="rq-formlabel">2+</span>{0} jours</span></span>
+                          <span class="rq-where">3 × - таймеры заданий <code>quest_timer_days</code>, <code>quest_timer_days_left</code>, <code>daily_reset_in</code> (ui)</span>
+                          <span class="rq-origin">вручную, A. Leroy</span>
+                        </span>
+                        <span class="rq-side"><span class="badge rq-rec">Рекомендация модели</span></span>
+                      </label>
+                      <p class="rq-reason" id="days-v1-why">Основание модели: короткая форма влезает в таймеры; «journée» - «день как время суток», для срока не подходит.</p>
+                      <label class="rq-option" for="days-v2">
+                        <input class="form-check-input" type="radio" name="g-days" id="days-v2" value="v2" data-hint="Запишется в 3 вхождения. 1 уже совпадает." />
+                        <span class="rq-option-body">
+                          <span class="rq-target rq-forms"><span><span class="rq-formlabel">1</span>{0} jour<mark class="diff">née</mark></span><span><span class="rq-formlabel">2+</span>{0} jour<mark class="diff">nées</mark></span></span>
+                          <span class="rq-where">1 × - ускорение постройки <code>build_speedup_days</code> (ui)</span>
+                          <span class="rq-origin">перевод модели</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                      <label class="rq-option rq-sep" for="days-custom">
+                        <input class="form-check-input" type="radio" name="g-days" id="days-custom" value="custom" data-hint="Запишется в 4 вхождения." />
+                        <span class="rq-option-body"><span>Свой вариант</span></span>
+                        <span class="rq-side"></span>
+                        <span class="rq-custom">
+                          <label class="form-text" for="days-custom-one">Одна форма (1)</label>
+                          <input class="form-control" id="days-custom-one" type="text" autocomplete="off" />
+                          <label class="form-text" for="days-custom-many">Несколько (2+)</label>
+                          <input class="form-control" id="days-custom-many" type="text" autocomplete="off" />
+                          <span class="form-text"><code>{0}</code> должен остаться в каждой форме; проверим в предпросмотре.</span>
+                        </span>
+                      </label>
+                      <label class="rq-option" for="days-keep">
+                        <input class="form-check-input" type="radio" name="g-days" id="days-keep" value="keep" data-hint="Переводы не меняются. 4 вхождения станут независимыми." />
+                        <span class="rq-option-body">
+                          <span>Оставить разные переводы</span>
+                          <span class="rq-where">Переводы не меняются. Вхождения станут независимыми, проверка «Непоследовательный повтор» перестанет их сравнивать.</span>
+                        </span>
+                        <span class="rq-side"></span>
+                      </label>
+                    </div>
+                  </fieldset>
+                  <div class="rq-actions">
+                    <button class="btn btn-primary" type="button" aria-disabled="true" data-preview>Посмотреть, что изменится</button>
+                    <span class="rq-hint" aria-live="polite">Выберите вариант, чтобы продолжить.</span>
+                  </div>
+                  <p class="rq-safe">До предпросмотра ничего не записывается. Одобренные переводы не меняются.</p>
+                  <details class="rq-members">
+                    <summary>Вхождения (4)</summary>
+                    <div class="table-scroll" tabindex="0" role="region" aria-label="Вхождения группы «{0} день»"><table class="table table-listing">
+                      <thead><tr><th>Ключ</th><th>Где</th><th>Сейчас</th><th>Состояние</th><th>Примечание</th><th><span class="visually-hidden">Действия</span></th></tr></thead>
+                      <tbody>
+                        <tr><td><code>quest_timer_days</code></td><td>ui · таймер задания</td><td class="rq-mono">{0} jour / {0} jours</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>quest_timer_days_left</code></td><td>ui · таймер задания</td><td class="rq-mono">{0} jour / {0} jours</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>daily_reset_in</code></td><td>ui · сброс ежедневных</td><td class="rq-mono">{0} jour / {0} jours</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>build_speedup_days</code></td><td>ui · ускорение постройки</td><td class="rq-mono">{0} journée / {0} journées</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                      </tbody>
+                    </table></div>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <!-- Решена -->
+          <li class="rq-group" data-status="resolved">
+            <h3 class="rq-head">
+              <button class="rq-toggle" type="button" aria-expanded="false" aria-controls="g-start" id="g-start-btn">
+                <svg class="rq-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="rq-source">Старт</span>
+                <span class="rq-meta">4 вхождения · общий перевод <span class="rq-mono">Démarrer</span> · решение general, 12.09.2026</span>
+                <span class="rq-status"><span class="badge text-bg-success">Решена</span></span>
+              </button>
+            </h3>
+            <div class="rq-panel-wrap">
+              <div class="rq-panel" id="g-start" role="region" aria-labelledby="g-start-btn">
+                <div class="rq-panel-inner">
+                  <p class="rq-explain"><span class="rq-k">Описание</span>Кнопка начала игры и заголовок экрана загрузки.</p>
+                  <p class="rq-explain">Все 4 вхождения совпадают с общим переводом. Новые строки с этим исходником в компонентах правила получат его при следующем автоматическом переводе.</p>
+                  <div class="rq-actions">
+                    <a class="btn btn-secondary" href="#">История решений</a>
+                    <button class="btn btn-secondary" type="button">Изменить решение</button>
+                  </div>
+                  <details class="rq-members">
+                    <summary>Вхождения (4)</summary>
+                    <div class="table-scroll" tabindex="0" role="region" aria-label="Вхождения группы «Старт»"><table class="table table-listing">
+                      <thead><tr><th>Ключ</th><th>Где</th><th>Сейчас</th><th>Состояние</th><th>Примечание</th><th><span class="visually-hidden">Действия</span></th></tr></thead>
+                      <tbody>
+                        <tr><td><code>ui_start_button</code></td><td>ui · кнопка старта</td><td class="rq-mono">Démarrer</td><td><span class="badge text-bg-success">Одобрено</span></td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>ui_loading_title</code></td><td>ui · экран загрузки</td><td class="rq-mono">Démarrer</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>tutorial_step_0</code></td><td>dialogs · обучение</td><td class="rq-mono">Démarrer</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                        <tr><td><code>menu_new_game</code></td><td>ui · меню</td><td class="rq-mono">Démarrer</td><td>Переведено</td><td></td><td><a class="btn-inline" href="#">Открыть</a></td></tr>
+                      </tbody>
+                    </table></div>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </li>
+        </ol>
+
+        <p class="rq-more"><button class="btn btn-secondary" type="button">Показать ещё 31 группу</button></p>
+      </section>
+
+      <!-- ============================ 2. ПРЕДПРОСМОТР ============================ -->
+      <section class="proto-state rq" data-state="preview" aria-labelledby="pv-title">
+        <p class="rq-back"><a href="#" data-jump="queue">Назад к группе «Угроза с севера»</a></p>
+        <h2 id="pv-title" class="rq-h2">Что изменится: «Угроза с севера», общий перевод <span class="rq-mono">Menace venue du nord</span></h2>
+        <p class="rq-explain">Ничего ещё не записано. Запишутся только отмеченные вхождения, каждое получит состояние «Переведено»; одобрить их сможет рецензент. Одобренные переводы не меняются.</p>
+        <div class="rq-preview">
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Что изменится, по вхождениям"><table class="table table-listing">
+            <thead><tr><th><span class="visually-hidden">Записать</span></th><th>Вхождение</th><th>Сейчас</th><th>Станет</th><th>Примечание</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="form-check"><input class="form-check-input" type="checkbox" id="pv-1" checked data-write aria-label="Записать ui_warning_north" /></div></td>
+                <td><label for="pv-1"><code>ui_warning_north</code></label><div class="rq-muted">ui · кнопка тревоги</div></td>
+                <td class="rq-mono">La menace du nord</td>
+                <td class="rq-mono">Menace venue du nord</td>
+                <td>20 из 24 символов, влезает</td>
+              </tr>
+              <tr>
+                <td><div class="form-check"><input class="form-check-input" type="checkbox" id="pv-2" checked data-write aria-label="Записать EVENT_602_TITLE" /></div></td>
+                <td><label for="pv-2"><code>EVENT_602_TITLE</code></label><div class="rq-muted">dialogs · заголовок события</div></td>
+                <td class="rq-mono">La menace du nord</td>
+                <td class="rq-mono">Menace venue du nord</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><div class="form-check"><input class="form-check-input" type="checkbox" id="pv-3" checked data-write aria-label="Записать EVENT_601_ANSWER_12" /></div></td>
+                <td><label for="pv-3"><code>EVENT_601_ANSWER_12</code></label><div class="rq-muted">dialogs · ответ игрока</div></td>
+                <td class="rq-mono">Menace du nord</td>
+                <td class="rq-mono">Menace venue du nord</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><div class="form-check"><input class="form-check-input" type="checkbox" id="pv-4" disabled aria-label="EVENT_601_ANSWER_13 сейчас правит A. Leroy, записать нельзя" /></div></td>
+                <td><label for="pv-4"><code>EVENT_601_ANSWER_13</code></label><div class="rq-muted">dialogs · ответ игрока</div></td>
+                <td class="rq-mono">Menace du nord</td>
+                <td class="rq-muted">не меняется</td>
+                <td>Сейчас правит A. Leroy. Вернётся в очередь, когда правка закончится.</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td><code>quest_north_warning</code><div class="rq-muted">dialogs · реплика стражника</div></td>
+                <td class="rq-mono">Menace venue du nord</td>
+                <td class="rq-muted">не меняется</td>
+                <td><span class="badge text-bg-success">Одобрено</span> уже совпадает</td>
+              </tr>
+            </tbody>
+          </table></div>
+        </div>
+        <p class="rq-explain">На карточке было 4 вхождения: с тех пор одно заблокировано правкой. Предпросмотр всегда свежий; если что-то изменится между ним и записью, запись остановится, а не перезапишет чужую правку.</p>
+        <div class="rq-actions">
+          <button class="btn btn-primary" type="button" id="pv-write">Записать 3 вхождения</button>
+          <a class="btn btn-secondary" href="#" data-jump="queue">Назад</a>
+          <span class="rq-hint rq-muted">Отменить можно, пока строки не изменены после записи.</span>
+        </div>
+      </section>
+
+      <!-- ============================ 3. ОТЧЁТ ============================ -->
+      <section class="proto-state rq" data-state="report" aria-labelledby="rp-title">
+        <p class="rq-back"><a href="#" data-jump="queue">К очереди</a></p>
+        <h2 id="rp-title" class="rq-h2">Записано: 2 группы из 4 полностью или частично</h2>
+        <p class="rq-explain">Каждая группа вернула свой итог. Ни одна одобренная строка не изменена. Проверка «Непоследовательный повтор» на соседних вхождениях пересчитывается сама: <span aria-live="polite">пересчитано 2 группы из 4</span>.</p>
+        <div class="rq-report">
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Итоги по группам"><table class="table table-listing">
+            <thead><tr><th>Группа</th><th>Итог</th><th>Подробности</th><th><span class="visually-hidden">Действия</span></th></tr></thead>
+            <tbody>
+              <tr><td class="rq-mono">Угроза с севера</td><td><span class="badge text-bg-success">Записано</span></td><td>3 вхождения записаны, 1 одобренное уже совпадало, 1 пропущено: правил A. Leroy.</td><td><a class="btn-inline" href="#">Отменить запись</a></td></tr>
+              <tr><td class="rq-mono">Основание</td><td><span class="badge text-bg-success">Разные намеренно</span></td><td>2 вхождения помечены независимыми, переводы не менялись. Конфликт снят.</td><td><a class="btn-inline" href="#">Отменить</a></td></tr>
+              <tr><td class="rq-mono">Ячейка</td><td><span class="badge text-bg-secondary">Не записано</span></td><td>У <code>inv_cell_tooltip</code> исходник изменился между предпросмотром и записью. Ничего не перезаписано.</td><td><a class="btn-inline" href="#">Обновить предпросмотр</a></td></tr>
+              <tr><td class="rq-mono">Готово</td><td><span class="badge text-bg-warning">Частично</span></td><td>2 из 4 записаны; 2 вне ваших прав остались как есть.</td><td><a class="btn-inline" href="#">Показать вхождения</a></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+        <p class="rq-explain rq-muted">«Отменить» вернёт только строки, которые всё ещё равны результату этой записи. Более поздняя правка или одобрение остаются, а не перезаписываются.</p>
+      </section>
+
+      <!-- ======================= 4. РЕКОМЕНДАЦИИ И MT ======================= -->
+      <section class="proto-state rq" data-state="paid" aria-labelledby="pd-title">
+        <p class="rq-back"><a href="#" data-jump="queue">К очереди</a></p>
+        <h2 id="pd-title" class="rq-h2">Рекомендации модели <span class="badge rq-paid">платно</span></h2>
+        <div class="rq-block" id="recommendations-card">
+          <h3>Подготовить для всей отфильтрованной очереди</h3>
+          <p class="rq-explain">14 групп, 43 вхождения. Не больше 14 запросов. Цена неизвестна: провайдер не сообщает её заранее, фактическая стоимость появится в отчёте о расходах после выполнения.</p>
+          <div class="row g-3 align-items-end mt-1">
+            <div class="col-12 col-md-3"><label class="form-label" for="cap">Не больше запросов</label><input class="form-control" type="number" id="cap" value="14" min="1" /></div>
+            <div class="col-12 col-md-9"><div class="form-check"><input class="form-check-input" type="checkbox" id="confirm-cost" /><label class="form-check-label" for="confirm-cost">Понимаю, что цена неизвестна, и разрешаю до 14 запросов</label></div></div>
+          </div>
+          <div class="rq-actions mt-3">
+            <button class="btn btn-primary" type="button">Запустить</button>
+            <button class="btn btn-secondary" type="button" data-dismiss="recommendations-card">Не сейчас</button>
+            <span class="rq-hint rq-muted">Рекомендация ничего не записывает: принять её можно только через предпросмотр.</span>
+          </div>
+        </div>
+        <div class="rq-block d-none" id="recommendations-skipped"><p class="rq-explain mb-0">Рекомендации пропущены. Очередь и автоматический перевод работают как обычно. <button class="btn btn-link p-0 align-baseline" type="button" data-restore="recommendations-card">Показать снова</button></p></div>
+        <div class="rq-block">
+          <h3>Если профиль модели недоступен</h3>
+          <p class="rq-explain mb-2"><button class="btn btn-primary" type="button" aria-disabled="true" aria-describedby="profile-unavailable">Запустить</button></p>
+          <p class="rq-explain rq-muted mb-0" id="profile-unavailable">Основной профиль модели недоступен, рекомендации не готовятся. Очередь и автоматический перевод работают как обычно.</p>
+        </div>
+        <div class="rq-block">
+          <h3>Результат последнего запуска, 12.09 14:20</h3>
+          <div class="rq-report">
+            <div class="table-scroll" tabindex="0" role="region" aria-label="Результат последнего запуска"><table class="table table-listing">
+              <thead><tr><th>Группа</th><th>Рекомендация</th><th>Основание</th><th>Состояние</th></tr></thead>
+              <tbody>
+                <tr><td class="rq-mono">Угроза с севера</td><td class="rq-mono">Menace venue du nord</td><td>уже одобрен рецензентом, подходит реплике и кнопке</td><td><span class="badge text-bg-success">Готова</span></td></tr>
+                <tr><td class="rq-mono">Готово</td><td class="rq-mono">Terminé</td><td>стоит в 25 вхождениях, 3 одобрены</td><td><span class="badge text-bg-success">Готова</span></td></tr>
+                <tr><td class="rq-mono">Ячейка</td><td class="rq-mono">Cellule</td><td>«Cellulaire» значит «сотовый»</td><td><span class="badge text-bg-warning">Устарела</span> исходник изменился 18.09</td></tr>
+                <tr><td class="rq-mono">Мастерская</td><td class="rq-muted">нет</td><td>запрос ушёл, ответ не получен</td><td><span class="badge text-bg-secondary">Неизвестно</span> <a class="btn-inline" href="#">Повторить с новым лимитом</a></td></tr>
+                <tr><td class="rq-mono">Печь</td><td class="rq-muted">нет</td><td>отменено до отправки, запросов не было</td><td><span class="badge text-bg-secondary">Отменено</span></td></tr>
+              </tbody>
+            </table></div>
+          </div>
+          <p class="rq-explain rq-muted mb-0">«Неизвестно» - не сбой: запрос ушёл, ответа нет, деньги могли списаться. Повтор требует нового лимита; готовые результаты повторно не запрашиваются.</p>
+        </div>
+        <div class="rq-block">
+          <h3>Автоматический перевод и повторы</h3>
+          <p class="rq-explain">Решённых общих строк: 18, подставятся без обращения к модели. Групп без общего перевода: 14, по одному кандидату на группу. Независимые и нерешённые вхождения: 26, обычный перевод по контексту.</p>
+          <div class="form-check"><input class="form-check-input" type="checkbox" id="rec-after-mt" /><label class="form-check-label" for="rec-after-mt">После перевода подготовить рекомендации по оставшимся расхождениям <span class="badge rq-paid">платно</span></label></div>
+          <p class="rq-explain rq-muted mt-1 mb-2">Без этой галочки после перевода платных запросов не будет.</p>
+          <button class="btn btn-primary" type="button">Перевести</button>
+        </div>
+      </section>
+
+      <!-- ============================ 5. РЕДАКТОР ============================ -->
+      <section class="proto-state rq" data-state="editor" aria-labelledby="ed-title">
+        <h2 id="ed-title" class="rq-h2">Редактор: строка <span class="rq-mono">EVENT_601_ANSWER_12</span></h2>
+        <div class="rq-block">
+          <p class="rq-explain rq-muted mb-1">Исходник (Russian)</p>
+          <p class="rq-mono mb-3">Угроза с севера</p>
+          <label class="form-label" for="target">Перевод (French)</label>
+          <textarea class="form-control rq-mono" id="target" rows="2">Menace du nord</textarea>
+          <p class="rq-explain rq-muted mt-1 mb-0">Строка входит в группу повторов «Угроза с севера» с общим переводом <span class="rq-mono">Menace venue du nord</span>.</p>
+        </div>
+        <div class="rq-block">
+          <h3>Ваш перевод отличается от общего</h3>
+          <fieldset class="rq-choice">
+            <legend class="visually-hidden">Что сделать с отличием</legend>
+            <div class="rq-options">
+              <label class="rq-option" for="ch-shared"><input class="form-check-input" type="radio" name="shared-choice" id="ch-shared" /><span class="rq-option-body"><span>Предложить его как общий</span><span class="rq-where">Сохранится эта строка. Остальные 4 вхождения вернутся в очередь, где вы посмотрите, что изменится, и подтвердите.</span></span><span class="rq-side"></span></label>
+              <label class="rq-option" for="ch-independent"><input class="form-check-input" type="radio" name="shared-choice" id="ch-independent" /><span class="rq-option-body"><span>Сделать эту строку независимой</span><span class="rq-where">Сохранится эта строка. Она выходит из общего перевода, остальные вхождения не меняются.</span></span><span class="rq-side"></span></label>
+            </div>
+          </fieldset>
+          <div class="rq-actions mt-3">
+            <button class="btn btn-primary" type="button">Сохранить</button>
+            <button class="btn btn-secondary" type="button">Отмена</button>
+            <span class="rq-hint rq-muted">Без выбора перевод не сохранится. Скрытого распространения нет ни в одном варианте.</span>
+          </div>
+        </div>
+        <div class="rq-block rq-check-item">
+          <h3>Непоследовательный повтор</h3>
+          <p class="rq-explain mb-2">Одна и та же исходная строка по-разному переведена под другим ключом.</p>
+          <p class="mb-0"><a class="btn btn-secondary" href="#" data-jump="queue">Открыть очередь повторов</a></p>
+        </div>
+      </section>
+
+      <!-- ============================ 6. ПРАВИЛО ============================ -->
+      <section class="proto-state rq" data-state="rule" aria-labelledby="rl-title">
+        <p class="rq-back"><a href="#" data-jump="queue">К очереди</a></p>
+        <h2 id="rl-title" class="rq-h2">Правило общих повторов: French</h2>
+        <p class="rq-explain">Правило действует на будущие строки и запуски автоматического перевода. Уже переведённое оно не трогает.</p>
+        <div class="rq-block">
+          <div class="row g-3">
+            <fieldset class="col-12 col-md-5 rq-field">
+              <legend>Компоненты</legend>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="r-dialogs" checked /><label class="form-check-label" for="r-dialogs">dialogs</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="r-ui" checked /><label class="form-check-label" for="r-ui">ui</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="r-items" /><label class="form-check-label" for="r-items">items</label></div>
+              <p class="form-text mb-0">Только компоненты этого проекта.</p>
+            </fieldset>
+            <fieldset class="col-12 col-md-7 rq-field">
+              <legend>Метки исходника</legend>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="r-label-ui" checked /><label class="form-check-label" for="r-label-ui">ui</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="r-label-quest" checked /><label class="form-check-label" for="r-label-quest">quest</label></div>
+              <p class="form-text mb-0">Строка попадает под правило, если у неё есть любая из выбранных меток. Без меток правило охватит все строки выбранных компонентов.</p>
+            </fieldset>
+          </div>
+        </div>
+        <div class="rq-block">
+          <h3>Область без меток</h3>
+          <p class="rq-explain">Метки не выбраны, поэтому под правило попадут все 2 480 строк компонентов <code>dialogs</code> и <code>ui</code>, а не только помеченные.</p>
+          <div class="form-check"><input class="form-check-input" type="checkbox" id="confirm-wide" /><label class="form-check-label" for="confirm-wide">Подтверждаю: все строки компонентов dialogs и ui</label></div>
+        </div>
+        <div class="rq-block">
+          <h3>Пересечение с другим правилом</h3>
+          <p class="rq-explain mb-0">Активное правило «dialogs + ui, метка quest» уже охватывает часть этих строк. Победителя по дате создания нет: сузьте область одного из правил, иначе это не сохранится.</p>
+        </div>
+        <div class="rq-actions mt-3">
+          <button class="btn btn-primary" type="button">Сохранить правило</button>
+          <a class="btn btn-secondary" href="#" data-jump="queue">Отмена</a>
+        </div>
+      </section>
+
+      <!-- ============================ 7. СОСТОЯНИЯ ============================ -->
+      <section class="proto-state rq" data-state="states" aria-labelledby="st-title">
+        <h2 id="st-title" class="rq-h2">Состояния</h2>
+        <div class="rq-block">
+          <h3>Пусто: расхождений нет</h3>
+          <p class="rq-explain">В компонентах <code>dialogs</code> и <code>ui</code> для French все повторы переведены одинаково или решены. Новые строки из загрузок попадут сюда сами: правило области действует.</p>
+          <p class="mb-0"><a class="btn btn-secondary" href="#">Показать решённые группы (23)</a> <a class="btn-inline ms-2" href="#" data-jump="rule">Правило области</a></p>
+        </div>
+        <div class="rq-block">
+          <h3>Нет прав на часть вхождений</h3>
+          <p class="rq-explain mb-0">2 из 5 вхождений вне ваших прав на правку: они останутся как есть, остальные можно записать. Это видно на карточке группы и в предпросмотре, а не после записи.</p>
+        </div>
+        <div class="rq-block">
+          <h3>Строка под двумя правилами</h3>
+          <p class="rq-explain mb-0">К исходнику добавили метку, и теперь он подходит двум правилам. Пока область одного из них не сужена, такая группа не переиспользуется и показана в очереди как «Конфликт правил».</p>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-bar" role="group" aria-label="Состояния прототипа">
+      <span class="proto-label">Прототип v3</span>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="queue">Очередь</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="preview">Предпросмотр</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="report">Отчёт</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="paid">Рекомендации</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="editor">Редактор</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="rule">Правило</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="states">Состояния</button>
+    </div>
+
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("bare") === "1") { document.body.dataset.bare = "1"; }
+
+        function show(name) {
+          document.body.dataset.state = name;
+          document.querySelectorAll(".proto-state").forEach(function (s) { s.classList.toggle("is-active", s.dataset.state === name); });
+          document.querySelectorAll(".proto-bar [data-jump]").forEach(function (b) {
+            b.classList.toggle("btn-primary", b.dataset.jump === name);
+            b.classList.toggle("btn-secondary", b.dataset.jump !== name);
+          });
+          window.scrollTo(0, 0);
+        }
+        document.querySelectorAll("[data-jump]").forEach(function (b) {
+          b.addEventListener("click", function (e) { e.preventDefault(); show(b.dataset.jump); });
+        });
+        show(params.get("state") || "queue");
+
+        document.querySelectorAll("[data-dismiss]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            document.getElementById(b.dataset.dismiss).classList.add("d-none");
+            document.getElementById("recommendations-skipped").classList.remove("d-none");
+          });
+        });
+        document.querySelectorAll("[data-restore]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            document.getElementById(b.dataset.restore).classList.remove("d-none");
+            document.getElementById("recommendations-skipped").classList.add("d-none");
+          });
+        });
+
+        /* Очередь: раскрыта одна группа. Заголовки - кнопки, стрелки ходят между ними. */
+        const groups = Array.from(document.querySelectorAll(".rq-group"));
+        const toggles = groups.map(function (g) { return g.querySelector(".rq-toggle"); });
+        function setOpen(group, open) {
+          const toggle = group.querySelector(".rq-toggle");
+          const wrap = group.querySelector(".rq-panel-wrap");
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+          if (open) { group.dataset.open = ""; wrap.dataset.open = ""; }
+          else { delete group.dataset.open; delete wrap.dataset.open; }
+        }
+        toggles.forEach(function (toggle, i) {
+          toggle.addEventListener("click", function () {
+            const wasOpen = toggle.getAttribute("aria-expanded") === "true";
+            groups.forEach(function (g) { setOpen(g, false); });
+            if (!wasOpen) { setOpen(groups[i], true); }
+          });
+          toggle.addEventListener("keydown", function (e) {
+            let next = null;
+            if (e.key === "ArrowDown" || e.key === "j" || e.key === "J") { next = Math.min(i + 1, toggles.length - 1); }
+            else if (e.key === "ArrowUp" || e.key === "k" || e.key === "K") { next = Math.max(i - 1, 0); }
+            else if (e.key === "Home") { next = 0; }
+            else if (e.key === "End") { next = toggles.length - 1; }
+            if (next !== null) { e.preventDefault(); toggles[next].focus(); }
+          });
+        });
+
+        /* Решение: главная кнопка недоступна, пока вариант не выбран; подпись говорит, что запишется. */
+        document.querySelectorAll(".rq-panel").forEach(function (panel) {
+          const button = panel.querySelector("[data-preview]");
+          const hint = panel.querySelector(".rq-hint");
+          if (!button) { return; }
+          panel.querySelectorAll("input[type=radio]").forEach(function (radio) {
+            radio.addEventListener("change", function () {
+              if (!radio.checked) { return; }
+              button.setAttribute("aria-disabled", "false");
+              hint.textContent = radio.dataset.hint || "";
+              const custom = radio.closest(".rq-option").querySelector(".rq-custom input");
+              if (custom) { custom.focus(); }
+            });
+          });
+          button.addEventListener("click", function () {
+            if (button.getAttribute("aria-disabled") === "true") { hint.textContent = "Сначала выберите вариант."; return; }
+            show("preview");
+          });
+        });
+
+        /* Предпросмотр: счётчик на кнопке следует за галочками. */
+        const writeBoxes = Array.from(document.querySelectorAll("[data-write]"));
+        const writeButton = document.getElementById("pv-write");
+        function plural(n, one, few, many) { const m10 = n % 10, m100 = n % 100; if (m10 === 1 && m100 !== 11) { return one; } if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) { return few; } return many; }
+        function updateWrite() {
+          const n = writeBoxes.filter(function (b) { return b.checked; }).length;
+          writeButton.textContent = n ? "Записать " + n + " " + plural(n, "вхождение", "вхождения", "вхождений") : "Нечего записывать";
+          writeButton.setAttribute("aria-disabled", n ? "false" : "true");
+        }
+        writeBoxes.forEach(function (b) { b.addEventListener("change", updateWrite); });
+        if (writeButton) { updateWrite(); writeButton.addEventListener("click", function () { if (writeButton.getAttribute("aria-disabled") !== "true") { show("report"); } }); }
+      })();
+    </script>
+  </body>
+</html>

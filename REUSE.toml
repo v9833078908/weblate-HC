@@ -33,6 +33,7 @@ path = [
   ".omp/skills/**/*.json",
   "analysis/**.baseline",
   "analysis/**.csv",
+  "analysis/**.html",
   "analysis/**.json",
   "analysis/**.jsonl",
   "analysis/**.log",

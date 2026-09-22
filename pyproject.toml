@@ -945,6 +945,8 @@ extend-exclude = [
   "analysis/data/**",
   # One-off analysis probes quoting translated strings
   "analysis/probes/**",
+  # Static screen prototypes with sample translations (AGENTS.md)
+  "analysis/prototypes/**",
   "docs/changes/contributors",
   "docs/product/measurements/2026-08-12-col4-judge-annotation.md",
   "docs/product/measurements/2026-09-04-glossary-morphology-vs-repeat-drift.md",

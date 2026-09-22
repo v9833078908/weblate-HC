@@ -239,7 +239,13 @@ Repository-specific parts:
 - `analysis/probes/`, `analysis/data/` - one-off measurement scripts and the
   corpora, golden sets and run outputs they read and write. Not documentation:
   nothing here is part of the product, and both directories are excluded from
-  packaging and from the `typos`/`codespell` hooks.
+  packaging and from the `typos`/`codespell` hooks. `analysis/prototypes/`
+  holds static HTML prototypes of screens that a plan under
+  `docs/product/plans/` pins as its UI contract; they link the real
+  `weblate/static/` styles by relative path and are served from the repository
+  root (see the `README.md` next to each prototype). They are evidence for a
+  plan, never product code: templates are written from the contract, not
+  copied from the prototype.
 - `loc_kit_ingest/` (tracked) - standalone loc-kit importer package (no Django
   imports): `reader.py` (CSV/TSV/XLSX), `infer.py` (derives a strict profile
   from the kit's own header row), `profile.py` (closed schema with two
