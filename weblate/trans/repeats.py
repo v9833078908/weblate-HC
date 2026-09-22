@@ -423,6 +423,74 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
     return event
 
 
+def undo_event(*, token: str, actor: User):
+    """Restore only recipients still unchanged since one repeat-apply event."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import Unit
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.repeat import RepeatDecisionEvent
+
+    with transaction.atomic():
+        event = RepeatDecisionEvent.objects.select_for_update().select_related(
+            "group__policy"
+        ).get(token=token, action=RepeatDecisionEvent.Action.APPLY)
+        if not actor.has_perm("project.edit", event.group.policy.project):
+            raise ValidationError("You cannot undo this repeat decision.")
+        group = event.group
+        expected_revision = event.group_revision + 1
+        if group.revision != expected_revision:
+            raise ValidationError("A later repeat decision prevents this undo.")
+        written = event.result.get("written", [])
+        units = {
+            unit.pk: unit
+            for unit in Unit.objects.select_for_update()
+            .filter(pk__in=[item["unit"] for item in written])
+            .select_related("translation__component", "translation__plural")
+        }
+        outcome: dict[str, list[dict[str, object]]] = {"restored": [], "conflicts": []}
+        translations = {}
+        for item in written:
+            unit = units.get(item["unit"])
+            if unit is None or unit.state == STATE_APPROVED:
+                outcome["conflicts"].append({"unit": item["unit"], "reason": "missing-or-approved"})
+                continue
+            if unit.get_target_plurals() != item["new"]:
+                outcome["conflicts"].append({"unit": item["unit"], "reason": "changed"})
+                continue
+            translations[unit.translation_id] = unit.translation
+            unit.is_batch_update = True
+            unit.translate(
+                actor,
+                item["old"],
+                STATE_TRANSLATED,
+                change_action=ActionEvents.REPEAT_UNDO,
+                propagate=False,
+                select_for_update=False,
+                change_details={"repeat_event": str(event.token)},
+            )
+            outcome["restored"].append({"unit": unit.pk})
+        for translation in translations.values():
+            translation.store_update_changes()
+            translation.invalidate_cache()
+        undo = RepeatDecisionEvent.objects.create(
+            group=group,
+            action=RepeatDecisionEvent.Action.UNDO,
+            actor=actor,
+            group_revision=group.revision,
+            policy_revision=group.policy.revision,
+            snapshot={"undo_of": str(event.token)},
+            result=outcome,
+        )
+        group.shared_target = []
+        group.decision_origin = ""
+        group.decision_author = None
+        group.decided_at = None
+        group.revision += 1
+        group.save()
+    return undo
+
+
 def detect_policy_groups(policy: RepeatPolicy) -> list[RepeatCandidate]:
     """Build exact repeat groups from live scope; no normalization is applied."""
     grouped: dict[tuple[tuple[str, ...], int], list[int]] = {}

@@ -14,6 +14,7 @@ from weblate.trans.repeats import (
     reconcile_unit,
     save_policy,
     preview_group,
+    undo_event,
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
@@ -97,3 +98,36 @@ class RepeatModelTest(ViewTestCase):
         self.assertEqual(first.target, "Shared")
         self.assertEqual(second.target, "Approved")
         self.assertEqual(len(event.result["written"]), 1)
+
+    def test_guarded_undo_preserves_later_human_edit(self) -> None:
+        self.make_manager()
+        first = self.add_repeat("first", "Old")
+        second = self.add_repeat("second", "Other")
+        policy = self.make_policy()
+        group = get_or_create_group(policy, first)
+        event = apply_preview(
+            token=preview_group(group=group, target=["Shared"], actor=self.user).token,
+            actor=self.user,
+        )
+        first.translate(self.user, "Later", STATE_TRANSLATED, propagate=False)
+        undo = undo_event(token=event.token, actor=self.user)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.target, "Later")
+        self.assertEqual(second.target, "Other")
+        self.assertEqual(undo.result["conflicts"], [{"unit": first.pk, "reason": "changed"}])
+
+    def test_independent_membership_is_excluded_from_repeat_check(self) -> None:
+        first = self.add_repeat("first", "One")
+        second = self.add_repeat("second", "Two")
+        policy = self.make_policy()
+        create_membership(
+            group=get_or_create_group(policy, first),
+            unit=first,
+            mode=RepeatMembership.Mode.INDEPENDENT,
+            reason="intentional",
+        )
+        from weblate.checks.consistency import RepeatDriftCheck
+
+        remaining = RepeatDriftCheck().get_repeat_members(second.repeat_units)
+        self.assertEqual(remaining, [])
