@@ -130,8 +130,6 @@ class ConfirmedRename:
     new_context: str
     expected_fingerprint: str
     desired_fingerprint: str
-    expected_structure: dict[int, list[str]]
-    desired_structure: dict[int, list[str]]
 
 
 @dataclass(frozen=True)
@@ -141,10 +139,10 @@ class ConfirmedMove:
     unit_id: int
     anchor_id: int
     placement: Literal["before", "after"]
+    old_position: int
+    new_position: int
     expected_fingerprint: str
     desired_fingerprint: str
-    expected_structure: dict[int, list[str]]
-    desired_structure: dict[int, list[str]]
 
 
 @dataclass(frozen=True)
@@ -2498,43 +2496,21 @@ class Translation(
         ).encode()
         return hashlib.sha256(payload).hexdigest()
 
-    @staticmethod
-    def normalize_structure(
-        structure: dict[int | str, list[str]],
-    ) -> dict[int, list[str]]:
-        """Restore integer translation IDs after a signed JSON payload round-trip."""
-        return {
-            int(translation_id): contexts
-            for translation_id, contexts in structure.items()
-        }
-
     def classify_structural_state(
         self,
         *,
         actual: dict[int, list[str]],
         expected_fingerprint: str,
         desired_fingerprint: str,
-        expected_structure: dict[int | str, list[str]],
-        desired_structure: dict[int | str, list[str]],
     ) -> Literal["before", "reconcile"]:
         """
         Accept only an exact signed file structure, never a partial mutation.
 
-        A fingerprint alone cannot distinguish a clean already-committed desired
-        tree from a third state.  The signed structure is therefore carried with
-        the UI confirmation and its own digest is verified before comparing the
-        current stores in the mandated desired-then-expected order.
+        The signed preview carries both complete-structure fingerprints. Comparing
+        the current stores in desired-then-expected order distinguishes a clean
+        already-committed tree from the original state without putting the full
+        component inventory into the browser token.
         """
-        expected = self.normalize_structure(expected_structure)
-        desired = self.normalize_structure(desired_structure)
-        if (
-            self.structure_fingerprint(expected) != expected_fingerprint
-            or self.structure_fingerprint(desired) != desired_fingerprint
-            or set(actual) != set(expected)
-            or set(actual) != set(desired)
-        ):
-            msg = "The component has changed. Create a new preview."
-            raise ValidationError(msg)
         actual_fingerprint = self.structure_fingerprint(actual)
         if actual_fingerprint == desired_fingerprint:
             return "reconcile"
@@ -2622,8 +2598,6 @@ class Translation(
             new_context=new_context,
             expected_fingerprint=self.structure_fingerprint(expected),
             desired_fingerprint=self.structure_fingerprint(desired),
-            expected_structure=expected,
-            desired_structure=desired,
         )
 
     def get_move_preview(
@@ -2655,10 +2629,10 @@ class Translation(
             unit_id=unit.pk,
             anchor_id=anchor.pk,
             placement=placement,
+            old_position=source_contexts.index(unit.context) + 1,
+            new_position=canonical_order.index(unit.context) + 1,
             expected_fingerprint=self.structure_fingerprint(expected),
             desired_fingerprint=self.structure_fingerprint(desired),
-            expected_structure=expected,
-            desired_structure=desired,
         )
 
     def commit_structural_stores(
@@ -2761,9 +2735,20 @@ class Translation(
                 actual=actual,
                 expected_fingerprint=change.expected_fingerprint,
                 desired_fingerprint=change.desired_fingerprint,
-                expected_structure=change.expected_structure,
-                desired_structure=change.desired_structure,
             )
+
+            desired = actual
+            if state == "before":
+                desired = {
+                    translation_id: [
+                        change.new_context if context == change.old_context else context
+                        for context in contexts
+                    ]
+                    for translation_id, contexts in actual.items()
+                }
+                if source.structure_fingerprint(desired) != change.desired_fingerprint:
+                    msg = "The component has changed. Create a new preview."
+                    raise ValidationError(msg)
 
             new_hash = component.file_format_cls.unit_class.calculate_id_hash(
                 component.has_template(), source_unit.source, change.new_context
@@ -2858,16 +2843,27 @@ class Translation(
                 actual=actual,
                 expected_fingerprint=change.expected_fingerprint,
                 desired_fingerprint=change.desired_fingerprint,
-                expected_structure=change.expected_structure,
-                desired_structure=change.desired_structure,
             )
-            expected = source.normalize_structure(change.expected_structure)
-            desired = source.normalize_structure(change.desired_structure)
-            old_position = expected[source.pk].index(unit.context) + 1
-            new_position = desired[source.pk].index(unit.context) + 1
+            old_position = change.old_position
+            new_position = change.new_position
 
             if state == "before":
-                canonical_order = desired[source.pk]
+                canonical_order = [
+                    context for context in actual[source.pk] if context != unit.context
+                ]
+                anchor_index = canonical_order.index(anchor.context)
+                canonical_order.insert(
+                    anchor_index + (change.placement == "after"), unit.context
+                )
+                desired = {
+                    translation_id: source.apply_context_order(
+                        contexts, canonical_order
+                    )
+                    for translation_id, contexts in actual.items()
+                }
+                if source.structure_fingerprint(desired) != change.desired_fingerprint:
+                    msg = "The component has changed. Create a new preview."
+                    raise ValidationError(msg)
                 changed_translations = [
                     translation
                     for translation in translations
@@ -2882,6 +2878,8 @@ class Translation(
                     message=f"Move string key {unit.context}",
                     previous_revision=previous_revision,
                 )
+            else:
+                desired = actual
             database_changed = False
             position_updates: list[Unit] = []
             for translation in translations:

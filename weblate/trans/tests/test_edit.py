@@ -1208,6 +1208,7 @@ class EditJSONMonoTest(EditTest):
         response = self.client.post(url, {"stage": "preview", "new_key": "renamed"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("token", response.json())
+        self.assertLess(len(response.json()["token"]), 4096)
 
     def test_structural_rename_confirm_updates_the_existing_unit(self) -> None:
         self.make_manager()
@@ -1290,7 +1291,9 @@ class EditJSONMonoTest(EditTest):
         tree = html.fromstring(response.content)
         self.assertEqual(len(tree.xpath('//*[@id="source-unit-structure-modal"]')), 1)
         self.assertEqual(len(tree.xpath('//*[@id="source-unit-structure-form"]')), 1)
-        self.assertEqual(len(tree.xpath('//button[contains(@class, "js-rename-key")]')), 1)
+        self.assertEqual(
+            len(tree.xpath('//button[contains(@class, "js-rename-key")]')), 1
+        )
 
         response = self.client.get(
             reverse("browse", kwargs={"path": source.get_url_path()})
