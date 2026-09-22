@@ -11,6 +11,7 @@ from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
 from weblate.lang.models import Language
+from weblate.trans.forms import RepeatPolicyForm
 from weblate.trans.models import Project, RepeatGroup, RepeatPolicy
 from weblate.trans.repeat_recommendations import (
     prepare_run,
@@ -103,3 +104,30 @@ def repeat_recommend(request, project: str, language: str):
     queue_attempt(attempt=attempt)
     messages.success(request, gettext("Repeat recommendations were queued."))
     return redirect("repeat-queue", project=project, language=language)
+
+
+@login_required
+def repeat_rule(request, project: str, language: str):
+    """Create or update the policy controlling this queue's future scope."""
+    obj = get_object_or_404(Project, slug=project)
+    target_language = get_object_or_404(Language, code=language)
+    if not request.user.has_perm("project.edit", obj):
+        raise PermissionDenied
+    policy = RepeatPolicy.objects.filter(
+        project=obj, target_language=target_language
+    ).first()
+    form = RepeatPolicyForm(
+        project=obj,
+        actor=request.user,
+        data=request.POST or None,
+        instance=policy,
+        initial={"target_language": target_language} if policy is None else None,
+    )
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        return redirect("repeat-queue", project=project, language=language)
+    return render(
+        request,
+        "repeat_rule.html",
+        {"project": obj, "language": target_language, "form": form},
+    )
