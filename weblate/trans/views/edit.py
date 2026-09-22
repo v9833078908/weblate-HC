@@ -1059,7 +1059,24 @@ def handle_translate(
 
             membership = current_shared_membership(unit)
             if membership is not None:
-                if request.POST.get("repeat_decision") != "independent":
+                decision = form.cleaned_data.get("repeat_decision")
+                if decision == "shared":
+                    messages.info(
+                        request,
+                        gettext(
+                            "Choose the shared translation from the repeat queue preview."
+                        ),
+                    )
+                    return HttpResponseRedirect(
+                        reverse(
+                            "repeat-queue",
+                            kwargs={
+                                "project": unit.translation.component.project.slug,
+                                "language": unit.translation.language.code,
+                            },
+                        )
+                    )
+                if decision != "independent":
                     messages.error(
                         request,
                         gettext(

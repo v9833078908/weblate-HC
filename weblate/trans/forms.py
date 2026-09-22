@@ -788,6 +788,31 @@ class TranslationForm(UnitForm):
             InlineRadios("review", css_class="review_radio"),
             Field("explanation"),
         )
+        # A shared repeat never silently becomes a divergent ordinary edit.
+        # The editor offers the local choice; changing the group remains the
+        # previewed operation in the repeat queue.
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.repeats import current_shared_membership
+
+        if current_shared_membership(unit) is not None:
+            self.fields["repeat_decision"] = forms.ChoiceField(
+                label=gettext_lazy("Repeat decision"),
+                choices=[
+                    ("", gettext_lazy("Choose how to handle this repeat")),
+                    (
+                        "shared",
+                        gettext_lazy(
+                            "Update the shared translation in the repeat queue"
+                        ),
+                    ),
+                    (
+                        "independent",
+                        gettext_lazy("Keep this occurrence independent"),
+                    ),
+                ],
+                required=True,
+            )
+            self.helper.layout.append(InlineRadios("repeat_decision"))
         if user_can_review or not user_can_edit:
             self.fields["fuzzy"].widget = forms.HiddenInput()
         else:
