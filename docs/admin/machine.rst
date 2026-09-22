@@ -44,6 +44,24 @@ Priority of machine translation and translation memory services
 
 Each machine translation service has a predefined maximum score it can produce. The use of installed translation services is ordered according to their maximum score. For each string with translation score lower than the service's maximum, the service is asked to produce a translation. Translations with a score exceeding the current one are accepted.
 
+Managed exact repeats
+---------------------
+
+An authorized project user can define an explicit repeat rule for selected
+components and source labels. Once they have previewed and accepted a shared
+translation for an exact-repeat group, an automatic translation run reuses that
+accepted target for current shared occurrences before asking a machine
+translation service. This reuse is limited to the run's selected strings; it
+does not expand an automatic translation scope or change ordinary translation
+memory matching.
+
+An approved target, a locked occurrence, a changed source identity, an
+independent occurrence, or an overlapping repeat rule is not silently
+overwritten. Such occurrences remain visible for a human decision. A repeat
+rule does not enable machine translation by itself, and opening the repeat
+queue never sends a provider request. Model recommendations are a separate,
+explicitly confirmed operation and never write translations automatically.
+
 .. _mt-sources:
 
 Source strings for the machine translation
