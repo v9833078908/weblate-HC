@@ -130,6 +130,8 @@ class ConfirmedRename:
     new_context: str
     expected_fingerprint: str
     desired_fingerprint: str
+    expected_structure: dict[int, list[str]]
+    desired_structure: dict[int, list[str]]
 
 
 @dataclass(frozen=True)
@@ -141,6 +143,8 @@ class ConfirmedMove:
     placement: Literal["before", "after"]
     expected_fingerprint: str
     desired_fingerprint: str
+    expected_structure: dict[int, list[str]]
+    desired_structure: dict[int, list[str]]
 
 
 @dataclass(frozen=True)
@@ -2494,6 +2498,51 @@ class Translation(
         ).encode()
         return hashlib.sha256(payload).hexdigest()
 
+    @staticmethod
+    def normalize_structure(
+        structure: dict[int | str, list[str]],
+    ) -> dict[int, list[str]]:
+        """Restore integer translation IDs after a signed JSON payload round-trip."""
+        return {
+            int(translation_id): contexts
+            for translation_id, contexts in structure.items()
+        }
+
+    def classify_structural_state(
+        self,
+        *,
+        actual: dict[int, list[str]],
+        expected_fingerprint: str,
+        desired_fingerprint: str,
+        expected_structure: dict[int | str, list[str]],
+        desired_structure: dict[int | str, list[str]],
+    ) -> Literal["before", "reconcile"]:
+        """
+        Accept only an exact signed file structure, never a partial mutation.
+
+        A fingerprint alone cannot distinguish a clean already-committed desired
+        tree from a third state.  The signed structure is therefore carried with
+        the UI confirmation and its own digest is verified before comparing the
+        current stores in the mandated desired-then-expected order.
+        """
+        expected = self.normalize_structure(expected_structure)
+        desired = self.normalize_structure(desired_structure)
+        if (
+            self.structure_fingerprint(expected) != expected_fingerprint
+            or self.structure_fingerprint(desired) != desired_fingerprint
+            or set(actual) != set(expected)
+            or set(actual) != set(desired)
+        ):
+            msg = "The component has changed. Create a new preview."
+            raise ValidationError(msg)
+        actual_fingerprint = self.structure_fingerprint(actual)
+        if actual_fingerprint == desired_fingerprint:
+            return "reconcile"
+        if actual_fingerprint == expected_fingerprint:
+            return "before"
+        msg = "The component has changed. Create a new preview."
+        raise ValidationError(msg)
+
     def get_store_structure(
         self, translations: list[Translation]
     ) -> dict[int, list[str]]:
@@ -2573,6 +2622,8 @@ class Translation(
             new_context=new_context,
             expected_fingerprint=self.structure_fingerprint(expected),
             desired_fingerprint=self.structure_fingerprint(desired),
+            expected_structure=expected,
+            desired_structure=desired,
         )
 
     def get_move_preview(
@@ -2606,6 +2657,8 @@ class Translation(
             placement=placement,
             expected_fingerprint=self.structure_fingerprint(expected),
             desired_fingerprint=self.structure_fingerprint(desired),
+            expected_structure=expected,
+            desired_structure=desired,
         )
 
     def commit_structural_stores(
@@ -2686,7 +2739,10 @@ class Translation(
                 msg = "This file format does not support renaming keys."
                 raise ValidationError(msg)
             source_unit = source.unit_set.select_for_update().get(pk=change.unit_id)
-            if not source_unit.is_source or source_unit.context != change.old_context:
+            if not source_unit.is_source or source_unit.context not in {
+                change.old_context,
+                change.new_context,
+            }:
                 msg = "The source string has changed. Create a new preview."
                 raise ValidationError(msg)
             if not change.new_context or any(
@@ -2700,31 +2756,21 @@ class Translation(
             source.flush_structural_pending(component, user)
             source.ensure_clean_repository(component)
             translations = source.get_structural_translations()
-            expected = source.get_store_structure(translations)
-            desired = {
-                translation_id: [
-                    change.new_context if context == change.old_context else context
-                    for context in contexts
-                ]
-                for translation_id, contexts in expected.items()
-            }
-            expected_fingerprint = source.structure_fingerprint(expected)
-            desired_fingerprint = source.structure_fingerprint(desired)
-            if expected_fingerprint == change.desired_fingerprint:
-                return source_unit
-            if (
-                expected_fingerprint != change.expected_fingerprint
-                or desired_fingerprint != change.desired_fingerprint
-            ):
-                msg = "The component has changed. Create a new preview."
-                raise ValidationError(msg)
+            actual = source.get_store_structure(translations)
+            state = source.classify_structural_state(
+                actual=actual,
+                expected_fingerprint=change.expected_fingerprint,
+                desired_fingerprint=change.desired_fingerprint,
+                expected_structure=change.expected_structure,
+                desired_structure=change.desired_structure,
+            )
 
             new_hash = component.file_format_cls.unit_class.calculate_id_hash(
                 component.has_template(), source_unit.source, change.new_context
             )
             units = list(
                 Unit.objects.select_for_update()
-                .filter(translation__in=translations, id_hash=source_unit.id_hash)
+                .filter(Q(pk=source_unit.pk) | Q(source_unit=source_unit))
                 .select_related("translation")
             )
             if (
@@ -2737,43 +2783,53 @@ class Translation(
                 raise ValidationError(msg)
 
             changed_translations: list[Translation] = []
-            for translation in translations:
-                try:
-                    _store_unit, created = translation.store.find_unit(
-                        change.old_context, source_unit.source
-                    )
-                except UnitNotFoundError:
-                    continue
-                if not created and translation.store.rename_key(
-                    change.old_context, change.new_context
-                ):
-                    changed_translations.append(translation)
+            if state == "before":
+                for translation in translations:
+                    try:
+                        _store_unit, created = translation.store.find_unit(
+                            change.old_context, source_unit.source
+                        )
+                    except UnitNotFoundError:
+                        continue
+                    if not created and translation.store.rename_key(
+                        change.old_context, change.new_context
+                    ):
+                        changed_translations.append(translation)
 
-            previous_revision = component.repository.last_revision
-            source.commit_structural_stores(
-                component=component,
-                translations=translations,
-                changed_translations=changed_translations,
-                user=user,
-                message=f"Rename string key {change.old_context} to {change.new_context}",
-                previous_revision=previous_revision,
-            )
-            Unit.objects.filter(pk__in=[unit.pk for unit in units]).update(
-                context=change.new_context, id_hash=new_hash
-            )
+                previous_revision = component.repository.last_revision
+                source.commit_structural_stores(
+                    component=component,
+                    translations=translations,
+                    changed_translations=changed_translations,
+                    user=user,
+                    message=(
+                        f"Rename string key {change.old_context} to "
+                        f"{change.new_context}"
+                    ),
+                    previous_revision=previous_revision,
+                )
+            database_changed = source_unit.context != change.new_context
+            if database_changed:
+                Unit.objects.filter(pk__in=[unit.pk for unit in units]).update(
+                    context=change.new_context, id_hash=new_hash
+                )
             source_unit.refresh_from_db()
-            source_unit.change_set.create(
-                action=ActionEvents.RENAME_STRING,
-                user=user,
-                author=user,
-                details={
+            if database_changed:
+                details: dict[str, str | bool] = {
                     "old_context": change.old_context,
                     "new_context": change.new_context,
-                },
-            )
-            transaction.on_commit(
-                lambda: source.finish_structural_operation(component, translations)
-            )
+                }
+                if state == "reconcile":
+                    details["reconciled_existing_file_state"] = True
+                source_unit.change_set.create(
+                    action=ActionEvents.RENAME_STRING,
+                    user=user,
+                    author=user,
+                    details=details,
+                )
+                transaction.on_commit(
+                    lambda: source.finish_structural_operation(component, translations)
+                )
             return source_unit
 
     def move_unit(self, *, change: ConfirmedMove, user: User) -> UnitMoveResult:
@@ -2796,53 +2852,36 @@ class Translation(
             source.flush_structural_pending(component, user)
             source.ensure_clean_repository(component)
             translations = source.get_structural_translations()
-            expected = source.get_store_structure(translations)
-            canonical_order = [
-                context for context in expected[source.pk] if context != unit.context
-            ]
-            anchor_index = canonical_order.index(anchor.context)
-            canonical_order.insert(
-                anchor_index + (change.placement == "after"), unit.context
+            actual = source.get_store_structure(translations)
+            state = source.classify_structural_state(
+                actual=actual,
+                expected_fingerprint=change.expected_fingerprint,
+                desired_fingerprint=change.desired_fingerprint,
+                expected_structure=change.expected_structure,
+                desired_structure=change.desired_structure,
             )
-            desired = {
-                translation_id: source.apply_context_order(contexts, canonical_order)
-                for translation_id, contexts in expected.items()
-            }
-            expected_fingerprint = source.structure_fingerprint(expected)
-            desired_fingerprint = source.structure_fingerprint(desired)
+            expected = source.normalize_structure(change.expected_structure)
+            desired = source.normalize_structure(change.desired_structure)
             old_position = expected[source.pk].index(unit.context) + 1
             new_position = desired[source.pk].index(unit.context) + 1
-            if expected_fingerprint == change.desired_fingerprint:
-                return UnitMoveResult(
-                    changed=False,
-                    unit_id=unit.pk,
-                    old_position=old_position,
-                    new_position=new_position,
-                    anchor_id=anchor.pk,
-                    anchor_context=anchor.context,
-                    placement=change.placement,
-                )
-            if (
-                expected_fingerprint != change.expected_fingerprint
-                or desired_fingerprint != change.desired_fingerprint
-            ):
-                msg = "The component has changed. Create a new preview."
-                raise ValidationError(msg)
 
-            changed_translations = [
-                translation
-                for translation in translations
-                if translation.store.apply_key_order(canonical_order)
-            ]
-            previous_revision = component.repository.last_revision
-            source.commit_structural_stores(
-                component=component,
-                translations=translations,
-                changed_translations=changed_translations,
-                user=user,
-                message=f"Move string key {unit.context}",
-                previous_revision=previous_revision,
-            )
+            if state == "before":
+                canonical_order = desired[source.pk]
+                changed_translations = [
+                    translation
+                    for translation in translations
+                    if translation.store.apply_key_order(canonical_order)
+                ]
+                previous_revision = component.repository.last_revision
+                source.commit_structural_stores(
+                    component=component,
+                    translations=translations,
+                    changed_translations=changed_translations,
+                    user=user,
+                    message=f"Move string key {unit.context}",
+                    previous_revision=previous_revision,
+                )
+            database_changed = False
             for translation in translations:
                 contexts = desired[translation.pk]
                 positions = {
@@ -2852,21 +2891,26 @@ class Translation(
                     position = positions.get(sibling.context)
                     if position is not None and sibling.position != position:
                         Unit.objects.filter(pk=sibling.pk).update(position=position)
+                        database_changed = True
             unit.refresh_from_db()
-            unit.change_set.create(
-                action=ActionEvents.MOVE_STRING,
-                user=user,
-                author=user,
-                details={
+            if database_changed:
+                details: dict[str, int | str | bool] = {
                     "old_position": old_position,
                     "new_position": new_position,
                     "anchor": anchor.context,
                     "placement": change.placement,
-                },
-            )
-            transaction.on_commit(
-                lambda: source.finish_structural_operation(component, translations)
-            )
+                }
+                if state == "reconcile":
+                    details["reconciled_existing_file_state"] = True
+                unit.change_set.create(
+                    action=ActionEvents.MOVE_STRING,
+                    user=user,
+                    author=user,
+                    details=details,
+                )
+                transaction.on_commit(
+                    lambda: source.finish_structural_operation(component, translations)
+                )
             return UnitMoveResult(
                 changed=True,
                 unit_id=unit.pk,

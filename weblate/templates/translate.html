@@ -246,7 +246,8 @@
                           <li>
                             <button type="button"
                                     class="dropdown-item js-rename-key"
-                                    data-url="{% url 'rename-key' pk=unit.pk %}">{% translate "Rename key" %}</button>
+                                    data-url="{% url 'rename-key' pk=unit.pk %}"
+                                    data-key="{{ unit.context }}">{% translate "Rename key" %}</button>
                           </li>
                         {% endif %}
                         {% if user_can_translate and unit.translation.component.is_multivalue %}
@@ -1224,5 +1225,7 @@
       <!-- /.modal -->
     </form>
   {% endif %}
+
+  {% include "snippets/source-unit-structure-modal.html" %}
 
 {% endblock content %}

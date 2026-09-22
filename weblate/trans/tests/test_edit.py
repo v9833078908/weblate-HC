@@ -1201,13 +1201,43 @@ class EditJSONMonoTest(EditTest):
             self.client.post(
                 url, {"stage": "preview", "new_key": "renamed"}
             ).status_code,
-            404,
+            403,
         )
 
         self.make_manager()
         response = self.client.post(url, {"stage": "preview", "new_key": "renamed"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("token", response.json())
+
+    def test_structural_rename_confirm_updates_the_existing_unit(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation
+        unit = source.unit_set.order_by("position", "pk").first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        url = reverse("rename-key", kwargs={"pk": unit.pk})
+
+        preview = self.client.post(url, {"stage": "preview", "new_key": "renamed"})
+        self.assertEqual(preview.status_code, 200)
+        response = self.client.post(url, {"token": preview.json()["token"]})
+        self.assertEqual(response.status_code, 200)
+        unit.refresh_from_db()
+        self.assertEqual(unit.context, "renamed")
+        self.assertEqual(response.json()["unit_id"], unit.pk)
+
+    def test_structural_move_confirm_returns_position_redirect(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation
+        unit, anchor = source.unit_set.order_by("position", "pk")[:2]
+        url = reverse("move-string", kwargs={"pk": unit.pk})
+
+        preview = self.client.post(
+            url, {"stage": "preview", "anchor": anchor.pk, "placement": "after"}
+        )
+        self.assertEqual(preview.status_code, 200)
+        response = self.client.post(url, {"token": preview.json()["token"]})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("sort_by=position", response.json()["url"])
 
     def enable_nested_unit_management(self) -> None:
         self.component.manage_units = True

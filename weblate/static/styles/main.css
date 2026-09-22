@@ -2781,3 +2781,20 @@ table.table-simple tbody#glossary-terms .alert-info {
 .ts-dropdown .create {
   color: var(--bs-secondary-color);
 }
+
+.source-unit-structure-results {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.source-unit-structure-preview {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-left: 3px solid var(--bs-primary);
+  background: var(--bs-tertiary-bg);
+}
+
+.table-embed-units tr:target {
+  outline: 3px solid var(--bs-primary);
+  outline-offset: -3px;
+}
