@@ -22,6 +22,7 @@ from weblate.trans.models import (
 from weblate.trans.repeat_recommendations import (
     execute_attempt,
     parse_results,
+    prepare_run,
     reserve_attempt,
 )
 from weblate.trans.repeats import (
@@ -206,6 +207,37 @@ class RepeatModelTest(ViewTestCase):
         self.assertEqual(attempt.ordinal, 1)
         with self.assertRaisesMessage(ValidationError, "request cap"):
             reserve_attempt(run=run, request_snapshot={"groups": []})
+
+    def test_recommendation_snapshot_contains_complete_untrusted_context(self) -> None:
+        self.make_manager()
+        first = self.add_repeat("first-context", "One")
+        self.add_repeat("second-context", "Two")
+        first.source_unit.explanation = "Shown in the inventory"
+        first.source_unit.save(update_fields=["explanation"])
+        policy = self.make_policy()
+        profile = SimpleNamespace(profile_fingerprint="p" * 64)
+        with (
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=profile,
+            ),
+        ):
+            run = prepare_run(policy=policy, actor=self.user, request_cap=1)
+
+        group = run.snapshot["groups"][0]
+        self.assertTrue(group["sendable"])
+        self.assertEqual(group["source_forms"], ["An exact repeat"])
+        self.assertEqual(
+            {member["context"] for member in group["members"]},
+            {"first-context", "second-context"},
+        )
+        self.assertEqual(group["members"][0]["explanation"], "Shown in the inventory")
+        first.refresh_from_db()
+        self.assertEqual(first.target, "One")
 
     def test_recommendation_parser_rejects_unknown_group_and_extra_fields(self) -> None:
         first = self.add_repeat("first", "One")

@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 
 
 REPEAT_RECOMMENDATION_PROMPT_REVISION = "repeat-recommendation-v1"
+MAX_REPEAT_GROUP_PAYLOAD_BYTES = 128 * 1024
 
 REPEAT_RECOMMENDATION_RESPONSE_SCHEMA = {
     "type": "object",
@@ -81,19 +82,60 @@ def prepare_run(*, policy: RepeatPolicy, actor: User, request_cap: int):
     # pair-wide validation and therefore never consults/falls back to seat 2.
     profile = resolve_judge_seat_profile(1, endpoint=judge_primary_endpoint())
     groups = []
+    visible_units = (
+        policy_units(policy)
+        .filter_access(actor)
+        .select_related("source_unit", "translation__component")
+        .prefetch_related("source_unit__labels")
+    )
     for candidate in detect_policy_groups(policy, user=actor):
-        unit = policy_units(policy).get(pk=candidate.unit_ids[0])
-        group = get_or_create_group(policy, unit)
-        groups.append(
-            {
-                "group": group.pk,
-                "group_revision": group.revision,
-                "source_forms": list(candidate.source_forms),
-                "unit_ids": list(candidate.unit_ids),
-            }
+        candidate_units = list(
+            visible_units.filter(pk__in=candidate.unit_ids).order_by("pk")
         )
+        unit = candidate_units[0]
+        group = get_or_create_group(policy, unit)
+        variants: dict[tuple[str, ...], int] = {}
+        members = []
+        for member in candidate_units:
+            target = tuple(member.get_target_plurals())
+            variants[target] = variants.get(target, 0) + 1
+            members.append(
+                {
+                    "unit": member.pk,
+                    "component": member.translation.component.slug,
+                    "context": member.context,
+                    "explanation": member.source_unit.explanation,
+                    "labels": sorted(
+                        member.source_unit.labels.values_list("name", flat=True)
+                    ),
+                    "target_forms": list(target),
+                    "state": member.state,
+                    "constraints": {
+                        "flags": member.all_flags.format(),
+                        "max_length": member.get_max_length(),
+                    },
+                }
+            )
+        item = {
+            "group": group.pk,
+            "group_revision": group.revision,
+            "source_forms": list(candidate.source_forms),
+            "unit_ids": list(candidate.unit_ids),
+            "variants": [
+                {"target_forms": list(target), "count": count}
+                for target, count in sorted(
+                    variants.items(), key=lambda value: (-value[1], value[0])
+                )
+            ],
+            "members": members,
+        }
+        item["sendable"] = (
+            len(json.dumps(item, ensure_ascii=False).encode())
+            <= MAX_REPEAT_GROUP_PAYLOAD_BYTES
+        )
+        groups.append(item)
     snapshot = {"policy_revision": policy.revision, "groups": groups}
-    return RepeatRecommendationRun.objects.create(
+    run = RepeatRecommendationRun.objects.create(
         policy=policy,
         actor=actor,
         snapshot=snapshot,
@@ -102,6 +144,22 @@ def prepare_run(*, policy: RepeatPolicy, actor: User, request_cap: int):
         prompt_fingerprint=fingerprint(REPEAT_RECOMMENDATION_PROMPT_REVISION),
         request_cap=request_cap,
     )
+    for item in groups:
+        if item["sendable"]:
+            continue
+        RepeatRecommendationResult.objects.create(
+            run=run,
+            group_id=item["group"],
+            group_revision=item["group_revision"],
+            snapshot_fingerprint=run.snapshot_fingerprint,
+            action="needs_human",
+            rationale="The complete group context exceeds the recommendation limit.",
+        )
+    if groups and not any(item["sendable"] for item in groups):
+        run.status = RepeatRecommendationRun.Status.COMPLETED
+        run.finished_at = timezone.now()
+        run.save(update_fields=["status", "finished_at"])
+    return run
 
 
 def reserve_attempt(*, run: RepeatRecommendationRun, request_snapshot: dict):
@@ -173,7 +231,11 @@ def parse_results(*, run: RepeatRecommendationRun, content: str) -> list[dict]:
     if not isinstance(results, list):
         msg = "The recommendation results must be a list."
         raise ValidationError(msg)
-    groups = {item["group"]: item for item in run.snapshot.get("groups", [])}
+    groups = {
+        item["group"]: item
+        for item in run.snapshot.get("groups", [])
+        if item.get("sendable", True)
+    }
     accepted = []
     seen: set[int] = set()
     actions = {"use_existing", "propose_new", "keep_independent", "needs_human"}
@@ -357,7 +419,7 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
         )
     returned = {result["group"] for result in accepted}
     for group_item in run.snapshot["groups"]:
-        if group_item["group"] in returned:
+        if not group_item.get("sendable", True) or group_item["group"] in returned:
             continue
         RepeatRecommendationResult.objects.update_or_create(
             run=run,

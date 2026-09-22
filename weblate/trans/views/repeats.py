@@ -257,9 +257,16 @@ def repeat_recommend(request, project: str, language: str):
         msg = "A positive recommendation request cap is required."
         raise ValidationError(msg) from error
     run = prepare_run(policy=policy, actor=request.user, request_cap=request_cap)
+    groups = [item for item in run.snapshot["groups"] if item.get("sendable", True)]
+    if not groups:
+        messages.info(
+            request,
+            gettext("No repeat groups require a model request."),
+        )
+        return redirect("repeat-queue", project=project, language=language)
     attempt = reserve_attempt(
         run=run,
-        request_snapshot={"groups": run.snapshot["groups"]},
+        request_snapshot={"groups": groups},
     )
     queue_attempt(attempt=attempt)
     messages.success(request, gettext("Repeat recommendations were queued."))
