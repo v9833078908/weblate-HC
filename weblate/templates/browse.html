@@ -4,6 +4,7 @@
 
 {% block extra_script %}
   <script defer src="{% static 'editor/browse.js' %}"></script>
+  <script defer src="{% static 'editor/source-unit-structure.js' %}"></script>
 {% endblock extra_script %}
 
 {% block breadcrumbs %}
@@ -28,6 +29,7 @@
   {% endif %}
 
   {% perm 'unit.add' object as user_can_add_unit %}
+  {% perm 'component.edit' object.component as user_can_edit_component %}
   {% if user_can_add_unit %}
     <a class="btn btn-link green float-end" href="{{ object.get_absolute_url }}#new">{% icon "plus-circle.svg" %} {{ object.component.get_add_label }}</a>
   {% endif %}
@@ -39,7 +41,9 @@
   {% if not units %}
     <em>{% translate "No strings found!" %}</em>
   {% else %}
-    {% include "snippets/embed-units.html" with translation=object include_search=True component=object.component %}
+    {% include "snippets/embed-units.html" with translation=object include_search=True component=object.component actions_template="snippets/unit-move-action.html" %}
   {% endif %}
+
+  {% include "snippets/source-unit-structure-modal.html" %}
 
 {% endblock content %}

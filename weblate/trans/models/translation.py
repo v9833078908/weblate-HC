@@ -5,10 +5,14 @@
 from __future__ import annotations
 
 import codecs
+import hashlib
+import json
 import os
 import tempfile
 from contextlib import contextmanager, suppress
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from io import BytesIO
 from itertools import batched, chain
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, Literal, NotRequired, TypedDict, overload
@@ -116,6 +120,47 @@ class NewUnitParams(TypedDict):
     explanation: NotRequired[str]
     state: NotRequired[int | None]
     skip_existing: NotRequired[bool]
+
+
+@dataclass(frozen=True)
+class ConfirmedRename:
+    """A preview-confirmed source key rename."""
+
+    unit_id: int
+    old_context: str
+    new_context: str
+    affected_translation_count: int
+    affected_file_count: int
+    expected_fingerprint: str
+    desired_fingerprint: str
+
+
+@dataclass(frozen=True)
+class ConfirmedMove:
+    """A preview-confirmed source key move."""
+
+    unit_id: int
+    anchor_id: int
+    placement: Literal["before", "after"]
+    old_position: int
+    new_position: int
+    previous_context: str | None
+    next_context: str | None
+    expected_fingerprint: str
+    desired_fingerprint: str
+
+
+@dataclass(frozen=True)
+class UnitMoveResult:
+    """The result of moving a source unit in canonical source order."""
+
+    changed: bool
+    unit_id: int
+    old_position: int
+    new_position: int
+    anchor_id: int
+    anchor_context: str
+    placement: Literal["before", "after"]
 
 
 class ActiveChangeGroup(TypedDict):
@@ -2441,6 +2486,497 @@ class Translation(
             user=user,
         )
         return reparsed
+
+    def get_structural_translations(self) -> list[Translation]:
+        """Return source and targets in the safe structural write order."""
+        translations = list(
+            self.component.translation_set.select_related("component", "language")
+        )
+        return sorted(translations, key=lambda translation: translation.is_source)
+
+    @staticmethod
+    def structure_fingerprint(structure: dict[int, list[str]]) -> str:
+        payload = json.dumps(
+            structure, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+        ).encode()
+        return hashlib.sha256(payload).hexdigest()
+
+    def classify_structural_state(
+        self,
+        *,
+        actual: dict[int, list[str]],
+        expected_fingerprint: str,
+        desired_fingerprint: str,
+    ) -> Literal["before", "reconcile"]:
+        """
+        Accept only an exact signed file structure, never a partial mutation.
+
+        The signed preview carries both complete-structure fingerprints. Comparing
+        the current stores in desired-then-expected order distinguishes a clean
+        already-committed tree from the original state without putting the full
+        component inventory into the browser token.
+        """
+        actual_fingerprint = self.structure_fingerprint(actual)
+        if actual_fingerprint == desired_fingerprint:
+            return "reconcile"
+        if actual_fingerprint == expected_fingerprint:
+            return "before"
+        msg = gettext("The component has changed. Create a new preview.")
+        raise ValidationError(msg)
+
+    def get_store_structure(
+        self, translations: list[Translation]
+    ) -> dict[int, list[str]]:
+        return {
+            translation.pk: [
+                translation.store.unit_class(translation.store, None, unit).context
+                for unit in translation.store.all_store_units
+            ]
+            for translation in translations
+        }
+
+    @staticmethod
+    def apply_context_order(
+        contexts: list[str], canonical_order: list[str]
+    ) -> list[str]:
+        """Apply known source order while preserving unknown raw file slots."""
+        known = set(canonical_order)
+        reordered = iter(context for context in canonical_order if context in contexts)
+        return [
+            next(reordered) if context in known else context for context in contexts
+        ]
+
+    def validate_structural_operation(self, component: Component, user: User) -> None:
+        if not self.is_source:
+            msg = gettext("Structural string operations require a source translation.")
+            raise ValidationError(msg)
+        if (
+            component.is_glossary
+            or component.locked
+            or not component.has_template()
+            or not component.manage_units
+            or not component.edit_template
+        ):
+            msg = gettext(
+                "This component does not support structural string operations."
+            )
+            raise ValidationError(msg)
+        if not user.has_perm("component.edit", component):
+            msg = gettext("You do not have permission to edit this component.")
+            raise PermissionError(msg)
+
+    @staticmethod
+    def ensure_clean_repository(component: Component) -> None:
+        if component.repository.needs_commit():
+            msg = gettext("The repository has uncommitted changes.")
+            raise ValidationError(msg)
+
+    def flush_structural_pending(self, component: Component, user: User) -> None:
+        component.commit_pending("structural string operation", user, skip_push=True)
+        if PendingUnitChange.objects.for_component(
+            component, apply_filters=False, include_linked=True
+        ).exists():
+            msg = gettext("Pending changes could not be committed.")
+            raise ValidationError(msg)
+
+    def get_rename_preview(self, unit_id: int, new_context: str) -> ConfirmedRename:
+        """Build an immutable rename preview without writing component state."""
+        unit = self.unit_set.get(pk=unit_id)
+        if not unit.is_source:
+            msg = gettext("Structural string operations require a source unit.")
+            raise ValidationError(msg)
+        if not new_context or any(
+            character in new_context for character in CONTROLCHARS
+        ):
+            msg = gettext("String contains control character or is blank.")
+            raise ValidationError(msg)
+        translations = self.get_structural_translations()
+        expected = self.get_store_structure(translations)
+        desired = {
+            translation_id: [
+                new_context if context == unit.context else context
+                for context in contexts
+            ]
+            for translation_id, contexts in expected.items()
+        }
+        return ConfirmedRename(
+            unit_id=unit.pk,
+            old_context=unit.context,
+            new_context=new_context,
+            affected_translation_count=len(translations),
+            affected_file_count=sum(
+                len(translation.filenames) for translation in translations
+            ),
+            expected_fingerprint=self.structure_fingerprint(expected),
+            desired_fingerprint=self.structure_fingerprint(desired),
+        )
+
+    def get_move_preview(
+        self, unit_id: int, anchor_id: int, placement: Literal["before", "after"]
+    ) -> ConfirmedMove:
+        """Build an immutable move preview without writing component state."""
+        if placement not in {"before", "after"}:
+            msg = gettext("Invalid string placement.")
+            raise ValidationError(msg)
+        unit, anchor = self.unit_set.filter(pk__in=(unit_id, anchor_id)).order_by("pk")
+        if unit.pk != unit_id:
+            unit, anchor = anchor, unit
+        if unit.pk == anchor.pk or not unit.is_source or not anchor.is_source:
+            msg = gettext("The move anchor must be another source unit.")
+            raise ValidationError(msg)
+        translations = self.get_structural_translations()
+        expected = self.get_store_structure(translations)
+        source_contexts = expected[self.pk]
+        canonical_order = [
+            context for context in source_contexts if context != unit.context
+        ]
+        anchor_index = canonical_order.index(anchor.context)
+        canonical_order.insert(anchor_index + (placement == "after"), unit.context)
+        moved_index = canonical_order.index(unit.context)
+        desired = {
+            translation_id: self.apply_context_order(contexts, canonical_order)
+            for translation_id, contexts in expected.items()
+        }
+        return ConfirmedMove(
+            unit_id=unit.pk,
+            anchor_id=anchor.pk,
+            placement=placement,
+            old_position=source_contexts.index(unit.context) + 1,
+            new_position=moved_index + 1,
+            previous_context=canonical_order[moved_index - 1] if moved_index else None,
+            next_context=canonical_order[moved_index + 1]
+            if moved_index + 1 < len(canonical_order)
+            else None,
+            expected_fingerprint=self.structure_fingerprint(expected),
+            desired_fingerprint=self.structure_fingerprint(desired),
+        )
+
+    def commit_structural_stores(
+        self,
+        *,
+        component: Component,
+        translations: list[Translation],
+        changed_translations: list[Translation],
+        user: User,
+        message: str,
+        previous_revision: str,
+    ) -> None:
+        try:
+            self._save_and_validate_structural_stores(changed_translations)
+            self._commit_structural_files(
+                component, changed_translations, user, message
+            )
+        except Exception:
+            if component.repository.last_revision == previous_revision:
+                component.repository.reset_to_revision(previous_revision)
+            raise
+        finally:
+            for translation in translations:
+                translation.drop_store_cache()
+            component.drop_template_store_cache()
+
+    @staticmethod
+    def _save_and_validate_structural_stores(
+        changed_translations: list[Translation],
+    ) -> None:
+        """Render and parse every changed store before replacing any file."""
+        rendered: list[tuple[Translation, bytes, bytes]] = []
+        for translation in changed_translations:
+            content = BytesIO()
+            translation.store.save_content(content)  # type: ignore[attr-defined]
+            filename = translation.get_filename()
+            if filename is None:
+                msg = gettext("Attempt to save store without a filename.")
+                raise ValueError(msg)
+            translation.load_store(
+                NamedBytesIO(filename, content.getvalue())
+            ).check_valid()
+            rendered.append(
+                (translation, content.getvalue(), Path(filename).read_bytes())
+            )
+
+        writes: list[tuple[Translation, str, bytes, bytes]] = []
+        for translation, content, original in rendered:
+            filename = translation.get_filename()
+            if filename is None:
+                msg = gettext("Attempt to save store without a filename.")
+                raise ValueError(msg)
+            writes.append((translation, filename, content, original))
+
+        try:
+            for translation, filename, content, _original in writes:
+                TranslationFormat.save_atomic(
+                    filename,
+                    lambda handle, content=content: handle.write(content),
+                    repo_temp_dir=translation.component.repository.get_repo_temp_dir(),
+                )
+        except Exception:
+            for translation, filename, _content, original in writes:
+                TranslationFormat.save_atomic(
+                    filename,
+                    lambda handle, original=original: handle.write(original),
+                    repo_temp_dir=translation.component.repository.get_repo_temp_dir(),
+                )
+            raise
+
+    @staticmethod
+    def _commit_structural_files(
+        component: Component,
+        changed_translations: list[Translation],
+        user: User,
+        message: str,
+    ) -> None:
+        files = list(
+            dict.fromkeys(
+                filename
+                for translation in changed_translations
+                for filename in translation.filenames
+            )
+        )
+        if files:
+            component.commit_files(
+                message=message,
+                author=user.get_author_name(),
+                files=files,
+                signals=False,
+                skip_push=True,
+                store_hash=False,
+            )
+
+    def finish_structural_operation(
+        self, component: Component, translations: list[Translation]
+    ) -> None:
+        for translation in translations:
+            translation.invalidate_cache()
+            translation.invalidate_keys()
+            translation.store_hash()
+        component.invalidate_cache()
+        component.update_variants()
+        component.send_post_commit_signal(store_hash=False)
+        component.push_if_needed()
+
+    def rename_unit_key(self, *, change: ConfirmedRename, user: User) -> Unit:
+        """Rename one source key across the component while keeping Unit PKs."""
+        with self.component.locked_for_update() as component:
+            source = component.source_translation
+            source.validate_structural_operation(component, user)
+            if not component.file_format_supports_key_rename:
+                msg = gettext("This file format does not support renaming keys.")
+                raise ValidationError(msg)
+            source_unit = source.unit_set.select_for_update().get(pk=change.unit_id)
+            if not source_unit.is_source or source_unit.context not in {
+                change.old_context,
+                change.new_context,
+            }:
+                msg = gettext("The source string has changed. Create a new preview.")
+                raise ValidationError(msg)
+            if not change.new_context or any(
+                character in change.new_context for character in CONTROLCHARS
+            ):
+                msg = gettext("String contains control character or is blank.")
+                raise ValidationError(msg)
+            # ruff: ignore[private-member-access]
+            source._validate_new_unit_context(change.new_context)
+
+            source.flush_structural_pending(component, user)
+            source.ensure_clean_repository(component)
+            translations = source.get_structural_translations()
+            actual = source.get_store_structure(translations)
+            state = source.classify_structural_state(
+                actual=actual,
+                expected_fingerprint=change.expected_fingerprint,
+                desired_fingerprint=change.desired_fingerprint,
+            )
+
+            desired = actual
+            if state == "before":
+                desired = {
+                    translation_id: [
+                        change.new_context if context == change.old_context else context
+                        for context in contexts
+                    ]
+                    for translation_id, contexts in actual.items()
+                }
+                if source.structure_fingerprint(desired) != change.desired_fingerprint:
+                    msg = gettext("The component has changed. Create a new preview.")
+                    raise ValidationError(msg)
+
+            new_hash = component.file_format_cls.unit_class.calculate_id_hash(
+                component.has_template(), source_unit.source, change.new_context
+            )
+            units = list(
+                Unit.objects.select_for_update()
+                .filter(Q(pk=source_unit.pk) | Q(source_unit=source_unit))
+                .select_related("translation")
+            )
+            if (
+                len(units) != len(translations)
+                or Unit.objects.filter(translation__in=translations, id_hash=new_hash)
+                .exclude(pk__in=[unit.pk for unit in units])
+                .exists()
+            ):
+                msg = gettext("The new key already exists.")
+                raise ValidationError(msg)
+
+            changed_translations: list[Translation] = []
+            if state == "before":
+                for translation in translations:
+                    try:
+                        _store_unit, created = translation.store.find_unit(
+                            change.old_context, source_unit.source
+                        )
+                    except UnitNotFoundError:
+                        continue
+                    if not created and translation.store.rename_key(
+                        change.old_context, change.new_context
+                    ):
+                        changed_translations.append(translation)
+
+                previous_revision = component.repository.last_revision
+                source.commit_structural_stores(
+                    component=component,
+                    translations=translations,
+                    changed_translations=changed_translations,
+                    user=user,
+                    message=(
+                        f"Rename string key {change.old_context} to "
+                        f"{change.new_context}"
+                    ),
+                    previous_revision=previous_revision,
+                )
+            database_changed = source_unit.context != change.new_context
+            if database_changed:
+                Unit.objects.filter(pk__in=[unit.pk for unit in units]).update(
+                    context=change.new_context, id_hash=new_hash
+                )
+            source_unit.refresh_from_db()
+            operation_changed = state == "before" or database_changed
+            if operation_changed:
+                details: dict[str, str | bool] = {
+                    "old_context": change.old_context,
+                    "new_context": change.new_context,
+                }
+                if state == "reconcile":
+                    details["reconciled_existing_file_state"] = True
+                source_unit.change_set.create(
+                    action=ActionEvents.RENAME_STRING,
+                    user=user,
+                    author=user,
+                    details=details,
+                )
+                transaction.on_commit(
+                    lambda: source.finish_structural_operation(component, translations)
+                )
+            return source_unit
+
+    def move_unit(self, *, change: ConfirmedMove, user: User) -> UnitMoveResult:
+        """Move one source string and persist its order across JSON stores."""
+        with self.component.locked_for_update() as component:
+            source = component.source_translation
+            source.validate_structural_operation(component, user)
+            if not component.file_format_supports_key_order:
+                msg = gettext("This file format does not support ordering keys.")
+                raise ValidationError(msg)
+            source_units = list(
+                source.unit_set.select_for_update().order_by("position", "pk")
+            )
+            unit_by_id = {unit.pk: unit for unit in source_units}
+            unit = unit_by_id.get(change.unit_id)
+            anchor = unit_by_id.get(change.anchor_id)
+            if unit is None or anchor is None or unit.pk == anchor.pk:
+                msg = gettext("The move anchor must be another source unit.")
+                raise ValidationError(msg)
+            source.flush_structural_pending(component, user)
+            source.ensure_clean_repository(component)
+            translations = source.get_structural_translations()
+            actual = source.get_store_structure(translations)
+            state = source.classify_structural_state(
+                actual=actual,
+                expected_fingerprint=change.expected_fingerprint,
+                desired_fingerprint=change.desired_fingerprint,
+            )
+            old_position = change.old_position
+            new_position = change.new_position
+
+            if state == "before":
+                canonical_order = [
+                    context for context in actual[source.pk] if context != unit.context
+                ]
+                anchor_index = canonical_order.index(anchor.context)
+                canonical_order.insert(
+                    anchor_index + (change.placement == "after"), unit.context
+                )
+                desired = {
+                    translation_id: source.apply_context_order(
+                        contexts, canonical_order
+                    )
+                    for translation_id, contexts in actual.items()
+                }
+                if source.structure_fingerprint(desired) != change.desired_fingerprint:
+                    msg = gettext("The component has changed. Create a new preview.")
+                    raise ValidationError(msg)
+                changed_translations = [
+                    translation
+                    for translation in translations
+                    if translation.store.apply_key_order(canonical_order)
+                ]
+                previous_revision = component.repository.last_revision
+                source.commit_structural_stores(
+                    component=component,
+                    translations=translations,
+                    changed_translations=changed_translations,
+                    user=user,
+                    message=f"Move string key {unit.context}",
+                    previous_revision=previous_revision,
+                )
+            else:
+                desired = actual
+            database_changed = False
+            position_updates: list[Unit] = []
+            canonical_positions = {
+                context: index
+                for index, context in enumerate(desired[source.pk], start=1)
+            }
+            for translation in translations:
+                for sibling in translation.unit_set.select_for_update():
+                    position = canonical_positions.get(sibling.context)
+                    if position is not None and sibling.position != position:
+                        sibling.position = position
+                        position_updates.append(sibling)
+                        database_changed = True
+            if position_updates:
+                Unit.objects.bulk_update(
+                    position_updates, ["position"], batch_size=1000
+                )
+            unit.refresh_from_db()
+            operation_changed = state == "before" or database_changed
+            if operation_changed:
+                details: dict[str, int | str | bool] = {
+                    "old_position": old_position,
+                    "new_position": new_position,
+                    "anchor": anchor.context,
+                    "placement": change.placement,
+                }
+                if state == "reconcile":
+                    details["reconciled_existing_file_state"] = True
+                unit.change_set.create(
+                    action=ActionEvents.MOVE_STRING,
+                    user=user,
+                    author=user,
+                    details=details,
+                )
+                transaction.on_commit(
+                    lambda: source.finish_structural_operation(component, translations)
+                )
+            return UnitMoveResult(
+                changed=operation_changed,
+                unit_id=unit.pk,
+                old_position=old_position,
+                new_position=new_position,
+                anchor_id=anchor.pk,
+                anchor_context=anchor.context,
+                placement=change.placement,
+            )
 
     def get_store_change_translations(self) -> list[Translation]:
         component = self.component

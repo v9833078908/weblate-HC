@@ -34215,6 +34215,8 @@ components:
       - 105
       - 106
       - 107
+      - 108
+      - 109
       type: integer
       description: |-
         * `0` - **Resource updated:** A translation file was synchronized with its repository.
@@ -34319,6 +34321,8 @@ components:
         * `105` - **Judge verdict resolved:** A producer recorded a decision on a judge verdict.
         * `106` - **Check fixed automatically:** A failing check was fixed automatically.
         * `107` - **Judge fix undone:** A producer undid a previously applied judge fix.
+        * `108` - **String key renamed:** A source string key was renamed.
+        * `109` - **String moved:** A source string was moved in source order.
     Addon:
       type: object
       properties:
@@ -41857,16 +41861,36 @@ components:
         * `-1` - Negative
     VcsEnum:
       enum:
+      - azure_devops
+      - bitbucketcloud
+      - bitbucketserver
+      - gerrit
       - git
       - git-force-push
+      - gitea
+      - github
       - github-app
+      - gitlab
       - local
+      - mercurial
+      - pagure
+      - subversion
       type: string
       description: |-
+        * `azure_devops` - Azure DevOps pull request
+        * `bitbucketcloud` - Bitbucket Cloud merge request
+        * `bitbucketserver` - Bitbucket Data Center pull request
+        * `gerrit` - Gerrit
         * `git` - Git
         * `git-force-push` - Git with force push
+        * `gitea` - Gitea pull request
+        * `github` - GitHub pull request
         * `github-app` - GitHub (via Weblate GitHub app)
+        * `gitlab` - GitLab merge request
         * `local` - No remote repository
+        * `mercurial` - Mercurial
+        * `pagure` - Pagure merge request
+        * `subversion` - Subversion
     ZenModeEnum:
       enum:
       - 0

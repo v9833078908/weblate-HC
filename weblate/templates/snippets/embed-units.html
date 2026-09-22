@@ -86,7 +86,8 @@
 <tbody class="unit-listing-body">
 
   {% for unit in units %}
-    <tr class="{% if current_unit.id == unit.id %}current_translation{% endif %}">
+    <tr id="unit-{{ unit.id }}"
+        class="{% if current_unit.id == unit.id %}current_translation{% endif %}">
       {% if selection_template %}
         <td class="unit-selection-cell">{% include selection_template %}</td>
       {% endif %}

@@ -6174,6 +6174,14 @@ class Component(  # ruff: ignore[too-many-public-methods]
         return self.file_format_cls.can_edit_base
 
     @property
+    def file_format_supports_key_rename(self) -> bool:
+        return self.file_format_cls.supports_key_rename(self.file_format_params)
+
+    @property
+    def file_format_supports_key_order(self) -> bool:
+        return self.file_format_cls.supports_key_order(self.file_format_params)
+
+    @property
     def file_format_create_style(self) -> str:
         return self.file_format_cls.create_style
 

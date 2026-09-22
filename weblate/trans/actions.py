@@ -666,6 +666,18 @@ class ActionEvents(IntegerChoices):
         gettext_lazy("A producer undid a previously applied judge fix."),
         gettext_lazy("Judge fix undone"),
     )
+    # Translators: Name and description of event in the history
+    RENAME_STRING = (
+        108,
+        gettext_lazy("A source string key was renamed."),
+        gettext_lazy("String key renamed"),
+    )
+    # Translators: Name and description of event in the history
+    MOVE_STRING = (
+        109,
+        gettext_lazy("A source string was moved in source order."),
+        gettext_lazy("String moved"),
+    )
 
 
 # Actions which are logged
