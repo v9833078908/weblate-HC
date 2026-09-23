@@ -56,7 +56,7 @@ def _selected_ids(request, name: str) -> set[int]:
     return result
 
 
-def _group_status(group, units) -> str:
+def _group_status(group, units, variant_count: int) -> str:
     """Return the user-facing queue state, separate from recipient notes."""
     approved_targets = {
         tuple(unit.get_target_plurals())
@@ -69,6 +69,8 @@ def _group_status(group, units) -> str:
         return "approved-conflict"
     if group.shared_target or group.decision_origin == "independent":
         return "resolved"
+    if variant_count == 1:
+        return "consistent"
     return "open"
 
 
@@ -95,7 +97,7 @@ def _queue_groups(request, policy):
         variants = {}
         for unit in units:
             variants.setdefault(tuple(unit.get_target_plurals()), []).append(unit)
-        status = _group_status(group, units)
+        status = _group_status(group, units, len(variants))
         recommendation = (
             RepeatRecommendationResult.objects.filter(
                 group=group,
@@ -131,7 +133,8 @@ def _queue_groups(request, policy):
         "rule-conflict": 0,
         "approved-conflict": 1,
         "open": 2,
-        "resolved": 3,
+        "consistent": 3,
+        "resolved": 4,
     }
     return sorted(
         groups, key=lambda item: (status_order[item["status"]], -len(item["units"]))
@@ -149,15 +152,16 @@ def repeat_queue(request, project: str, language: str):
         project=obj, target_language=target_language, enabled=True
     ).first()
     groups = _queue_groups(request, policy) if policy is not None else []
-    requested_status = request.GET.get("status", "all")
+    requested_status = request.GET.get("status", "open")
     status_aliases = {
         "all": None,
         "open": "open",
         "conflict": {"rule-conflict", "approved-conflict"},
+        "consistent": "consistent",
         "resolved": "resolved",
     }
     if requested_status not in status_aliases:
-        requested_status = "all"
+        requested_status = "open"
     wanted = status_aliases[requested_status]
     filtered_groups = [
         item
@@ -170,8 +174,13 @@ def repeat_queue(request, project: str, language: str):
         "conflict": sum(
             item["status"] in {"rule-conflict", "approved-conflict"} for item in groups
         ),
+        "consistent": sum(item["status"] == "consistent" for item in groups),
         "resolved": sum(item["status"] == "resolved" for item in groups),
     }
+    query = request.GET.copy()
+    query.pop("page", None)
+    query.pop("limit", None)
+    query["status"] = requested_status
     page_obj = Paginator(filtered_groups, 20).get_page(request.GET.get("page"))
     visible_components = Component.objects.filter(project=obj).filter_access(
         request.user
@@ -197,6 +206,7 @@ def repeat_queue(request, project: str, language: str):
             "open_group": request.GET.get("group"),
             "shown_count": len(page_obj.object_list),
             "total_count": len(filtered_groups),
+            "query_string": query.urlencode(),
         },
     )
 

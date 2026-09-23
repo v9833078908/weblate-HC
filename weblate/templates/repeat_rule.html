@@ -4,7 +4,9 @@
 
 {% block content %}
   <main class="rq">
-    <h1>{% translate "Repeat rule" %}: {{ language }}</h1>
+    <h1>{% translate "Where to look for repeats" %}: {{ language }}</h1>
+    <p>{% translate "Identical source text in the selected components is treated as one string: it appears in the repeat queue and can share one translation." %}</p>
+    <p class="text-muted">{% translate "Select only components where identical text means the same thing, such as the interface. Leave dialogue out if the same line can mean different things there." %}</p>
     <form method="post">
       {% csrf_token %}
       {% crispy form %}

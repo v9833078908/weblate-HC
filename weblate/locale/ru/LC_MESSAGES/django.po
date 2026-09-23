@@ -32109,3 +32109,144 @@ msgstr "Ни одной группе повторов не нужен запро
 #: weblate/trans/views/repeats.py:329
 msgid "Repeat recommendations were queued."
 msgstr "Рекомендации по повторам поставлены в очередь."
+
+#: weblate/templates/repeat_queue.html:23
+msgid ""
+"The same source text should read the same everywhere in the game. Choose one "
+"translation per group; nothing is written until you confirm the preview."
+msgstr ""
+"Одинаковый исходный текст должен звучать в игре одинаково. Выберите один "
+"перевод для каждой группы; ничего не записывается, пока вы не подтвердите "
+"предпросмотр."
+
+#: weblate/templates/repeat_queue.html:26 weblate/templates/repeat_rule.html:7
+msgid "Where to look for repeats"
+msgstr "Где искать повторы"
+
+#: weblate/templates/repeat_queue.html:30
+msgid "Choose where to look for repeats"
+msgstr "Выбрать, где искать повторы"
+
+#: weblate/templates/repeat_queue.html:71
+#: weblate/templates/snippets/repeat_group.html:20
+msgid "Different translations"
+msgstr "Расходятся"
+
+#: weblate/templates/repeat_queue.html:75
+msgid "Make shared"
+msgstr "Закрепить как общие"
+
+#: weblate/templates/repeat_queue.html:81
+msgctxt "Costs money to run"
+msgid "Paid"
+msgstr "Платно"
+
+#: weblate/templates/repeat_queue.html:93
+msgid ""
+"No repeat is translated in different ways. Groups that already share one "
+"translation are under \"Make shared\"."
+msgstr ""
+"Расходящихся повторов нет. Группы с уже одинаковым переводом находятся во "
+"вкладке «Закрепить как общие»."
+
+#: weblate/templates/repeat_rule.html:8
+msgid ""
+"Identical source text in the selected components is treated as one string: it"
+" appears in the repeat queue and can share one translation."
+msgstr ""
+"Одинаковый исходный текст в выбранных компонентах считается одной строкой: он"
+" попадает в очередь повторов и может получить общий перевод."
+
+#: weblate/templates/repeat_rule.html:9
+msgid ""
+"Select only components where identical text means the same thing, such as the"
+" interface. Leave dialogue out if the same line can mean different things "
+"there."
+msgstr ""
+"Выбирайте только компоненты, где одинаковый текст означает одно и то же, "
+"например интерфейс. Не включайте диалоги, если там одна и та же фраза может "
+"значить разное."
+
+#: weblate/templates/snippets/repeat_group.html:10
+#, python-format
+msgid "%(counter)s place"
+msgid_plural "%(counter)s places"
+msgstr[0] "%(counter)s место"
+msgstr[1] "%(counter)s места"
+msgstr[2] "%(counter)s мест"
+
+#: weblate/templates/snippets/repeat_group.html:18
+msgid "Same translation"
+msgstr "Перевод одинаковый"
+
+#: weblate/templates/snippets/repeat_group.html:30
+msgid ""
+"The translation is already the same everywhere, so nothing needs fixing. Make"
+" it shared: a later edit then updates every place, and new strings with this "
+"text reuse it instead of being translated again."
+msgstr ""
+"Перевод уже одинаковый везде, исправлять нечего. Закрепите его как общий: "
+"тогда правка в одном месте обновит все места, а новые строки с этим текстом "
+"получат этот перевод, а не будут переводиться заново."
+
+#: weblate/templates/snippets/repeat_group.html:32
+#, python-format
+msgid ""
+"This text is translated in %(counter)s way. Choose one translation for every "
+"place."
+msgid_plural ""
+"This text is translated in %(counter)s different ways. Choose one translation"
+" for every place."
+msgstr[0] ""
+"Этот текст переведён %(counter)s способом. Выберите один перевод для всех "
+"мест."
+msgstr[1] ""
+"Этот текст переведён %(counter)s разными способами. Выберите один перевод для"
+" всех мест."
+msgstr[2] ""
+"Этот текст переведён %(counter)s разными способами. Выберите один перевод для"
+" всех мест."
+
+#: weblate/templates/snippets/repeat_group.html:64
+#, python-format
+msgid "used in %(counter)s place"
+msgid_plural "used in %(counter)s places"
+msgstr[0] "используется в %(counter)s месте"
+msgstr[1] "используется в %(counter)s местах"
+msgstr[2] "используется в %(counter)s местах"
+
+#: weblate/templates/snippets/repeat_group.html:73
+msgid "Enter a new translation for every place"
+msgstr "Ввести новый перевод для всех мест"
+
+#: weblate/templates/snippets/repeat_group.html:77
+msgid "New translation for every place"
+msgstr "Новый перевод для всех мест"
+
+#: weblate/templates/snippets/repeat_group.html:86
+msgid "Different meanings: do not link these places"
+msgstr "Это разные смыслы: не связывать эти места"
+
+#: weblate/templates/snippets/repeat_group.html:94
+msgid "Translations are not changed; each place keeps its own translation."
+msgstr "Переводы не изменятся; у каждого места останется свой перевод."
+
+#: weblate/templates/snippets/repeat_group.html:100
+#, python-format
+msgid "Where it is used (%(counter)s)"
+msgid_plural "Where it is used (%(counter)s)"
+msgstr[0] "Где используется (%(counter)s)"
+msgstr[1] "Где используется (%(counter)s)"
+msgstr[2] "Где используется (%(counter)s)"
+
+#: weblate/trans/forms.py:710
+msgid "Identical source text in these components is treated as one string."
+msgstr "Одинаковый исходный текст в этих компонентах считается одной строкой."
+
+#: weblate/trans/forms.py:712
+msgid "Only strings with labels"
+msgstr "Только строки с метками"
+
+#: weblate/trans/forms.py:714
+msgid "Leave empty to include every string of the selected components."
+msgstr "Оставьте пустым, чтобы включить все строки выбранных компонентов."

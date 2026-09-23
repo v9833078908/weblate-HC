@@ -20,18 +20,19 @@
     <div class="rq-heading">
       <div>
         <h1>{% translate "Repeat queue" %}: {{ language }}</h1>
-        <p class="text-muted">{% translate "Choose a group decision, then review every affected occurrence before writing." %}</p>
+        <p class="text-muted">{% translate "The same source text should read the same everywhere in the game. Choose one translation per group; nothing is written until you confirm the preview." %}</p>
       </div>
       <a class="btn btn-outline-secondary"
-         href="{% url 'repeat-rule' project=project.slug language=language.code %}">{% translate "Scope rule" %}</a>
+         href="{% url 'repeat-rule' project=project.slug language=language.code %}">{% translate "Where to look for repeats" %}</a>
     </div>
 
     {% if not policy %}
-      <p class="alert alert-info">{% translate "No active repeat rule exists for this language." %}</p>
+      <p class="alert alert-info">{% translate "No active repeat rule exists for this language." %} <a href="{% url 'repeat-rule' project=project.slug language=language.code %}">{% translate "Choose where to look for repeats" %}</a></p>
     {% else %}
       <form class="rq-filters"
             method="get"
             aria-label="{% translate 'Repeat queue filters' %}">
+        <input type="hidden" name="status" value="{{ status }}" />
         <div>
           <span class="form-label">{% translate "Components" %}</span>
           {% for component in components %}
@@ -67,15 +68,17 @@
 
       <div class="rq-toolbar">
         <nav aria-label="{% translate 'Repeat queue status' %}">
-          <a{% if status == 'all' %} aria-current="page"{% endif %} href="?status=all">{% translate "All" %} <span class="badge text-bg-secondary">{{ status_counts.all }}</span></a>
-          <a{% if status == 'open' %} aria-current="page"{% endif %} href="?status=open">{% translate "Needs a decision" %} <span class="badge text-bg-secondary">{{ status_counts.open }}</span></a>
+          <a{% if status == 'open' %} aria-current="page"{% endif %} href="?status=open">{% translate "Different translations" %} <span class="badge text-bg-secondary">{{ status_counts.open }}</span></a>
           <a {% if status == 'conflict' %} aria-current="page"{% endif %}
              href="?status=conflict">{% translate "Conflicts" %} <span class="badge text-bg-secondary">{{ status_counts.conflict }}</span></a>
+          <a {% if status == 'consistent' %} aria-current="page"{% endif %}
+             href="?status=consistent">{% translate "Make shared" %} <span class="badge text-bg-secondary">{{ status_counts.consistent }}</span></a>
           <a {% if status == 'resolved' %} aria-current="page"{% endif %}
              href="?status=resolved">{% translate "Resolved" %} <span class="badge text-bg-secondary">{{ status_counts.resolved }}</span></a>
+          <a{% if status == 'all' %} aria-current="page"{% endif %} href="?status=all">{% translate "All" %} <span class="badge text-bg-secondary">{{ status_counts.all }}</span></a>
         </nav>
         <a class="btn btn-outline-primary"
-           href="{% url 'repeat-recommend' project=project.slug language=language.code %}">{% translate "Prepare recommendations" %} <span class="badge text-bg-warning">{% translate "Paid" %}</span></a>
+           href="{% url 'repeat-recommend' project=project.slug language=language.code %}">{% translate "Prepare recommendations" %} <span class="badge text-bg-warning">{% translate "Paid" context "Costs money to run" %}</span></a>
       </div>
     {% endif %}
 
@@ -85,7 +88,13 @@
       {% for item in groups %}
         {% include "snippets/repeat_group.html" with item=item %}
       {% empty %}
-        <li class="alert alert-info">{% translate "There are no exact repeats in the selected scope." %}</li>
+        <li class="alert alert-info">
+          {% if status == 'open' and status_counts.consistent %}
+            {% translate 'No repeat is translated in different ways. Groups that already share one translation are under "Make shared".' %}
+          {% else %}
+            {% translate "There are no exact repeats in the selected scope." %}
+          {% endif %}
+        </li>
       {% endfor %}
     </ul>
     {% if page_obj %}

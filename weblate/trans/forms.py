@@ -706,6 +706,13 @@ class RepeatPolicyForm(forms.ModelForm):
             project=project
         ).filter_access(actor)
         self.fields["source_labels"].queryset = Label.objects.filter(project=project)
+        self.fields["components"].help_text = gettext(
+            "Identical source text in these components is treated as one string."
+        )
+        self.fields["source_labels"].label = gettext("Only strings with labels")
+        self.fields["source_labels"].help_text = gettext(
+            "Leave empty to include every string of the selected components."
+        )
 
     def save(self, commit: bool = True) -> RepeatPolicy:
         if not commit:

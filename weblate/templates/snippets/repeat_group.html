@@ -7,15 +7,17 @@
             aria-expanded="{% if open_group == item.group.pk|stringformat:'s' or not open_group and forloop.first %}true{% else %}false{% endif %}"
             aria-controls="group-{{ item.group.pk }}">
       <span class="rq-source">{{ item.group.source_forms.0 }}</span>
-      <span class="rq-group-summary">{% blocktranslate count counter=item.units|length %}{{ counter }} occurrence{% plural %}{{ counter }} occurrences{% endblocktranslate %} · {% blocktranslate count counter=item.variants|length %}{{ counter }} translation{% plural %}{{ counter }} translations{% endblocktranslate %}</span>
+      <span class="rq-group-summary">{% blocktranslate count counter=item.units|length %}{{ counter }} place{% plural %}{{ counter }} places{% endblocktranslate %} · {% blocktranslate count counter=item.variants|length %}{{ counter }} translation{% plural %}{{ counter }} translations{% endblocktranslate %}</span>
       {% if item.status == 'approved-conflict' %}
         <span class="badge text-bg-warning">{% translate "Approved conflict" %}</span>
       {% elif item.status == 'rule-conflict' %}
         <span class="badge text-bg-danger">{% translate "Rule conflict" %}</span>
       {% elif item.status == 'resolved' %}
         <span class="badge text-bg-success">{% translate "Resolved" %}</span>
+      {% elif item.status == 'consistent' %}
+        <span class="badge text-bg-light">{% translate "Same translation" %}</span>
       {% else %}
-        <span class="badge text-bg-secondary">{% translate "Needs a decision" %}</span>
+        <span class="badge text-bg-secondary">{% translate "Different translations" %}</span>
       {% endif %}
     </button>
   </h2>
@@ -24,6 +26,11 @@
            role="region"
            aria-labelledby="g-{{ item.group.pk }}"
            {% if open_group != item.group.pk|stringformat:'s' and open_group or open_group and open_group != item.group.pk|stringformat:'s' or not open_group and not forloop.first %} hidden{% endif %}>
+    {% if item.status == 'consistent' %}
+      <p>{% translate "The translation is already the same everywhere, so nothing needs fixing. Make it shared: a later edit then updates every place, and new strings with this text reuse it instead of being translated again." %}</p>
+    {% elif item.status == 'open' or item.approved_conflict %}
+      <p>{% blocktranslate count counter=item.variants|length %}This text is translated in {{ counter }} way. Choose one translation for every place.{% plural %}This text is translated in {{ counter }} different ways. Choose one translation for every place.{% endblocktranslate %}</p>
+    {% endif %}
     {% if item.approved_conflict %}
       <p class="alert alert-warning">{% translate "Approved translations differ. They remain unchanged; you can still write a selected translation to eligible non-approved occurrences." %}</p>
     {% endif %}
@@ -54,7 +61,7 @@
                      name="target"
                      value="{{ variant.target.0 }}"
                      data-choice="variant" />
-              <span class="form-check-label"><code>{{ variant.target.0 }}</code> — {% blocktranslate count counter=variant.units|length %}used by {{ counter }} occurrence{% plural %}used by {{ counter }} occurrences{% endblocktranslate %}</span>
+              <span class="form-check-label"><code>{{ variant.target.0 }}</code> — {% blocktranslate count counter=variant.units|length %}used in {{ counter }} place{% plural %}used in {{ counter }} places{% endblocktranslate %}</span>
             </label>
           {% endfor %}
           <label class="rq-option form-check">
@@ -63,11 +70,11 @@
                    name="choice"
                    value="custom"
                    data-choice="custom" />
-            <span class="form-check-label">{% translate "Own translation" %}</span>
+            <span class="form-check-label">{% translate "Enter a new translation for every place" %}</span>
           </label>
           <input class="form-control rq-custom"
                  name="custom_target"
-                 aria-label="{% translate 'Own translation' %}"
+                 aria-label="{% translate 'New translation for every place' %}"
                  hidden />
         {% endif %}
         <label class="rq-option form-check">
@@ -76,7 +83,7 @@
                  name="choice"
                  value="keep"
                  data-choice="keep" />
-          <span class="form-check-label">{% translate "Keep different translations" %}</span>
+          <span class="form-check-label">{% translate "Different meanings: do not link these places" %}</span>
         </label>
       </fieldset>
       <button class="btn btn-primary rq-preview" type="submit" aria-disabled="true">{% translate "Preview changes" %}</button>
@@ -84,13 +91,13 @@
          aria-live="polite"
          data-hint-default="{% translate 'Choose an option to continue.' %}"
          data-hint-preview="{% translate 'Review the affected occurrences before writing.' %}"
-         data-hint-keep="{% translate 'Translations are not changed; the occurrences become independent.' %}"
+         data-hint-keep="{% translate 'Translations are not changed; each place keeps its own translation.' %}"
          data-hint-required="{% translate 'Choose an option first.' %}">{% translate "Choose an option to continue." %}</p>
       <p class="text-muted">{% translate "Nothing is written before the preview. Approved translations are never changed." %}</p>
     </form>
 
     <details>
-      <summary>{% blocktranslate count counter=item.units|length %}Occurrences ({{ counter }}){% plural %}Occurrences ({{ counter }}){% endblocktranslate %}</summary>
+      <summary>{% blocktranslate count counter=item.units|length %}Where it is used ({{ counter }}){% plural %}Where it is used ({{ counter }}){% endblocktranslate %}</summary>
       <div class="table-scroll"
            role="region"
            tabindex="0"

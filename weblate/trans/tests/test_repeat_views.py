@@ -33,14 +33,10 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertContains(response, "Repeat queue")
         self.assertContains(response, "No active repeat rule exists")
 
-    def test_project_language_page_links_repeat_drift_to_queue(self) -> None:
-        self.project.check_flags = "repeat-drift"
-        self.project.save()
+    def add_repeat(self, source: str, targets: list[str], start: int = 1000):
         translation = self.component.translation_set.get(language_code="cs")
-        source = "A drifting repeat"
-        for position, (context, target) in enumerate(
-            [("dialogue", "One"), ("menu", "Two")], start=1000
-        ):
+        for position, target in enumerate(targets, start=start):
+            context = f"key{position}"
             source_unit = self.component.source_translation.unit_set.create(
                 id_hash=calculate_hash(source, context),
                 position=position,
@@ -58,6 +54,38 @@ class RepeatQueueViewTest(ViewTestCase):
                 target=target,
                 state=STATE_TRANSLATED,
             )
+        return translation
+
+    def test_queue_separates_diverging_and_consistent_groups(self) -> None:
+        translation = self.add_repeat("Drifting text", ["One", "Two"])
+        self.add_repeat("Consistent text", ["Same", "Same"], start=2000)
+        save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=translation.language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+        url = reverse(
+            "repeat-queue", kwargs={"project": self.project.slug, "language": "cs"}
+        )
+
+        default = self.client.get(url)
+        consistent = self.client.get(url, {"status": "consistent"})
+
+        self.assertContains(default, "Drifting text")
+        self.assertNotContains(default, "Consistent text")
+        self.assertContains(consistent, "Consistent text")
+        self.assertContains(consistent, "Same translation")
+        self.assertNotContains(consistent, "Drifting text")
+
+    def test_project_language_page_links_repeat_drift_to_queue(self) -> None:
+        self.project.check_flags = "repeat-drift"
+        self.project.save()
+        translation = self.add_repeat("A drifting repeat", ["One", "Two"])
         CHECKS["repeat-drift"].perform_batch(self.component)
         translation.invalidate_cache()
 
