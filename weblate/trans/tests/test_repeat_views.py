@@ -94,6 +94,48 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertContains(preview, "No translation changes.")
         self.assertContains(preview, "Pin as the shared translation")
 
+    def test_manager_first_visit_creates_default_rule(self) -> None:
+        self.make_manager()
+        self.add_repeat("Drifting text", ["One", "Two"])
+        url = reverse(
+            "repeat-queue", kwargs={"project": self.project.slug, "language": "cs"}
+        )
+
+        response = self.client.get(url)
+        self.client.get(url)
+
+        policy = RepeatPolicy.objects.get(project=self.project)
+        self.assertEqual(list(policy.components.all()), [self.component])
+        self.assertEqual(policy.source_language, self.component.source_language)
+        self.assertEqual(policy.author, self.user)
+        self.assertContains(response, "Drifting text")
+
+    def test_default_rule_respects_disabled_rule(self) -> None:
+        self.make_manager()
+        policy = save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=self.add_repeat(
+                    "Drifting text", ["One", "Two"]
+                ).language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+        RepeatPolicy.objects.filter(pk=policy.pk).update(enabled=False)
+
+        response = self.client.get(
+            reverse(
+                "repeat-queue",
+                kwargs={"project": self.project.slug, "language": "cs"},
+            )
+        )
+
+        self.assertEqual(RepeatPolicy.objects.count(), 1)
+        self.assertContains(response, "No active repeat rule exists")
+
     def test_project_language_page_links_repeat_drift_to_queue(self) -> None:
         self.project.check_flags = "repeat-drift"
         self.project.save()

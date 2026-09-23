@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -25,7 +26,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from weblate.auth.models import User
-    from weblate.trans.models import Component, Label
+    from weblate.lang.models import Language
+    from weblate.trans.models import Component, Label, Project
     from weblate.trans.models.repeat import RepeatGroup, RepeatMembership, RepeatPolicy
 
 
@@ -160,6 +162,53 @@ def save_policy(
         policy.revision += 1
         policy.save(update_fields=["revision", "updated"])
     return policy
+
+
+def ensure_default_policy(
+    *, project: Project, target_language: Language, actor: User
+) -> RepeatPolicy | None:
+    """Create the all-components policy on first visit when none was ever set."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import Component, Project
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.repeat import RepeatPolicy
+
+    with transaction.atomic():
+        # Serializes concurrent first visits so only one policy is created.
+        Project.objects.select_for_update().filter(pk=project.pk).exists()
+        if RepeatPolicy.objects.filter(
+            project=project, target_language=target_language
+        ).exists():
+            return None
+        components = list(
+            Component.objects.filter(
+                project=project,
+                is_glossary=False,
+                allow_translation_propagation=True,
+            )
+            .exclude(source_language=target_language)
+            .filter_access(actor)
+        )
+        if not components:
+            return None
+        source_language_id = Counter(
+            component.source_language_id for component in components
+        ).most_common(1)[0][0]
+        return save_policy(
+            policy=RepeatPolicy(
+                project=project,
+                source_language_id=source_language_id,
+                target_language=target_language,
+            ),
+            components=[
+                component
+                for component in components
+                if component.source_language_id == source_language_id
+            ],
+            labels=[],
+            actor=actor,
+        )
 
 
 def get_or_create_group(policy: RepeatPolicy, unit: Unit) -> RepeatGroup:

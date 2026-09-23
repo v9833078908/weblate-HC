@@ -30,6 +30,7 @@ from django.utils.translation import gettext, gettext_lazy, ngettext
 from django.views.generic.base import TemplateView, View
 from django.views.generic.edit import CreateView
 
+from weblate.checks.consistency import REPEAT_DRIFT_CHECK_ID
 from weblate.glossary.tasks import flag_glossary_terminology
 from weblate.lang.models import Language
 from weblate.trans.backups import ProjectBackup
@@ -203,6 +204,7 @@ class CreateProject(BaseCreateView):
             return self.form_invalid(form)
         for field in INHERITABLE_COMPONENT_FLAGS:
             setattr(form.instance, field, workspace is not None)
+        form.instance.check_flags = REPEAT_DRIFT_CHECK_ID
         license_code = form.cleaned_data.get("license")
         if workspace is None:
             form.instance.inherit_license = False

@@ -39,6 +39,7 @@ from weblate.trans.repeat_recommendations import (
 from weblate.trans.repeats import (
     apply_preview,
     detect_policy_groups,
+    ensure_default_policy,
     get_or_create_group,
     policy_overlaps,
     policy_units,
@@ -243,6 +244,10 @@ def repeat_queue(request, project: str, language: str):
     policy = RepeatPolicy.objects.filter(
         project=obj, target_language=target_language, enabled=True
     ).first()
+    if policy is None and request.user.has_perm("project.edit", obj):
+        policy = ensure_default_policy(
+            project=obj, target_language=target_language, actor=request.user
+        )
     groups = _queue_groups(request, policy) if policy is not None else []
     requested_status = request.GET.get("status", "open")
     status_aliases = {

@@ -130,6 +130,16 @@ class CreateTest(ViewTestCase):
         self.client_create_project(True)
         self.client_create_project(True, name="p2", slug="p2")
 
+    def test_create_project_enables_repeat_drift(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+
+        self.client_create_project(True)
+
+        self.assertEqual(
+            Project.objects.get(slug="create-project").check_flags, "repeat-drift"
+        )
+
     @modify_settings(INSTALLED_APPS={"remove": "weblate.billing"})
     def test_create_project_asks_for_license(self) -> None:
         self.user.is_superuser = True
