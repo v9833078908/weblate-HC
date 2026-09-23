@@ -31620,3 +31620,492 @@ msgstr "Знаки приводятся в соответствие с исто�
 msgid ""
 "Choose whether to apply to all matching strings or only the selected page."
 msgstr "Выберите, применять ли ко всем подходящим строкам или только к выбранной странице."
+
+#: weblate/api/views.py:556
+msgid "This shared repeat requires an explicit repeat_decision before editing."
+msgstr "Для редактирования общего повтора требуется явное repeat_decision."
+
+#: weblate/templates/repeat_preview.html:8
+msgid "Back to the group"
+msgstr "Назад к группе"
+
+#: weblate/templates/repeat_preview.html:10
+msgid "What will change"
+msgstr "Что изменится"
+
+#: weblate/templates/repeat_preview.html:12
+msgid ""
+"Nothing has been saved yet. Confirming this preview keeps the current "
+"translations and makes these occurrences independent."
+msgstr ""
+"Пока ничего не сохранено. Подтверждение этого предпросмотра оставит текущие "
+"переводы и сделает эти вхождения независимыми."
+
+#: weblate/templates/repeat_preview.html:14
+msgid ""
+"Nothing has been saved yet. Only checked eligible occurrences will be "
+"written; approved translations are not changed."
+msgstr ""
+"Пока ничего не сохранено. Будут записаны только отмеченные подходящие "
+"вхождения; одобренные переводы не изменяются."
+
+#: weblate/templates/repeat_preview.html:21
+msgid "Changes by occurrence"
+msgstr "Изменения по вхождениям"
+
+#: weblate/templates/repeat_preview.html:27
+msgid "Keep independent"
+msgstr "Оставить независимыми"
+
+#: weblate/templates/repeat_preview.html:29
+msgid "Write"
+msgstr "Записать"
+
+#: weblate/templates/repeat_preview.html:32
+msgid "Occurrence"
+msgstr "Вхождение"
+
+#: weblate/templates/repeat_preview.html:47
+#, python-format
+msgid "Write occurrence %(unit)s"
+msgstr "Записать вхождение %(unit)s"
+
+#: weblate/templates/repeat_preview.html:61
+msgid "Keep translations independent"
+msgstr "Оставить переводы независимыми"
+
+#: weblate/templates/repeat_preview.html:61
+msgid "Apply decision"
+msgstr "Применить решение"
+
+#: weblate/templates/repeat_queue.html:15
+msgid "Repeats"
+msgstr "Повторы"
+
+#: weblate/templates/repeat_queue.html:22
+msgid "Repeat queue"
+msgstr "Очередь повторов"
+
+#: weblate/templates/repeat_queue.html:23
+msgid ""
+"Choose a group decision, then review every affected occurrence before "
+"writing."
+msgstr ""
+"Выберите решение для группы, затем проверьте каждое затронутое вхождение "
+"перед записью."
+
+#: weblate/templates/repeat_queue.html:26
+msgid "Scope rule"
+msgstr "Правило области"
+
+#: weblate/templates/repeat_queue.html:30
+msgid "No active repeat rule exists for this language."
+msgstr "Для этого языка нет активного правила повторов."
+
+#: weblate/templates/repeat_queue.html:34
+msgid "Repeat queue filters"
+msgstr "Фильтры очереди повторов"
+
+#: weblate/templates/repeat_queue.html:50
+msgid "Source labels"
+msgstr "Метки исходных строк"
+
+#: weblate/templates/repeat_queue.html:64
+msgid "Show"
+msgstr "Показать"
+
+#: weblate/templates/repeat_queue.html:69
+msgid "Repeat queue status"
+msgstr "Статус очереди повторов"
+
+#: weblate/templates/repeat_queue.html:71
+#: weblate/templates/snippets/repeat_group.html:18
+msgid "Needs a decision"
+msgstr "Нужно решение"
+
+#: weblate/templates/repeat_queue.html:73
+msgid "Conflicts"
+msgstr "Конфликты"
+
+#: weblate/templates/repeat_queue.html:75
+#: weblate/templates/snippets/repeat_group.html:16
+msgid "Resolved"
+msgstr "Решено"
+
+#: weblate/templates/repeat_queue.html:78
+msgid "Prepare recommendations"
+msgstr "Подготовить рекомендации"
+
+#: weblate/templates/repeat_queue.html:82
+#, python-format
+msgid ""
+"Showing %(counter)s group of %(total_count)s. Conflicts are shown first."
+msgid_plural ""
+"Showing %(counter)s groups of %(total_count)s. Conflicts are shown first."
+msgstr[0] ""
+"Показана %(counter)s группа из %(total_count)s. Конфликты показаны первыми."
+msgstr[1] ""
+"Показаны %(counter)s группы из %(total_count)s. Конфликты показаны первыми."
+msgstr[2] ""
+"Показано %(counter)s групп из %(total_count)s. Конфликты показаны первыми."
+
+#: weblate/templates/repeat_queue.html:82
+msgid "move between groups; Enter opens a group."
+msgstr "переход между группами; Enter открывает группу."
+
+#: weblate/templates/repeat_queue.html:88
+msgid "There are no exact repeats in the selected scope."
+msgstr "В выбранной области нет точных повторов."
+
+#: weblate/templates/repeat_recommend.html:7
+msgid "Prepare repeat recommendations"
+msgstr "Подготовить рекомендации по повторам"
+
+#: weblate/templates/repeat_recommend.html:9
+#, python-format
+msgid ""
+"The model will receive the complete context of %(counter)s repeat group and "
+"return a read-only recommendation."
+msgid_plural ""
+"The model will receive the complete context of %(counter)s repeat groups and "
+"return read-only recommendations."
+msgstr[0] ""
+"Модель получит полный контекст %(counter)s группы повторов и вернёт "
+"рекомендации только для просмотра."
+msgstr[1] ""
+"Модель получит полный контекст %(counter)s групп повторов и вернёт "
+"рекомендации только для просмотра."
+msgstr[2] ""
+"Модель получит полный контекст %(counter)s групп повторов и вернёт "
+"рекомендации только для просмотра."
+
+#: weblate/templates/repeat_recommend.html:11
+msgid "Recommendations are unavailable:"
+msgstr "Рекомендации недоступны:"
+
+#: weblate/templates/repeat_recommend.html:17
+msgid "Estimated cost"
+msgstr "Оценка стоимости"
+
+#: weblate/templates/repeat_recommend.html:20
+#, python-format
+msgid "Observed cost per group: USD %(low)s to %(high)s."
+msgstr "Наблюдаемая стоимость на группу: от %(low)s до %(high)s USD."
+
+#: weblate/templates/repeat_recommend.html:22
+msgid ""
+"Unknown. No reliable priced history exists for this model and operation."
+msgstr "Неизвестно. Для этой модели и операции нет надёжной истории цен."
+
+#: weblate/templates/repeat_recommend.html:29
+msgid "Maximum paid requests"
+msgstr "Максимум платных запросов"
+
+#: weblate/templates/repeat_recommend.html:37
+msgid "The run stops before sending more requests than this limit."
+msgstr "Запуск остановится, не отправив больше запросов, чем этот лимит."
+
+#: weblate/templates/repeat_recommend.html:39
+msgid "Start paid recommendation run"
+msgstr "Запустить платную подготовку рекомендаций"
+
+#: weblate/templates/repeat_report.html:7
+msgid "Repeat decision result"
+msgstr "Результат решения по повтору"
+
+#: weblate/templates/repeat_report.html:9
+#, python-format
+msgid "%(counter)s occurrence was marked different on purpose."
+msgid_plural "%(counter)s occurrences were marked different on purpose."
+msgstr[0] "%(counter)s вхождение намеренно помечено как отличающееся."
+msgstr[1] "%(counter)s вхождения намеренно помечены как отличающиеся."
+msgstr[2] "%(counter)s вхождений намеренно помечены как отличающиеся."
+
+#: weblate/templates/repeat_report.html:11
+#, python-format
+msgid "%(counter)s occurrence was updated."
+msgid_plural "%(counter)s occurrences were updated."
+msgstr[0] "%(counter)s вхождение обновлено."
+msgstr[1] "%(counter)s вхождения обновлены."
+msgstr[2] "%(counter)s вхождений обновлено."
+
+#: weblate/templates/repeat_report.html:13
+msgid "Not written"
+msgstr "Не записано"
+
+#: weblate/templates/repeat_rule.html:7
+msgid "Repeat rule"
+msgstr "Правило повторов"
+
+#: weblate/templates/repeat_rule.html:11
+msgid "Save repeat rule"
+msgstr "Сохранить правило повторов"
+
+#: weblate/templates/snippets/repeat_group.html:10
+#, python-format
+msgid "%(counter)s occurrence"
+msgid_plural "%(counter)s occurrences"
+msgstr[0] "%(counter)s вхождение"
+msgstr[1] "%(counter)s вхождения"
+msgstr[2] "%(counter)s вхождений"
+
+#: weblate/templates/snippets/repeat_group.html:10
+#, python-format
+msgid "%(counter)s translation"
+msgid_plural "%(counter)s translations"
+msgstr[0] "%(counter)s перевод"
+msgstr[1] "%(counter)s перевода"
+msgstr[2] "%(counter)s переводов"
+
+#: weblate/templates/snippets/repeat_group.html:12
+msgid "Approved conflict"
+msgstr "Конфликт одобренных"
+
+#: weblate/templates/snippets/repeat_group.html:14
+msgid "Rule conflict"
+msgstr "Конфликт правил"
+
+#: weblate/templates/snippets/repeat_group.html:28
+msgid ""
+"Approved translations differ. They remain unchanged; you can still write a "
+"selected translation to eligible non-approved occurrences."
+msgstr ""
+"Одобренные переводы различаются. Они останутся без изменений; выбранный "
+"перевод всё равно можно записать в подходящие неодобренные вхождения."
+
+#: weblate/templates/snippets/repeat_group.html:30
+msgid "Current shared translation:"
+msgstr "Текущий общий перевод:"
+
+#: weblate/templates/snippets/repeat_group.html:37
+msgid "What to do with this group?"
+msgstr "Что сделать с этой группой?"
+
+#: weblate/templates/snippets/repeat_group.html:46
+msgid "Model recommendation"
+msgstr "Рекомендация модели"
+
+#: weblate/templates/snippets/repeat_group.html:47
+#, python-format
+msgid "Model rationale: %(reason)s"
+msgstr "Обоснование модели: %(reason)s"
+
+#: weblate/templates/snippets/repeat_group.html:57
+#, python-format
+msgid "used by %(counter)s occurrence"
+msgid_plural "used by %(counter)s occurrences"
+msgstr[0] "используется в %(counter)s вхождении"
+msgstr[1] "используется в %(counter)s вхождениях"
+msgstr[2] "используется в %(counter)s вхождениях"
+
+#: weblate/templates/snippets/repeat_group.html:66
+#: weblate/templates/snippets/repeat_group.html:70
+msgid "Own translation"
+msgstr "Свой перевод"
+
+#: weblate/templates/snippets/repeat_group.html:79
+msgid "Keep different translations"
+msgstr "Оставить разные переводы"
+
+#: weblate/templates/snippets/repeat_group.html:82
+msgid "Preview changes"
+msgstr "Предпросмотр изменений"
+
+#: weblate/templates/snippets/repeat_group.html:85
+#: weblate/templates/snippets/repeat_group.html:88
+msgid "Choose an option to continue."
+msgstr "Выберите вариант, чтобы продолжить."
+
+#: weblate/templates/snippets/repeat_group.html:86
+msgid "Review the affected occurrences before writing."
+msgstr "Проверьте затронутые вхождения перед записью."
+
+#: weblate/templates/snippets/repeat_group.html:87
+msgid "Translations are not changed; the occurrences become independent."
+msgstr "Переводы не изменятся; вхождения станут независимыми."
+
+#: weblate/templates/snippets/repeat_group.html:88
+msgid "Choose an option first."
+msgstr "Сначала выберите вариант."
+
+#: weblate/templates/snippets/repeat_group.html:89
+msgid ""
+"Nothing is written before the preview. Approved translations are never "
+"changed."
+msgstr ""
+"До предпросмотра ничего не записывается. Одобренные переводы никогда не "
+"изменяются."
+
+#: weblate/templates/snippets/repeat_group.html:93
+#, python-format
+msgid "Occurrences (%(counter)s)"
+msgid_plural "Occurrences (%(counter)s)"
+msgstr[0] "Вхождения (%(counter)s)"
+msgstr[1] "Вхождения (%(counter)s)"
+msgstr[2] "Вхождения (%(counter)s)"
+
+#: weblate/templates/snippets/repeat_group.html:97
+msgid "Repeat occurrences"
+msgstr "Вхождения повтора"
+
+#: weblate/templates/snippets/repeat_group.html:101
+#: weblate/templates/trans/loc_kit_strings_preview.html:144
+msgid "Key"
+msgstr "Ключ"
+
+#: weblate/templates/snippets/repeat_group.html:112
+#, python-format
+msgid "Show the remaining %(count)s"
+msgstr "Показать остальные (%(count)s)"
+
+#: weblate/templates/snippets/translation.html:114
+msgid "Open repeat queue"
+msgstr "Открыть очередь повторов"
+
+#: weblate/trans/actions.py:684
+msgid "A managed repeat decision was applied."
+msgstr "Применено управляемое решение по повтору."
+
+#: weblate/trans/actions.py:685
+msgid "Repeat decision applied"
+msgstr "Решение по повтору применено"
+
+#: weblate/trans/actions.py:690
+msgid "A repeat was explicitly kept independent."
+msgstr "Повтор явно оставлен независимым."
+
+#: weblate/trans/actions.py:691
+msgid "Repeat kept independent"
+msgstr "Повтор оставлен независимым"
+
+#: weblate/trans/actions.py:696
+msgid "A managed repeat decision was undone."
+msgstr "Управляемое решение по повтору отменено."
+
+#: weblate/trans/actions.py:697
+msgid "Repeat decision undone"
+msgstr "Решение по повтору отменено"
+
+#: weblate/trans/forms.py:740
+msgid "Every component must use the selected source language."
+msgstr "Все компоненты должны использовать выбранный исходный язык."
+
+#: weblate/trans/forms.py:853
+msgid "Repeat decision"
+msgstr "Решение по повтору"
+
+#: weblate/trans/forms.py:855
+msgid "Choose how to handle this repeat"
+msgstr "Выберите, что сделать с этим повтором"
+
+#: weblate/trans/forms.py:859
+msgid "Update the shared translation in the repeat queue"
+msgstr "Обновить общий перевод в очереди повторов"
+
+#: weblate/trans/forms.py:864
+msgid "Keep this occurrence independent"
+msgstr "Оставить это вхождение независимым"
+
+#: weblate/trans/models/repeat.py:65
+msgid "Select a component."
+msgstr "Выберите компонент."
+
+#: weblate/trans/models/repeat.py:68
+msgid "Components must belong to this project."
+msgstr "Компоненты должны принадлежать этому проекту."
+
+#: weblate/trans/models/repeat.py:72
+msgid "Labels must belong to this project."
+msgstr "Метки должны принадлежать этому проекту."
+
+#: weblate/trans/models/repeat.py:124
+msgid "Shared"
+msgstr "Общий"
+
+#: weblate/trans/models/repeat.py:125
+msgid "Independent"
+msgstr "Независимый"
+
+#: weblate/trans/models/repeat.py:171
+msgid "Apply repeat decision"
+msgstr "Применить решение по повтору"
+
+#: weblate/trans/models/repeat.py:172
+msgid "Keep repeats independent"
+msgstr "Оставить повторы независимыми"
+
+#: weblate/trans/models/repeat.py:173
+msgid "Undo repeat decision"
+msgstr "Отменить решение по повтору"
+
+#: weblate/trans/models/repeat.py:206
+msgid "Queued"
+msgstr "В очереди"
+
+#: weblate/trans/models/repeat.py:207
+msgid "Running"
+msgstr "Выполняется"
+
+#: weblate/trans/models/repeat.py:209 weblate/trans/models/repeat.py:253
+msgid "Unknown"
+msgstr "Неизвестно"
+
+#: weblate/trans/models/repeat.py:210
+msgid "Cancelled"
+msgstr "Отменено"
+
+#: weblate/trans/models/repeat.py:250
+msgid "Reserved"
+msgstr "Зарезервировано"
+
+#: weblate/trans/models/repeat.py:251
+msgid "Sent"
+msgstr "Отправлено"
+
+#: weblate/trans/models/suggestion.py:311
+msgid "Choose the repeat decision before accepting this suggestion."
+msgstr "Выберите решение по повтору, прежде чем принять это предложение."
+
+#: weblate/trans/repeats.py:612
+msgid "The repeat group changed; refresh the preview."
+msgstr "Группа повторов изменилась; обновите предпросмотр."
+
+#: weblate/trans/repeats.py:622
+msgid "A repeat recipient changed; refresh the preview."
+msgstr "Одно из вхождений изменилось; обновите предпросмотр."
+
+#: weblate/trans/views/bulk_suggestions.py:74
+#, python-format
+msgid ""
+"%(count)d suggestion was skipped because its repeat requires a decision."
+msgid_plural ""
+"%(count)d suggestions were skipped because their repeats require a decision."
+msgstr[0] ""
+"%(count)d предложение пропущено, потому что для его повтора требуется "
+"решение."
+msgstr[1] ""
+"%(count)d предложения пропущены, потому что для их повторов требуется "
+"решение."
+msgstr[2] ""
+"%(count)d предложений пропущено, потому что для их повторов требуется "
+"решение."
+
+#: weblate/trans/views/edit.py:1067 weblate/trans/views/edit.py:2536
+msgid "Choose the shared translation from the repeat queue preview."
+msgstr "Выберите общий перевод в предпросмотре очереди повторов."
+
+#: weblate/trans/views/edit.py:1083
+msgid ""
+"Choose whether to update the shared repeat in its queue or keep this "
+"occurrence independent."
+msgstr ""
+"Выберите: обновить общий повтор в его очереди или оставить это вхождение "
+"независимым."
+
+#: weblate/trans/views/repeats.py:321
+msgid "No repeat groups require a model request."
+msgstr "Ни одной группе повторов не нужен запрос к модели."
+
+#: weblate/trans/views/repeats.py:329
+msgid "Repeat recommendations were queued."
+msgstr "Рекомендации по повторам поставлены в очередь."
