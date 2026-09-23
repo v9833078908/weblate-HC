@@ -104,6 +104,11 @@ real_patterns = [
         name="repeat-apply",
     ),
     path(
+        "repeats/undo/",
+        weblate.trans.views.repeats.repeat_undo,
+        name="repeat-undo",
+    ),
+    path(
         "repeats/<slug:project>/<slug:language>/recommend/",
         weblate.trans.views.repeats.repeat_recommend,
         name="repeat-recommend",

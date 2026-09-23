@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext
@@ -23,9 +24,11 @@ from weblate.trans.models import (
     Component,
     Label,
     Project,
+    RepeatDecisionEvent,
     RepeatGroup,
     RepeatPolicy,
     RepeatRecommendationResult,
+    Unit,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.repeat_recommendations import (
@@ -42,6 +45,7 @@ from weblate.trans.repeats import (
     preview_group,
     preview_keep_group,
     source_fingerprint,
+    undo_event,
 )
 from weblate.utils.state import STATE_APPROVED
 
@@ -165,6 +169,70 @@ def _add_recommendations(items) -> None:
         )
 
 
+def _queue_url(group) -> str:
+    return reverse(
+        "repeat-queue",
+        kwargs={
+            "project": group.policy.project.slug,
+            "language": group.policy.target_language.code,
+        },
+    )
+
+
+def _own_event(request, token: str):
+    """Return the requesting user's decision event, or None for anything else."""
+    try:
+        return RepeatDecisionEvent.objects.select_related(
+            "group__policy__project", "group__policy__target_language"
+        ).get(token=token, actor=request.user)
+    except (RepeatDecisionEvent.DoesNotExist, ValidationError):
+        return None
+
+
+def _decision_summary(request, project: Project):
+    """Describe the decision the user has just made, shown on top of the queue."""
+    event = _own_event(request, request.GET.get("done", ""))
+    if event is None or event.group.policy.project_id != project.pk:
+        return None
+    group = event.group
+    result = event.result
+    summary = {"action": event.action, "source": group.source_forms[0]}
+    if event.action == RepeatDecisionEvent.Action.APPLY:
+        skipped = result.get("skipped", [])
+        blocked = [
+            item["unit"]
+            for item in skipped
+            if item["reason"] in {"approved", "protected"}
+        ]
+        written = len(result.get("written", []))
+        summary.update(
+            token=event.token,
+            target=" / ".join(event.snapshot["target"]),
+            written=written,
+            already=sum(item["reason"] == "already-matches" for item in skipped),
+            unchecked=sum(item["reason"] == "not-selected" for item in skipped),
+            units=list(
+                Unit.objects.filter(pk__in=blocked)
+                .filter_access(request.user)
+                .select_related("translation__component")
+            ),
+            can_undo=written > 0
+            and group.revision == event.group_revision + 1
+            and request.user.has_perm("project.edit", project),
+        )
+    elif event.action == RepeatDecisionEvent.Action.UNDO:
+        conflicts = [item["unit"] for item in result.get("conflicts", [])]
+        summary.update(
+            restored=len(result.get("restored", [])),
+            units=list(
+                Unit.objects.filter(pk__in=conflicts)
+                .filter_access(request.user)
+                .select_related("translation__component")
+            ),
+        )
+    return summary
+
+
 @login_required
 def repeat_queue(request, project: str, language: str):
     """Render one project/language repeat queue using the variant-C hierarchy."""
@@ -204,6 +272,7 @@ def repeat_queue(request, project: str, language: str):
     query = request.GET.copy()
     query.pop("page", None)
     query.pop("limit", None)
+    query.pop("done", None)
     query["status"] = requested_status
     page_obj = Paginator(filtered_groups, 20).get_page(request.GET.get("page"))
     _add_recommendations(page_obj.object_list)
@@ -232,6 +301,7 @@ def repeat_queue(request, project: str, language: str):
             "shown_count": len(page_obj.object_list),
             "total_count": len(filtered_groups),
             "query_string": query.urlencode(),
+            "decision": _decision_summary(request, obj),
         },
     )
 
@@ -298,12 +368,51 @@ def repeat_preview(request, group_id: int):
 @login_required
 @require_POST
 def repeat_apply(request):
-    """Commit a previewed decision and render a per-recipient report."""
-    selected = [int(value) for value in request.POST.getlist("unit") if value.isdigit()]
-    event = apply_preview(
-        token=request.POST["token"], actor=request.user, unit_ids=selected
+    """Commit a previewed decision and return to the queue with its summary."""
+    group_id = request.POST.get("group", "")
+    group = get_object_or_404(
+        RepeatGroup.objects.select_related(
+            "policy__project", "policy__target_language"
+        ),
+        pk=int(group_id) if group_id.isdigit() else 0,
     )
-    return render(request, "repeat_report.html", {"event": event})
+    if not request.user.can_access_project(group.policy.project):
+        raise PermissionDenied
+    selected = [int(value) for value in request.POST.getlist("unit") if value.isdigit()]
+    try:
+        event = apply_preview(
+            token=request.POST.get("token", ""),
+            actor=request.user,
+            unit_ids=selected,
+        )
+    except ValidationError:
+        messages.error(
+            request,
+            gettext(
+                "Nothing was changed: the strings changed or the preview expired. "
+                "Open the group and decide again."
+            ),
+        )
+        return redirect(_queue_url(group))
+    return redirect(f"{_queue_url(event.group)}?done={event.token}")
+
+
+@login_required
+@require_POST
+def repeat_undo(request):
+    """Undo the user's own shared-translation decision from the queue."""
+    event = _own_event(request, request.POST.get("token", ""))
+    if event is None:
+        raise Http404
+    try:
+        undo = undo_event(token=str(event.token), actor=request.user)
+    except (ValidationError, RepeatDecisionEvent.DoesNotExist):
+        messages.error(
+            request,
+            gettext("This decision can no longer be undone: the group changed."),
+        )
+        return redirect(_queue_url(event.group))
+    return redirect(f"{_queue_url(event.group)}?done={undo.token}")
 
 
 @login_required

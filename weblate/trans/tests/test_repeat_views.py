@@ -239,11 +239,82 @@ class RepeatQueueViewTest(ViewTestCase):
 
         applied = self.client.post(
             reverse("repeat-apply"),
-            {"token": preview.context["preview"].token},
+            {"token": preview.context["preview"].token, "group": group.pk},
+            follow=True,
         )
-        self.assertEqual(applied.status_code, 200)
+        self.assertContains(applied, "the translations stay different")
         group.refresh_from_db()
         self.assertEqual(group.decision_origin, "independent")
+
+    def test_apply_returns_to_queue_with_summary_and_undo(self) -> None:
+        self.make_manager()
+        translation = self.add_repeat("Shared text", ["One", "One", "Two"])
+        policy = save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=translation.language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+        first = translation.unit_set.get(context="key1000")
+        group = get_or_create_group(policy, first)
+        preview = self.client.post(
+            reverse("repeat-preview", kwargs={"group_id": group.pk}),
+            {"choice": "variant", "target": "One"},
+        )
+        units = [member.unit_id for member in preview.context["preview"].changing]
+
+        applied = self.client.post(
+            reverse("repeat-apply"),
+            {
+                "token": preview.context["preview"].token,
+                "group": group.pk,
+                "unit": units,
+            },
+        )
+
+        self.assertEqual(applied.status_code, 302)
+        queue = self.client.get(applied.url)
+        self.assertContains(queue, '"Shared text" now has one shared translation')
+        self.assertContains(queue, "1 place was changed.")
+        self.assertContains(queue, "2 more already had this translation.")
+        self.assertContains(queue, reverse("repeat-undo"))
+        self.assertEqual(translation.unit_set.get(context="key1002").target, "One")
+
+        undone = self.client.post(
+            reverse("repeat-undo"),
+            {"token": queue.context["decision"]["token"]},
+            follow=True,
+        )
+
+        self.assertContains(undone, "was undone")
+        self.assertContains(undone, "1 place got its previous translation back.")
+        self.assertEqual(translation.unit_set.get(context="key1002").target, "Two")
+
+    def test_stale_apply_returns_to_queue_with_error(self) -> None:
+        translation = self.add_repeat("Stale text", ["One", "Two"])
+        policy = save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=translation.language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+        group = get_or_create_group(policy, translation.unit_set.get(context="key1000"))
+
+        response = self.client.post(
+            reverse("repeat-apply"),
+            {"token": "broken", "group": group.pk},
+            follow=True,
+        )
+
+        self.assertContains(response, "Nothing was changed")
 
     def test_recommendation_paid_trigger_has_free_confirmation(self) -> None:
         self.make_manager()

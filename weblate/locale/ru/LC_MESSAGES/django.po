@@ -32354,3 +32354,90 @@ msgstr "Слишком длинно для этой строки"
 #: weblate/trans/repeats.py:373
 msgid "Covered by another repeat rule"
 msgstr "Попадает под другое правило повторов"
+
+#: weblate/templates/repeat_queue.html:34
+#, python-format
+msgid "\"%(source)s\" now has one shared translation: \"%(target)s\"."
+msgstr "Для «%(source)s» теперь один общий перевод: «%(target)s»."
+
+#: weblate/templates/repeat_queue.html:35
+#, python-format
+msgid "%(counter)s place was changed."
+msgid_plural "%(counter)s places were changed."
+msgstr[0] "Изменено %(counter)s место."
+msgstr[1] "Изменено %(counter)s места."
+msgstr[2] "Изменено %(counter)s мест."
+
+#: weblate/templates/repeat_queue.html:37
+#, python-format
+msgid "%(counter)s more already had this translation."
+msgid_plural "%(counter)s more already had this translation."
+msgstr[0] "Ещё %(counter)s место уже было переведено так."
+msgstr[1] "Ещё %(counter)s места уже были переведены так."
+msgstr[2] "Ещё %(counter)s мест уже были переведены так."
+
+#: weblate/templates/repeat_queue.html:40
+#, python-format
+msgid "You left %(counter)s place unchanged."
+msgid_plural "You left %(counter)s places unchanged."
+msgstr[0] "Вы оставили без изменений %(counter)s место."
+msgstr[1] "Вы оставили без изменений %(counter)s места."
+msgstr[2] "Вы оставили без изменений %(counter)s мест."
+
+#: weblate/templates/repeat_queue.html:45
+#, python-format
+msgid "%(counter)s place was not changed because it is approved or locked:"
+msgid_plural ""
+"%(counter)s places were not changed because they are approved or locked:"
+msgstr[0] "%(counter)s место не изменено: оно одобрено или заблокировано:"
+msgstr[1] "%(counter)s места не изменены: они одобрены или заблокированы:"
+msgstr[2] "%(counter)s мест не изменено: они одобрены или заблокированы:"
+
+#: weblate/templates/repeat_queue.html:50
+#, python-format
+msgid ""
+"\"%(source)s\": the translations stay different, and each place is translated"
+" separately from now on."
+msgstr ""
+"«%(source)s»: переводы остаются разными, дальше каждое место переводится "
+"отдельно."
+
+#: weblate/templates/repeat_queue.html:54
+#, python-format
+msgid "The decision for \"%(source)s\" was undone."
+msgstr "Решение для «%(source)s» отменено."
+
+#: weblate/templates/repeat_queue.html:55
+#, python-format
+msgid "%(counter)s place got its previous translation back."
+msgid_plural "%(counter)s places got their previous translations back."
+msgstr[0] "%(counter)s месту вернули прежний перевод."
+msgstr[1] "%(counter)s местам вернули прежние переводы."
+msgstr[2] "%(counter)s местам вернули прежние переводы."
+
+#: weblate/templates/repeat_queue.html:59
+#, python-format
+msgid ""
+"%(counter)s place was not restored because it was changed after the decision:"
+msgid_plural ""
+"%(counter)s places were not restored because they were changed after the "
+"decision:"
+msgstr[0] "%(counter)s место не восстановлено: его изменили после решения:"
+msgstr[1] "%(counter)s места не восстановлены: их изменили после решения:"
+msgstr[2] "%(counter)s мест не восстановлено: их изменили после решения:"
+
+#: weblate/templates/repeat_queue.html:76
+msgid "Undo"
+msgstr "Отменить"
+
+#: weblate/trans/views/repeats.py:392
+msgid ""
+"Nothing was changed: the strings changed or the preview expired. Open the "
+"group and decide again."
+msgstr ""
+"Ничего не изменено: строки изменились или предпросмотр устарел. Откройте "
+"группу и примите решение заново."
+
+#: weblate/trans/views/repeats.py:412
+msgid "This decision can no longer be undone: the group changed."
+msgstr "Это решение уже нельзя отменить: группа изменилась."

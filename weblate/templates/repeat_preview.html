@@ -19,6 +19,7 @@
   <form method="post" action="{% url 'repeat-apply' %}">
     {% csrf_token %}
     <input type="hidden" name="token" value="{{ preview.token }}" />
+    <input type="hidden" name="group" value="{{ group.pk }}" />
     {% if preview.action == 'keep' %}
       <div class="table-scroll"
            role="region"

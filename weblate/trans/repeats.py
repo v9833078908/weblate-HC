@@ -548,7 +548,12 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
         translations = {}
         for unit in units:
             if selected is not None and unit.pk not in selected:
-                result["skipped"].append({"unit": unit.pk, "reason": "not-selected"})
+                reason = (
+                    "already-matches"
+                    if unit.get_target_plurals() == snapshot["target"]
+                    else "not-selected"
+                )
+                result["skipped"].append({"unit": unit.pk, "reason": reason})
             elif (
                 unit.state == STATE_APPROVED
                 and unit.get_target_plurals() != snapshot["target"]

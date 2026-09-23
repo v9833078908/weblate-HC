@@ -26,6 +26,59 @@
          href="{% url 'repeat-rule' project=project.slug language=language.code %}">{% translate "Where to look for repeats" %}</a>
     </div>
 
+    {% if decision %}
+      <div class="alert {% if decision.units %}alert-warning{% else %}alert-success{% endif %}"
+           role="status">
+        {% if decision.action == "apply" %}
+          <p>
+            {% blocktranslate with source=decision.source target=decision.target %}"{{ source }}" now has one shared translation: "{{ target }}".{% endblocktranslate %}
+            {% blocktranslate count counter=decision.written %}{{ counter }} place was changed.{% plural %}{{ counter }} places were changed.{% endblocktranslate %}
+            {% if decision.already %}
+              {% blocktranslate count counter=decision.already %}{{ counter }} more already had this translation.{% plural %}{{ counter }} more already had this translation.{% endblocktranslate %}
+            {% endif %}
+            {% if decision.unchecked %}
+              {% blocktranslate count counter=decision.unchecked %}You left {{ counter }} place unchanged.{% plural %}You left {{ counter }} places unchanged.{% endblocktranslate %}
+            {% endif %}
+          </p>
+          {% if decision.units %}
+            <p>
+              {% blocktranslate count counter=decision.units|length %}{{ counter }} place was not changed because it is approved or locked:{% plural %}{{ counter }} places were not changed because they are approved or locked:{% endblocktranslate %}
+            </p>
+          {% endif %}
+        {% elif decision.action == "independent" %}
+          <p>
+            {% blocktranslate with source=decision.source %}"{{ source }}": the translations stay different, and each place is translated separately from now on.{% endblocktranslate %}
+          </p>
+        {% else %}
+          <p>
+            {% blocktranslate with source=decision.source %}The decision for "{{ source }}" was undone.{% endblocktranslate %}
+            {% blocktranslate count counter=decision.restored %}{{ counter }} place got its previous translation back.{% plural %}{{ counter }} places got their previous translations back.{% endblocktranslate %}
+          </p>
+          {% if decision.units %}
+            <p>
+              {% blocktranslate count counter=decision.units|length %}{{ counter }} place was not restored because it was changed after the decision:{% plural %}{{ counter }} places were not restored because they were changed after the decision:{% endblocktranslate %}
+            </p>
+          {% endif %}
+        {% endif %}
+        {% if decision.units %}
+          <ul>
+            {% for unit in decision.units %}
+              <li>
+                <a href="{{ unit.get_absolute_url }}"><code>{{ unit.context }}</code></a> ({{ unit.translation.component }})
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if decision.can_undo %}
+          <form method="post" action="{% url 'repeat-undo' %}">
+            {% csrf_token %}
+            <input type="hidden" name="token" value="{{ decision.token }}" />
+            <button class="btn btn-outline-secondary btn-sm" type="submit">{% translate "Undo" %}</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
+
     {% if not policy %}
       <p class="alert alert-info">{% translate "No active repeat rule exists for this language." %} <a href="{% url 'repeat-rule' project=project.slug language=language.code %}">{% translate "Choose where to look for repeats" %}</a></p>
     {% else %}
