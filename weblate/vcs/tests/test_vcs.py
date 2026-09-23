@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import tempfile
 from configparser import RawConfigParser
-from contextlib import ExitStack
+from contextlib import ExitStack, chdir
 from datetime import datetime
 from io import BytesIO
 from os import utime
@@ -2740,6 +2740,17 @@ class VCSGitTest(TestCase, RepoTestMixin, TempDirMixin):
 
     def test_remote_branch(self) -> None:
         self.assertEqual(self._remote_branch, self.repo.get_remote_branch(self.tempdir))
+
+    def test_remote_branch_ignores_working_directory(self) -> None:
+        # A Git worktree bind-mounted into a container carries a gitfile whose
+        # target exists only on the host.
+        with tempfile.TemporaryDirectory() as workdir:
+            Path(workdir, ".git").write_text(
+                "gitdir: /nonexistent/worktrees/test\n", encoding="utf-8"
+            )
+            with chdir(workdir):
+                branch = self.repo.get_remote_branch(self.tempdir)
+        self.assertEqual(self._remote_branch, branch)
 
 
 class VCSGitForcePushTest(VCSGitTest):

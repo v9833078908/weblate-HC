@@ -673,7 +673,9 @@ class GitRepository(Repository):
             ["ls-remote", "--symref", "--", repo, "HEAD"], None, target
         )
         try:
-            result = cls._popen(args, environment=environment)
+            # ls-remote treats the working directory as a repository, and a
+            # broken one there makes it fail, so run it outside any repository
+            result = cls._popen(args, cwd=data_dir("home"), environment=environment)
         except RepositoryCommandError as error:
             if target is not None:
                 cls.handle_remote_command_error(error, repo, target, environment)
