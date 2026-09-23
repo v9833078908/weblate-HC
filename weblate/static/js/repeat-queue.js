@@ -53,7 +53,10 @@ document.addEventListener("DOMContentLoaded", () => {
         : hint.dataset.hintDefault;
     };
     form.addEventListener("change", updateDecision);
-    form.addEventListener("submit", (event) => {
+    // Block on click, not submit: the global double-submission guard in
+    // loader-bootstrap.js would otherwise mark the form as submitted and
+    // ignore every later click.
+    preview.addEventListener("click", (event) => {
       if (preview.getAttribute("aria-disabled") === "true") {
         event.preventDefault();
         hint.textContent = hint.dataset.hintRequired;

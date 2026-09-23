@@ -32250,3 +32250,19 @@ msgstr "Только строки с метками"
 #: weblate/trans/forms.py:714
 msgid "Leave empty to include every string of the selected components."
 msgstr "Оставьте пустым, чтобы включить все строки выбранных компонентов."
+
+#: weblate/templates/snippets/repeat_group.html
+msgid "Show what will change"
+msgstr "Показать, что изменится"
+
+#: weblate/templates/snippets/repeat_group.html
+msgid "Next you will see every place that changes and confirm the write."
+msgstr "Дальше вы увидите все места, которые изменятся, и подтвердите запись."
+
+#: weblate/templates/snippets/repeat_group.html
+msgid ""
+"Nothing is written until you confirm on the next screen. Approved "
+"translations are never changed."
+msgstr ""
+"Ничего не записывается, пока вы не подтвердите на следующем экране. "
+"Одобренные переводы никогда не изменяются."

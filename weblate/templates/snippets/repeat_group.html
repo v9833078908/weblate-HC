@@ -86,14 +86,14 @@
           <span class="form-check-label">{% translate "Different meanings: do not link these places" %}</span>
         </label>
       </fieldset>
-      <button class="btn btn-primary rq-preview" type="submit" aria-disabled="true">{% translate "Preview changes" %}</button>
+      <button class="btn btn-primary rq-preview" type="submit" aria-disabled="true">{% translate "Show what will change" %}</button>
       <p class="rq-hint"
          aria-live="polite"
          data-hint-default="{% translate 'Choose an option to continue.' %}"
-         data-hint-preview="{% translate 'Review the affected occurrences before writing.' %}"
+         data-hint-preview="{% translate 'Next you will see every place that changes and confirm the write.' %}"
          data-hint-keep="{% translate 'Translations are not changed; each place keeps its own translation.' %}"
          data-hint-required="{% translate 'Choose an option first.' %}">{% translate "Choose an option to continue." %}</p>
-      <p class="text-muted">{% translate "Nothing is written before the preview. Approved translations are never changed." %}</p>
+      <p class="text-muted">{% translate "Nothing is written until you confirm on the next screen. Approved translations are never changed." %}</p>
     </form>
 
     <details>
