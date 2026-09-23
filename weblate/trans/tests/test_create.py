@@ -1112,7 +1112,7 @@ class CreateTest(ViewTestCase):
         new_component = Component.objects.get(name="Create Component From Existing")
         response = self.client.get(new_component.get_absolute_url(), follow=True)
         self.assertContains(response, "Diagnostics")
-        self.assertContains(response, "Test/Create Component From Existing @ Weblate")
+        self.assertContains(response, "Test/Create Component From Existing @ HCGameLoc")
 
         cloned_fields = [
             "agreement",
