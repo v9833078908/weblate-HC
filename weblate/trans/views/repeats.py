@@ -41,6 +41,7 @@ from weblate.trans.repeats import (
     policy_units,
     preview_group,
     preview_keep_group,
+    source_fingerprint,
 )
 from weblate.utils.state import STATE_APPROVED
 
@@ -56,14 +57,14 @@ def _selected_ids(request, name: str) -> set[int]:
     return result
 
 
-def _group_status(group, units, variant_count: int) -> str:
+def _group_status(group, units, variant_count: int, rule_conflict: bool) -> str:
     """Return the user-facing queue state, separate from recipient notes."""
     approved_targets = {
         tuple(unit.get_target_plurals())
         for unit in units
         if unit.state == STATE_APPROVED
     }
-    if policy_overlaps(group.policy, exclude_policy_id=group.policy_id):
+    if rule_conflict:
         return "rule-conflict"
     if len(approved_targets) > 1:
         return "approved-conflict"
@@ -88,25 +89,40 @@ def _queue_groups(request, policy):
             source_unit__labels__in=label_ids
         ).distinct()
 
+    candidates = detect_policy_groups(policy, user=request.user)
+    units_by_pk = {
+        unit.pk: unit
+        for unit in visible_units.filter(
+            pk__in=[pk for candidate in candidates for pk in candidate.unit_ids]
+        )
+    }
+    existing_groups = {
+        (group.source_hash, group.plural_number): group
+        for group in RepeatGroup.objects.filter(policy=policy)
+    }
+    # Overlap depends only on the policy, not on the group.
+    rule_conflict = bool(policy_overlaps(policy, exclude_policy_id=policy.pk))
+
     groups = []
-    for candidate in detect_policy_groups(policy, user=request.user):
-        units = list(visible_units.filter(pk__in=candidate.unit_ids).order_by("pk"))
+    for candidate in candidates:
+        units = [
+            units_by_pk[pk] for pk in sorted(candidate.unit_ids) if pk in units_by_pk
+        ]
         if len(units) < 2:
             continue
-        group = get_or_create_group(policy, units[0])
+        source_forms = list(candidate.source_forms)
+        group = existing_groups.get(
+            (
+                source_fingerprint(source_forms, candidate.plural_number),
+                candidate.plural_number,
+            )
+        )
+        if group is None or group.source_forms != source_forms:
+            group = get_or_create_group(policy, units[0])
         variants = {}
         for unit in units:
             variants.setdefault(tuple(unit.get_target_plurals()), []).append(unit)
-        status = _group_status(group, units, len(variants))
-        recommendation = (
-            RepeatRecommendationResult.objects.filter(
-                group=group,
-                group_revision=group.revision,
-                run__status="completed",
-            )
-            .order_by("-created_at")
-            .first()
-        )
+        status = _group_status(group, units, len(variants), rule_conflict)
         groups.append(
             {
                 "group": group,
@@ -118,15 +134,8 @@ def _queue_groups(request, policy):
                     )
                 ],
                 "status": status,
-                "recommendation": recommendation,
                 "approved_conflict": status == "approved-conflict",
                 "all_approved": all(unit.state == STATE_APPROVED for unit in units),
-                "writable_count": sum(
-                    unit.state != STATE_APPROVED
-                    and not unit.translation.component.locked
-                    and bool(request.user.has_perm("unit.edit", unit))
-                    for unit in units
-                ),
             }
         )
     status_order = {
@@ -139,6 +148,21 @@ def _queue_groups(request, policy):
     return sorted(
         groups, key=lambda item: (status_order[item["status"]], -len(item["units"]))
     )
+
+
+def _add_recommendations(items) -> None:
+    """Look up recommendations only for the groups shown on the page."""
+    for item in items:
+        group = item["group"]
+        item["recommendation"] = (
+            RepeatRecommendationResult.objects.filter(
+                group=group,
+                group_revision=group.revision,
+                run__status="completed",
+            )
+            .order_by("-created_at")
+            .first()
+        )
 
 
 @login_required
@@ -182,6 +206,7 @@ def repeat_queue(request, project: str, language: str):
     query.pop("limit", None)
     query["status"] = requested_status
     page_obj = Paginator(filtered_groups, 20).get_page(request.GET.get("page"))
+    _add_recommendations(page_obj.object_list)
     visible_components = Component.objects.filter(project=obj).filter_access(
         request.user
     )

@@ -18,6 +18,7 @@ from django.utils.translation import gettext
 
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models import Unit
+from weblate.trans.util import split_plural
 from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
@@ -733,9 +734,14 @@ def detect_policy_groups(
     units = policy_units(policy)
     if user is not None:
         units = units.filter_access(user)
-    for unit in units.filter(state__gte=STATE_TRANSLATED):
-        key = (tuple(unit.get_source_plurals()), unit.translation.plural.number)
-        grouped.setdefault(key, []).append(unit.pk)
+    # Only the grouping key is needed; building full Unit rows dominates the
+    # queue load time on large components.
+    rows = units.filter(state__gte=STATE_TRANSLATED).values_list(
+        "pk", "source", "translation__plural__number"
+    )
+    for pk, source, plural_number in rows:
+        key = (tuple(split_plural(source)), plural_number)
+        grouped.setdefault(key, []).append(pk)
     return [
         RepeatCandidate(source_forms=key[0], plural_number=key[1], unit_ids=tuple(ids))
         for key, ids in grouped.items()
