@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from django.urls import reverse
 
+from weblate.checks.models import CHECKS
 from weblate.trans.models import RepeatPolicy
 from weblate.trans.repeats import get_or_create_group, save_policy
 from weblate.trans.tests.test_views import ViewTestCase
@@ -31,6 +32,49 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Repeat queue")
         self.assertContains(response, "No active repeat rule exists")
+
+    def test_project_language_page_links_repeat_drift_to_queue(self) -> None:
+        self.project.check_flags = "repeat-drift"
+        self.project.save()
+        translation = self.component.translation_set.get(language_code="cs")
+        source = "A drifting repeat"
+        for position, (context, target) in enumerate(
+            [("dialogue", "One"), ("menu", "Two")], start=1000
+        ):
+            source_unit = self.component.source_translation.unit_set.create(
+                id_hash=calculate_hash(source, context),
+                position=position,
+                context=context,
+                source=source,
+                target=source,
+                state=STATE_TRANSLATED,
+            )
+            translation.unit_set.create(
+                id_hash=calculate_hash(source, context),
+                position=position,
+                source_unit=source_unit,
+                context=context,
+                source=source,
+                target=target,
+                state=STATE_TRANSLATED,
+            )
+        CHECKS["repeat-drift"].perform_batch(self.component)
+        translation.invalidate_cache()
+
+        response = self.client.get(
+            reverse(
+                "show",
+                kwargs={"path": [self.project.slug, "-", "cs"]},
+            )
+        )
+
+        self.assertContains(
+            response,
+            reverse(
+                "repeat-queue",
+                kwargs={"project": self.project.slug, "language": "cs"},
+            ),
+        )
 
     def test_project_manager_can_open_repeat_rule_form(self) -> None:
         self.make_manager()
