@@ -135,6 +135,37 @@ verified glossary check semantics:
   reads the glossary at all: it lives in the Weblate database, not in the
   game repository.
 
+### Research summary: incomplete translations and Git delivery (2026-09-23)
+
+The primary-source comparison in
+`docs/product/research/2026-09-23-tms-incomplete-translations-git-release-practices.md`
+covers Weblate, Crowdin, Phrase Strings, and Lokalise. It distinguishes
+translation status, export behavior, Git delivery, and the separate decision
+to accept a PR or build:
+
+- Weblate's [translation quality filter](https://docs.weblate.org/en/latest/admin/projects.html#project-commit-policy)
+  selects which translation states enter commits; it does not require every
+  language to reach 100% before Git push.
+- Crowdin and Lokalise document choices to substitute source text, omit
+  untranslated keys, or export empty values. Phrase documents locale
+  fallback and including empty translations. These are export policies,
+  not a universal release gate; a required repository status check is
+  configured separately.
+- Missing keys are not harmless when a game displays the raw key at runtime.
+  A source-language fallback is a possible *game artifact* policy, not a
+  completed translation to write back into Weblate. Track intentionally
+  empty source strings separately from missing targets with nonempty sources.
+
+This plan's strict missing-key and empty-target rules remain the **Choice of
+Life 4** release contract above; this research does not silently change its
+fixed decisions. For **Pirate Ships**, the Game Director accepted the current
+23 missing target entries as non-blocking. Any reuse of the validator there
+must make coverage a visible per-language warning rather than a required
+push, merge, or build check until that game's release policy changes.
+JSON syntax and engine-placeholder safety need their own decisions and must
+not inherit that coverage exception. The GitHub PR/PO/XLSX workflow below
+also cannot be applied unchanged to Pirate Ships' SCM-Manager/JSON workflow.
+
 ---
 
 ## Execution prerequisite: isolated worktrees
