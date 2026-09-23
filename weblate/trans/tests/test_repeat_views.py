@@ -59,7 +59,7 @@ class RepeatQueueViewTest(ViewTestCase):
     def test_queue_separates_diverging_and_consistent_groups(self) -> None:
         translation = self.add_repeat("Drifting text", ["One", "Two"])
         self.add_repeat("Consistent text", ["Same", "Same"], start=2000)
-        save_policy(
+        policy = save_policy(
             policy=RepeatPolicy(
                 project=self.project,
                 source_language=self.component.source_language,
@@ -81,6 +81,18 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertContains(consistent, "Consistent text")
         self.assertContains(consistent, "Same translation")
         self.assertNotContains(consistent, "Drifting text")
+
+        group = next(
+            group
+            for group in policy.groups.all()
+            if group.source_forms[0] == "Consistent text"
+        )
+        preview = self.client.post(
+            reverse("repeat-preview", kwargs={"group_id": group.pk}),
+            {"choice": "variant", "target": "Same"},
+        )
+        self.assertContains(preview, "No translation changes.")
+        self.assertContains(preview, "Pin as the shared translation")
 
     def test_project_language_page_links_repeat_drift_to_queue(self) -> None:
         self.project.check_flags = "repeat-drift"
@@ -168,8 +180,14 @@ class RepeatQueueViewTest(ViewTestCase):
         )
 
         self.assertEqual(preview.status_code, 200)
-        self.assertContains(preview, "Nothing has been saved yet")
+        self.assertContains(preview, "Nothing is saved yet")
+        self.assertContains(preview, "1 of 2 places will change.")
         self.assertContains(preview, 'name="unit"')
+        self.assertContains(preview, "<code>menu</code>")
+        self.assertContains(preview, "<code>Two</code>")
+        self.assertContains(preview, "Already translated this way")
+        self.assertNotContains(preview, "already-matches")
+        self.assertContains(preview, f'action="{reverse("repeat-apply")}"')
 
     def test_keep_different_requires_a_preview_before_recording_decision(self) -> None:
         """Keeping variants independent must not mutate the group from the queue."""
@@ -215,7 +233,7 @@ class RepeatQueueViewTest(ViewTestCase):
         )
 
         self.assertEqual(preview.status_code, 200)
-        self.assertContains(preview, "Nothing has been saved yet")
+        self.assertContains(preview, "Nothing is saved yet")
         group.refresh_from_db()
         self.assertEqual(group.decision_origin, "")
 

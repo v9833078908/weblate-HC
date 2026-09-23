@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from django.core import signing
@@ -361,6 +361,17 @@ class RepeatPreviewMember:
     target: tuple[str, ...]
     eligible: bool
     reason: str
+    unit: Unit | None = field(default=None, compare=False, repr=False)
+
+    @property
+    def reason_label(self) -> str:
+        return {
+            "already-matches": gettext("Already translated this way"),
+            "approved": gettext("Approved, not changed"),
+            "locked": gettext("The component is locked"),
+            "max-length": gettext("Too long for this string"),
+            "rule-conflict": gettext("Covered by another repeat rule"),
+        }.get(self.reason, self.reason)
 
 
 @dataclass(frozen=True)
@@ -371,6 +382,14 @@ class RepeatPreview:
     group_id: int
     members: tuple[RepeatPreviewMember, ...]
     action: str = "apply"
+
+    @property
+    def changing(self) -> list[RepeatPreviewMember]:
+        return [member for member in self.members if member.eligible]
+
+    @property
+    def unchanged(self) -> list[RepeatPreviewMember]:
+        return [member for member in self.members if not member.eligible]
 
 
 def preview_group(
@@ -383,6 +402,7 @@ def preview_group(
         policy_units(group.policy)
         .filter_access(actor)
         .filter(source=group.source_forms[0])
+        .select_related("translation__component")
         .order_by("pk")
     ):
         if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
@@ -403,6 +423,7 @@ def preview_group(
                 target=tuple(target),
                 eligible=not reason and unit.get_target_plurals() != target,
                 reason=reason or "already-matches",
+                unit=unit,
             )
         )
     payload = {
@@ -432,10 +453,12 @@ def preview_keep_group(*, group: RepeatGroup, actor: User) -> RepeatPreview:
             target=tuple(unit.get_target_plurals()),
             eligible=True,
             reason="",
+            unit=unit,
         )
         for unit in policy_units(group.policy)
         .filter_access(actor)
         .filter(source=group.source_forms[0])
+        .select_related("translation__component")
         .order_by("pk")
         if tuple(unit.get_source_plurals()) == tuple(group.source_forms)
     )

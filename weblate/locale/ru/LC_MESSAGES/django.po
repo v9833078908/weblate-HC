@@ -27038,9 +27038,6 @@ msgstr "текущий текст изменился после этого пр�
 #~ msgid "Please request support through other means."
 #~ msgstr "Пожалуйста, обращайтесь за поддержкой другими способами."
 
-#~ msgid "New translation"
-#~ msgstr "Новый перевод"
-
 #~ msgid "Committed changes"
 #~ msgstr "Коммит изменений"
 
@@ -32266,3 +32263,94 @@ msgid ""
 msgstr ""
 "Ничего не записывается, пока вы не подтвердите на следующем экране. "
 "Одобренные переводы никогда не изменяются."
+
+#: weblate/templates/repeat_preview.html:12
+msgid ""
+"Nothing is saved yet. Confirming keeps the current translations and lets each"
+" place be translated separately from now on."
+msgstr ""
+"Пока ничего не сохранено. После подтверждения текущие переводы останутся, и "
+"дальше каждое место можно переводить отдельно."
+
+#: weblate/templates/repeat_preview.html:15
+#, python-format
+msgid "%(counter)s of %(total)s places will change."
+msgid_plural "%(counter)s of %(total)s places will change."
+msgstr[0] "Изменится %(counter)s место из %(total)s."
+msgstr[1] "Изменятся %(counter)s места из %(total)s."
+msgstr[2] "Изменится %(counter)s мест из %(total)s."
+
+#: weblate/templates/repeat_preview.html:16
+msgid ""
+"Nothing is saved yet. Only the checked places are changed; approved "
+"translations are never changed."
+msgstr ""
+"Пока ничего не сохранено. Изменятся только отмеченные места; одобренные "
+"переводы не меняются никогда."
+
+#: weblate/templates/repeat_preview.html:26
+#: weblate/templates/repeat_preview.html:54
+msgid "Changes by place"
+msgstr "Изменения по местам"
+
+#: weblate/templates/repeat_preview.html:58
+msgctxt "Apply to this place"
+msgid "Change"
+msgstr "Изменить"
+
+#: weblate/templates/repeat_preview.html:62
+msgid "New translation"
+msgstr "Новый перевод"
+
+#: weblate/templates/repeat_preview.html:73
+#, python-format
+msgid "Change %(key)s"
+msgstr "Изменить %(key)s"
+
+#: weblate/templates/repeat_preview.html:91
+msgid ""
+"No translation changes. Confirming pins this translation as the shared one "
+"for this text."
+msgstr ""
+"Переводы не изменятся. После подтверждения этот перевод закрепится как общий "
+"для этого текста."
+
+#: weblate/templates/repeat_preview.html:96
+#, python-format
+msgid "Not changed (%(counter)s)"
+msgid_plural "Not changed (%(counter)s)"
+msgstr[0] "Без изменений (%(counter)s)"
+msgstr[1] "Без изменений (%(counter)s)"
+msgstr[2] "Без изменений (%(counter)s)"
+
+#: weblate/templates/repeat_preview.html:101
+msgid "Places that are not changed"
+msgstr "Места без изменений"
+
+#: weblate/templates/repeat_preview.html:132
+msgid "Apply to the checked places"
+msgstr "Применить к отмеченным местам"
+
+#: weblate/templates/repeat_preview.html:134
+msgid "Pin as the shared translation"
+msgstr "Закрепить как общий перевод"
+
+#: weblate/trans/repeats.py:369
+msgid "Already translated this way"
+msgstr "Уже так переведено"
+
+#: weblate/trans/repeats.py:370
+msgid "Approved, not changed"
+msgstr "Одобрено, не меняем"
+
+#: weblate/trans/repeats.py:371
+msgid "The component is locked"
+msgstr "Компонент заблокирован"
+
+#: weblate/trans/repeats.py:372
+msgid "Too long for this string"
+msgstr "Слишком длинно для этой строки"
+
+#: weblate/trans/repeats.py:373
+msgid "Covered by another repeat rule"
+msgstr "Попадает под другое правило повторов"

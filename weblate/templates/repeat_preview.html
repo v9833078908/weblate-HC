@@ -9,57 +9,129 @@
   </p>
   <h1>{% translate "What will change" %}</h1>
   {% if preview.action == 'keep' %}
-    <p>{% translate "Nothing has been saved yet. Confirming this preview keeps the current translations and makes these occurrences independent." %}</p>
-  {% else %}
-    <p>{% translate "Nothing has been saved yet. Only checked eligible occurrences will be written; approved translations are not changed." %}</p>
+    <p>{% translate "Nothing is saved yet. Confirming keeps the current translations and lets each place be translated separately from now on." %}</p>
+  {% elif preview.changing %}
+    <p>
+      {% blocktranslate count counter=preview.changing|length with total=preview.members|length %}{{ counter }} of {{ total }} places will change.{% plural %}{{ counter }} of {{ total }} places will change.{% endblocktranslate %}
+      {% translate "Nothing is saved yet. Only the checked places are changed; approved translations are never changed." %}
+    </p>
   {% endif %}
-  <form method="post" action="{% url 'repeat-apply' %}>{% csrf_token %}
+  <form method="post" action="{% url 'repeat-apply' %}">
+    {% csrf_token %}
     <input type="hidden" name="token" value="{{ preview.token }}" />
-    <div class="table-scroll"
-      role="region"
-      tabindex="0"
-      aria-label="{% translate 'Changes by occurrence' %}">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>
-              {% if preview.action == 'keep' %}
-                {% translate "Keep independent" %}
-              {% else %}
-                {% translate "Write" %}
-              {% endif %}
-            </th>
-            <th>{% translate "Occurrence" %}</th>
-            <th>{% translate "Result" %}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for member in preview.members %}
+    {% if preview.action == 'keep' %}
+      <div class="table-scroll"
+           role="region"
+           tabindex="0"
+           aria-label="{% translate 'Changes by place' %}">
+        <table class="table">
+          <thead>
             <tr>
-              <td>
-                {% if preview.action == 'keep' %}
-                  <span aria-hidden="true">✓</span>
-                {% elif member.eligible %}
-                  <input type="checkbox"
-                    name="unit"
-                    value="{{ member.unit_id }}"
-                    checked
-                    aria-label="{% blocktranslate with unit=member.unit_id %}Write occurrence {{ unit }}{% endblocktranslate %}" />
-                {% else %}
-                  <span aria-label="{{ member.reason }}">—</span>
-                {% endif %}
-              </td>
-              <td>{{ member.unit_id }}</td>
-              <td>{% if member.eligible %}<code>{{ member.target|join:' / ' }}</code>{% else %}{{ member.reason }}{% endif %}</td>
+              <th>{% translate "Component" %}</th>
+              <th>{% translate "Key" %}</th>
+              <th>{% translate "Current translation" %}</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <button class="btn btn-primary" type="submit">
-      {% if preview.action == 'keep' %}
-        {% translate "Keep translations independent" %}{% else %}{% translate "Apply decision" %}
-      {% endif %}
-    </button>
+          </thead>
+          <tbody>
+            {% for member in preview.members %}
+              <tr>
+                <td>{{ member.unit.translation.component }}</td>
+                <td>
+                  <a href="{{ member.unit.get_absolute_url }}"><code>{{ member.unit.context }}</code></a>
+                </td>
+                <td>
+                  <code>{{ member.unit.target }}</code>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif preview.changing %}
+      <div class="table-scroll"
+           role="region"
+           tabindex="0"
+           aria-label="{% translate 'Changes by place' %}">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{% translate "Change" context "Apply to this place" %}</th>
+              <th>{% translate "Component" %}</th>
+              <th>{% translate "Key" %}</th>
+              <th>{% translate "Current translation" %}</th>
+              <th>{% translate "New translation" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for member in preview.changing %}
+              <tr>
+                <td>
+                  <input type="checkbox"
+                         name="unit"
+                         value="{{ member.unit_id }}"
+                         checked
+                         aria-label="{% blocktranslate with key=member.unit.context %}Change {{ key }}{% endblocktranslate %}" />
+                </td>
+                <td>{{ member.unit.translation.component }}</td>
+                <td>
+                  <a href="{{ member.unit.get_absolute_url }}"><code>{{ member.unit.context }}</code></a>
+                </td>
+                <td>
+                  <code>{{ member.unit.target }}</code>
+                </td>
+                <td>
+                  <code>{{ member.target|join:' / ' }}</code>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p>{% translate "No translation changes. Confirming pins this translation as the shared one for this text." %}</p>
+    {% endif %}
+    {% if preview.action != 'keep' and preview.unchanged %}
+      <details>
+        <summary>
+          {% blocktranslate count counter=preview.unchanged|length %}Not changed ({{ counter }}){% plural %}Not changed ({{ counter }}){% endblocktranslate %}
+        </summary>
+        <div class="table-scroll"
+             role="region"
+             tabindex="0"
+             aria-label="{% translate 'Places that are not changed' %}">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>{% translate "Component" %}</th>
+                <th>{% translate "Key" %}</th>
+                <th>{% translate "Current translation" %}</th>
+                <th>{% translate "Reason" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for member in preview.unchanged %}
+                <tr>
+                  <td>{{ member.unit.translation.component }}</td>
+                  <td>
+                    <a href="{{ member.unit.get_absolute_url }}"><code>{{ member.unit.context }}</code></a>
+                  </td>
+                  <td>
+                    <code>{{ member.unit.target }}</code>
+                  </td>
+                  <td>{{ member.reason_label }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    {% endif %}
+    {% if preview.action == 'keep' %}
+      <button class="btn btn-primary" type="submit">{% translate "Keep translations independent" %}</button>
+    {% elif preview.changing %}
+      <button class="btn btn-primary" type="submit">{% translate "Apply to the checked places" %}</button>
+    {% else %}
+      <button class="btn btn-primary" type="submit">{% translate "Pin as the shared translation" %}</button>
+    {% endif %}
   </form>
 {% endblock content %}
