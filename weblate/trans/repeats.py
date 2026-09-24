@@ -614,7 +614,13 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
                 result["skipped"].append({"unit": unit.pk, "reason": "protected"})
             else:
                 old = unit.get_target_plurals()
-                translations[unit.translation_id] = unit.translation
+                # Unit.save_backend schedules a full stats recount through
+                # translation.invalidate_cache(), which deduplicates per
+                # Translation instance. Share one instance per translation so
+                # a group of N places recounts once, not N times.
+                unit.translation = translations.setdefault(
+                    unit.translation_id, unit.translation
+                )
                 unit.is_batch_update = True
                 unit.translate(
                     actor,

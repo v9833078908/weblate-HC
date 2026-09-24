@@ -81,6 +81,24 @@ class RepeatModelTest(ViewTestCase):
             actor=self.user,
         )
 
+    def test_apply_recounts_translation_stats_once(self) -> None:
+        """Every written place must not trigger its own full stats recount."""
+        first = self.add_repeat("first", "Old")
+        self.add_repeat("second", "Older")
+        policy = self.make_policy()
+        group = get_or_create_group(policy, first)
+        preview = preview_group(group=group, target=["Shared"], actor=self.user)
+
+        with self.captureOnCommitCallbacks() as callbacks:
+            apply_preview(token=preview.token, actor=self.user)
+
+        recounts = [
+            callback
+            for callback in callbacks
+            if getattr(callback, "__name__", "") == "_invalidate_trigger"
+        ]
+        self.assertEqual(len(recounts), 1)
+
     def test_detects_only_exact_live_repeats_and_stales_changed_identity(self) -> None:
         first = self.add_repeat("first", "Prvni")
         second = self.add_repeat("second", "Druhy")
