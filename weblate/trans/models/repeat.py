@@ -226,6 +226,9 @@ class RepeatRecommendationRun(models.Model):
     prompt_fingerprint = models.CharField(max_length=64)
     request_cap = models.PositiveIntegerField()
     requests_reserved = models.PositiveIntegerField(default=0)
+    # Candidates left unsent because the cap or the packing bounds stopped the
+    # run. Provider omissions are separate results, never part of this count.
+    unsent_groups = models.PositiveIntegerField(default=0)
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.QUEUED
     )
@@ -264,6 +267,10 @@ class RepeatRecommendationAttempt(models.Model):
     response = models.JSONField(default=dict)
     failure = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    # Claiming an attempt starts a deadline above the transport timeout; a late
+    # response and an expiry reconciliation can never both finalize it.
+    deadline_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -285,11 +292,22 @@ class RepeatRecommendationResult(models.Model):
     run = models.ForeignKey(
         RepeatRecommendationRun, on_delete=models.CASCADE, related_name="results"
     )
+    # Legacy and locally derived results have no provider request behind them.
+    attempt = models.ForeignKey(
+        RepeatRecommendationAttempt,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="results",
+    )
     group = models.ForeignKey(
         RepeatGroup, on_delete=models.CASCADE, related_name="recommendations"
     )
     group_revision = models.PositiveBigIntegerField()
     snapshot_fingerprint = models.CharField(max_length=64)
+    # The frozen group context this decision was made against; a result without
+    # one predates frozen contexts and must be refreshed before use.
+    context_fingerprint = models.CharField(max_length=64, blank=True)
     action = models.CharField(max_length=30)
     target = models.JSONField(default=list, blank=True)
     exclusions = models.JSONField(default=list, blank=True)
@@ -302,7 +320,12 @@ class RepeatRecommendationResult(models.Model):
         constraints = [  # ruff: ignore[mutable-class-default]
             models.UniqueConstraint(
                 fields=["run", "group"], name="repeat_recommendation_result_unique"
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["attempt", "group"],
+                condition=Q(attempt__isnull=False),
+                name="repeat_recommendation_attempt_group_unique",
+            ),
         ]
 
     def __str__(self) -> str:

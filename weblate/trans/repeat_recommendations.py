@@ -30,10 +30,14 @@ from weblate.trans.repeats import (
     fingerprint,
     get_or_create_group,
     policy_units,
+    unit_fingerprint,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from weblate.auth.models import User
+    from weblate.trans.models import Unit
     from weblate.trans.models.repeat import RepeatPolicy
 
 
@@ -70,6 +74,155 @@ REPEAT_RECOMMENDATION_RESPONSE_SCHEMA = {
         }
     },
 }
+
+
+REPEAT_RECOMMENDATION_BATCH_SIZE = 25
+MAX_REPEAT_REQUEST_BYTES = 128 * 1024
+
+
+def queue_importance(source: str, place_count: int) -> tuple[bool, int]:
+    """Order by what players see: short strings first, then the widest groups."""
+    return (len(source.split()) > 3, -place_count)
+
+
+def build_group_context(
+    *, policy: RepeatPolicy, group: RepeatGroup, units: Iterable[Unit]
+) -> dict[str, Any]:
+    """Freeze every model input and scope field for one exact repeat group."""
+    variants: dict[tuple[str, ...], int] = {}
+    members = []
+    for member in units:
+        target = tuple(member.get_target_plurals())
+        variants[target] = variants.get(target, 0) + 1
+        members.append(
+            {
+                "unit": member.pk,
+                "id_hash": member.id_hash,
+                "component": member.translation.component.slug,
+                "context": member.context,
+                "explanation": member.source_unit.explanation,
+                "labels": sorted(
+                    member.source_unit.labels.values_list("name", flat=True)
+                ),
+                "source_forms": list(member.get_source_plurals()),
+                "target_forms": list(target),
+                "state": member.state,
+                "unit_fingerprint": unit_fingerprint(member),
+                "constraints": {
+                    "flags": member.all_flags.format(),
+                    "max_length": member.get_max_length(),
+                },
+            }
+        )
+    return {
+        "policy_revision": policy.revision,
+        "policy_enabled": policy.enabled,
+        "group": group.pk,
+        "group_revision": group.revision,
+        "source_forms": list(group.source_forms),
+        "plural_number": group.plural_number,
+        "unit_ids": sorted(member.pk for member in units),
+        "variants": [
+            {"target_forms": list(target), "count": count}
+            for target, count in sorted(
+                variants.items(), key=lambda value: (-value[1], value[0])
+            )
+        ],
+        "members": members,
+    }
+
+
+def context_fingerprint(context: dict[str, Any]) -> str:
+    """Hash the canonical frozen context instead of trusting hand-set revisions."""
+    return fingerprint(context)
+
+
+def result_fingerprint(result: RepeatRecommendationResult) -> str:
+    """Identify the reviewed decision content independently of its run."""
+    return fingerprint(
+        {
+            "group": result.group_id,
+            "action": result.action,
+            "target": list(result.target),
+            "exclusions": sorted(result.exclusions),
+            "rationale": result.rationale,
+        }
+    )
+
+
+def live_group_contexts(
+    policy: RepeatPolicy, *, actor: User
+) -> dict[tuple[tuple[str, ...], int], dict[str, Any]]:
+    """Rebuild every visible group's context from current data in one pass."""
+    visible_units = (
+        policy_units(policy)
+        .filter_access(actor)
+        .select_related("source_unit", "translation__component")
+        .prefetch_related("source_unit__labels")
+    )
+    groups = {
+        (tuple(group.source_forms), group.plural_number): group
+        for group in RepeatGroup.objects.filter(policy=policy)
+    }
+    contexts = {}
+    for candidate in detect_policy_groups(policy, user=actor):
+        identity = (tuple(candidate.source_forms), candidate.plural_number)
+        group = groups.get(identity)
+        if group is None:
+            continue
+        units = list(visible_units.filter(pk__in=candidate.unit_ids).order_by("pk"))
+        contexts[identity] = build_group_context(
+            policy=policy, group=group, units=units
+        )
+    return contexts
+
+
+def recommendation_is_current(
+    result: RepeatRecommendationResult,
+    *,
+    actor: User,
+    contexts: dict | None = None,
+) -> bool:
+    """Tell whether one stored result still describes the group it points at."""
+    # Legacy results carry no context fingerprint. They need a refresh instead
+    # of being trusted as current.
+    if not result.context_fingerprint:
+        return False
+    policy = result.group.policy
+    if not policy.enabled:
+        return False
+    if contexts is None:
+        contexts = live_group_contexts(policy, actor=actor)
+    identity = (tuple(result.group.source_forms), result.group.plural_number)
+    context = contexts.get(identity)
+    return (
+        context is not None
+        and context["group"] == result.group_id
+        and context_fingerprint(context) == result.context_fingerprint
+    )
+
+
+def current_recommendations(
+    policy: RepeatPolicy, *, actor: User
+) -> dict[int, RepeatRecommendationResult]:
+    """Return each group's newest still-current result across all runs."""
+    contexts = live_group_contexts(policy, actor=actor)
+    current: dict[int, RepeatRecommendationResult] = {}
+    for result in (
+        RepeatRecommendationResult.objects.filter(group__policy=policy)
+        .select_related("group", "group__policy", "attempt")
+        .order_by("-run__created_at", "-run_id", "-id")
+    ):
+        if result.group_id in current:
+            continue
+        if (
+            result.attempt_id is not None
+            and result.attempt.status != RepeatRecommendationAttempt.Status.COMPLETED
+        ):
+            continue
+        if recommendation_is_current(result, actor=actor, contexts=contexts):
+            current[result.group_id] = result
+    return current
 
 
 def prepare_run(*, policy: RepeatPolicy, actor: User, request_cap: int):
