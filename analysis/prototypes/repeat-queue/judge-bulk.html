@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html lang="ru" dir="ltr">
+  <!--
+    PROTOTYPE: очередь повторов с проверкой судьёй и массовым применением.
+    Вариант 3 из обсуждения 2026-09-24: судья проверяет варианты, продюсер
+    применяет «единственный вариант без ошибок» пачкой после одной таблицы.
+    План: docs/product/plans/2026-09-24-repeat-queue-producer-ux.md. Запуск: README.md.
+    Тексты групп и вариантов взяты из локальной очереди anvil-saga/fr;
+    вердикты судьи, обратные переводы и итоговые числа выдуманы для показа.
+    Состояние: ?state=start|running|ready|review|done; ?bare=1 прячет панель.
+  -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Повторы - Anvil Saga / French - HCGameLoc (prototype)</title>
+    <link rel="stylesheet" href="../../../weblate/static/styles/vendor/bootstrap5.css" />
+    <link rel="stylesheet" href="weblate_fonts/source-code-pro.css" />
+    <link rel="stylesheet" href="weblate_fonts/source-sans-3.css" />
+    <link rel="stylesheet" href="../../../weblate/static/styles/variables.css" />
+    <link rel="stylesheet" href="../../../weblate/static/styles/main.css" />
+    <link rel="stylesheet" href="../../../weblate/static/styles/repeat-queue.css" />
+    <link rel="stylesheet" href="../../../weblate/static/style-dark.css" media="(prefers-color-scheme: dark)" />
+    <style>
+      .proto-bar { position: fixed; inset: auto 0 0 0; z-index: 1080; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 6px 12px; background: var(--wl-color-bg, #fff); border-top: 1px solid var(--wl-color-border, #ddd); }
+      .proto-bar .proto-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--wl-color-muted, #666); margin-right: 8px; }
+      .proto-bar .proto-note { font-size: 12px; color: var(--wl-color-muted, #666); margin-left: auto; }
+      body { padding-bottom: 56px; }
+      body[data-bare="1"] { padding-bottom: 0; }
+      body[data-bare="1"] .proto-bar { display: none; }
+      .proto-state { display: none; }
+      .proto-state.is-active { display: block; }
+      .jb-panel { border: 1px solid var(--wl-color-border, #ddd); border-radius: 8px; padding: 16px 20px; margin: 0 0 16px; }
+      .jb-panel h2 { font-size: 20px; margin: 0 0 8px; }
+      .jb-steps { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0 16px; padding: 0; list-style: none; font-size: 14px; }
+      .jb-steps li { display: flex; gap: 8px; align-items: baseline; }
+      .jb-steps .num { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center; border: 1px solid currentColor; font-size: 12px; flex: none; }
+      .jb-buckets { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 12px 0 0; }
+      .jb-bucket { border: 1px solid var(--wl-color-border, #ddd); border-radius: 6px; padding: 10px 12px; }
+      .jb-bucket .n { font-size: 24px; font-weight: 600; line-height: 1.2; }
+      .jb-bucket .what { font-size: 14px; }
+      .jb-bucket a { font-size: 14px; }
+      .jb-bucket.is-primary { border-width: 2px; border-color: var(--bs-primary, #2eccaa); }
+      .jb-meta { font-size: 14px; color: var(--wl-color-muted, #666); }
+      .jb-back { display: block; font-size: 14px; color: var(--wl-color-muted, #666); margin: 2px 0 0 0; }
+      .jb-flag { display: block; font-size: 14px; margin: 2px 0 0 0; }
+      .jb-review td, .jb-review th { vertical-align: top; }
+      .jb-review .src { font-weight: 600; }
+      .jb-review .old { color: var(--wl-color-muted, #666); font-size: 14px; }
+      .jb-sticky { position: sticky; bottom: 56px; background: var(--wl-color-bg, #fff); border-top: 1px solid var(--wl-color-border, #ddd); padding: 12px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+      body[data-bare="1"] .jb-sticky { bottom: 0; }
+      .jb-sticky .jb-meta { flex: 1 1 280px; }
+      .rq-toggle .rq-reco { font-size: 14px; color: var(--wl-color-muted, #666); }
+      .progress { height: 10px; }
+    </style>
+  </head>
+  <body data-state="start">
+    <main class="rq container-fluid py-3">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="#">Anvil Saga</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Повторы</li>
+        </ol>
+      </nav>
+
+      <div class="rq-heading">
+        <div>
+          <h1>Очередь повторов: Французский</h1>
+          <p class="text-muted">Одинаковый исходный текст должен звучать в игре одинаково. Выберите один перевод для каждой группы; ничего не записывается, пока вы не подтвердите предпросмотр.</p>
+        </div>
+        <a class="btn btn-outline-secondary" href="#">Где искать повторы</a>
+      </div>
+
+      <!-- ============ 1. START: судья ещё не проверял ============ -->
+      <section class="proto-state" data-state="start">
+        <div class="jb-panel" role="region" aria-labelledby="jb-start-title">
+          <h2 id="jb-start-title">Как быстро разобрать 383 группы</h2>
+          <p class="mb-0">Судья проверит каждый вариант перевода и отметит ошибки. Если в группе ровно один вариант без ошибок, его можно применить сразу ко многим группам: вы просматриваете одну таблицу и нажимаете одну кнопку.</p>
+          <ol class="jb-steps">
+            <li><span class="num" aria-hidden="true">1</span> Судья проверяет 1052 места</li>
+            <li><span class="num" aria-hidden="true">2</span> Вы смотрите одну таблицу</li>
+            <li><span class="num" aria-hidden="true">3</span> Применяете; всё можно отменить одной кнопкой</li>
+          </ol>
+          <a class="btn btn-primary" href="?state=running">Проверить варианты судьёй</a>
+          <p class="jb-meta mt-2 mb-0">Откроется обычный запуск проверки судьёй, уже настроенный на эти 1052 места. Проверка платная; её стоимость будет в отчёте проверки.</p>
+        </div>
+        <div data-cards="plain"></div>
+      </section>
+
+      <!-- ============ 2. RUNNING ============ -->
+      <section class="proto-state" data-state="running">
+        <div class="jb-panel" role="region" aria-labelledby="jb-run-title">
+          <h2 id="jb-run-title">Судья проверяет варианты</h2>
+          <div class="progress" role="progressbar" aria-label="Проверка судьёй" aria-valuenow="420" aria-valuemin="0" aria-valuemax="1052">
+            <div class="progress-bar" style="width: 40%"></div>
+          </div>
+          <p class="mt-2 mb-0">Проверено 420 из 1052 мест. Можно уйти со страницы: проверка идёт в фоне, результаты появятся здесь. <a href="#">Отчёт проверки</a></p>
+        </div>
+        <div data-cards="plain"></div>
+      </section>
+
+      <!-- ============ 3. READY: вердикты есть ============ -->
+      <section class="proto-state" data-state="ready">
+        <div class="jb-panel" role="region" aria-labelledby="jb-ready-title">
+          <h2 id="jb-ready-title">Судья проверил все 383 группы</h2>
+          <div class="jb-buckets">
+            <div class="jb-bucket is-primary">
+              <div class="n">214</div>
+              <div class="what">групп: ровно один вариант без ошибок</div>
+              <a class="btn btn-primary btn-sm mt-2" href="?state=review">Проверить и применить разом</a>
+            </div>
+            <div class="jb-bucket">
+              <div class="n">96</div>
+              <div class="what">групп: судья одобрил несколько вариантов, выбор за вами</div>
+              <a href="#">Показать</a>
+            </div>
+            <div class="jb-bucket">
+              <div class="n">41</div>
+              <div class="what">группа: ошибки во всех вариантах, нужен новый перевод</div>
+              <a href="#">Показать</a>
+            </div>
+            <div class="jb-bucket">
+              <div class="n">32</div>
+              <div class="what">группы судья не смог проверить</div>
+              <a href="#">Показать</a>
+            </div>
+          </div>
+        </div>
+        <div data-cards="judged"></div>
+      </section>
+
+      <!-- ============ 4. REVIEW: одна таблица ============ -->
+      <section class="proto-state" data-state="review">
+        <p><a href="?state=ready">← К очереди</a></p>
+        <h2>Применить варианты, одобренные судьёй</h2>
+        <p>В каждой группе ниже судья не нашёл ошибок ровно в одном варианте. Этот вариант будет записан во все места группы. Снимите галочку, если сомневаетесь: такая группа останется в очереди.</p>
+        <p class="jb-meta">Одобренные переводы не меняются. После применения весь пакет можно отменить одной кнопкой.</p>
+        <form class="jb-review" onsubmit="location.search='?state=done'; return false;">
+          <div class="table-scroll" role="region" tabindex="0" aria-label="Группы для применения">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th scope="col"><input class="form-check-input" type="checkbox" id="jb-all" checked aria-label="Выбрать все группы" /></th>
+                  <th scope="col">Исходный текст</th>
+                  <th scope="col">Станет везде</th>
+                  <th scope="col">Сейчас ещё</th>
+                  <th scope="col">Изменится мест</th>
+                </tr>
+              </thead>
+              <tbody id="jb-rows"></tbody>
+            </table>
+          </div>
+          <p class="jb-meta">…и ещё 208 групп. <a href="#">Показать все</a></p>
+          <div class="jb-sticky">
+            <button class="btn btn-primary" type="submit" id="jb-apply">Применить 214 групп</button>
+            <span class="jb-meta" id="jb-count" aria-live="polite">Изменится 431 место.</span>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ 5. DONE ============ -->
+      <section class="proto-state" data-state="done">
+        <div class="alert alert-success d-flex flex-wrap gap-3 align-items-center" role="status">
+          <span><strong>Применено 212 групп, изменено 427 мест.</strong> 2 группы вы оставили в очереди.</span>
+          <a class="btn btn-outline-secondary btn-sm" href="?state=ready">Отменить пакет</a>
+        </div>
+        <div class="jb-panel" role="region" aria-labelledby="jb-left-title">
+          <h2 id="jb-left-title">Осталось 171 группа</h2>
+          <div class="jb-buckets">
+            <div class="jb-bucket"><div class="n">98</div><div class="what">выбрать вариант самим</div><a href="#">Разобрать</a></div>
+            <div class="jb-bucket"><div class="n">41</div><div class="what">нужен новый перевод</div><a href="#">Разобрать</a></div>
+            <div class="jb-bucket"><div class="n">32</div><div class="what">не проверены судьёй</div><a href="#">Разобрать</a></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-bar" role="navigation" aria-label="Состояния прототипа">
+      <span class="proto-label">Прототип</span>
+      <a class="btn btn-sm btn-outline-secondary" href="?state=start">1. До проверки</a>
+      <a class="btn btn-sm btn-outline-secondary" href="?state=running">2. Судья проверяет</a>
+      <a class="btn btn-sm btn-outline-secondary" href="?state=ready">3. Вердикты готовы</a>
+      <a class="btn btn-sm btn-outline-secondary" href="?state=review">4. Одна таблица</a>
+      <a class="btn btn-sm btn-outline-secondary" href="?state=done">5. После применения</a>
+      <span class="proto-note">Вердикты, обратные переводы и итоги условные</span>
+    </div>
+
+    <script>
+      // Real anvil-saga/fr groups; judge verdicts are invented for the prototype.
+      const GROUPS = [
+        { id: 180, src: "Добропорядочный гражданин", places: 14, variants: [
+          { t: "Citoyen respectable", n: 10, j: "pass", back: "Добропорядочный гражданин" },
+          { t: "Citoyen modèle", n: 2, j: "none" },
+          { t: "Honnête citoyen", n: 1, j: "flag", why: "Сдвиг смысла: «честный гражданин»" },
+          { t: "Un citoyen respectable", n: 1, j: "flag", why: "Лишний артикль в названии" } ] },
+        { id: 201, src: "Спасение утопающих", places: 7, variants: [
+          { t: "Sauvetage des noyés", n: 6, j: "flag", why: "«noyés» - утонувшие, а не утопающие" },
+          { t: "Le salut des naufragés", n: 1, j: "pass", back: "Спасение потерпевших кораблекрушение" } ] },
+        { id: 190, src: "Добрая душа", places: 11, variants: [
+          { t: "Bonne âme", n: 7, j: "pass", back: "Добрая душа" },
+          { t: "Âme charitable", n: 4, j: "flag", why: "Другой оттенок: «милосердная душа»" } ] },
+        { id: 173, src: "Добивая выживших", places: 19, variants: [
+          { t: "Achever les survivants", n: 12, j: "pass", back: "Добить выживших" },
+          { t: "En achevant les survivants", n: 7, j: "pass", back: "Добивая выживших" } ] },
+        { id: 195, src: "Предчувствие битвы", places: 10, variants: [
+          { t: "Pressentiment de bataille", n: 8, j: "pass", back: "Предчувствие битвы" },
+          { t: "Pressentiment de la bataille", n: 2, j: "none" } ] },
+        { id: 210, src: "Урок зельеварения", places: 5, variants: [
+          { t: "Leçon de potions", n: 3, j: "pass", back: "Урок зелий" },
+          { t: "Cours de potions", n: 2, j: "flag", why: "«Cours» - курс, а не урок" } ] },
+      ];
+
+      const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+      const recommended = (g) => {
+        const passed = g.variants.filter((v) => v.j === "pass");
+        return passed.length === 1 ? passed[0] : null;
+      };
+      const plural = (n, one, few, many) => {
+        const d = n % 10, h = n % 100;
+        if (d === 1 && h !== 11) return one;
+        if (d >= 2 && d <= 4 && (h < 12 || h > 14)) return few;
+        return many;
+      };
+      const placesWord = (n) => plural(n, "месте", "местах", "местах");
+
+      function card(g, judged, open) {
+        const reco = judged ? recommended(g) : null;
+        const variants = reco ? [reco, ...g.variants.filter((v) => v !== reco)] : g.variants;
+        const summaryReco = judged
+          ? reco
+            ? `<span class="badge text-bg-success">Рекомендуем: ${esc(reco.t)}</span>`
+            : `<span class="badge text-bg-secondary">Судья одобрил несколько</span>`
+          : `<span class="badge text-bg-secondary">Расходятся</span>`;
+        const options = variants.map((v) => {
+          let badge = "";
+          let extra = "";
+          if (judged && v === reco) {
+            badge = ' <span class="badge text-bg-success">Рекомендуем: проверен судьёй</span>';
+          } else if (judged && v.j === "pass") {
+            badge = ' <span class="badge text-bg-info">Проверен судьёй</span>';
+          } else if (judged && v.j === "flag") {
+            badge = ' <span class="badge text-bg-warning">Судья нашёл ошибку</span>';
+            extra = `<span class="jb-flag">${esc(v.why)}</span>`;
+          }
+          if (judged && v.back) extra += `<span class="jb-back">Обратный перевод: ${esc(v.back)}</span>`;
+          return `<label class="rq-option form-check">
+              <input class="form-check-input" type="radio" name="target-${g.id}"${judged && v === reco ? " checked" : ""} />
+              <span class="form-check-label"><code>${esc(v.t)}</code> - используется в ${v.n} ${placesWord(v.n)}${badge}${extra}</span>
+            </label>`;
+        }).join("");
+        const note = reco
+          ? '<p class="jb-meta">Судья проверил этот перевод в одном из мест. Перед подтверждением просмотрите, что изменится.</p>'
+          : "";
+        return `<li id="g-${g.id}" class="rq-group rq-open">
+          <h2><button class="rq-toggle" type="button" aria-expanded="${open}" aria-controls="p-${g.id}">
+            <span class="rq-source">${esc(g.src)}</span>
+            <span class="rq-group-summary">${g.places} ${plural(g.places, "место", "места", "мест")} · ${g.variants.length} ${plural(g.variants.length, "перевод", "перевода", "переводов")}</span>
+            ${summaryReco}
+          </button></h2>
+          <section id="p-${g.id}" class="rq-panel" role="region"${open ? "" : " hidden"}>
+            <form class="rq-decision" onsubmit="return false;">
+              <fieldset><legend>Что сделать с этой группой?</legend>${options}
+                <label class="rq-option form-check"><input class="form-check-input" type="radio" name="target-${g.id}" /><span class="form-check-label">Ввести новый перевод для всех мест</span></label>
+                <label class="rq-option form-check"><input class="form-check-input" type="radio" name="target-${g.id}" /><span class="form-check-label">Это разные смыслы: не связывать эти места</span></label>
+              </fieldset>
+              ${note}
+              <button class="btn btn-primary rq-preview" type="submit"${judged && reco ? "" : ' aria-disabled="true"'}>Показать, что изменится</button>
+            </form>
+          </section>
+        </li>`;
+      }
+
+      function renderCards() {
+        document.querySelectorAll("[data-cards]").forEach((host) => {
+          const judged = host.dataset.cards === "judged";
+          host.innerHTML = `<p class="rq-summary">Показано 20 групп из 383.</p><ul class="rq-groups">${
+            GROUPS.map((g, i) => card(g, judged, i === 0)).join("")}</ul>`;
+        });
+        document.querySelectorAll(".rq-toggle").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const panel = document.getElementById(btn.getAttribute("aria-controls"));
+            const open = btn.getAttribute("aria-expanded") === "true";
+            btn.setAttribute("aria-expanded", String(!open));
+            panel.hidden = open;
+          });
+        });
+      }
+
+      function renderReview() {
+        const rows = GROUPS.filter(recommended).map((g) => {
+          const r = recommended(g);
+          const others = g.variants.filter((v) => v !== r).map((v) => `<code>${esc(v.t)}</code>`).join(", ");
+          const change = g.places - r.n;
+          return `<tr>
+            <td><input class="form-check-input jb-row" type="checkbox" checked data-change="${change}" aria-label="Применить: ${esc(g.src)}" /></td>
+            <td class="src">${esc(g.src)}</td>
+            <td><code>${esc(r.t)}</code><span class="jb-back">Обратный перевод: ${esc(r.back)}</span></td>
+            <td class="old">${others}</td>
+            <td>${change}</td>
+          </tr>`;
+        });
+        document.getElementById("jb-rows").innerHTML = rows.join("");
+        const boxes = [...document.querySelectorAll(".jb-row")];
+        const update = () => {
+          const on = boxes.filter((b) => b.checked);
+          const off = boxes.length - on.length;
+          const groups = 214 - off;
+          const places = 431 - boxes.filter((b) => !b.checked).reduce((s, b) => s + Number(b.dataset.change), 0);
+          document.getElementById("jb-apply").textContent = `Применить ${groups} ${plural(groups, "группу", "группы", "групп")}`;
+          document.getElementById("jb-count").textContent = `${plural(places, "Изменится", "Изменятся", "Изменится")} ${places} ${plural(places, "место", "места", "мест")}.` + (off ? ` ${off} ${plural(off, "группа останется", "группы останутся", "групп останутся")} в очереди.` : "");
+          document.getElementById("jb-all").checked = off === 0;
+        };
+        boxes.forEach((b) => b.addEventListener("change", update));
+        document.getElementById("jb-all").addEventListener("change", (e) => {
+          boxes.forEach((b) => (b.checked = e.target.checked));
+          update();
+        });
+      }
+
+      const params = new URLSearchParams(location.search);
+      const state = params.get("state") || "start";
+      if (params.get("bare") === "1") document.body.dataset.bare = "1";
+      document.querySelectorAll(".proto-state").forEach((el) => el.classList.toggle("is-active", el.dataset.state === state));
+      renderCards();
+      renderReview();
+    </script>
+  </body>
+</html>
