@@ -776,7 +776,9 @@ def undo_event(*, token: str, actor: User):
             if unit.get_target_plurals() != item["new"]:
                 outcome["conflicts"].append({"unit": item["unit"], "reason": "changed"})
                 continue
-            translations[unit.translation_id] = unit.translation
+            unit.translation = translations.setdefault(
+                unit.translation_id, unit.translation
+            )
             unit.is_batch_update = True
             unit.translate(
                 actor,

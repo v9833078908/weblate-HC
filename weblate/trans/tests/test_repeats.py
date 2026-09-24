@@ -99,6 +99,27 @@ class RepeatModelTest(ViewTestCase):
         ]
         self.assertEqual(len(recounts), 1)
 
+    def test_undo_recounts_translation_stats_once(self) -> None:
+        self.make_manager()
+        first = self.add_repeat("first", "Old")
+        self.add_repeat("second", "Older")
+        policy = self.make_policy()
+        group = get_or_create_group(policy, first)
+        event = apply_preview(
+            token=preview_group(group=group, target=["Shared"], actor=self.user).token,
+            actor=self.user,
+        )
+
+        with self.captureOnCommitCallbacks() as callbacks:
+            undo_event(token=str(event.token), actor=self.user)
+
+        recounts = [
+            callback
+            for callback in callbacks
+            if getattr(callback, "__name__", "") == "_invalidate_trigger"
+        ]
+        self.assertEqual(len(recounts), 1)
+
     def test_detects_only_exact_live_repeats_and_stales_changed_identity(self) -> None:
         first = self.add_repeat("first", "Prvni")
         second = self.add_repeat("second", "Druhy")
