@@ -8,11 +8,11 @@ from __future__ import annotations
 import threading
 from unittest.mock import patch
 
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.test import TransactionTestCase
 from django.utils import timezone
-from django.core import signing
 
 from weblate.auth.models import Group, User, setup_project_groups
 from weblate.lang.models import Language
@@ -209,7 +209,9 @@ class RepeatBulkModelTest(ViewTestCase):
     def test_item_ordinal_is_unique_per_run(self) -> None:
         policy = self.make_policy()
         first_group = self.make_group(policy, "An exact repeat", ["Old", "Older"])
-        second_group = self.make_group(policy, "Another exact repeat", ["Stale", "Staler"])
+        second_group = self.make_group(
+            policy, "Another exact repeat", ["Stale", "Staler"]
+        )
         run = self.make_run(policy, review_nonce="signed-review")
         self.make_result(run, first_group, ["Shared meaning"], action="propose_new")
         with self.assertRaises(IntegrityError), transaction.atomic():
@@ -250,11 +252,17 @@ class RepeatBulkModelTest(ViewTestCase):
     def test_several_results_in_one_run_reuse_run_object(self) -> None:
         policy = self.make_policy()
         first_group = self.make_group(policy, "An exact repeat", ["Old", "Older"])
-        second_group = self.make_group(policy, "Another exact repeat", ["Stale", "Staler"])
+        second_group = self.make_group(
+            policy, "Another exact repeat", ["Stale", "Staler"]
+        )
         run = self.make_run(policy, review_nonce="signed-review")
         items = [
-            self.make_result(run, first_group, ["Shared meaning"], action="propose_new"),
-            self.make_result(run, second_group, ["Kept wording"], action="use_existing"),
+            self.make_result(
+                run, first_group, ["Shared meaning"], action="propose_new"
+            ),
+            self.make_result(
+                run, second_group, ["Kept wording"], action="use_existing"
+            ),
         ]
         for item in items:
             self.assertIs(item.run, run)
@@ -310,7 +318,8 @@ class RepeatBulkServiceFixtures:
         """Create one completed apply batch with a committed event per source."""
         policy = self.make_policy()
         groups = [
-            self.make_group(policy, source, ["Old one", "Old two"]) for source in sources
+            self.make_group(policy, source, ["Old one", "Old two"])
+            for source in sources
         ]
         results = [
             self.make_result(self.make_run(policy), group, ["New shared"]).result
@@ -341,7 +350,9 @@ class RepeatBulkReviewBindingTest(RepeatBulkServiceFixtures, ViewTestCase):
 
         # A newer recommendation for the same group must not replace the review.
         self.recommendation_run = self.make_recommendation_run(policy)
-        result_b = self.make_result(self.make_run(policy), group, ["Other shared"]).result
+        result_b = self.make_result(
+            self.make_run(policy), group, ["Other shared"]
+        ).result
         self.assertNotEqual(result_a.run_id, result_b.run_id)
         refreshed = plan_bulk(policy=policy, actor=self.user)
         self.assertEqual([row.result_id for row in refreshed.rows], [result_b.pk])
@@ -368,7 +379,9 @@ class RepeatBulkReviewBindingTest(RepeatBulkServiceFixtures, ViewTestCase):
         second = self.make_group(
             policy, "Second reviewed repeat", ["Old one", "Old two"]
         )
-        result_first = self.make_result(self.make_run(policy), first, ["New shared"]).result
+        result_first = self.make_result(
+            self.make_run(policy), first, ["New shared"]
+        ).result
         self.recommendation_run = self.make_recommendation_run(policy)
         result_second = self.make_result(
             self.make_run(policy), second, ["Other shared"]
@@ -469,8 +482,12 @@ class RepeatBulkStaleConfirmationTest(RepeatBulkServiceFixtures, ViewTestCase):
         ]
         for label, mutate, message in boundaries:
             with self.subTest(boundary=label):
-                stale = self.make_group(policy, f"Stale {label}", ["Old one", "Old two"])
-                fresh = self.make_group(policy, f"Fresh {label}", ["Old one", "Old two"])
+                stale = self.make_group(
+                    policy, f"Stale {label}", ["Old one", "Old two"]
+                )
+                fresh = self.make_group(
+                    policy, f"Fresh {label}", ["Old one", "Old two"]
+                )
                 stale_result = self.make_result(
                     self.make_run(policy), stale, ["New shared"]
                 ).result
@@ -657,7 +674,8 @@ class RepeatBulkCrashBoundaryTest(RepeatBulkServiceFixtures, ViewTestCase):
 
         def crash_after_item_writes(**kwargs):
             real_apply(**kwargs)
-            raise RuntimeError("failpoint after item writes, before commit")
+            msg = "failpoint after item writes, before commit"
+            raise RuntimeError(msg)
 
         with patch(
             "weblate.trans.repeat_bulk.apply_preview",
@@ -683,7 +701,9 @@ class RepeatBulkCrashBoundaryTest(RepeatBulkServiceFixtures, ViewTestCase):
         policy = self.make_policy()
         first = self.make_group(policy, "First committed", ["Old one", "Old two"])
         second = self.make_group(policy, "Second committed", ["Old one", "Old two"])
-        first_result = self.make_result(self.make_run(policy), first, ["New shared"]).result
+        first_result = self.make_result(
+            self.make_run(policy), first, ["New shared"]
+        ).result
         second_result = self.make_result(
             self.make_run(policy), second, ["Other shared"]
         ).result
@@ -735,7 +755,8 @@ class RepeatBulkCrashBoundaryTest(RepeatBulkServiceFixtures, ViewTestCase):
 
         def crash_after_restores(**kwargs):
             real_undo(**kwargs)
-            raise RuntimeError("failpoint after restores, before commit")
+            msg = "failpoint after restores, before commit"
+            raise RuntimeError(msg)
 
         with patch(
             "weblate.trans.repeat_bulk.undo_event", side_effect=crash_after_restores
@@ -854,7 +875,8 @@ class RepeatBulkResumabilityTest(RepeatBulkServiceFixtures, ViewTestCase):
             # The stale middle item never reaches the write boundary, so the
             # second call is the last item's turn and dies there.
             if calls == 2:
-                raise RuntimeError("failpoint on the last item")
+                msg = "failpoint on the last item"
+                raise RuntimeError(msg)
             return real_apply(**kwargs)
 
         with patch("weblate.trans.repeat_bulk.apply_preview", side_effect=flaky):
@@ -881,7 +903,9 @@ class RepeatBulkResumabilityTest(RepeatBulkServiceFixtures, ViewTestCase):
         run.refresh_from_db()
         self.assertEqual(run.status, RepeatBulkRun.Status.QUEUED)
 
-        with patch("weblate.trans.repeat_bulk.apply_preview", wraps=real_apply) as wrapped:
+        with patch(
+            "weblate.trans.repeat_bulk.apply_preview", wraps=real_apply
+        ) as wrapped:
             process_apply_items(run_id=run.pk)
 
         self.assertEqual(wrapped.call_count, 1)
@@ -973,9 +997,7 @@ class RepeatBulkUndoSemanticsTest(RepeatBulkServiceFixtures, ViewTestCase):
         excluded.refresh_from_db()
         self.assertEqual(excluded.target, "Old one")
 
-        edited.translate(
-            self.user, ["Edited since"], STATE_TRANSLATED, propagate=False
-        )
+        edited.translate(self.user, ["Edited since"], STATE_TRANSLATED, propagate=False)
         approved.translate(self.user, ["New shared"], STATE_APPROVED, propagate=False)
 
         undo_run = start_undo(run=run, actor=self.user)
@@ -997,7 +1019,9 @@ class RepeatBulkUndoSemanticsTest(RepeatBulkServiceFixtures, ViewTestCase):
         )
         self.assertEqual(undo_item.outcome, {**event.result, "code": CODE_UNDONE})
         undo_run.refresh_from_db()
-        self.assertEqual((undo_run.restored, undo_run.conflict, undo_run.written), (1, 2, 0))
+        self.assertEqual(
+            (undo_run.restored, undo_run.conflict, undo_run.written), (1, 2, 0)
+        )
         untouched.refresh_from_db()
         self.assertEqual(untouched.target, "Old four")
         edited.refresh_from_db()
@@ -1007,7 +1031,9 @@ class RepeatBulkUndoSemanticsTest(RepeatBulkServiceFixtures, ViewTestCase):
         policy = self.make_policy()
         first = self.make_group(policy, "A completed item", ["Old one", "Old two"])
         second = self.make_group(policy, "A skipped item", ["Old one", "Old two"])
-        first_result = self.make_result(self.make_run(policy), first, ["New shared"]).result
+        first_result = self.make_result(
+            self.make_run(policy), first, ["New shared"]
+        ).result
         second_result = self.make_result(
             self.make_run(policy), second, ["Other shared"]
         ).result
@@ -1058,9 +1084,7 @@ class RepeatBulkProtectedPlacesTest(RepeatBulkServiceFixtures, ViewTestCase):
             ["Old one", "Old two", "Old three"],
         )
         excluded, written, approved = self.group_units[group.pk]
-        approved.translate(
-            self.user, ["Old three"], STATE_APPROVED, propagate=False
-        )
+        approved.translate(self.user, ["Old three"], STATE_APPROVED, propagate=False)
         result = self.make_result(self.make_run(policy), group, ["New shared"]).result
 
         review = plan_bulk(policy=policy, actor=self.user)
@@ -1165,7 +1189,9 @@ class RepeatBulkProtectedPlacesTest(RepeatBulkServiceFixtures, ViewTestCase):
         self.assertEqual((run.done, run.written, run.failed), (1, 0, 0))
 
 
-class RepeatBulkConcurrencyTest(RepeatBulkServiceFixtures, RepoTestMixin, TransactionTestCase):
+class RepeatBulkConcurrencyTest(
+    RepeatBulkServiceFixtures, RepoTestMixin, TransactionTestCase
+):
     """
     Two independent DB connections racing the bulk services.
 

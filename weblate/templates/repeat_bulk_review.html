@@ -35,7 +35,8 @@
                      type="checkbox"
                      name="result"
                      id="result-{{ row.result_id }}"
-                     value="{{ row.result_id }}" checked />
+                     value="{{ row.result_id }}"
+                     checked />
               <span class="form-check-label">{% translate "Apply this decision" %}</span>
             </label>
             <h2 id="row-{{ row.result_id }}">
@@ -56,7 +57,7 @@
               {% for blocked in row.blocked %}<li>{% blocktranslate count counter=blocked.count with label=blocked.reason_label %}{{ counter }} place: {{ label }}{% plural %}{{ counter }} places: {{ label }}{% endblocktranslate %}</li>{% endfor %}
             </ul>
             {% if row.exclusions %}
-              <p>{% translate "Explicit exceptions (stay unchanged):" %} {% for unit_id in row.exclusions %}<code>#{{ unit_id }}</code> {% endfor %}</p>
+              <p>{% translate "Explicit exceptions (stay unchanged):" %} {% for unit_id in row.exclusions %}<code>#{{ unit_id }}</code>{% endfor %}</p>
             {% endif %}
             <div class="table-scroll"
                  role="region"

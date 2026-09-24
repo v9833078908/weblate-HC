@@ -16,7 +16,7 @@ from django.test import TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from weblate.auth.models import Group, setup_project_groups
+from weblate.auth.models import setup_project_groups
 from weblate.checks.consistency import RepeatDriftCheck
 from weblate.trans.autotranslate import AutoTranslate
 from weblate.trans.models import (
@@ -39,9 +39,9 @@ from weblate.trans.repeat_recommendations import (
     prompt_fingerprint,
     queue_attempt,
     reconcile_expired_attempts,
-    requeue_reserved_attempts,
     request_payload,
     request_size,
+    requeue_reserved_attempts,
     reserve_attempt,
 )
 from weblate.trans.repeats import (
@@ -225,7 +225,9 @@ class RepeatModelTest(ViewTestCase):
             self.complete_attempt(
                 attempt,
                 self.provider_result(
-                    attempt.request_snapshot["groups"][0]["group"], "use_existing", ["One"]
+                    attempt.request_snapshot["groups"][0]["group"],
+                    "use_existing",
+                    ["One"],
                 ),
             )
 
@@ -240,7 +242,9 @@ class RepeatModelTest(ViewTestCase):
             self.complete_attempt(
                 attempt,
                 self.provider_result(
-                    attempt.request_snapshot["groups"][0]["group"], "use_existing", ["One"]
+                    attempt.request_snapshot["groups"][0]["group"],
+                    "use_existing",
+                    ["One"],
                 ),
             )
 
@@ -285,7 +289,9 @@ class RepeatModelTest(ViewTestCase):
         self.make_manager()
         policy = self.make_policy()
         human = self.add_group("Human source", ["One", "Two"])[0]
-        independent = self.add_group("Independent source", ["One", "Two"], start=2000)[0]
+        independent = self.add_group("Independent source", ["One", "Two"], start=2000)[
+            0
+        ]
         human_group = get_or_create_group(policy, human)
         independent_group = get_or_create_group(policy, independent)
 
@@ -293,9 +299,7 @@ class RepeatModelTest(ViewTestCase):
         for attempt in run.attempts.all():
             group_id = attempt.request_snapshot["groups"][0]["group"]
             action = "needs_human" if group_id == human_group.pk else "keep_independent"
-            self.complete_attempt(
-                attempt, self.provider_result(group_id, action, [])
-            )
+            self.complete_attempt(attempt, self.provider_result(group_id, action, []))
 
         again = self.paying_run(policy=policy, request_cap=5)
         self.assertEqual(again.attempts.count(), 0)
@@ -364,9 +368,7 @@ class RepeatModelTest(ViewTestCase):
         self.assertEqual(empty.attempts.count(), 0)
 
         self.add_group("Huge source", ["One", "Two"], start=2000)
-        with patch(
-            "weblate.trans.repeat_recommendations.MAX_REPEAT_REQUEST_BYTES", 10
-        ):
+        with patch("weblate.trans.repeat_recommendations.MAX_REPEAT_REQUEST_BYTES", 10):
             run = self.paying_run(policy=policy, request_cap=2)
         self.assertEqual(run.attempts.count(), 0)
         local = run.results.get()
@@ -459,7 +461,9 @@ class RepeatModelTest(ViewTestCase):
                 user = json.loads(payload["messages"][1]["content"])
                 context = user["untrusted_repeat_groups"]["groups"][0]
                 self.assertEqual(context["group"], group.pk)
-                self.assertEqual(context["plural_number"], self.translation.plural.number)
+                self.assertEqual(
+                    context["plural_number"], self.translation.plural.number
+                )
                 self.assertEqual(
                     context["source_language"], self.component.source_language.code
                 )
@@ -485,7 +489,10 @@ class RepeatModelTest(ViewTestCase):
         self.complete_attempt(
             attempt,
             SimpleNamespace(
-                payload={"choices": [{"message": {"content": "not json"}}], "usage": {}},
+                payload={
+                    "choices": [{"message": {"content": "not json"}}],
+                    "usage": {},
+                },
                 transport_succeeded=True,
                 provider_cost=None,
                 failure_kind="",
@@ -526,7 +533,9 @@ class RepeatModelTest(ViewTestCase):
             outcomes = {first_group.pk: "success", second_group.pk: failure_mode}
             for reverse_order in (False, True):
                 with (
-                    self.subTest(failure_mode=failure_mode, reverse_order=reverse_order),
+                    self.subTest(
+                        failure_mode=failure_mode, reverse_order=reverse_order
+                    ),
                     patch(
                         "weblate.trans.repeat_recommendations.REPEAT_RECOMMENDATION_BATCH_SIZE",
                         1,
@@ -1178,7 +1187,9 @@ class RepeatRecommendationConcurrencyTest(RepoTestMixin, TransactionTestCase):
                     patch("weblate.trans.repeat_recommendations.queue_attempt"),
                 ):
                     barrier.wait(timeout=10)
-                    run = prepare_run(policy=self.policy, actor=self.user, request_cap=1)
+                    run = prepare_run(
+                        policy=self.policy, actor=self.user, request_cap=1
+                    )
                 with lock:
                     runs.append(run.pk)
             finally:

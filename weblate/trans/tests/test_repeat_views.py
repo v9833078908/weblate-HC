@@ -96,7 +96,9 @@ class RepeatQueueViewTest(ViewTestCase):
         )
 
         response = self.client.get(
-            reverse("repeat-queue", kwargs={"project": self.project.slug, "language": "cs"})
+            reverse(
+                "repeat-queue", kwargs={"project": self.project.slug, "language": "cs"}
+            )
         )
 
         content = response.content.decode()
@@ -533,7 +535,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         attempt: RepeatRecommendationAttempt | None = None,
         rationale: str = "The key names this exact meaning.",
     ) -> RepeatRecommendationResult:
-        """A stored result frozen against a real, current group context."""
+        """Store a result frozen against a real, current group context."""
         context = build_group_context(policy=self.policy, group=group, units=units)
         return RepeatRecommendationResult.objects.create(
             run=run,
@@ -625,6 +627,11 @@ class RepeatBulkViewsTest(ViewTestCase):
         )
         return done_run, pending_run, overdue, reserved, live
 
+    def assert_checked(self, response, value: int) -> None:
+        """Match a checked checkbox across formatter-normalized HTML whitespace."""
+        content = " ".join(response.content.decode().split())
+        self.assertIn(f'value="{value}" checked', content)
+
     def test_review_renders_rows_places_and_counts(self) -> None:
         group, units = self.make_group(
             "A shared sword name", ["Old", "Older", "Shared", "Oddest"]
@@ -645,7 +652,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         # The manifest and exactly the reviewed result as a checked form field.
         self.assertContains(response, 'name="manifest"')
         self.assertContains(response, 'name="result"', count=1)
-        self.assertContains(response, f'value="{result.pk}" checked')
+        self.assert_checked(response, result.pk)
         # Every source/target plural form, the action and the rationale.
         self.assertContains(response, "A shared sword name")
         self.assertContains(response, "Propose a new translation")
@@ -709,7 +716,9 @@ class RepeatBulkViewsTest(ViewTestCase):
         current_group, current_units = self.make_group(
             "Current line", ["C1", "C2"], start=4000
         )
-        stale_group, stale_units = self.make_group("Stale line", ["S1", "S2"], start=5000)
+        stale_group, stale_units = self.make_group(
+            "Stale line", ["S1", "S2"], start=5000
+        )
         current = self.make_recommendation(
             self.make_recommendation_run(), current_group, current_units, target=["Cur"]
         )
@@ -722,7 +731,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         response = self.client.get(self.review_url)
 
         self.assertContains(response, 'name="result"', count=1)
-        self.assertContains(response, f'value="{current.pk}" checked')
+        self.assert_checked(response, current.pk)
         self.assertNotContains(response, f'value="{stale.pk}"')
         self.assertContains(
             response,
@@ -746,7 +755,9 @@ class RepeatBulkViewsTest(ViewTestCase):
             self.assertEqual(unit.target, target)
 
     def test_apply_binds_displayed_result_and_redirects_to_status(self) -> None:
-        group, units = self.make_group("Wording to unify", ["Alpha", "Beta"], start=7000)
+        group, units = self.make_group(
+            "Wording to unify", ["Alpha", "Beta"], start=7000
+        )
         result = self.make_recommendation(
             self.make_recommendation_run(), group, units, target=["Unified"]
         )
@@ -790,7 +801,9 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertEqual(item.decision["result_fingerprint"], result_fingerprint(old))
 
     def test_review_table_collects_results_across_two_runs(self) -> None:
-        first_group, first_units = self.make_group("Sword", ["Epee", "Glaive"], start=9000)
+        first_group, first_units = self.make_group(
+            "Sword", ["Epee", "Glaive"], start=9000
+        )
         second_group, second_units = self.make_group(
             "A long sentence that players rarely see twice",
             ["Long one", "Long two"],
@@ -810,8 +823,8 @@ class RepeatBulkViewsTest(ViewTestCase):
         content = response.content.decode()
 
         self.assertContains(response, 'name="result"', count=2)
-        self.assertContains(response, f'value="{first.pk}" checked')
-        self.assertContains(response, f'value="{second.pk}" checked')
+        self.assert_checked(response, first.pk)
+        self.assert_checked(response, second.pk)
         # Stable queue order: short strings first.
         self.assertLess(content.index("Sword"), content.index("A long sentence"))
 
@@ -830,7 +843,7 @@ class RepeatBulkViewsTest(ViewTestCase):
 
         response = self.client.get(self.review_url)
 
-        self.assertContains(response, f'value="{result.pk}" checked')
+        self.assert_checked(response, result.pk)
         self.assertContains(response, "Partial provider line")
 
     def test_stale_post_explains_and_refreshes_without_writes(self) -> None:
@@ -957,7 +970,9 @@ class RepeatBulkViewsTest(ViewTestCase):
 
     def test_failed_partial_batch_offers_resume_and_undo(self) -> None:
         first_group, _ = self.make_group("First batch line", ["1a", "1b"], start=15000)
-        second_group, _ = self.make_group("Second batch line", ["2a", "2b"], start=15500)
+        second_group, _ = self.make_group(
+            "Second batch line", ["2a", "2b"], start=15500
+        )
         first = self.make_recommendation(
             self.make_recommendation_run(),
             first_group,
@@ -1094,11 +1109,15 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertContains(status, units[1].context)
 
     def test_queue_banner_counts_current_applicable_results(self) -> None:
-        first_group, first_units = self.make_group("Banner line", ["B1", "B2"], start=20000)
+        first_group, first_units = self.make_group(
+            "Banner line", ["B1", "B2"], start=20000
+        )
         second_group, second_units = self.make_group(
             "Banner text here", ["C1", "C2"], start=20500
         )
-        human_group, human_units = self.make_group("Needs eyes", ["N1", "N2"], start=21000)
+        human_group, human_units = self.make_group(
+            "Needs eyes", ["N1", "N2"], start=21000
+        )
         stale_group, stale_units = self.make_group(
             "Stale banner", ["S1", "S2"], start=21500
         )
@@ -1131,7 +1150,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertContains(response, f'href="{self.review_url}"')
 
     def test_recommend_page_exposes_attempt_counts_and_overdue_sends(self) -> None:
-        done_run, pending_run, overdue, reserved, live = self.attempt_fixture()
+        done_run, pending_run, overdue, reserved, _live = self.attempt_fixture()
         profile = SimpleNamespace(
             model="test-model", provider="test", profile_fingerprint="p" * 64
         )
@@ -1180,7 +1199,9 @@ class RepeatBulkViewsTest(ViewTestCase):
                 "weblate.trans.views.repeats.resolve_judge_seat_profile",
                 return_value=profile,
             ),
-            patch("weblate.trans.repeat_recommendations.queue_attempt") as queue_attempt,
+            patch(
+                "weblate.trans.repeat_recommendations.queue_attempt"
+            ) as queue_attempt,
         ):
             response = self.client.post(
                 self.recommend_url, {"action": "reconcile"}, follow=True
@@ -1197,7 +1218,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertEqual(reserved.status, RepeatRecommendationAttempt.Status.RESERVED)
         self.assertEqual(queue_attempt.call_count, 1)
         self.assertEqual(queue_attempt.call_args.kwargs["attempt"].pk, reserved.pk)
-        # Recovery re-uses existing reservations; it never pays for new ones.
+        # Recovery reuses existing reservations; it never pays for new ones.
         self.assertEqual(pending_run.attempts.count(), 3)
         self.assertEqual(done_run.attempts.count(), 2)
 

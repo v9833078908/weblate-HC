@@ -911,8 +911,7 @@ def _bulk_summary(run) -> dict:
         "stale": stale,
         "untouched": untouched,
         "partial": bool(
-            run.status == RepeatBulkRun.Status.COMPLETED
-            and (untouched or run.conflict)
+            run.status == RepeatBulkRun.Status.COMPLETED and (untouched or run.conflict)
         ),
     }
 
@@ -958,9 +957,7 @@ def _bulk_items_display(run, *, actor) -> list[dict]:
                 ),
                 (
                     gettext("Places already matching"),
-                    sum(
-                        entry.get("reason") == "already-matches" for entry in skipped
-                    ),
+                    sum(entry.get("reason") == "already-matches" for entry in skipped),
                 ),
                 (gettext("Places excluded"), len(outcome.get("exclusions", []))),
             ]
@@ -1056,8 +1053,7 @@ def repeat_bulk_status(request, project: str, language: str, token):
             "can_resume": (
                 run.items.filter(status=RepeatBulkItem.Status.PENDING).exists()
                 and not (
-                    run.action == RepeatBulkRun.Action.APPLY
-                    and run.undo_runs.exists()
+                    run.action == RepeatBulkRun.Action.APPLY and run.undo_runs.exists()
                 )
             ),
             "undo_run": undo_run,

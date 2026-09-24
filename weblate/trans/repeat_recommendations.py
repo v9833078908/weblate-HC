@@ -25,10 +25,10 @@ from weblate.trans.judge import (
 from weblate.trans.models import (
     LLMUsageLog,
     RepeatGroup,
+    RepeatPolicy,
     RepeatRecommendationAttempt,
     RepeatRecommendationResult,
     RepeatRecommendationRun,
-    RepeatPolicy,
 )
 from weblate.trans.repeats import (
     detect_policy_groups,
@@ -310,7 +310,9 @@ def request_payload(
 def request_size(profile: JudgeSeatProfile, groups: list[dict[str, Any]]) -> int:
     """Return the UTF-8 size of the complete request body for these groups."""
     return len(
-        json.dumps(request_payload(profile, {"groups": groups}), ensure_ascii=False).encode()
+        json.dumps(
+            request_payload(profile, {"groups": groups}), ensure_ascii=False
+        ).encode()
     )
 
 
@@ -332,8 +334,10 @@ def _reserved_contexts(policy: RepeatPolicy, statuses: set) -> set[tuple[int, st
         for attempt in run.attempts.all():
             if attempt.status not in statuses:
                 continue
-            for group in attempt.request_snapshot.get("groups", []):
-                pairs.add((group["group"], frozen.get(group["group"], "")))
+            pairs.update(
+                (group["group"], frozen.get(group["group"], ""))
+                for group in attempt.request_snapshot.get("groups", [])
+            )
     return pairs
 
 
@@ -522,6 +526,7 @@ def queue_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
     """Publish one pre-reserved attempt after commit at interactive priority."""
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.tasks import execute_repeat_recommendation_attempt
+
     # ruff: ignore[import-outside-top-level]
     from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY
 

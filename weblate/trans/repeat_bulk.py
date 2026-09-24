@@ -11,14 +11,15 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from django.core import signing
 
 from weblate.trans.models import (
     RepeatBulkItem,
     RepeatBulkRun,
+    RepeatDecisionEvent,
     RepeatGroup,
     RepeatRecommendationResult,
 )
@@ -53,18 +54,6 @@ CODE_ACTOR_MISSING = "actor-missing"
 CODE_POLICY_DISABLED = "policy-disabled"
 CODE_LATER_DECISION = "later-decision"
 CODE_UNDONE = "undone"
-
-
-class StaleItem(Exception):
-    """The frozen context no longer matches live data for this item."""
-
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
-
-
-class NoWritableItem(Exception):
-    """No eligible, non-excluded recipient remains for this decision."""
 
 
 @dataclass(frozen=True)
@@ -302,53 +291,58 @@ def start_bulk(
         # A concurrent double submission already created this batch.
         existing = RepeatBulkRun.objects.get(review_nonce=nonce)
         if existing.policy_id != policy.pk or existing.actor_id != actor.pk:
-            raise PermissionDenied
+            raise PermissionDenied from None
         return existing
     queue_bulk_run(run)
     return run
+
+
+def _create_undo_run(*, apply_run: RepeatBulkRun, actor: User) -> RepeatBulkRun:
+    """Create one undo batch and its items in their own savepoint."""
+    with transaction.atomic():
+        undo_run = RepeatBulkRun.objects.create(
+            policy=apply_run.policy,
+            actor=actor,
+            action=RepeatBulkRun.Action.UNDO,
+            apply_run=apply_run,
+            status=RepeatBulkRun.Status.QUEUED,
+        )
+        applied = list(apply_run.items.exclude(decision_event=None).order_by("ordinal"))
+        for ordinal, item in enumerate(applied, start=1):
+            RepeatBulkItem.objects.create(
+                run=undo_run,
+                ordinal=ordinal,
+                group=item.group,
+                group_identity=item.group_identity,
+                apply_event=item.decision_event,
+                decision=item.decision,
+                context_fingerprint=item.context_fingerprint,
+            )
+        undo_run.total = len(applied)
+        undo_run.save(update_fields=["total"])
+    return undo_run
 
 
 def start_undo(*, run: RepeatBulkRun, actor: User) -> RepeatBulkRun:
     """Create (or return) the single undo batch for one apply batch."""
     if not actor.has_perm("project.edit", run.policy.project):
         raise PermissionDenied
-    try:
-        with transaction.atomic():
-            apply_run = RepeatBulkRun.objects.select_for_update().get(pk=run.pk)
-            if apply_run.action != RepeatBulkRun.Action.APPLY:
-                msg = "Only an apply batch can be undone."
-                raise ValidationError(msg)
-            if apply_run.status in {
-                RepeatBulkRun.Status.QUEUED,
-                RepeatBulkRun.Status.RUNNING,
-            }:
-                msg = "The batch is still being processed."
-                raise ValidationError(msg)
-            undo_run = RepeatBulkRun.objects.create(
-                policy=apply_run.policy,
-                actor=actor,
-                action=RepeatBulkRun.Action.UNDO,
-                apply_run=apply_run,
-                status=RepeatBulkRun.Status.QUEUED,
-            )
-            applied = list(
-                apply_run.items.exclude(decision_event=None).order_by("ordinal")
-            )
-            for ordinal, item in enumerate(applied, start=1):
-                RepeatBulkItem.objects.create(
-                    run=undo_run,
-                    ordinal=ordinal,
-                    group=item.group,
-                    group_identity=item.group_identity,
-                    apply_event=item.decision_event,
-                    decision=item.decision,
-                    context_fingerprint=item.context_fingerprint,
-                )
-            undo_run.total = len(applied)
-            undo_run.save(update_fields=["total"])
-    except IntegrityError:
-        # Concurrent callers get the one undo batch of this apply batch.
-        undo_run = RepeatBulkRun.objects.get(apply_run=run)
+    with transaction.atomic():
+        apply_run = RepeatBulkRun.objects.select_for_update().get(pk=run.pk)
+        if apply_run.action != RepeatBulkRun.Action.APPLY:
+            msg = "Only an apply batch can be undone."
+            raise ValidationError(msg)
+        if apply_run.status in {
+            RepeatBulkRun.Status.QUEUED,
+            RepeatBulkRun.Status.RUNNING,
+        }:
+            msg = "The batch is still being processed."
+            raise ValidationError(msg)
+        try:
+            undo_run = _create_undo_run(apply_run=apply_run, actor=actor)
+        except IntegrityError:
+            # Concurrent callers get the one undo batch of this apply batch.
+            undo_run = RepeatBulkRun.objects.get(apply_run=run)
     queue_bulk_run(undo_run)
     return undo_run
 
@@ -374,6 +368,7 @@ def queue_bulk_run(run: RepeatBulkRun) -> None:
     """Publish one batch after commit at interactive priority."""
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.tasks import process_repeat_bulk_apply, process_repeat_bulk_undo
+
     # ruff: ignore[import-outside-top-level]
     from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY
 
@@ -572,73 +567,91 @@ def _apply_one_item(*, run: RepeatBulkRun, item: RepeatBulkItem, actor: User) ->
         _record_skip(item=item, code=CODE_STALE)
         return
     try:
-        with transaction.atomic():
-            group = (
-                RepeatGroup.objects.select_for_update()
-                .select_related("policy")
-                .get(pk=item.group_id)
-            )
-            context = _item_context(policy=run.policy, group=group, actor=actor)
-            if context_fingerprint(context) != item.context_fingerprint:
-                raise StaleItem(CODE_STALE)
-            preview = preview_group(
-                group=group, target=item.decision["target"], actor=actor
-            )
-            frozen_members = {
-                member["unit"]: member["unit_fingerprint"]
-                for member in context["members"]
-            }
-            preview_members = {
-                member.unit_id: member.fingerprint for member in preview.members
-            }
-            if preview_members != frozen_members:
-                # The recipient read and the preview read must agree exactly.
-                raise StaleItem(CODE_STALE)
-            exclusions = set(item.decision["exclusions"])
-            if not exclusions <= set(preview_members):
-                raise StaleItem(CODE_STALE)
-            selected = [
-                member.unit_id
-                for member in preview.changing
-                if member.unit_id not in exclusions
-            ]
-            if not selected:
-                raise NoWritableItem
-            event = apply_preview(token=preview.token, actor=actor, unit_ids=selected)
-    except NoWritableItem:
-        _record_skip(item=item, code=CODE_NO_WRITE)
-        return
-    except (StaleItem, ValidationError):
+        event, skip_code = _apply_item_transaction(run=run, item=item, actor=actor)
+    except ValidationError:
         # The expected edit wins: roll back and record a skipped item instead
         # of overwriting newer human work.
         _record_skip(item=item, code=CODE_STALE)
+        return
+    if skip_code or event is None:
+        _record_skip(item=item, code=skip_code or CODE_STALE)
         return
     item.status = RepeatBulkItem.Status.APPLIED
     item.decision_event = event
     item.outcome = {**event.result, "exclusions": sorted(item.decision["exclusions"])}
     item.save(
-        update_fields=["status", "decision_event", "outcome", "failure_code", "updated_at"]
+        update_fields=[
+            "status",
+            "decision_event",
+            "outcome",
+            "failure_code",
+            "updated_at",
+        ]
     )
+
+
+def _apply_item_transaction(
+    *, run: RepeatBulkRun, item: RepeatBulkItem, actor: User
+) -> tuple[RepeatDecisionEvent | None, str]:
+    """Validate the frozen context and apply one decision in its savepoint."""
+    with transaction.atomic():
+        group = (
+            RepeatGroup.objects.select_for_update()
+            .select_related("policy")
+            .get(pk=item.group_id)
+        )
+        context = _item_context(policy=run.policy, group=group, actor=actor)
+        if context_fingerprint(context) != item.context_fingerprint:
+            return None, CODE_STALE
+        preview = preview_group(
+            group=group, target=item.decision["target"], actor=actor
+        )
+        frozen_members = {
+            member["unit"]: member["unit_fingerprint"] for member in context["members"]
+        }
+        preview_members = {
+            member.unit_id: member.fingerprint for member in preview.members
+        }
+        if preview_members != frozen_members:
+            # The recipient read and the preview read must agree exactly.
+            return None, CODE_STALE
+        exclusions = set(item.decision["exclusions"])
+        if not exclusions <= set(preview_members):
+            return None, CODE_STALE
+        selected = [
+            member.unit_id
+            for member in preview.changing
+            if member.unit_id not in exclusions
+        ]
+        if not selected:
+            return None, CODE_NO_WRITE
+        event = apply_preview(token=preview.token, actor=actor, unit_ids=selected)
+    return event, ""
 
 
 def _undo_one_item(*, run: RepeatBulkRun, item: RepeatBulkItem, actor: User) -> None:
     """Undo one committed event; recipient conflicts stay visible and linked."""
     try:
-        with transaction.atomic():
-            if item.apply_event_id is None:
-                raise StaleItem(CODE_STALE)
-            undo = undo_event(token=str(item.apply_event.token), actor=actor)
-    except StaleItem as error:
-        item.status = RepeatBulkItem.Status.SKIPPED
-        item.failure_code = error.code
-        item.save(update_fields=["status", "failure_code", "updated_at"])
-        return
+        undo = _undo_item_transaction(item=item, actor=actor)
     except ValidationError:
         item.status = RepeatBulkItem.Status.SKIPPED
         item.failure_code = CODE_LATER_DECISION
         item.save(update_fields=["status", "failure_code", "updated_at"])
         return
+    if undo is None:
+        _record_skip(item=item, code=CODE_STALE)
+        return
     item.status = RepeatBulkItem.Status.UNDONE
     item.decision_event = undo
     item.outcome = {**undo.result, "code": CODE_UNDONE}
     item.save(update_fields=["status", "decision_event", "outcome", "updated_at"])
+
+
+def _undo_item_transaction(
+    *, item: RepeatBulkItem, actor: User
+) -> RepeatDecisionEvent | None:
+    """Undo one committed event in its savepoint; None when not undoable."""
+    with transaction.atomic():
+        if item.apply_event_id is None:
+            return None
+        return undo_event(token=str(item.apply_event.token), actor=actor)
