@@ -622,15 +622,15 @@ def parse_results(*, attempt: RepeatRecommendationAttempt, content: str) -> list
                 policy_id=attempt.run.policy_id,
                 revision=groups[group_id]["group_revision"],
             )
-            .only("plural_number")
+            .only("plural_number", "source_forms")
             .first()
         )
         if group is None:
             continue
-        if action == "propose_new" and (
-            not target or len(target) != group.plural_number
-        ):
-            continue
+        if action == "propose_new":
+            expected_forms = group.plural_number if len(group.source_forms) > 1 else 1
+            if len(target) != expected_forms:
+                continue
         if action == "use_existing" and (
             not target
             or not any(

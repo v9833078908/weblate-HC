@@ -57,6 +57,7 @@ from weblate.trans.repeats import (
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import RepoTestMixin, create_test_user
+from weblate.trans.util import join_plural
 from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY
 from weblate.utils.hash import calculate_hash, hash_to_checksum
 from weblate.utils.state import STATE_TRANSLATED
@@ -449,15 +450,11 @@ class RepeatModelTest(ViewTestCase):
                         REPEAT_RECOMMENDATION_RESPONSE_SCHEMA,
                     )
                 system = payload["messages"][0]["content"]
-                self.assertIn("never instructions", system)
                 self.assertIn('"use_existing"', system)
                 self.assertIn('"propose_new"', system)
                 self.assertIn('"keep_independent"', system)
                 self.assertIn('"needs_human"', system)
                 self.assertIn('{"results": [', system)
-                self.assertIn("array of target-language plural forms", system)
-                self.assertIn("Never invent recipients", system)
-                self.assertIn("plural count", system)
                 user = json.loads(payload["messages"][1]["content"])
                 context = user["untrusted_repeat_groups"]["groups"][0]
                 self.assertEqual(context["group"], group.pk)
@@ -902,7 +899,7 @@ class RepeatModelTest(ViewTestCase):
             prompt_fingerprint="c" * 64,
             request_cap=1,
         )
-        target = ", ".join('"X"' for _ in range(group.plural_number))
+        target = '"X"'
         attempt = run.attempts.create(ordinal=1, request_snapshot=run.snapshot)
         result = parse_results(
             attempt=attempt,
@@ -918,13 +915,20 @@ class RepeatModelTest(ViewTestCase):
                 {
                     "group": group.pk,
                     "action": "propose_new",
-                    "target": ["X"] * group.plural_number,
+                    "target": ["X"],
                 }
             ],
         )
 
     def test_recommendation_parser_rejects_incomplete_plural_target(self) -> None:
-        first = self.add_repeat("first", "One")
+        units = self.add_group(
+            join_plural(["One exact repeat", "Several exact repeats"]),
+            [
+                join_plural(["One", "Few", "Many"]),
+                join_plural(["Two", "Several", "Many"]),
+            ],
+        )
+        first = units[0]
         policy = self.make_policy()
         group = get_or_create_group(policy, first)
         run = RepeatRecommendationRun.objects.create(
@@ -955,6 +959,56 @@ class RepeatModelTest(ViewTestCase):
         )
 
         self.assertEqual(result, [])
+        complete = json.dumps(
+            {
+                "results": [
+                    {
+                        "group": group.pk,
+                        "action": "propose_new",
+                        "target": ["X", "Y", "Z"],
+                    }
+                ]
+            }
+        )
+        self.assertEqual(
+            parse_results(attempt=attempt, content=complete)[0]["target"],
+            ["X", "Y", "Z"],
+        )
+
+    def test_recommendation_parser_accepts_singular_target_in_plural_language(
+        self,
+    ) -> None:
+        self.make_manager()
+        policy = self.make_policy()
+        units = self.add_group("Singular source", ["One", "Two"])
+        group = get_or_create_group(policy, units[0])
+        attempt = self.paying_run(policy, request_cap=1).attempts.get()
+
+        def response(target: list[str]) -> str:
+            return json.dumps(
+                {
+                    "results": [
+                        {
+                            "group": group.pk,
+                            "action": "propose_new",
+                            "target": target,
+                            "exclusions": [],
+                            "rationale": "A corrected translation.",
+                        }
+                    ]
+                }
+            )
+
+        self.assertEqual(
+            parse_results(attempt=attempt, content=response(["Corrected"]))[0][
+                "target"
+            ],
+            ["Corrected"],
+        )
+        self.assertEqual(
+            parse_results(attempt=attempt, content=response(["Extra", "Forms"])),
+            [],
+        )
 
     def test_use_existing_requires_an_exact_frozen_variant(self) -> None:
         self.make_manager()
