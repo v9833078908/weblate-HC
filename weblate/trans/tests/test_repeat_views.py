@@ -564,6 +564,65 @@ class RepeatBulkViewsTest(ViewTestCase):
             kwargs={"project": self.project.slug, "language": "cs"},
         )
 
+    def test_start_recommendations_reserves_only_the_capped_requests(self) -> None:
+        """The POST must not reserve the same groups again after preparation."""
+        self.make_group("Sword", ["Blade", "Sabre"])
+        profile = SimpleNamespace(
+            profile_fingerprint="p" * 64,
+            model="test-model",
+            temperature=0,
+            response_format="json_object",
+            provider="test",
+            reasoning="",
+        )
+        with (
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=profile,
+            ),
+            patch("weblate.trans.repeat_recommendations.queue_attempt"),
+        ):
+            response = self.client.post(
+                self.recommend_url, {"action": "start", "request_cap": "1"}
+            )
+
+        self.assertEqual(response.status_code, 302)
+        run = RepeatRecommendationRun.objects.get()
+        self.assertEqual(run.requests_reserved, 1)
+        self.assertEqual(run.attempts.count(), 1)
+        self.assertEqual(
+            run.attempts.get().request_snapshot["groups"][0]["group"],
+            self.policy.groups.get().pk,
+        )
+
+    def test_queue_card_and_banner_discard_changed_recommendation(self) -> None:
+        """An ordinary Unit edit invalidates both displays without a group bump."""
+        group, units = self.make_group("Sword", ["Blade", "Sabre"])
+        result = self.make_recommendation(
+            self.make_recommendation_run(
+                status=RepeatRecommendationRun.Status.COMPLETED
+            ),
+            group,
+            units,
+            target=["Blade"],
+        )
+        before = self.client.get(self.queue_url)
+        self.assertEqual(before.context["bulk_ready"], 1)
+        self.assertEqual(before.context["groups"][0]["recommendation"].pk, result.pk)
+
+        units[0].target = "Dagger"
+        units[0].save(update_fields=["target"])
+        group.refresh_from_db()
+        self.assertEqual(group.revision, result.group_revision)
+
+        after = self.client.get(self.queue_url)
+        self.assertEqual(after.context["bulk_ready"], 0)
+        self.assertIsNone(after.context["groups"][0]["recommendation"])
+
     @property
     def queue_url(self) -> str:
         return reverse(

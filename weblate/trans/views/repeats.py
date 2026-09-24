@@ -31,7 +31,6 @@ from weblate.trans.models import (
     RepeatGroup,
     RepeatPolicy,
     RepeatRecommendationAttempt,
-    RepeatRecommendationResult,
     RepeatRecommendationRun,
     Unit,
 )
@@ -53,11 +52,9 @@ from weblate.trans.repeat_bulk import (
 from weblate.trans.repeat_recommendations import (
     current_recommendations,
     prepare_run,
-    queue_attempt,
     queue_importance,
     reconcile_expired_attempts,
     requeue_reserved_attempts,
-    reserve_attempt,
 )
 from weblate.trans.repeats import (
     apply_preview,
@@ -187,19 +184,10 @@ def _queue_groups(request, policy):
     return sorted(groups, key=importance)
 
 
-def _add_recommendations(items) -> None:
-    """Look up recommendations only for the groups shown on the page."""
+def _add_recommendations(items, current) -> None:
+    """Show only current recommendations for groups on this page."""
     for item in items:
-        group = item["group"]
-        item["recommendation"] = (
-            RepeatRecommendationResult.objects.filter(
-                group=group,
-                group_revision=group.revision,
-                run__status="completed",
-            )
-            .order_by("-created_at")
-            .first()
-        )
+        item["recommendation"] = current.get(item["group"].pk)
 
 
 def _queue_url(group) -> str:
@@ -312,7 +300,12 @@ def repeat_queue(request, project: str, language: str):
     query.pop("done", None)
     query["status"] = requested_status
     page_obj = Paginator(filtered_groups, 20).get_page(request.GET.get("page"))
-    _add_recommendations(page_obj.object_list)
+    current = (
+        current_recommendations(policy, actor=request.user)
+        if policy is not None
+        else {}
+    )
+    _add_recommendations(page_obj.object_list, current)
     visible_components = Component.objects.filter(project=obj).filter_access(
         request.user
     )
@@ -328,7 +321,7 @@ def repeat_queue(request, project: str, language: str):
         # page freezes, across every recommendation run.
         bulk_ready = sum(
             result.action in {"use_existing", "propose_new"}
-            for result in current_recommendations(policy, actor=request.user).values()
+            for result in current.values()
         )
     return render(
         request,
@@ -600,11 +593,6 @@ def repeat_recommend(request, project: str, language: str):
             gettext("No repeat groups require a model request."),
         )
         return redirect("repeat-queue", project=project, language=language)
-    attempt = reserve_attempt(
-        run=run,
-        request_snapshot={"groups": groups},
-    )
-    queue_attempt(attempt=attempt)
     messages.success(request, gettext("Repeat recommendations were queued."))
     return redirect("repeat-queue", project=project, language=language)
 
