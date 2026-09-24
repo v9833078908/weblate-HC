@@ -133,6 +133,12 @@
         <a class="btn btn-outline-primary"
            href="{% url 'repeat-recommend' project=project.slug language=language.code %}">{% translate "Prepare recommendations" %} <span class="badge text-bg-warning">{% translate "Paid" context "Costs money to run" %}</span></a>
       </div>
+      {% if bulk_ready %}
+        <p class="alert alert-info" role="status">
+          {% blocktranslate count counter=bulk_ready %}{{ counter }} current recommendation is ready to review and apply.{% plural %}{{ counter }} current recommendations are ready to review and apply.{% endblocktranslate %}
+          <a class="alert-link" href="{{ bulk_review_url }}">{% translate "Review and apply" %}</a>
+        </p>
+      {% endif %}
     {% endif %}
 
     <p class="rq-summary">{% blocktranslate count counter=shown_count %}Showing {{ counter }} group of {{ total_count }}. Conflicts first, then short strings and the widest groups.{% plural %}Showing {{ counter }} groups of {{ total_count }}. Conflicts first, then short strings and the widest groups.{% endblocktranslate %} <span class="text-muted"><kbd>↑</kbd> <kbd>↓</kbd> {% translate "move between groups; Enter opens a group." %}</span></p>

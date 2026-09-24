@@ -7,9 +7,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.http import Http404
+from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
@@ -24,16 +25,38 @@ from weblate.trans.models import (
     Component,
     Label,
     Project,
+    RepeatBulkItem,
+    RepeatBulkRun,
     RepeatDecisionEvent,
     RepeatGroup,
     RepeatPolicy,
+    RepeatRecommendationAttempt,
     RepeatRecommendationResult,
+    RepeatRecommendationRun,
     Unit,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
+from weblate.trans.repeat_bulk import (
+    CODE_ACTOR_MISSING,
+    CODE_ITEM_ERROR,
+    CODE_LATER_DECISION,
+    CODE_NO_WRITE,
+    CODE_PERMISSION_CHANGED,
+    CODE_POLICY_DISABLED,
+    CODE_STALE,
+    CODE_UNDONE,
+    plan_bulk,
+    resume_bulk,
+    start_bulk,
+    start_undo,
+)
 from weblate.trans.repeat_recommendations import (
+    current_recommendations,
     prepare_run,
     queue_attempt,
+    queue_importance,
+    reconcile_expired_attempts,
+    requeue_reserved_attempts,
     reserve_attempt,
 )
 from weblate.trans.repeats import (
@@ -48,6 +71,7 @@ from weblate.trans.repeats import (
     source_fingerprint,
     undo_event,
 )
+from weblate.trans.util import join_plural
 from weblate.utils.state import STATE_APPROVED
 
 
@@ -153,9 +177,12 @@ def _queue_groups(request, policy):
 
     def importance(item) -> tuple[int, bool, int]:
         # Short strings are the ones players see many times; a dialogue line
-        # repeated under two keys is seen once.
-        words = len(item["group"].source_forms[0].split())
-        return (status_order[item["status"]], words > 3, -len(item["units"]))
+        # repeated under two keys is seen once. One rule for the queue, the
+        # review table and request packing.
+        return (
+            status_order[item["status"]],
+            *queue_importance(item["group"].source_forms[0], len(item["units"])),
+        )
 
     return sorted(groups, key=importance)
 
@@ -292,6 +319,17 @@ def repeat_queue(request, project: str, language: str):
     visible_labels = Label.objects.filter(project=obj).order_by("name")
     selected_components = _selected_ids(request, "component")
     selected_labels = _selected_ids(request, "label")
+    bulk_ready = 0
+    bulk_review_url = reverse(
+        "repeat-bulk-review", kwargs={"project": project, "language": language}
+    )
+    if policy is not None and request.user.has_perm("project.edit", obj):
+        # The banner counts the same current, applicable results the review
+        # page freezes, across every recommendation run.
+        bulk_ready = sum(
+            result.action in {"use_existing", "propose_new"}
+            for result in current_recommendations(policy, actor=request.user).values()
+        )
     return render(
         request,
         "repeat_queue.html",
@@ -312,6 +350,8 @@ def repeat_queue(request, project: str, language: str):
             "total_count": len(filtered_groups),
             "query_string": query.urlencode(),
             "decision": _decision_summary(request, obj),
+            "bulk_ready": bulk_ready,
+            "bulk_review_url": bulk_review_url,
         },
     )
 
@@ -326,7 +366,7 @@ def repeat_preview(request, group_id: int):
     visible_members = (
         policy_units(group.policy)
         .filter_access(request.user)
-        .filter(source=group.source_forms[0])
+        .filter(source=join_plural(group.source_forms))
     )
     if not any(
         tuple(unit.get_source_plurals()) == tuple(group.source_forms)
@@ -425,6 +465,80 @@ def repeat_undo(request):
     return redirect(f"{_queue_url(event.group)}?done={undo.token}")
 
 
+def _recommendation_attempt_rows(policy: RepeatPolicy) -> list[dict]:
+    """Expose durable per-run attempt progress and overdue sends on a GET."""
+    now = timezone.now()
+    rows = []
+    for run in (
+        RepeatRecommendationRun.objects.filter(policy=policy)
+        .order_by("-created_at")
+        .prefetch_related("attempts", "results")
+    ):
+        attempts = list(run.attempts.all())
+        rows.append(
+            {
+                "run": run,
+                "status_label": run.get_status_display(),
+                "reserved": sum(
+                    attempt.status == RepeatRecommendationAttempt.Status.RESERVED
+                    for attempt in attempts
+                ),
+                "sent": sum(
+                    attempt.status == RepeatRecommendationAttempt.Status.SENT
+                    for attempt in attempts
+                ),
+                "completed": sum(
+                    attempt.status == RepeatRecommendationAttempt.Status.COMPLETED
+                    for attempt in attempts
+                ),
+                "failed": sum(
+                    attempt.status == RepeatRecommendationAttempt.Status.FAILED
+                    for attempt in attempts
+                ),
+                "unknown": sum(
+                    attempt.status == RepeatRecommendationAttempt.Status.UNKNOWN
+                    for attempt in attempts
+                ),
+                "overdue": sum(
+                    attempt.status == RepeatRecommendationAttempt.Status.SENT
+                    and attempt.deadline_at is not None
+                    and attempt.deadline_at < now
+                    for attempt in attempts
+                ),
+                "results": len(run.results.all()),
+            }
+        )
+    return rows
+
+
+def _recover_attempts(request, policy, project: str, language: str):
+    """Reconcile overdue sends and re-enqueue reserved ones; never pay twice."""
+    reconciled = 0
+    requeued = 0
+    for run in (
+        RepeatRecommendationRun.objects.filter(
+            policy=policy,
+            attempts__status__in=[
+                RepeatRecommendationAttempt.Status.RESERVED,
+                RepeatRecommendationAttempt.Status.SENT,
+            ],
+        )
+        .distinct()
+        .order_by("pk")
+    ):
+        reconciled += reconcile_expired_attempts(run=run, actor=request.user)
+        requeued += requeue_reserved_attempts(run=run, actor=request.user)
+    messages.success(
+        request,
+        gettext(
+            "Marked %(reconciled)s overdue sends unknown; re-enqueued %(requeued)s "
+            "reserved requests. No new paid request was created."
+        )
+        % {"reconciled": reconciled, "requeued": requeued},
+    )
+    return redirect("repeat-recommend", project=project, language=language)
+
+
 @login_required
 def repeat_recommend(request, project: str, language: str):
     """Preview, then explicitly reserve a bounded recommendation request."""
@@ -451,6 +565,7 @@ def repeat_recommend(request, project: str, language: str):
             )
         except JudgeError as error:
             unavailable = str(error)
+        attempt_rows = _recommendation_attempt_rows(policy)
         return render(
             request,
             "repeat_recommend.html",
@@ -460,8 +575,18 @@ def repeat_recommend(request, project: str, language: str):
                 "profile": profile,
                 "cost_range": cost_range,
                 "unavailable": unavailable,
+                "attempt_rows": attempt_rows,
+                "can_recover": any(
+                    row["reserved"] or row["overdue"] for row in attempt_rows
+                ),
             },
         )
+    action = request.POST.get("action", "")
+    if action == "reconcile":
+        # Strictly separate from starting a new capped paid run below.
+        return _recover_attempts(request, policy, project, language)
+    if action not in {"", "start"}:
+        return HttpResponseBadRequest(gettext("Unknown action."))
     try:
         request_cap = int(request.POST["request_cap"])
     except (KeyError, TypeError, ValueError) as error:
@@ -508,4 +633,447 @@ def repeat_rule(request, project: str, language: str):
         request,
         "repeat_rule.html",
         {"project": obj, "language": target_language, "form": form},
+    )
+
+
+def _member_reason_label(reason: str) -> str:
+    """Map one stable preview reason code to its translated explanation."""
+    return {
+        "already-matches": gettext("Already translated this way"),
+        "approved": gettext("Approved, not changed"),
+        "locked": gettext("The component is locked"),
+        "max-length": gettext("Too long for this string"),
+        "rule-conflict": gettext("Covered by another repeat rule"),
+    }.get(reason, reason)
+
+
+def _failure_reason(code: str) -> str:
+    """Map one stable outcome code to its translated reason; never raw errors."""
+    return {
+        CODE_STALE: gettext(
+            "A string changed after this decision was reviewed; refresh and decide again."
+        ),
+        CODE_NO_WRITE: gettext(
+            "Nothing needed changing: every place already matched or was excluded."
+        ),
+        CODE_ITEM_ERROR: gettext(
+            "Processing hit an unexpected error; resume to process the remaining groups."
+        ),
+        CODE_PERMISSION_CHANGED: gettext(
+            "Permission to change this project was revoked during processing."
+        ),
+        CODE_ACTOR_MISSING: gettext(
+            "The user who started this batch no longer exists."
+        ),
+        CODE_POLICY_DISABLED: gettext(
+            "The repeat rule was disabled before this batch finished."
+        ),
+        CODE_LATER_DECISION: gettext(
+            "A later decision changed this group; it was not undone."
+        ),
+        CODE_UNDONE: gettext("Undone; previous translations were restored."),
+    }.get(code, "")
+
+
+def _conflict_reason_label(reason: str) -> str:
+    """Map one stable undo-conflict code to its translated reason."""
+    return {
+        "changed": gettext("Changed after the decision"),
+        "missing-or-approved": gettext("Deleted or approved after the decision"),
+    }.get(reason, reason)
+
+
+def _action_label(action: str) -> str:
+    """Map one stable recommendation action code to its translated label."""
+    return {
+        "use_existing": gettext("Use an existing translation"),
+        "propose_new": gettext("Propose a new translation"),
+        "keep_independent": gettext("Keep these places independent"),
+        "needs_human": gettext("Needs a human decision"),
+    }.get(action, action)
+
+
+def _forms_text(forms) -> str:
+    """Show every plural form of one source or target."""
+    return " / ".join(forms)
+
+
+def _review_refresh_error() -> str:
+    return gettext(
+        "This review confirmation is no longer valid: a string, the repeat rule "
+        "or your permissions changed after the review. Nothing was written; the "
+        "review below was refreshed and can be selected again."
+    )
+
+
+def _review_rows_display(review, *, actor) -> list[dict]:
+    """Render review rows with each place's current translation in one lookup."""
+    unit_ids = {member["unit_id"] for row in review.rows for member in row.members}
+    units = {
+        unit.pk: unit
+        for unit in Unit.objects.filter(pk__in=unit_ids)
+        .filter_access(actor)
+        .select_related(
+            "translation__component",
+            "translation__component__project",
+            "translation__component__category",
+            "translation__language",
+            "translation__plural",
+        )
+    }
+    rows = []
+    for row in review.rows:
+        members = []
+        for member in row.members:
+            unit = units.get(member["unit_id"])
+            members.append(
+                {
+                    "unit_id": member["unit_id"],
+                    "url": unit.get_absolute_url() if unit is not None else "",
+                    "key": member["key"],
+                    "component": member["component"],
+                    "current_target": (
+                        _forms_text(unit.get_target_plurals())
+                        if unit is not None
+                        else "—"
+                    ),
+                    "excluded": member["excluded"],
+                    "will_change": member["eligible"] and not member["excluded"],
+                    "reason_label": (
+                        ""
+                        if member["eligible"]
+                        else _member_reason_label(member["reason"])
+                    ),
+                }
+            )
+        rows.append(
+            {
+                "result_id": row.result_id,
+                "group_id": row.group_id,
+                "source_forms": list(row.source_forms),
+                "source_text": _forms_text(row.source_forms),
+                "target_forms": list(row.target),
+                "target_text": _forms_text(row.target),
+                "action": row.action,
+                "action_label": _action_label(row.action),
+                "rationale": row.rationale,
+                "exclusions": list(row.exclusions),
+                "writable": row.writable,
+                "already_matching": row.already_matching,
+                "blocked": [
+                    {"reason_label": _member_reason_label(reason), "count": count}
+                    for reason, count in sorted(row.blocked.items())
+                ],
+                "members": members,
+            }
+        )
+    return rows
+
+
+def _decision_groups_display(results, *, actor, policy, queue_url: str) -> list[dict]:
+    """List manual decisions with links to their individual places and group."""
+    if not results:
+        return []
+    wanted = {join_plural(list(result.group.source_forms)) for result in results}
+    units_by_source: dict[tuple[str, ...], list] = {}
+    for unit in (
+        policy_units(policy)
+        .filter_access(actor)
+        .filter(source__in=sorted(wanted))
+        .select_related(
+            "translation__component__project",
+            "translation__component__category",
+            "translation__language",
+        )
+    ):
+        units_by_source.setdefault(tuple(unit.get_source_plurals()), []).append(unit)
+    display = []
+    for result in results:
+        forms = tuple(result.group.source_forms)
+        display.append(
+            {
+                "result_id": result.pk,
+                "group_id": result.group_id,
+                "source_text": _forms_text(forms),
+                "rationale": result.rationale,
+                "group_url": f"{queue_url}?group={result.group_id}",
+                "units": [
+                    {"key": unit.context, "url": unit.get_absolute_url()}
+                    for unit in sorted(
+                        units_by_source.get(forms, []), key=lambda unit: unit.pk
+                    )
+                ],
+            }
+        )
+    return display
+
+
+def _review_context(
+    request, *, project: str, language: str, policy, review, error: str
+) -> dict:
+    queue_url = reverse(
+        "repeat-queue", kwargs={"project": project, "language": language}
+    )
+    return {
+        "project": policy.project,
+        "language": policy.target_language,
+        "policy": policy,
+        "rows": _review_rows_display(review, actor=request.user),
+        "needs_human": _decision_groups_display(
+            review.needs_human, actor=request.user, policy=policy, queue_url=queue_url
+        ),
+        "independent": _decision_groups_display(
+            review.independent, actor=request.user, policy=policy, queue_url=queue_url
+        ),
+        "stale": review.stale,
+        "manifest": review.manifest,
+        "expires_at": review.expires_at,
+        "error": error,
+        "queue_url": queue_url,
+    }
+
+
+@login_required
+def repeat_bulk_review(request, project: str, language: str):
+    """Freeze current recommendations for review; GET never writes anything."""
+    policy = get_object_or_404(
+        RepeatPolicy,
+        project__slug=project,
+        target_language__code=language,
+        enabled=True,
+    )
+    if not request.user.can_access_project(policy.project):
+        raise PermissionDenied
+    if not request.user.has_perm("project.edit", policy.project):
+        raise PermissionDenied
+    error = ""
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        if action != "apply":
+            return HttpResponseBadRequest(gettext("Unknown action."))
+        selected = request.POST.getlist("result")
+        if not selected:
+            error = gettext("Select at least one recommendation to apply.")
+        elif any(not value.isdigit() for value in selected):
+            error = _review_refresh_error()
+        else:
+            try:
+                run = start_bulk(
+                    policy=policy,
+                    actor=request.user,
+                    manifest=request.POST.get("manifest", ""),
+                    result_ids=[int(value) for value in selected],
+                )
+            except ValidationError:
+                # Stale, expired or tampered confirmation: nothing was written.
+                error = _review_refresh_error()
+            else:
+                return redirect(
+                    "repeat-bulk-status",
+                    project=project,
+                    language=language,
+                    token=run.token,
+                )
+    review = plan_bulk(policy=policy, actor=request.user)
+    return render(
+        request,
+        "repeat_bulk_review.html",
+        _review_context(
+            request,
+            project=project,
+            language=language,
+            policy=policy,
+            review=review,
+            error=error,
+        ),
+    )
+
+
+def _bulk_summary(run) -> dict:
+    """Distinct counts: matching, excluded, blocked, stale, left untouched."""
+    excluded = blocked = matching = stale = untouched = 0
+    for item in run.items.all():
+        outcome = item.outcome or {}
+        excluded += len(outcome.get("exclusions", []))
+        for skipped in outcome.get("skipped", []):
+            if skipped.get("reason") in {"approved", "protected"}:
+                blocked += 1
+            elif skipped.get("reason") == "already-matches":
+                matching += 1
+        if item.failure_code == CODE_STALE:
+            stale += 1
+        if item.status in {RepeatBulkItem.Status.SKIPPED, RepeatBulkItem.Status.FAILED}:
+            untouched += 1
+    return {
+        "excluded": excluded,
+        "blocked": blocked,
+        "matching": matching,
+        "stale": stale,
+        "untouched": untouched,
+        "partial": bool(
+            run.status == RepeatBulkRun.Status.COMPLETED
+            and (untouched or run.conflict)
+        ),
+    }
+
+
+def _bulk_items_display(run, *, actor) -> list[dict]:
+    """Per-group audit rows; undo conflicts link their exact recipients."""
+    loaded = []
+    conflict_ids = set()
+    for item in run.items.all():
+        outcome = item.outcome or {}
+        conflicts = outcome.get("conflicts", [])
+        conflict_ids.update(conflict.get("unit") for conflict in conflicts)
+        loaded.append((item, outcome, conflicts))
+    units = {
+        unit.pk: unit
+        for unit in Unit.objects.filter(pk__in=conflict_ids)
+        .filter_access(actor)
+        .select_related(
+            "translation__component",
+            "translation__component__project",
+            "translation__component__category",
+            "translation__language",
+            "translation__plural",
+        )
+    }
+    display = []
+    for item, outcome, conflicts in loaded:
+        skipped = outcome.get("skipped", [])
+        if run.action == RepeatBulkRun.Action.UNDO:
+            candidates = [
+                (gettext("Places restored"), len(outcome.get("restored", []))),
+                (gettext("Places not restored"), len(conflicts)),
+            ]
+        else:
+            candidates = [
+                (gettext("Places changed"), len(outcome.get("written", []))),
+                (
+                    gettext("Approved or locked places unchanged"),
+                    sum(
+                        entry.get("reason") in {"approved", "protected"}
+                        for entry in skipped
+                    ),
+                ),
+                (
+                    gettext("Places already matching"),
+                    sum(
+                        entry.get("reason") == "already-matches" for entry in skipped
+                    ),
+                ),
+                (gettext("Places excluded"), len(outcome.get("exclusions", []))),
+            ]
+        conflict_display = []
+        for conflict in conflicts:
+            unit = units.get(conflict.get("unit"))
+            conflict_display.append(
+                {
+                    "unit_id": conflict.get("unit"),
+                    "url": unit.get_absolute_url() if unit is not None else "",
+                    "key": unit.context if unit is not None else "",
+                    "reason_label": _conflict_reason_label(conflict.get("reason", "")),
+                }
+            )
+        display.append(
+            {
+                "ordinal": item.ordinal,
+                "source_text": _forms_text(item.group_identity.get("source_forms", [])),
+                "status_label": item.get_status_display(),
+                "reason": _failure_reason(item.failure_code),
+                "counts": [
+                    {"label": label, "value": value}
+                    for label, value in candidates
+                    if value
+                ],
+                "conflicts": conflict_display,
+            }
+        )
+    return display
+
+
+@login_required
+def repeat_bulk_status(request, project: str, language: str, token):
+    """Show one durable batch; mutations are explicit, idempotent POST actions."""
+    run = get_object_or_404(
+        RepeatBulkRun.objects.select_related(
+            "policy__project", "policy__target_language", "apply_run"
+        ).prefetch_related("items"),
+        token=token,
+        policy__project__slug=project,
+        policy__target_language__code=language,
+    )
+    policy = run.policy
+    if not request.user.can_access_project(policy.project):
+        raise PermissionDenied
+    if not request.user.has_perm("project.edit", policy.project):
+        raise PermissionDenied
+    kwargs = {"project": project, "language": language, "token": run.token}
+    status_url = reverse("repeat-bulk-status", kwargs=kwargs)
+    paused = request.GET.get("pause") == "1" or request.POST.get("pause") == "1"
+    pause_query = "?pause=1" if paused else ""
+    error = ""
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        if action not in {"undo", "resume"}:
+            return HttpResponseBadRequest(gettext("Unknown action."))
+        try:
+            if action == "undo":
+                undo_run = start_undo(run=run, actor=request.user)
+                return redirect(
+                    f"{reverse('repeat-bulk-status', kwargs={**kwargs, 'token': undo_run.token})}{pause_query}"
+                )
+            resume_bulk(run=run, actor=request.user)
+            return redirect(f"{status_url}{pause_query}")
+        except ValidationError:
+            error = gettext(
+                "This batch cannot accept that action now: it is still being "
+                "processed, was already undone, or has nothing left to process. "
+                "Nothing was changed."
+            )
+    undo_run = run.undo_runs.first()
+    summary = _bulk_summary(run)
+    return render(
+        request,
+        "repeat_bulk_status.html",
+        {
+            "project": policy.project,
+            "language": policy.target_language,
+            "policy": policy,
+            "run": run,
+            "items": _bulk_items_display(run, actor=request.user),
+            "summary": summary,
+            "failure_reason": _failure_reason(run.failure_code),
+            # Undo follows the committed events, never the written counter: a
+            # partially applied failed batch keeps its undo inventory.
+            "can_undo": (
+                run.action == RepeatBulkRun.Action.APPLY
+                and run.status
+                in {RepeatBulkRun.Status.COMPLETED, RepeatBulkRun.Status.FAILED}
+                and run.items.exclude(decision_event__isnull=True).exists()
+                and undo_run is None
+            ),
+            "can_resume": (
+                run.items.filter(status=RepeatBulkItem.Status.PENDING).exists()
+                and not (
+                    run.action == RepeatBulkRun.Action.APPLY
+                    and run.undo_runs.exists()
+                )
+            ),
+            "undo_run": undo_run,
+            "apply_run": run.apply_run,
+            "paused": paused,
+            "refresh_seconds": (
+                30
+                if run.status
+                in {RepeatBulkRun.Status.QUEUED, RepeatBulkRun.Status.RUNNING}
+                and not paused
+                else None
+            ),
+            "pause_url": f"{status_url}?pause=1",
+            "unpause_url": status_url,
+            "refresh_url": f"{status_url}?pause=1" if paused else status_url,
+            "status_url": status_url,
+            "error": error,
+        },
     )

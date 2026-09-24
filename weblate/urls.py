@@ -118,6 +118,16 @@ real_patterns = [
         weblate.trans.views.repeats.repeat_rule,
         name="repeat-rule",
     ),
+    path(
+        "repeats/<slug:project>/<slug:language>/recommendations/",
+        weblate.trans.views.repeats.repeat_bulk_review,
+        name="repeat-bulk-review",
+    ),
+    path(
+        "repeats/<slug:project>/<slug:language>/bulk/<uuid:token>/",
+        weblate.trans.views.repeats.repeat_bulk_status,
+        name="repeat-bulk-status",
+    ),
     path("", weblate.trans.views.dashboard.home, name="home"),
     path("dashboard/", weblate.trans.views.dashboard.dashboard, name="dashboard"),
     path("projects/", weblate.trans.views.basic.list_projects, name="projects"),
