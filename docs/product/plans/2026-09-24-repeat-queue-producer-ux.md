@@ -56,8 +56,8 @@ scope.
 ## Prerequisites in the current branch
 
 Both defects are in `codex/repeat-queue-speed-and-bulk` (pushed and working
-copy, checked 2026-09-24). Fix them there before merge; if they are still
-present when this plan starts, fix them as Task 0 here.
+copy, checked 2026-09-24) and were handed to that branch on 2026-09-24. They
+are fixed there before merge, not in this plan.
 
 1. **Double reservation on launch.** `weblate/trans/views/repeats.py`,
    `repeat_recommend` POST: `prepare_run` already reserves and queues every
