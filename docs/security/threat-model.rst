@@ -1172,6 +1172,23 @@ a group already present in that frozen scope. It cannot modify a translation,
 state, membership, or check; applying a recommendation is a later local,
 permission-checked repeat-decision preview. *(maintainer)*
 
+Confirmed bulk application of those recommendations adds authenticated
+``POST`` routes that mass-mutate translation content and queue background
+work, the condition named above. Its blast radius is bounded by a signed
+review manifest bound to one actor, one policy, and one policy revision: it
+freezes the exact result ids, decision content, and group contexts reviewed
+on screen for four hours, and the routes refuse selections outside that
+manifest, duplicate selections, and any result whose content or context
+changed since review. Application only ever runs through the same local
+repeat-decision preview and apply services, so approved, locked, and
+length-constrained places remain unchanged and no direct bulk unit-write
+path exists. Each applied group keeps its decision event as undo inventory
+inside the same transaction as the translation writes. Undo is one
+idempotent batch per apply batch, reports per-recipient conflicts instead of
+silently restoring, and the resume and undo routes require the same
+project-management permission as the review. No REST API endpoint is exposed
+for this feature. *(maintainer)*
+
 Microsoft Clarity session recording (see :setting:`CLARITY_PROJECT_ID`) is the
 reviewed instance of a new outbound integration class: once a project ID is
 configured, page markup, URLs, and the signed-in username are sent to

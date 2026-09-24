@@ -3,7 +3,11 @@
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 Date: 2026-09-23.
-Status: **revised after review on 2026-09-23; implementation not started.**
+Status: **implemented on `codex/repeat-queue-speed-and-bulk` (2026-09-24):
+Tasks 1–3 and 5–11 are complete and verified; Task 4's timing run and Task 12's
+live browser, interruption and 385-group checks await dev-deployment
+approval; Task 15 remains a paid step requiring separate explicit approval
+with a request cap.**
 Parts 1 and 2 retain their previous approval. Part 3 below replaces the
 reviewed implementation sketches with explicit persistence, confirmation and
 recovery contracts; its revised design is ready for implementation review.
@@ -1071,28 +1075,34 @@ or deploy as part of delivery without the applicable explicit authorization.
 
 ### Task 14: acceptance checklist and scope decisions
 
-- [ ] Parts 1–2 retain single-group behavior, one recount per translation and
-      the stated queue order; timings distinguish observed results from estimates.
-- [ ] A second capped run covers remaining eligible groups, and successful
+- [x] Parts 1–2 retain single-group behavior, one recount per translation and
+      the stated queue order; timings distinguish observed results from estimates
+      (Task 4 timings are pending and labeled as such in Results).
+- [x] A second capped run covers remaining eligible groups, and successful
       results survive partial failure and later runs.
-- [ ] JSON-object and strict-schema profiles receive a complete output contract;
+- [x] JSON-object and strict-schema profiles receive a complete output contract;
       local validation is attempt-scoped and checks target/exclusion shapes.
-- [ ] Signed confirmation binds exact results, full targets, exclusions, actor
+- [x] Signed confirmation binds exact results, full targets, exclusions, actor
       and scope. A newer run cannot replace the reviewed decision.
-- [ ] Ordinary Unit edits and scope/member changes invalidate stale decisions
+- [x] Ordinary Unit edits and scope/member changes invalidate stale decisions
       even if `RepeatGroup.revision` did not change.
-- [ ] Apply/undo and per-item progress commit atomically; duplicate delivery and
+- [x] Apply/undo and per-item progress commit atomically; duplicate delivery and
       crash recovery have real transaction tests, not only sequential mocks.
-- [ ] Failure, missing actors and permission changes have visible terminal or
-      recoverable outcomes. Partial apply retains usable undo inventory.
-- [ ] Undo is idempotent; partial conflicts are shown with recipient links.
-- [ ] Apply uses only `use_existing`/`propose_new`; `keep_independent` and
+- [x] Failure and permission changes have visible terminal or recoverable
+      outcomes, and partial apply retains usable undo inventory. The
+      actor-missing branch shares `_load_actor`'s terminal handling but has no
+      dedicated test of its own.
+- [x] Undo is idempotent; partial conflicts are shown with recipient links.
+- [x] Apply uses only `use_existing`/`propose_new`; `keep_independent` and
       `needs_human` remain visible manual decisions. No model output auto-applies.
-- [ ] Existing `project.edit` and component/Unit access checks remain effective;
+- [x] Existing `project.edit` and component/Unit access checks remain effective;
       protected places are unchanged and no direct bulk Unit write path is added.
-- [ ] No JavaScript polling; refresh can be paused; Russian pluralization and
-      keyboard/accessibility checks pass.
-- [ ] Feature branch, PR, deployment boundaries and paid-request cap are respected.
+- [~] No JavaScript polling; refresh can be paused; Russian pluralization passes
+      (3 forms, `msgfmt -c`). The keyboard/screen-reader browser check is part
+      of the deployment-gated Task 12 pass and is not yet run.
+- [~] Feature branch, deployment boundaries and the paid-request cap are
+      respected (Task 15 not run); delivery as PR vs. direct merge awaits the
+      repository owner's choice.
 
 ### Task 15 (gated, paid): real recommendation run on anvil-saga fr
 
@@ -1113,19 +1123,32 @@ available observed cost information before the real run; do not invent a cost.
 
 ## Results
 
-Implementation and measurements are pending. Fill each entry from observed
-output; include the tested commit/environment and explain any skipped check.
+Measured on the implementation branch `codex/repeat-queue-speed-and-bulk`
+(commits `8e498a17`..`2380926c` plus follow-up lint/format fixes), host-side
+pytest on `weblate.settings_test` with PostgreSQL, `-n 0`. The automated
+evidence below is observed output; deployment-gated checks are named as not
+run rather than passed.
 
 | Measurement or check | Before | After / evidence |
 | --- | --- | --- |
-| Apply, 7 written places (Task 4) | 4.07 s / 477 queries | Pending |
-| Undo, 7 places (Task 4) | 4.46 s / 905 queries | Pending |
-| Two capped runs cover disjoint remaining groups | Not supported | Pending |
-| Confirmation survives a newer run without substitution | Not supported | Pending |
-| Unit/scope changes reject stale recommendations | Group revision only | Pending |
-| Apply/undo crash and concurrent-delivery tests | Not covered | Pending |
-| Partial undo reports recipient conflicts | Not supported by proposed UI | Pending |
-| Batch comparable to 385 groups, wall time (Task 12) | n/a | Pending |
-| Conflict-free undo of that batch (Task 12) | n/a | Pending |
-| Russian browser/accessibility check | n/a | Pending |
+| Apply, 7 written places (Task 4) | 4.07 s / 477 queries | Probe written (`analysis/probes/repeat_apply_timing.py`); timing run not executed — it writes translations on the shared dev instance and needs dev-deployment approval |
+| Undo, 7 places (Task 4) | 4.46 s / 905 queries | Same probe, same gate |
+| Two capped runs cover disjoint remaining groups | Not supported | `test_capped_runs_reserve_disjoint_attempts_and_keep_all_results`: batch size 1, cap 2 reserves 2 disjoint attempts + 1 unsent; the second capped run reserves only the third group; all three results reviewable together |
+| Confirmation survives a newer run without substitution | Not supported | `test_review_binds_exact_result_despite_newer_recommendation` (POST binds result A after run B completes) and `test_review_collects_results_across_recommendation_runs` |
+| Unit/scope changes reject stale recommendations | Group revision only | `test_stale_boundaries_reject_whole_confirmation` (5 subtests: target edit, member added, member renamed, member deleted, policy re-save) and `test_permission_revocation_rejects_with_permission_denied`; freshness is the full context fingerprint (policy revision, group identity, member set and data, explanations, labels), enforced at review, POST and item processing |
+| Apply/undo crash and concurrent-delivery tests | Not covered | `RepeatBulkCrashBoundaryTest` (crash before/after commit × apply/undo failpoints over the real services) and `RepeatBulkConcurrencyTest`/`test_two_connections_process_one_run_with_one_event_per_item` (two DB connections: one event per item, exact counters, one run on double submit) |
+| Partial undo reports recipient conflicts | Not supported by proposed UI | `test_undo_restores_eligible_and_reports_recipient_conflicts` (exact conflict dicts with unit ids and reasons) and `test_partially_completed_batch_can_be_undone_but_not_resumed`; the status page renders per-recipient conflicts with links |
+| Batch comparable to 385 groups, wall time (Task 12) | n/a | Not run — needs a deployed instance with the producer corpus (deployment-gated). The earlier 5–6 minute estimate remains a hypothesis |
+| Conflict-free undo of that batch (Task 12) | n/a | Not run (same gate); conflict-free restoration is covered by `test_undo_crash_after_commit_resumes_next_item_once` and the restored path of `test_undo_restores_eligible_and_reports_recipient_conflicts` |
+| Russian browser/accessibility check | n/a | Catalog: 90 new entries (15 plural) translated with the prescribed producer terms, `msgfmt -c` clean. Browser check in the ru locale: not run (deployment-gated) |
 | Rejected recommendations / sample size (Task 15) | n/a | Gated; not run |
+
+Final checks actually run: `pytest` over `test_repeats.py`,
+`test_repeat_views.py` and `test_repeat_bulk.py` (94 passed, 0 failed),
+`makemigrations --check --dry-run` ("No changes detected"), `msgfmt -c` on the
+Russian catalog (clean), and `prek run` over every changed file (all hooks
+green except `reuse lint`, which fails on ~135 pre-existing files such as
+`frontend-wizard/**`, none of which belong to this change — recorded as a
+demonstrably pre-existing failure). No changelog entry was added: the repeat
+queue itself is unreleased, so the repository's release rules exempt these
+changes.
