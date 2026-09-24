@@ -447,6 +447,7 @@ def preview_group(
     """Create a signed, current snapshot for an explicit shared target."""
     members: list[RepeatPreviewMember] = []
     target = list(target)
+    overlapping = policy_overlaps(group.policy, exclude_policy_id=group.policy.pk)
     for unit in (
         policy_units(group.policy)
         .filter_access(actor)
@@ -457,7 +458,7 @@ def preview_group(
         if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
             continue
         reason = ""
-        if unit_has_policy_conflict(unit, group.policy):
+        if any(unit_matches_policy(unit, other) for other in overlapping):
             reason = "rule-conflict"
         elif unit.state == STATE_APPROVED and unit.get_target_plurals() != target:
             reason = "approved"
@@ -578,9 +579,10 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
         ):
             msg = "A repeat recipient changed; refresh the preview."
             raise ValidationError(msg)
+        overlapping = policy_overlaps(group.policy, exclude_policy_id=group.policy.pk)
         if any(
             not unit_matches_policy(unit, group.policy)
-            or unit_has_policy_conflict(unit, group.policy)
+            or any(unit_matches_policy(unit, other) for other in overlapping)
             for unit in units
         ):
             msg = "The repeat policy scope changed; refresh the preview."
