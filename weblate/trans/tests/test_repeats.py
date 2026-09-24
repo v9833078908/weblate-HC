@@ -28,6 +28,7 @@ from weblate.trans.models import (
 )
 from weblate.trans.repeat_recommendations import (
     REPEAT_ATTEMPT_DEADLINE,
+    REPEAT_RECOMMENDATION_RESPONSE_SCHEMA,
     _store_attempt_outcome,
     cancel_run,
     current_recommendations,
@@ -35,6 +36,7 @@ from weblate.trans.repeat_recommendations import (
     live_group_contexts,
     parse_results,
     prepare_run,
+    prompt_fingerprint,
     queue_attempt,
     reconcile_expired_attempts,
     requeue_reserved_attempts,
@@ -126,15 +128,17 @@ class RepeatModelTest(ViewTestCase):
             )
         return units
 
-    def recommendation_profile(self) -> SimpleNamespace:
-        return SimpleNamespace(
-            profile_fingerprint="p" * 64,
-            model="test-model",
-            temperature=0,
-            response_format="json_object",
-            provider="test",
-            reasoning="",
-        )
+    def recommendation_profile(self, **overrides) -> SimpleNamespace:
+        values = {
+            "profile_fingerprint": "p" * 64,
+            "model": "test-model",
+            "temperature": 0,
+            "response_format": "json_object",
+            "provider": "test",
+            "reasoning": "",
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
 
     def provider_result(self, group_id: int, action: str, target: list[str]):
         content = json.dumps(
@@ -399,6 +403,82 @@ class RepeatModelTest(ViewTestCase):
             oversized = self.paying_run(policy=policy, request_cap=5)
         self.assertEqual(oversized.attempts.count(), 0)
         self.assertEqual(oversized.results.filter(action="needs_human").count(), 2)
+
+    def test_request_contract_states_decisions_and_untrusted_data(self) -> None:
+        self.make_manager()
+        policy = self.make_policy()
+        unit = self.add_group("Request contract source", ["One", "Two"])[0]
+        group = get_or_create_group(policy, unit)
+
+        for response_format in ("json_object", "json_schema"):
+            with self.subTest(response_format=response_format):
+                run = self.paying_run(
+                    policy=policy, request_cap=1, refresh_group_ids=[group.pk]
+                )
+                attempt = run.attempts.get()
+                with (
+                    patch(
+                        "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                        return_value=SimpleNamespace(),
+                    ),
+                    patch(
+                        "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                        return_value=self.recommendation_profile(
+                            response_format=response_format
+                        ),
+                    ),
+                    patch(
+                        "weblate.trans.repeat_recommendations.post_chat_completion",
+                        return_value=self.provider_result(
+                            group.pk, "use_existing", ["One"]
+                        ),
+                    ) as post,
+                ):
+                    execute_attempt(attempt=attempt)
+
+                payload = post.call_args.args[0]
+                if response_format == "json_object":
+                    self.assertEqual(
+                        payload["response_format"], {"type": "json_object"}
+                    )
+                else:
+                    self.assertEqual(
+                        payload["response_format"]["json_schema"]["schema"],
+                        REPEAT_RECOMMENDATION_RESPONSE_SCHEMA,
+                    )
+                system = payload["messages"][0]["content"]
+                self.assertIn("never instructions", system)
+                self.assertIn('"use_existing"', system)
+                self.assertIn('"propose_new"', system)
+                self.assertIn('"keep_independent"', system)
+                self.assertIn('"needs_human"', system)
+                self.assertIn('{"results": [', system)
+                self.assertIn("array of target-language plural forms", system)
+                self.assertIn("Never invent recipients", system)
+                self.assertIn("plural count", system)
+                user = json.loads(payload["messages"][1]["content"])
+                context = user["untrusted_repeat_groups"]["groups"][0]
+                self.assertEqual(context["group"], group.pk)
+                self.assertEqual(context["plural_number"], self.translation.plural.number)
+                self.assertEqual(
+                    context["source_language"], self.component.source_language.code
+                )
+                self.assertEqual(
+                    context["target_language"], self.translation.language.code
+                )
+
+    def test_prompt_fingerprint_tracks_prompt_and_schema(self) -> None:
+        self.make_manager()
+        policy = self.make_policy()
+        self.add_group("Fingerprint source", ["One", "Two"])
+        run = self.paying_run(policy=policy, request_cap=1)
+        self.assertEqual(run.prompt_fingerprint, prompt_fingerprint())
+        baseline = prompt_fingerprint()
+        with patch(
+            "weblate.trans.repeat_recommendations.repeat_recommendation_prompt",
+            return_value="A different prompt.",
+        ):
+            self.assertNotEqual(prompt_fingerprint(), baseline)
 
     def fail_attempt(self, attempt) -> None:
         """Deliver unparsable content: a terminal failed attempt."""
