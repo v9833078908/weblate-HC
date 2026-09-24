@@ -33,6 +33,7 @@ from weblate.trans.repeat_bulk import (
 from weblate.trans.repeat_recommendations import (
     build_group_context,
     context_fingerprint,
+    current_recommendations,
     result_fingerprint,
 )
 from weblate.trans.repeats import fingerprint, get_or_create_group, save_policy
@@ -1388,6 +1389,16 @@ class RepeatBulkViewsTest(ViewTestCase):
             len(second_capture.captured_queries) - len(first_capture.captured_queries),
             30,
         )
+
+    def test_empty_recommendations_do_not_scan_every_repeat_group(self) -> None:
+        self.make_group("First unreviewed repeat", ["One", "Two"], start=26000)
+        self.make_group("Second unreviewed repeat", ["Three", "Four"], start=27000)
+
+        with CaptureQueriesContext(connection) as capture:
+            current = current_recommendations(self.policy, actor=self.user)
+
+        self.assertEqual(current, {})
+        self.assertLessEqual(len(capture.captured_queries), 2)
 
     def test_queue_banner_query_cost_is_bounded(self) -> None:
         group, units = self.make_group("Banner count line", ["BC1", "BC2"], start=25000)

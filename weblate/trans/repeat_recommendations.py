@@ -222,13 +222,16 @@ def current_recommendations(
     policy: RepeatPolicy, *, actor: User
 ) -> dict[int, RepeatRecommendationResult]:
     """Return each group's newest still-current result across all runs."""
-    contexts = live_group_contexts(policy, actor=actor)
-    current: dict[int, RepeatRecommendationResult] = {}
-    for result in (
+    results = list(
         RepeatRecommendationResult.objects.filter(group__policy=policy)
         .select_related("group", "group__policy", "attempt")
         .order_by("-run__created_at", "-run_id", "-id")
-    ):
+    )
+    if not results:
+        return {}
+    contexts = live_group_contexts(policy, actor=actor)
+    current: dict[int, RepeatRecommendationResult] = {}
+    for result in results:
         if result.group_id in current:
             continue
         if (
