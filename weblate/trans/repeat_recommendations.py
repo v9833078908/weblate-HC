@@ -631,6 +631,14 @@ def parse_results(*, attempt: RepeatRecommendationAttempt, content: str) -> list
             not target or len(target) != group.plural_number
         ):
             continue
+        if action == "use_existing" and (
+            not target
+            or not any(
+                target == variant["target_forms"]
+                for variant in groups[group_id]["variants"]
+            )
+        ):
+            continue
         accepted.append(result)
         seen.add(group_id)
     return accepted

@@ -599,6 +599,73 @@ class RepeatBulkViewsTest(ViewTestCase):
             self.policy.groups.get().pk,
         )
 
+    def test_free_preview_matches_capped_paid_selection(self) -> None:
+        groups = [
+            self.make_group(
+                f"Preview source {index}", ["One", "Two"], start=21000 + index * 10
+            )[0]
+            for index in range(3)
+        ]
+        consistent, _ = self.make_group(
+            "Already consistent", ["Same", "Same"], start=21100
+        )
+        profile = SimpleNamespace(
+            profile_fingerprint="p" * 64,
+            model="test-model",
+            temperature=0,
+            response_format="json_object",
+            provider="test",
+            reasoning="",
+        )
+        with (
+            patch(
+                "weblate.trans.views.repeats.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.views.repeats.resolve_judge_seat_profile",
+                return_value=profile,
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=profile,
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.REPEAT_RECOMMENDATION_BATCH_SIZE",
+                1,
+            ),
+            patch("weblate.trans.repeat_recommendations.queue_attempt"),
+        ):
+            preview = self.client.get(self.recommend_url, {"request_cap": "2"})
+            self.assertEqual(preview.context["candidate_count"], 3)
+            self.assertEqual(preview.context["request_count"], 2)
+            self.assertEqual(preview.context["unsent_count"], 1)
+            self.assertContains(preview, "3 candidate groups")
+            self.assertContains(preview, "2 paid requests")
+            self.assertContains(preview, "1 group outside the limit")
+            self.assertEqual(RepeatRecommendationRun.objects.count(), 0)
+
+            started = self.client.post(
+                self.recommend_url, {"action": "start", "request_cap": "2"}
+            )
+
+        self.assertEqual(started.status_code, 302)
+        run = RepeatRecommendationRun.objects.get()
+        self.assertEqual(run.attempts.count(), 2)
+        self.assertEqual(run.unsent_groups, 1)
+        sent = {
+            group["group"]
+            for attempt in run.attempts.all()
+            for group in attempt.request_snapshot["groups"]
+        }
+        self.assertEqual(len(sent), 2)
+        self.assertTrue(sent <= {group.pk for group in groups})
+        self.assertNotIn(consistent.pk, sent)
+
     def test_queue_card_and_banner_discard_changed_recommendation(self) -> None:
         """An ordinary Unit edit invalidates both displays without a group bump."""
         group, units = self.make_group("Sword", ["Blade", "Sabre"])
@@ -1089,6 +1156,11 @@ class RepeatBulkViewsTest(ViewTestCase):
         )
         self.assertNotContains(response, "Cancel this batch")
         self.assertNotContains(response, 'value="undo"')
+
+        forced = self.client.post(self.status_url(run), {"action": "undo"})
+        self.assertEqual(forced.status_code, 200)
+        self.assertContains(forced, "This batch cannot accept that action now")
+        self.assertFalse(run.undo_runs.exists())
 
     def test_undo_is_idempotent(self) -> None:
         group, units = self.make_group("Undo twice line", ["D1", "D2"], start=17000)

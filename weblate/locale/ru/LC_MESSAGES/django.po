@@ -31763,23 +31763,13 @@ msgstr "В выбранной области нет точных повторо�
 msgid "Prepare repeat recommendations"
 msgstr "Подготовить рекомендации по повторам"
 
-#: weblate/templates/repeat_recommend.html:9
-#, python-format
+#: weblate/templates/repeat_recommend.html:8
 msgid ""
-"The model will receive the complete context of %(counter)s repeat group and "
-"return a read-only recommendation."
-msgid_plural ""
-"The model will receive the complete context of %(counter)s repeat groups and "
-"return read-only recommendations."
-msgstr[0] ""
-"Модель получит полный контекст %(counter)s группы повторов и вернёт "
-"рекомендации только для просмотра."
-msgstr[1] ""
-"Модель получит полный контекст %(counter)s групп повторов и вернёт "
-"рекомендации только для просмотра."
-msgstr[2] ""
-"Модель получит полный контекст %(counter)s групп повторов и вернёт "
-"рекомендации только для просмотра."
+"Preview the request limit before starting a paid run. Previewing sends no "
+"model requests."
+msgstr ""
+"Перед платным запуском проверьте лимит запросов. Предпросмотр не отправляет "
+"запросы модели."
 
 #: weblate/templates/repeat_recommend.html:11
 msgid "Recommendations are unavailable:"
@@ -31810,6 +31800,50 @@ msgstr "Запуск остановится, не отправив больше 
 #: weblate/templates/repeat_recommend.html:39
 msgid "Start paid recommendation run"
 msgstr "Запустить платную подготовку рекомендаций"
+
+#: weblate/templates/repeat_recommend.html:36
+msgid "Preview request limit"
+msgstr "Проверить лимит запросов"
+
+#: weblate/templates/repeat_recommend.html:40
+#, python-format
+msgid "%(counter)s candidate group"
+msgid_plural "%(counter)s candidate groups"
+msgstr[0] "%(counter)s группа для рекомендации"
+msgstr[1] "%(counter)s группы для рекомендаций"
+msgstr[2] "%(counter)s групп для рекомендаций"
+
+#: weblate/templates/repeat_recommend.html:41
+#, python-format
+msgid "%(counter)s paid request planned"
+msgid_plural "%(counter)s paid requests planned"
+msgstr[0] "Запланирован %(counter)s платный запрос"
+msgstr[1] "Запланировано %(counter)s платных запроса"
+msgstr[2] "Запланировано %(counter)s платных запросов"
+
+#: weblate/templates/repeat_recommend.html:42
+#, python-format
+msgid "%(counter)s group outside the limit"
+msgid_plural "%(counter)s groups outside the limit"
+msgstr[0] "%(counter)s группа вне лимита"
+msgstr[1] "%(counter)s группы вне лимита"
+msgstr[2] "%(counter)s групп вне лимита"
+
+#: weblate/templates/repeat_recommend.html:43
+#, python-format
+msgid "%(counter)s group is too large for a model request and needs manual review."
+msgid_plural "%(counter)s groups are too large for a model request and need manual review."
+msgstr[0] "%(counter)s группа слишком велика для запроса к модели и требует ручной проверки."
+msgstr[1] "%(counter)s группы слишком велики для запроса к модели и требуют ручной проверки."
+msgstr[2] "%(counter)s групп слишком велики для запроса к модели и требуют ручной проверки."
+
+#: weblate/templates/repeat_recommend.html:44
+msgid "The paid run rechecks the scope; counts may change if strings or permissions change."
+msgstr "При платном запуске область проверяется снова: числа могут измениться, если изменились строки или права доступа."
+
+#: weblate/templates/repeat_recommend.html:53
+msgid "Record oversized groups for manual review"
+msgstr "Отправить слишком большие группы на ручную проверку"
 
 #: weblate/templates/repeat_report.html:7
 msgid "Repeat decision result"

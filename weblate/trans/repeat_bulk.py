@@ -338,6 +338,9 @@ def start_undo(*, run: RepeatBulkRun, actor: User) -> RepeatBulkRun:
         }:
             msg = "The batch is still being processed."
             raise ValidationError(msg)
+        if not apply_run.items.exclude(decision_event__isnull=True).exists():
+            msg = "This batch has no committed decisions to undo."
+            raise ValidationError(msg)
         try:
             undo_run = _create_undo_run(apply_run=apply_run, actor=actor)
         except IntegrityError:

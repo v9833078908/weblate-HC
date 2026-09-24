@@ -51,6 +51,7 @@ from weblate.trans.repeat_bulk import (
 )
 from weblate.trans.repeat_recommendations import (
     current_recommendations,
+    plan_recommendations,
     prepare_run,
     queue_importance,
     reconcile_expired_attempts,
@@ -544,12 +545,22 @@ def repeat_recommend(request, project: str, language: str):
     if not request.user.has_perm("project.edit", policy.project):
         raise PermissionDenied
     if request.method == "GET":
-        group_count = len(detect_policy_groups(policy, user=request.user))
+        try:
+            request_cap = max(1, int(request.GET.get("request_cap", "1")))
+        except ValueError:
+            request_cap = 1
+        plan = None
         profile = None
         cost_range = None
         unavailable = ""
         try:
             profile = resolve_judge_seat_profile(1, endpoint=judge_primary_endpoint())
+            plan = plan_recommendations(
+                policy=policy,
+                actor=request.user,
+                profile=profile,
+                request_cap=request_cap,
+            )
             cost_range = recent_cost_range(
                 policy.project_id,
                 profile.provider,
@@ -564,9 +575,13 @@ def repeat_recommend(request, project: str, language: str):
             "repeat_recommend.html",
             {
                 "policy": policy,
-                "group_count": group_count,
                 "profile": profile,
                 "cost_range": cost_range,
+                "candidate_count": len(plan.contexts) if plan else 0,
+                "request_count": len(plan.requests) if plan else 0,
+                "unsent_count": plan.unsent if plan else 0,
+                "oversized_count": len(plan.oversized) if plan else 0,
+                "request_cap": request_cap,
                 "unavailable": unavailable,
                 "attempt_rows": attempt_rows,
                 "can_recover": any(

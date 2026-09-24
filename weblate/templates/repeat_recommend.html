@@ -5,9 +5,7 @@
 {% block content %}
 
   <h1>{% translate "Prepare repeat recommendations" %}</h1>
-  <p>
-    {% blocktranslate count counter=group_count %}The model will receive the complete context of {{ counter }} repeat group and return a read-only recommendation.{% plural %}The model will receive the complete context of {{ counter }} repeat groups and return read-only recommendations.{% endblocktranslate %}
-  </p>
+  <p>{% translate "Preview the request limit before starting a paid run. Previewing sends no model requests." %}</p>
   {% if unavailable %}<p class="alert alert-warning">{% translate "Recommendations are unavailable:" %} {{ unavailable }}</p>{% endif %}
   <dl>
     <dt>{% translate "Model" %}</dt>
@@ -23,9 +21,7 @@
       {% endif %}
     </dd>
   </dl>
-  <form method="post">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="start" />
+  <form method="get">
     <div class="form-group">
       <label for="repeat-request-cap">{% translate "Maximum paid requests" %}</label>
       <input id="repeat-request-cap"
@@ -33,12 +29,34 @@
              name="request_cap"
              type="number"
              min="1"
-             value="1"
+             value="{{ request_cap }}"
              required />
       <p class="help-block">{% translate "The run stops before sending more requests than this limit." %}</p>
     </div>
-    <button class="btn btn-primary" type="submit"{% if unavailable %} disabled{% endif %}>{% translate "Start paid recommendation run" %}</button>
+    <button class="btn btn-outline-secondary"
+            type="submit"
+            {% if unavailable %} disabled{% endif %}>{% translate "Preview request limit" %}</button>
   </form>
+
+  {% if profile %}
+    <p>{% blocktranslate count counter=candidate_count %}{{ counter }} candidate group{% plural %}{{ counter }} candidate groups{% endblocktranslate %}</p>
+    <p>{% blocktranslate count counter=request_count %}{{ counter }} paid request planned{% plural %}{{ counter }} paid requests planned{% endblocktranslate %}</p>
+    <p>{% blocktranslate count counter=unsent_count %}{{ counter }} group outside the limit{% plural %}{{ counter }} groups outside the limit{% endblocktranslate %}</p>
+    {% if oversized_count %}<p>{% blocktranslate count counter=oversized_count %}{{ counter }} group is too large for a model request and needs manual review.{% plural %}{{ counter }} groups are too large for a model request and need manual review.{% endblocktranslate %}</p>{% endif %}
+    <p class="help-block">{% translate "The paid run rechecks the scope; counts may change if strings or permissions change." %}</p>
+    {% if request_count or oversized_count %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="start" />
+        <input type="hidden" name="request_cap" value="{{ request_cap }}" />
+        {% if request_count %}
+          <button class="btn btn-primary" type="submit">{% translate "Start paid recommendation run" %}</button>
+        {% else %}
+          <button class="btn btn-primary" type="submit">{% translate "Record oversized groups for manual review" %}</button>
+        {% endif %}
+      </form>
+    {% endif %}
+  {% endif %}
 
   {% if attempt_rows %}
     <h2>{% translate "Recommendation requests" %}</h2>

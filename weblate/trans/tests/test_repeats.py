@@ -956,6 +956,52 @@ class RepeatModelTest(ViewTestCase):
 
         self.assertEqual(result, [])
 
+    def test_use_existing_requires_an_exact_frozen_variant(self) -> None:
+        self.make_manager()
+        policy = self.make_policy()
+        units = self.add_group("Existing variant", ["One", "Two"])
+        group = get_or_create_group(policy, units[0])
+        attempt = self.paying_run(policy, request_cap=1).attempts.get()
+
+        valid_target = units[1].get_target_plurals()
+        for target in (
+            [],
+            ["Invented"],
+            [*valid_target, "extra"],
+        ):
+            with self.subTest(target=target):
+                content = json.dumps(
+                    {
+                        "results": [
+                            {
+                                "group": group.pk,
+                                "action": "use_existing",
+                                "target": target,
+                                "exclusions": [],
+                                "rationale": "Claimed existing variant",
+                            }
+                        ]
+                    }
+                )
+                self.assertEqual(parse_results(attempt=attempt, content=content), [])
+
+        valid = json.dumps(
+            {
+                "results": [
+                    {
+                        "group": group.pk,
+                        "action": "use_existing",
+                        "target": valid_target,
+                        "exclusions": [],
+                        "rationale": "This variant fits the context.",
+                    }
+                ]
+            }
+        )
+        self.assertEqual(
+            parse_results(attempt=attempt, content=valid)[0]["target"], valid_target
+        )
+
     def test_recommendation_send_exception_is_unknown_and_not_replayed(self) -> None:
         """A lost response consumes its reservation without leaving a sent run."""
         self.make_manager()
