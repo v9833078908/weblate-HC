@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.db import connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -34,6 +35,7 @@ from weblate.trans.repeat_recommendations import (
     build_group_context,
     context_fingerprint,
     current_recommendations,
+    execute_attempt,
     result_fingerprint,
 )
 from weblate.trans.repeats import fingerprint, get_or_create_group, save_policy
@@ -666,6 +668,83 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertEqual(len(sent), 2)
         self.assertTrue(sent <= {group.pk for group in groups})
         self.assertNotIn(consistent.pk, sent)
+
+    @override_settings(
+        JUDGE_ENABLED=True, JUDGE_API_KEY="", JUDGE_MODEL_SEAT_1="test-model"
+    )
+    def test_missing_api_key_disables_start_and_refuses_stale_post(self) -> None:
+        self.make_group("Sword", ["Blade", "Sabre"])
+
+        page = self.client.get(self.recommend_url)
+        self.assertContains(page, "Recommendations are unavailable")
+        self.assertNotContains(page, "Start paid recommendation run")
+
+        with patch("weblate.trans.repeat_recommendations.queue_attempt") as queue:
+            response = self.client.post(
+                self.recommend_url, {"action": "start", "request_cap": "1"}
+            )
+
+        self.assertRedirects(response, self.recommend_url)
+        self.assertFalse(RepeatRecommendationRun.objects.exists())
+        queue.assert_not_called()
+
+    def test_unknown_delivery_is_resent_only_after_explicit_consent(self) -> None:
+        group, _units = self.make_group("Sword", ["Blade", "Sabre"])
+        profile = SimpleNamespace(
+            profile_fingerprint="p" * 64,
+            model="test-model",
+            temperature=0,
+            response_format="json_object",
+            provider="test",
+            reasoning="",
+        )
+        with (
+            patch(
+                "weblate.trans.views.repeats.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.views.repeats.resolve_judge_seat_profile",
+                return_value=profile,
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=profile,
+            ),
+            patch("weblate.trans.repeat_recommendations.queue_attempt"),
+        ):
+            self.client.post(
+                self.recommend_url, {"action": "start", "request_cap": "1"}
+            )
+            with patch(
+                "weblate.trans.repeat_recommendations.post_chat_completion",
+                side_effect=RuntimeError("connection dropped"),
+            ):
+                execute_attempt(attempt=RepeatRecommendationAttempt.objects.get())
+
+            held = self.client.get(self.recommend_url)
+            self.assertEqual(held.context["candidate_count"], 0)
+            self.assertEqual(held.context["unknown_count"], 1)
+            self.assertContains(held, 'name="retry_unknown"')
+            self.assertNotContains(held, "Start paid recommendation run")
+
+            consented = self.client.get(self.recommend_url, {"retry_unknown": "1"})
+            self.assertEqual(consented.context["candidate_count"], 1)
+            self.assertContains(consented, "Start paid recommendation run")
+
+            self.client.post(
+                self.recommend_url,
+                {"action": "start", "request_cap": "1", "retry_unknown": "1"},
+            )
+
+        resent = RepeatRecommendationRun.objects.order_by("-pk").first()
+        self.assertEqual(
+            resent.attempts.get().request_snapshot["groups"][0]["group"], group.pk
+        )
 
     def test_queue_card_and_banner_discard_changed_recommendation(self) -> None:
         """An ordinary Unit edit invalidates both displays without a group bump."""

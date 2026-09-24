@@ -12,13 +12,14 @@ from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.db import connection
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from weblate.auth.models import setup_project_groups
 from weblate.checks.consistency import RepeatDriftCheck
 from weblate.trans.autotranslate import AutoTranslate
+from weblate.trans.judge import JudgeError
 from weblate.trans.models import (
     Label,
     RepeatMembership,
@@ -359,6 +360,54 @@ class RepeatModelTest(ViewTestCase):
             policy=policy, request_cap=5, refresh_group_ids=[unknown_group.pk]
         )
         self.assertEqual(self.sent_groups(retried), {unknown_group.pk})
+
+    def test_retry_unknown_consent_resends_only_held_groups(self) -> None:
+        self.make_manager()
+        policy = self.make_policy()
+        held = get_or_create_group(
+            policy, self.add_group("Held source", ["One", "Two"])[0]
+        )
+        run = self.paying_run(policy=policy, request_cap=1)
+        with (
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=self.recommendation_profile(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.post_chat_completion",
+                side_effect=RuntimeError("connection dropped"),
+            ),
+        ):
+            execute_attempt(attempt=run.attempts.get())
+        fresh = get_or_create_group(
+            policy, self.add_group("Fresh source", ["One", "Two"], start=2000)[0]
+        )
+
+        plain = self.paying_run(policy=policy, request_cap=5)
+        self.assertEqual(self.sent_groups(plain), {fresh.pk})
+        consented = self.paying_run(policy=policy, request_cap=5, retry_unknown=True)
+        self.assertEqual(self.sent_groups(consented), {held.pk})
+
+    @override_settings(
+        JUDGE_ENABLED=True, JUDGE_API_KEY="", JUDGE_MODEL_SEAT_1="test-model"
+    )
+    def test_missing_api_key_refuses_before_any_reservation(self) -> None:
+        self.make_manager()
+        policy = self.make_policy()
+        self.add_group("Diverging source", ["One", "Two"])
+
+        with (
+            patch("weblate.trans.repeat_recommendations.queue_attempt") as queue,
+            self.assertRaises(JudgeError),
+        ):
+            prepare_run(policy=policy, actor=self.user, request_cap=1)
+
+        self.assertFalse(RepeatRecommendationRun.objects.exists())
+        queue.assert_not_called()
 
     def test_empty_candidates_and_oversized_groups_never_reserve(self) -> None:
         self.make_manager()

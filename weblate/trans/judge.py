@@ -457,6 +457,10 @@ def _resolve_profile(
         raise JudgeError(_("The LLM judge is not configured."))
     if endpoint is None:
         endpoint = judge_primary_endpoint()
+    # An empty key fails in the HTTP client after a paid request was reserved;
+    # refuse it here, before any caller can reserve one.
+    if not isinstance(endpoint.api_key, str) or not endpoint.api_key.strip():
+        raise JudgeError(_("The LLM judge is not configured."))
     base_url = endpoint.base_url
     provider = endpoint.provider
     if seat:

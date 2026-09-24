@@ -31797,6 +31797,28 @@ msgstr "Максимум платных запросов"
 msgid "The run stops before sending more requests than this limit."
 msgstr "Запуск остановится, не отправив больше запросов, чем этот лимит."
 
+#: weblate/templates/repeat_recommend.html:50
+#, python-format
+msgid "Send %(counter)s group with an unknown earlier request again"
+msgid_plural "Send %(counter)s groups with an unknown earlier request again"
+msgstr[0] ""
+"Повторно отправить %(counter)s группу с неизвестным результатом прошлого "
+"запроса"
+msgstr[1] ""
+"Повторно отправить %(counter)s группы с неизвестным результатом прошлого "
+"запроса"
+msgstr[2] ""
+"Повторно отправить %(counter)s групп с неизвестным результатом прошлого "
+"запроса"
+
+#: weblate/templates/repeat_recommend.html:53
+msgid ""
+"The earlier request may have reached the provider, so sending it again can "
+"be charged twice."
+msgstr ""
+"Прошлый запрос мог дойти до провайдера, поэтому повторная отправка может "
+"быть оплачена дважды."
+
 #: weblate/templates/repeat_recommend.html:39
 msgid "Start paid recommendation run"
 msgstr "Запустить платную подготовку рекомендаций"

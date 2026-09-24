@@ -252,6 +252,8 @@ class RecommendationPlan:
     requests: tuple[tuple[dict[str, Any], ...], ...]
     oversized: tuple[dict[str, Any], ...]
     unsent: int
+    # Groups whose earlier send has unknown delivery, sent only on consent.
+    unknown: int
 
 
 def repeat_recommendation_prompt() -> str:
@@ -351,6 +353,7 @@ def plan_recommendations(
     profile: JudgeSeatProfile,
     request_cap: int,
     refresh_group_ids: Iterable[int] = (),
+    retry_unknown: bool = False,
 ) -> RecommendationPlan:
     """Select and pack paid candidates; shared by the preview page and the run."""
     refresh = set(refresh_group_ids)
@@ -364,6 +367,7 @@ def plan_recommendations(
     )
     unknown = _reserved_contexts(policy, {RepeatRecommendationAttempt.Status.UNKNOWN})
     candidates = []
+    unknown_groups = 0
     for context in live_group_contexts(policy, actor=actor).values():
         group_id = context["group"]
         identity = (group_id, context_fingerprint(context))
@@ -377,10 +381,16 @@ def plan_recommendations(
         if identity in active:
             # An active reservation already covers this unchanged context.
             continue
-        if group_id not in refresh and (group_id in current or identity in unknown):
-            # Current results are never repurchased and an unknown paid send is
-            # never replayed without explicit consent.
-            continue
+        if group_id not in refresh:
+            if group_id in current:
+                # Current results are never repurchased.
+                continue
+            if identity in unknown:
+                unknown_groups += 1
+                if not retry_unknown:
+                    # An unknown paid send is never replayed without explicit
+                    # consent.
+                    continue
         candidates.append(context)
     candidates.sort(
         key=lambda context: queue_importance(
@@ -425,6 +435,7 @@ def plan_recommendations(
         requests=tuple(requests),
         oversized=oversized,
         unsent=unsent,
+        unknown=unknown_groups,
     )
 
 
@@ -434,6 +445,7 @@ def prepare_run(
     actor: User,
     request_cap: int,
     refresh_group_ids: Iterable[int] = (),
+    retry_unknown: bool = False,
 ) -> RepeatRecommendationRun:
     """Freeze a visible policy scope and reserve its bounded paid requests."""
     if request_cap < 1:
@@ -454,6 +466,7 @@ def prepare_run(
             profile=profile,
             request_cap=request_cap,
             refresh_group_ids=refresh_group_ids,
+            retry_unknown=retry_unknown,
         )
         oversized_ids = {context["group"] for context in plan.oversized}
         groups = [

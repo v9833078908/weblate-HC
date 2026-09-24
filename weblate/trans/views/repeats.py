@@ -549,6 +549,7 @@ def repeat_recommend(request, project: str, language: str):
             request_cap = max(1, int(request.GET.get("request_cap", "1")))
         except ValueError:
             request_cap = 1
+        retry_unknown = request.GET.get("retry_unknown") == "1"
         plan = None
         profile = None
         cost_range = None
@@ -560,6 +561,7 @@ def repeat_recommend(request, project: str, language: str):
                 actor=request.user,
                 profile=profile,
                 request_cap=request_cap,
+                retry_unknown=retry_unknown,
             )
             cost_range = recent_cost_range(
                 policy.project_id,
@@ -581,6 +583,8 @@ def repeat_recommend(request, project: str, language: str):
                 "request_count": len(plan.requests) if plan else 0,
                 "unsent_count": plan.unsent if plan else 0,
                 "oversized_count": len(plan.oversized) if plan else 0,
+                "unknown_count": plan.unknown if plan else 0,
+                "retry_unknown": retry_unknown,
                 "request_cap": request_cap,
                 "unavailable": unavailable,
                 "attempt_rows": attempt_rows,
@@ -600,7 +604,16 @@ def repeat_recommend(request, project: str, language: str):
     except (KeyError, TypeError, ValueError) as error:
         msg = "A positive recommendation request cap is required."
         raise ValidationError(msg) from error
-    run = prepare_run(policy=policy, actor=request.user, request_cap=request_cap)
+    try:
+        run = prepare_run(
+            policy=policy,
+            actor=request.user,
+            request_cap=request_cap,
+            retry_unknown=request.POST.get("retry_unknown") == "1",
+        )
+    except JudgeError as error:
+        messages.error(request, str(error))
+        return redirect("repeat-recommend", project=project, language=language)
     groups = [item for item in run.snapshot["groups"] if item.get("sendable", True)]
     if not groups:
         messages.info(

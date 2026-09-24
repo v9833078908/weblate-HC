@@ -10,7 +10,11 @@
   <dl>
     <dt>{% translate "Model" %}</dt>
     <dd>
-      {{ profile.model|default:"—" }}
+      {% if profile %}
+        {{ profile.model }}
+      {% else %}
+        —
+      {% endif %}
     </dd>
     <dt>{% translate "Estimated cost" %}</dt>
     <dd>
@@ -33,6 +37,23 @@
              required />
       <p class="help-block">{% translate "The run stops before sending more requests than this limit." %}</p>
     </div>
+    {% if unknown_count %}
+      <div class="form-check">
+        <input id="repeat-retry-unknown"
+               class="form-check-input"
+               name="retry_unknown"
+               type="checkbox"
+               value="1"
+               aria-describedby="repeat-retry-unknown-help"
+               {% if retry_unknown %}checked{% endif %} />
+        <label class="form-check-label" for="repeat-retry-unknown">
+          {% blocktranslate count counter=unknown_count %}Send {{ counter }} group with an unknown earlier request again{% plural %}Send {{ counter }} groups with an unknown earlier request again{% endblocktranslate %}
+        </label>
+        <p id="repeat-retry-unknown-help" class="help-block">
+          {% translate "The earlier request may have reached the provider, so sending it again can be charged twice." %}
+        </p>
+      </div>
+    {% endif %}
     <button class="btn btn-outline-secondary"
             type="submit"
             {% if unavailable %} disabled{% endif %}>{% translate "Preview request limit" %}</button>
@@ -49,6 +70,7 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="start" />
         <input type="hidden" name="request_cap" value="{{ request_cap }}" />
+        {% if retry_unknown %}<input type="hidden" name="retry_unknown" value="1" />{% endif %}
         {% if request_count %}
           <button class="btn btn-primary" type="submit">{% translate "Start paid recommendation run" %}</button>
         {% else %}
