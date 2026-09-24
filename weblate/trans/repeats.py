@@ -19,7 +19,7 @@ from django.utils.translation import gettext
 
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models import Unit
-from weblate.trans.util import split_plural
+from weblate.trans.util import join_plural, split_plural
 from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
@@ -451,7 +451,7 @@ def preview_group(
     for unit in (
         policy_units(group.policy)
         .filter_access(actor)
-        .filter(source=group.source_forms[0])
+        .filter(source=join_plural(group.source_forms))
         .select_related("translation__component")
         .order_by("pk")
     ):
@@ -507,7 +507,7 @@ def preview_keep_group(*, group: RepeatGroup, actor: User) -> RepeatPreview:
         )
         for unit in policy_units(group.policy)
         .filter_access(actor)
-        .filter(source=group.source_forms[0])
+        .filter(source=join_plural(group.source_forms))
         .select_related("translation__component")
         .order_by("pk")
         if tuple(unit.get_source_plurals()) == tuple(group.source_forms)
@@ -685,7 +685,7 @@ def keep_group_independent(
         units = list(
             policy_units(group.policy)
             .filter_access(actor)
-            .filter(source=group.source_forms[0])
+            .filter(source=join_plural(group.source_forms))
             .select_related("translation__component", "translation__plural")
             .order_by("pk")
         )

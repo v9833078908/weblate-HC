@@ -108,6 +108,24 @@ def reconcile_repeat_unit(unit_id: int) -> None:
 
 
 @app.task(trail=False, acks_late=True, reject_on_worker_lost=True)
+def process_repeat_bulk_apply(run_id: int) -> None:
+    """Apply one confirmed repeat bulk run with resumable per-item progress."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.repeat_bulk import process_apply_items
+
+    process_apply_items(run_id)
+
+
+@app.task(trail=False, acks_late=True, reject_on_worker_lost=True)
+def process_repeat_bulk_undo(run_id: int) -> None:
+    """Undo one bulk run's committed events with resumable per-item progress."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.repeat_bulk import process_undo_items
+
+    process_undo_items(run_id)
+
+
+@app.task(trail=False, acks_late=True, reject_on_worker_lost=True)
 def execute_repeat_recommendation_attempt(attempt_id: int) -> None:
     """Execute one already-reserved repeat recommendation request."""
     # ruff: ignore[import-outside-top-level]
