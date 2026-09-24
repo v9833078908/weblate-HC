@@ -150,9 +150,14 @@ def _queue_groups(request, policy):
         "consistent": 3,
         "resolved": 4,
     }
-    return sorted(
-        groups, key=lambda item: (status_order[item["status"]], -len(item["units"]))
-    )
+
+    def importance(item) -> tuple[int, bool, int]:
+        # Short strings are the ones players see many times; a dialogue line
+        # repeated under two keys is seen once.
+        words = len(item["group"].source_forms[0].split())
+        return (status_order[item["status"]], words > 3, -len(item["units"]))
+
+    return sorted(groups, key=importance)
 
 
 def _add_recommendations(items) -> None:

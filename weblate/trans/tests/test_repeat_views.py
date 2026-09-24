@@ -56,6 +56,29 @@ class RepeatQueueViewTest(ViewTestCase):
             )
         return translation
 
+    def test_queue_shows_short_strings_before_long_sentences(self) -> None:
+        translation = self.add_repeat(
+            "A long sentence that players rarely see twice", ["One", "Two", "Three"]
+        )
+        self.add_repeat("Sword", ["Epee", "Glaive"], start=2000)
+        save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=translation.language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+
+        response = self.client.get(
+            reverse("repeat-queue", kwargs={"project": self.project.slug, "language": "cs"})
+        )
+
+        content = response.content.decode()
+        self.assertLess(content.index("Sword"), content.index("A long sentence"))
+
     def test_queue_separates_diverging_and_consistent_groups(self) -> None:
         translation = self.add_repeat("Drifting text", ["One", "Two"])
         self.add_repeat("Consistent text", ["Same", "Same"], start=2000)
