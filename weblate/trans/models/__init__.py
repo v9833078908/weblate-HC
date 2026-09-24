@@ -47,6 +47,8 @@ from weblate.trans.models.multilingual_spreadsheet import (
 from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.models.project import CommitPolicyChoices, Project
 from weblate.trans.models.repeat import (
+    RepeatBulkItem,
+    RepeatBulkRun,
     RepeatDecisionEvent,
     RepeatGroup,
     RepeatMembership,
@@ -93,6 +95,8 @@ __all__ = [
     "PendingUnitChange",
     "ProducerRun",
     "Project",
+    "RepeatBulkItem",
+    "RepeatBulkRun",
     "RepeatDecisionEvent",
     "RepeatGroup",
     "RepeatMembership",

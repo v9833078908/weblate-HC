@@ -330,3 +330,153 @@ class RepeatRecommendationResult(models.Model):
 
     def __str__(self) -> str:
         return f"Repeat recommendation result {self.run_id}:{self.group_id}"
+
+
+class RepeatBulkRun(models.Model):
+    """One confirmed bulk batch: apply reviewed decisions or undo their events."""
+
+    class Action(models.TextChoices):
+        APPLY = "apply", gettext_lazy("Apply repeat decisions")
+        UNDO = "undo", gettext_lazy("Undo repeat decisions")
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", gettext_lazy("Queued")
+        RUNNING = "running", gettext_lazy("Running")
+        COMPLETED = "completed", gettext_lazy("Completed")
+        FAILED = "failed", gettext_lazy("Failed")
+
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    policy = models.ForeignKey(
+        RepeatPolicy, on_delete=models.CASCADE, related_name="bulk_runs"
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="repeat_bulk_runs",
+    )
+    action = models.CharField(max_length=20, choices=Action.choices)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.QUEUED
+    )
+    # Undo runs point back to the apply run they revert; the single-undo
+    # constraint makes resuming reuse that run instead of stacking undos.
+    apply_run = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="undo_runs",
+    )
+    # Signed review confirmation nonce: its uniqueness makes a double
+    # submission resolve to the existing run instead of a second batch.
+    review_nonce = models.CharField(max_length=64, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    # Transactionally maintained summaries; the item rows plus their event
+    # references are the authoritative audit record.
+    total = models.PositiveIntegerField(default=0)
+    done = models.PositiveIntegerField(default=0)
+    written = models.PositiveIntegerField(default=0)
+    restored = models.PositiveIntegerField(default=0)
+    conflict = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    failure_code = models.CharField(max_length=80, blank=True)
+
+    class Meta:
+        app_label = "trans"
+        required_db_vendor = "postgresql"
+        constraints = [  # ruff: ignore[mutable-class-default]
+            models.UniqueConstraint(
+                fields=["review_nonce"],
+                condition=~Q(review_nonce=""),
+                name="repeat_bulk_run_nonce_unique",
+            ),
+            models.UniqueConstraint(
+                fields=["apply_run"],
+                condition=Q(apply_run__isnull=False),
+                name="repeat_bulk_run_single_undo",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Repeat bulk run {self.token}"
+
+
+class RepeatBulkItem(models.Model):
+    """One confirmed group decision, or its undo, inside a bulk run."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", gettext_lazy("Pending")
+        APPLIED = "applied", gettext_lazy("Applied")
+        SKIPPED = "skipped", gettext_lazy("Skipped")
+        FAILED = "failed", gettext_lazy("Failed")
+        UNDONE = "undone", gettext_lazy("Undone")
+
+    run = models.ForeignKey(
+        RepeatBulkRun, on_delete=models.CASCADE, related_name="items"
+    )
+    ordinal = models.PositiveIntegerField()
+    group = models.ForeignKey(
+        RepeatGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bulk_items",
+    )
+    # {"source_forms": [...], "plural_number": int}: snapshot identity that
+    # survives deletion of the referenced group.
+    group_identity = models.JSONField(default=dict)
+    result = models.ForeignKey(
+        RepeatRecommendationResult,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bulk_items",
+    )
+    # Copied immutable decision {"action", "target": [forms],
+    # "exclusions": [unit ids], "rationale", "result_fingerprint"} so deleting
+    # the source result never erases the batch's audit/undo inventory.
+    decision = models.JSONField(default=dict)
+    context_fingerprint = models.CharField(max_length=64, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    # The decision event THIS item produced.
+    decision_event = models.ForeignKey(
+        RepeatDecisionEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bulk_items",
+    )
+    # Undo items only: the original apply event to undo.
+    apply_event = models.ForeignKey(
+        RepeatDecisionEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="undo_bulk_items",
+    )
+    # Structured per-item outcome; authoritative together with the event.
+    outcome = models.JSONField(default=dict)
+    failure_code = models.CharField(max_length=80, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "trans"
+        required_db_vendor = "postgresql"
+        constraints = [  # ruff: ignore[mutable-class-default]
+            models.UniqueConstraint(
+                fields=["run", "ordinal"], name="repeat_bulk_item_ordinal_unique"
+            ),
+            models.UniqueConstraint(
+                fields=["run", "group_identity"], name="repeat_bulk_item_group_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Repeat bulk item {self.run_id}:{self.ordinal}"
