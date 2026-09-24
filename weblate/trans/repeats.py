@@ -19,7 +19,7 @@ from django.utils.translation import gettext
 
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models import Unit
-from weblate.trans.util import split_plural
+from weblate.trans.util import join_plural, split_plural
 from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
@@ -447,17 +447,18 @@ def preview_group(
     """Create a signed, current snapshot for an explicit shared target."""
     members: list[RepeatPreviewMember] = []
     target = list(target)
+    overlapping = policy_overlaps(group.policy, exclude_policy_id=group.policy.pk)
     for unit in (
         policy_units(group.policy)
         .filter_access(actor)
-        .filter(source=group.source_forms[0])
+        .filter(source=join_plural(group.source_forms))
         .select_related("translation__component")
         .order_by("pk")
     ):
         if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
             continue
         reason = ""
-        if unit_has_policy_conflict(unit, group.policy):
+        if any(unit_matches_policy(unit, other) for other in overlapping):
             reason = "rule-conflict"
         elif unit.state == STATE_APPROVED and unit.get_target_plurals() != target:
             reason = "approved"
@@ -506,7 +507,7 @@ def preview_keep_group(*, group: RepeatGroup, actor: User) -> RepeatPreview:
         )
         for unit in policy_units(group.policy)
         .filter_access(actor)
-        .filter(source=group.source_forms[0])
+        .filter(source=join_plural(group.source_forms))
         .select_related("translation__component")
         .order_by("pk")
         if tuple(unit.get_source_plurals()) == tuple(group.source_forms)
@@ -578,9 +579,10 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
         ):
             msg = "A repeat recipient changed; refresh the preview."
             raise ValidationError(msg)
+        overlapping = policy_overlaps(group.policy, exclude_policy_id=group.policy.pk)
         if any(
             not unit_matches_policy(unit, group.policy)
-            or unit_has_policy_conflict(unit, group.policy)
+            or any(unit_matches_policy(unit, other) for other in overlapping)
             for unit in units
         ):
             msg = "The repeat policy scope changed; refresh the preview."
@@ -614,7 +616,13 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
                 result["skipped"].append({"unit": unit.pk, "reason": "protected"})
             else:
                 old = unit.get_target_plurals()
-                translations[unit.translation_id] = unit.translation
+                # Unit.save_backend schedules a full stats recount through
+                # translation.invalidate_cache(), which deduplicates per
+                # Translation instance. Share one instance per translation so
+                # a group of N places recounts once, not N times.
+                unit.translation = translations.setdefault(
+                    unit.translation_id, unit.translation
+                )
                 unit.is_batch_update = True
                 unit.translate(
                     actor,
@@ -677,7 +685,7 @@ def keep_group_independent(
         units = list(
             policy_units(group.policy)
             .filter_access(actor)
-            .filter(source=group.source_forms[0])
+            .filter(source=join_plural(group.source_forms))
             .select_related("translation__component", "translation__plural")
             .order_by("pk")
         )
@@ -770,7 +778,9 @@ def undo_event(*, token: str, actor: User):
             if unit.get_target_plurals() != item["new"]:
                 outcome["conflicts"].append({"unit": item["unit"], "reason": "changed"})
                 continue
-            translations[unit.translation_id] = unit.translation
+            unit.translation = translations.setdefault(
+                unit.translation_id, unit.translation
+            )
             unit.is_batch_update = True
             unit.translate(
                 actor,

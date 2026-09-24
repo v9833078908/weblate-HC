@@ -31736,15 +31736,20 @@ msgstr "Подготовить рекомендации"
 #: weblate/templates/repeat_queue.html:82
 #, python-format
 msgid ""
-"Showing %(counter)s group of %(total_count)s. Conflicts are shown first."
+"Showing %(counter)s group of %(total_count)s. Conflicts first, then short "
+"strings and the widest groups."
 msgid_plural ""
-"Showing %(counter)s groups of %(total_count)s. Conflicts are shown first."
+"Showing %(counter)s groups of %(total_count)s. Conflicts first, then short "
+"strings and the widest groups."
 msgstr[0] ""
-"Показана %(counter)s группа из %(total_count)s. Конфликты показаны первыми."
+"Показана %(counter)s группа из %(total_count)s. Сначала конфликты, потом "
+"короткие строки и самые широкие группы."
 msgstr[1] ""
-"Показаны %(counter)s группы из %(total_count)s. Конфликты показаны первыми."
+"Показаны %(counter)s группы из %(total_count)s. Сначала конфликты, потом "
+"короткие строки и самые широкие группы."
 msgstr[2] ""
-"Показано %(counter)s групп из %(total_count)s. Конфликты показаны первыми."
+"Показано %(counter)s групп из %(total_count)s. Сначала конфликты, потом "
+"короткие строки и самые широкие группы."
 
 #: weblate/templates/repeat_queue.html:82
 msgid "move between groups; Enter opens a group."
@@ -31758,23 +31763,13 @@ msgstr "В выбранной области нет точных повторо�
 msgid "Prepare repeat recommendations"
 msgstr "Подготовить рекомендации по повторам"
 
-#: weblate/templates/repeat_recommend.html:9
-#, python-format
+#: weblate/templates/repeat_recommend.html:8
 msgid ""
-"The model will receive the complete context of %(counter)s repeat group and "
-"return a read-only recommendation."
-msgid_plural ""
-"The model will receive the complete context of %(counter)s repeat groups and "
-"return read-only recommendations."
-msgstr[0] ""
-"Модель получит полный контекст %(counter)s группы повторов и вернёт "
-"рекомендации только для просмотра."
-msgstr[1] ""
-"Модель получит полный контекст %(counter)s групп повторов и вернёт "
-"рекомендации только для просмотра."
-msgstr[2] ""
-"Модель получит полный контекст %(counter)s групп повторов и вернёт "
-"рекомендации только для просмотра."
+"Preview the request limit before starting a paid run. Previewing sends no "
+"model requests."
+msgstr ""
+"Перед платным запуском проверьте лимит запросов. Предпросмотр не отправляет "
+"запросы модели."
 
 #: weblate/templates/repeat_recommend.html:11
 msgid "Recommendations are unavailable:"
@@ -31805,6 +31800,50 @@ msgstr "Запуск остановится, не отправив больше 
 #: weblate/templates/repeat_recommend.html:39
 msgid "Start paid recommendation run"
 msgstr "Запустить платную подготовку рекомендаций"
+
+#: weblate/templates/repeat_recommend.html:36
+msgid "Preview request limit"
+msgstr "Проверить лимит запросов"
+
+#: weblate/templates/repeat_recommend.html:40
+#, python-format
+msgid "%(counter)s candidate group"
+msgid_plural "%(counter)s candidate groups"
+msgstr[0] "%(counter)s группа для рекомендации"
+msgstr[1] "%(counter)s группы для рекомендаций"
+msgstr[2] "%(counter)s групп для рекомендаций"
+
+#: weblate/templates/repeat_recommend.html:41
+#, python-format
+msgid "%(counter)s paid request planned"
+msgid_plural "%(counter)s paid requests planned"
+msgstr[0] "Запланирован %(counter)s платный запрос"
+msgstr[1] "Запланировано %(counter)s платных запроса"
+msgstr[2] "Запланировано %(counter)s платных запросов"
+
+#: weblate/templates/repeat_recommend.html:42
+#, python-format
+msgid "%(counter)s group outside the limit"
+msgid_plural "%(counter)s groups outside the limit"
+msgstr[0] "%(counter)s группа вне лимита"
+msgstr[1] "%(counter)s группы вне лимита"
+msgstr[2] "%(counter)s групп вне лимита"
+
+#: weblate/templates/repeat_recommend.html:43
+#, python-format
+msgid "%(counter)s group is too large for a model request and needs manual review."
+msgid_plural "%(counter)s groups are too large for a model request and need manual review."
+msgstr[0] "%(counter)s группа слишком велика для запроса к модели и требует ручной проверки."
+msgstr[1] "%(counter)s группы слишком велики для запроса к модели и требуют ручной проверки."
+msgstr[2] "%(counter)s групп слишком велики для запроса к модели и требуют ручной проверки."
+
+#: weblate/templates/repeat_recommend.html:44
+msgid "The paid run rechecks the scope; counts may change if strings or permissions change."
+msgstr "При платном запуске область проверяется снова: числа могут измениться, если изменились строки или права доступа."
+
+#: weblate/templates/repeat_recommend.html:53
+msgid "Record oversized groups for manual review"
+msgstr "Отправить слишком большие группы на ручную проверку"
 
 #: weblate/templates/repeat_report.html:7
 msgid "Repeat decision result"
@@ -32441,3 +32480,471 @@ msgstr ""
 #: weblate/trans/views/repeats.py:412
 msgid "This decision can no longer be undone: the group changed."
 msgstr "Это решение уже нельзя отменить: группа изменилась."
+
+#: weblate/templates/repeat_bulk_review.html:8
+#: weblate/templates/repeat_queue.html:139
+msgid "Review and apply"
+msgstr "Проверить и применить"
+
+#: weblate/templates/repeat_bulk_review.html:13
+msgid "Review and apply repeat recommendations"
+msgstr "Проверить и применить рекомендации по повторам"
+
+#: weblate/templates/repeat_bulk_review.html:15
+msgid ""
+"Each row is one model decision for a group of identical source strings. "
+"Nothing is written until you apply the selected decisions."
+msgstr "Каждая строка — это решение модели для группы одинаковых исходных строк. Ничего не записывается, пока вы не примените выбранные решения."
+
+#: weblate/templates/repeat_bulk_review.html:20
+#, python-format
+msgid ""
+"%(counter)s recommendation is out of date and needs a refresh before it can "
+"be applied."
+msgid_plural ""
+"%(counter)s recommendations are out of date and need a refresh before they "
+"can be applied."
+msgstr[0] "%(counter)s рекомендация устарела: перед применением нужно обновить данные."
+msgstr[1] "%(counter)s рекомендации устарели: перед применением нужно обновить данные."
+msgstr[2] "%(counter)s рекомендаций устарели: перед применением нужно обновить данные."
+
+#: weblate/templates/repeat_bulk_review.html:28
+#, python-format
+msgid ""
+"This confirmation freezes exactly these decisions and expires at %(expires)s."
+msgstr "Это подтверждение фиксирует именно эти решения и действует до %(expires)s."
+
+#: weblate/templates/repeat_bulk_review.html:39
+msgid "Apply this decision"
+msgstr "Применить это решение"
+
+#: weblate/templates/repeat_bulk_review.html:47
+msgid "Action:"
+msgstr "Действие:"
+
+#: weblate/templates/repeat_bulk_review.html:48
+msgid "Proposed translation:"
+msgstr "Предлагаемый перевод:"
+
+#: weblate/templates/repeat_bulk_review.html:54
+#, python-format
+msgid "%(counter)s place can change."
+msgid_plural "%(counter)s places can change."
+msgstr[0] "Может измениться %(counter)s место."
+msgstr[1] "Могут измениться %(counter)s места."
+msgstr[2] "Могут измениться %(counter)s мест."
+
+#: weblate/templates/repeat_bulk_review.html:55
+#, python-format
+msgid "%(counter)s place already has this translation."
+msgid_plural "%(counter)s places already have this translation."
+msgstr[0] "%(counter)s место уже использует этот перевод."
+msgstr[1] "%(counter)s места уже используют этот перевод."
+msgstr[2] "%(counter)s мест уже используют этот перевод."
+
+#: weblate/templates/repeat_bulk_review.html:56
+#, python-format
+msgid "%(counter)s place: %(label)s"
+msgid_plural "%(counter)s places: %(label)s"
+msgstr[0] "%(counter)s место: %(label)s"
+msgstr[1] "%(counter)s места: %(label)s"
+msgstr[2] "%(counter)s мест: %(label)s"
+
+#: weblate/templates/repeat_bulk_review.html:59
+msgid "Explicit exceptions (stay unchanged):"
+msgstr "Явные исключения (остаются без изменений):"
+
+#: weblate/templates/repeat_bulk_review.html:64
+msgid "Places in this group"
+msgstr "Места в этой группе"
+
+#: weblate/templates/repeat_bulk_review.html:71
+msgid "Included in this decision"
+msgstr "Включено в это решение"
+
+#: weblate/templates/repeat_bulk_review.html:72
+msgid "Will change"
+msgstr "Изменится"
+
+#: weblate/templates/repeat_bulk_review.html:74
+msgid "Place"
+msgstr "Место"
+
+#: weblate/templates/repeat_bulk_review.html:89
+msgid "Excluded"
+msgstr "Исключено"
+
+#: weblate/templates/repeat_bulk_review.html:91
+msgid "Included"
+msgstr "Включено"
+
+#: weblate/templates/repeat_bulk_review.html:96
+msgid "Yes"
+msgstr "Да"
+
+#: weblate/templates/repeat_bulk_review.html:98
+msgid "No"
+msgstr "Нет"
+
+#: weblate/templates/repeat_bulk_review.html:113
+msgid ""
+"No current recommendation can be applied. Out-of-date recommendations need a "
+"new model run before they return here."
+msgstr "Применять нечего: устаревшие рекомендации вернутся сюда после нового запуска модели."
+
+#: weblate/templates/repeat_bulk_review.html:116
+msgid "Apply the selected decisions"
+msgstr "Применить отмеченные решения"
+
+#: weblate/templates/repeat_bulk_review.html:122
+#: weblate/trans/views/repeats.py:692
+msgid "Needs a human decision"
+msgstr "Требуется решение человека"
+
+#: weblate/templates/repeat_bulk_review.html:123
+msgid ""
+"The model could not decide these groups. They are never applied "
+"automatically."
+msgstr "Модель не смогла решить эти группы. Они никогда не применяются автоматически."
+
+#: weblate/templates/repeat_bulk_review.html:129
+#: weblate/templates/repeat_bulk_review.html:147
+msgid "Places:"
+msgstr "Места:"
+
+#: weblate/templates/repeat_bulk_review.html:131
+#: weblate/templates/repeat_bulk_review.html:149
+msgid "Open the group in the queue"
+msgstr "Открыть группу в очереди"
+
+#: weblate/templates/repeat_bulk_review.html:140
+msgid "Kept independent"
+msgstr "Оставлены независимыми"
+
+#: weblate/templates/repeat_bulk_review.html:141
+msgid ""
+"The model saw distinct meanings here, so these places stay separate "
+"translations. They are never applied automatically."
+msgstr "Модель увидела здесь разные значения, поэтому эти места остаются с разными переводами. Они никогда не применяются автоматически."
+
+#: weblate/templates/repeat_bulk_status.html:11
+#: weblate/templates/repeat_bulk_status.html:16
+msgid "Repeat batch"
+msgstr "Пакет повторов"
+
+#: weblate/templates/repeat_bulk_status.html:18
+msgid "Batch type:"
+msgstr "Тип пакета:"
+
+#: weblate/templates/repeat_bulk_status.html:19
+msgid "Status:"
+msgstr "Статус:"
+
+#: weblate/templates/repeat_bulk_status.html:26
+#, python-format
+msgid ""
+"Processing stopped after %(counter)s processed group. Nothing else was "
+"changed."
+msgid_plural ""
+"Processing stopped after %(counter)s processed groups. Nothing else was "
+"changed."
+msgstr[0] "Обработка остановлена после %(counter)s обработанной группы. Больше ничего не изменено."
+msgstr[1] "Обработка остановлена после %(counter)s обработанных групп. Больше ничего не изменено."
+msgstr[2] "Обработка остановлена после %(counter)s обработанных групп. Больше ничего не изменено."
+
+#: weblate/templates/repeat_bulk_status.html:28
+msgid "Reason:"
+msgstr "Причина:"
+
+#: weblate/templates/repeat_bulk_status.html:31
+#, python-format
+msgid ""
+"The batch finished, but %(counter)s group was not changed. The reasons are "
+"in the table below."
+msgid_plural ""
+"The batch finished, but %(counter)s groups were not changed. The reasons are "
+"in the table below."
+msgstr[0] "Пакет завершён, но %(counter)s группа не изменилась. Причины — в таблице ниже."
+msgstr[1] "Пакет завершён, но %(counter)s группы не изменились. Причины — в таблице ниже."
+msgstr[2] "Пакет завершён, но %(counter)s групп не изменились. Причины — в таблице ниже."
+
+#: weblate/templates/repeat_bulk_status.html:34
+msgid "The batch finished: every group was processed successfully."
+msgstr "Пакет завершён: все группы успешно обработаны."
+
+#: weblate/templates/repeat_bulk_status.html:40
+#, python-format
+msgid "%(counter)s group processed of %(total)s."
+msgid_plural "%(counter)s groups processed of %(total)s."
+msgstr[0] "Обработана %(counter)s группа из %(total)s."
+msgstr[1] "Обработаны %(counter)s группы из %(total)s."
+msgstr[2] "Обработано %(counter)s групп из %(total)s."
+
+#: weblate/templates/repeat_bulk_status.html:42
+#, python-format
+msgid "%(counter)s place restored."
+msgid_plural "%(counter)s places restored."
+msgstr[0] "Восстановлено %(counter)s место."
+msgstr[1] "Восстановлено %(counter)s места."
+msgstr[2] "Восстановлено %(counter)s мест."
+
+#: weblate/templates/repeat_bulk_status.html:43
+#, python-format
+msgid "%(counter)s place could not be undone."
+msgid_plural "%(counter)s places could not be undone."
+msgstr[0] "Не удалось отменить %(counter)s место."
+msgstr[1] "Не удалось отменить %(counter)s места."
+msgstr[2] "Не удалось отменить %(counter)s мест."
+
+#: weblate/templates/repeat_bulk_status.html:45
+#, python-format
+msgid "%(counter)s place changed."
+msgid_plural "%(counter)s places changed."
+msgstr[0] "Изменено %(counter)s место."
+msgstr[1] "Изменено %(counter)s места."
+msgstr[2] "Изменено %(counter)s мест."
+
+#: weblate/templates/repeat_bulk_status.html:46
+#, python-format
+msgid "%(counter)s place already had the shared translation."
+msgid_plural "%(counter)s places already had the shared translation."
+msgstr[0] "%(counter)s место уже имело общий перевод."
+msgstr[1] "%(counter)s места уже имели общий перевод."
+msgstr[2] "%(counter)s мест уже имели общий перевод."
+
+#: weblate/templates/repeat_bulk_status.html:47
+#, python-format
+msgid "%(counter)s place kept as an explicit exception."
+msgid_plural "%(counter)s places kept as explicit exceptions."
+msgstr[0] "%(counter)s место оставлено как явное исключение."
+msgstr[1] "%(counter)s места оставлены как явные исключения."
+msgstr[2] "%(counter)s мест оставлено как явные исключения."
+
+#: weblate/templates/repeat_bulk_status.html:48
+#, python-format
+msgid "%(counter)s approved or locked place unchanged."
+msgid_plural "%(counter)s approved or locked places unchanged."
+msgstr[0] "Без изменений: %(counter)s одобренное или заблокированное место."
+msgstr[1] "Без изменений: %(counter)s одобренных или заблокированных места."
+msgstr[2] "Без изменений: %(counter)s одобренных или заблокированных мест."
+
+#: weblate/templates/repeat_bulk_status.html:49
+#, python-format
+msgid "%(counter)s group was out of date and skipped."
+msgid_plural "%(counter)s groups were out of date and skipped."
+msgstr[0] "%(counter)s группа устарела и пропущена."
+msgstr[1] "%(counter)s группы устарели и пропущены."
+msgstr[2] "%(counter)s групп устарели и пропущены."
+
+#: weblate/templates/repeat_bulk_status.html:55
+#, python-format
+msgid "This page reloads automatically every %(seconds)s seconds."
+msgstr "Страница автоматически обновляется каждые %(seconds)s секунд."
+
+#: weblate/templates/repeat_bulk_status.html:56
+msgid "Pause auto-refresh"
+msgstr "Приостановить автообновление"
+
+#: weblate/templates/repeat_bulk_status.html:58
+msgid "Auto-refresh is paused."
+msgstr "Автообновление приостановлено."
+
+#: weblate/templates/repeat_bulk_status.html:59
+msgid "Resume auto-refresh"
+msgstr "Возобновить автообновление"
+
+#: weblate/templates/repeat_bulk_status.html:61
+msgid "Refresh now"
+msgstr "Обновить сейчас"
+
+#: weblate/templates/repeat_bulk_status.html:71
+msgid "Resume processing"
+msgstr "Продолжить обработку"
+
+#: weblate/templates/repeat_bulk_status.html:79
+msgid "Cancel this batch"
+msgstr "Отменить пакет"
+
+#: weblate/templates/repeat_bulk_status.html:84
+msgid "Open the undo batch"
+msgstr "Открыть пакет отмены"
+
+#: weblate/templates/repeat_bulk_status.html:88
+msgid "Open the applied batch"
+msgstr "Открыть применённый пакет"
+
+#: weblate/templates/repeat_bulk_status.html:92
+#: weblate/templates/repeat_bulk_status.html:96
+msgid "Groups in this batch"
+msgstr "Группы в этом пакете"
+
+#: weblate/templates/repeat_bulk_status.html:103
+msgid "Outcome"
+msgstr "Результат"
+
+#: weblate/templates/repeat_bulk_status.html:149
+msgid "This batch has no groups."
+msgstr "В этом пакете нет групп."
+
+#: weblate/templates/repeat_queue.html:138
+#, python-format
+msgid "%(counter)s current recommendation is ready to review and apply."
+msgid_plural ""
+"%(counter)s current recommendations are ready to review and apply."
+msgstr[0] "%(counter)s актуальная рекомендация готова к проверке и применению."
+msgstr[1] "%(counter)s актуальные рекомендации готовы к проверке и применению."
+msgstr[2] "%(counter)s актуальных рекомендаций готовы к проверке и применению."
+
+#: weblate/templates/repeat_recommend.html:44
+#: weblate/templates/repeat_recommend.html:51
+msgid "Recommendation requests"
+msgstr "Запросы рекомендаций"
+
+#: weblate/templates/repeat_recommend.html:46
+msgid ""
+"Requests already paid for are listed here. Recommendations from successful "
+"requests stay reviewable even when other requests in the same run failed."
+msgstr "Здесь перечислены уже оплаченные запросы. Рекомендации из успешных запросов остаются доступными для просмотра, даже если другие запросы той же серии завершились ошибкой."
+
+#: weblate/templates/repeat_recommend.html:55
+msgid "Started"
+msgstr "Начат"
+
+#: weblate/templates/repeat_recommend.html:62
+msgid "Overdue sends"
+msgstr "Просроченные отправки"
+
+#: weblate/templates/repeat_recommend.html:63
+msgid "Results"
+msgstr "Результаты"
+
+#: weblate/templates/repeat_recommend.html:78
+msgid "Overdue"
+msgstr "Просрочено"
+
+#: weblate/templates/repeat_recommend.html:89
+msgid "Unfinished requests"
+msgstr "Незавершённые запросы"
+
+#: weblate/templates/repeat_recommend.html:91
+msgid ""
+"Some requests were reserved but never delivered, or were sent and are now "
+"overdue."
+msgstr "Некоторые запросы зарезервированы, но не доставлены, либо отправлены и сейчас просрочены."
+
+#: weblate/templates/repeat_recommend.html:96
+msgid "Reconcile overdue sends and re-enqueue reserved requests"
+msgstr "Закрыть просроченные отправки и вернуть зарезервированные запросы в очередь"
+
+#: weblate/templates/repeat_recommend.html:99
+msgid ""
+"Overdue sends become unknown and reserved requests are delivered again. This "
+"never starts a new paid run and never replays an unknown send."
+msgstr "Просроченные отправки станут неизвестными, а зарезервированные запросы будут доставлены снова. Это не запускает новую платную серию и никогда не повторяет неизвестную отправку."
+
+#: weblate/trans/views/repeats.py:534
+#, python-format
+msgid ""
+"Marked %(reconciled)s overdue sends unknown; re-enqueued %(requeued)s "
+"reserved requests. No new paid request was created."
+msgstr "Неизвестными отмечено %(reconciled)s просроченных отправок; в очередь возвращено %(requeued)s зарезервированных запросов. Новые платные запросы не создавались."
+
+#: weblate/trans/views/repeats.py:589 weblate/trans/views/repeats.py:853
+#: weblate/trans/views/repeats.py:1019
+msgid "Unknown action."
+msgstr "Неизвестное действие."
+
+#: weblate/trans/views/repeats.py:654
+msgid ""
+"A string changed after this decision was reviewed; refresh and decide again."
+msgstr "Строка изменилась после проверки этого решения; обновите данные и решите снова."
+
+#: weblate/trans/views/repeats.py:657
+msgid "Nothing needed changing: every place already matched or was excluded."
+msgstr "Менять нечего: все места уже совпадают или исключены."
+
+#: weblate/trans/views/repeats.py:660
+msgid ""
+"Processing hit an unexpected error; resume to process the remaining groups."
+msgstr "В обработке произошла непредвиденная ошибка; продолжите, чтобы обработать остальные группы."
+
+#: weblate/trans/views/repeats.py:663
+msgid "Permission to change this project was revoked during processing."
+msgstr "Право изменять этот проект было отозвано во время обработки."
+
+#: weblate/trans/views/repeats.py:666
+msgid "The user who started this batch no longer exists."
+msgstr "Пользователь, запустивший этот пакет, больше не существует."
+
+#: weblate/trans/views/repeats.py:669
+msgid "The repeat rule was disabled before this batch finished."
+msgstr "Правило повторов было отключено до завершения пакета."
+
+#: weblate/trans/views/repeats.py:672
+msgid "A later decision changed this group; it was not undone."
+msgstr "Более позднее решение изменило эту группу; отмена не выполнена."
+
+#: weblate/trans/views/repeats.py:674
+msgid "Undone; previous translations were restored."
+msgstr "Отменено; прежние переводы восстановлены."
+
+#: weblate/trans/views/repeats.py:681
+msgid "Changed after the decision"
+msgstr "Изменено после решения"
+
+#: weblate/trans/views/repeats.py:682
+msgid "Deleted or approved after the decision"
+msgstr "Удалено или одобрено после решения"
+
+#: weblate/trans/views/repeats.py:689
+msgid "Use an existing translation"
+msgstr "Использовать существующий перевод"
+
+#: weblate/trans/views/repeats.py:690
+msgid "Propose a new translation"
+msgstr "Предложить новый перевод"
+
+#: weblate/trans/views/repeats.py:691
+msgid "Keep these places independent"
+msgstr "Оставить эти места независимыми"
+
+#: weblate/trans/views/repeats.py:703
+msgid ""
+"This review confirmation is no longer valid: a string, the repeat rule or "
+"your permissions changed after the review. Nothing was written; the review "
+"below was refreshed and can be selected again."
+msgstr "Это подтверждение больше недействительно: строка, правило повторов или ваши права изменились после проверки. Ничего не записано; таблица ниже обновлена и может быть выбрана снова."
+
+#: weblate/trans/views/repeats.py:856
+msgid "Select at least one recommendation to apply."
+msgstr "Отметьте хотя бы одну рекомендацию для применения."
+
+#: weblate/trans/views/repeats.py:946
+msgid "Places restored"
+msgstr "Мест восстановлено"
+
+#: weblate/trans/views/repeats.py:947
+msgid "Places not restored"
+msgstr "Мест не восстановлено"
+
+#: weblate/trans/views/repeats.py:951
+msgid "Places changed"
+msgstr "Мест изменено"
+
+#: weblate/trans/views/repeats.py:953
+msgid "Approved or locked places unchanged"
+msgstr "Одобрённых или заблокированных мест без изменений"
+
+#: weblate/trans/views/repeats.py:960
+msgid "Places already matching"
+msgstr "Мест уже совпадает"
+
+#: weblate/trans/views/repeats.py:965
+msgid "Places excluded"
+msgstr "Мест исключено"
+
+#: weblate/trans/views/repeats.py:1030
+msgid ""
+"This batch cannot accept that action now: it is still being processed, was "
+"already undone, or has nothing left to process. Nothing was changed."
+msgstr "Пакет сейчас не может принять это действие: обработка ещё идёт, пакет уже отменён или нечего продолжать. Ничего не изменено."

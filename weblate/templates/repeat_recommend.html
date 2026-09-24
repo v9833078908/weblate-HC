@@ -5,9 +5,7 @@
 {% block content %}
 
   <h1>{% translate "Prepare repeat recommendations" %}</h1>
-  <p>
-    {% blocktranslate count counter=group_count %}The model will receive the complete context of {{ counter }} repeat group and return a read-only recommendation.{% plural %}The model will receive the complete context of {{ counter }} repeat groups and return read-only recommendations.{% endblocktranslate %}
-  </p>
+  <p>{% translate "Preview the request limit before starting a paid run. Previewing sends no model requests." %}</p>
   {% if unavailable %}<p class="alert alert-warning">{% translate "Recommendations are unavailable:" %} {{ unavailable }}</p>{% endif %}
   <dl>
     <dt>{% translate "Model" %}</dt>
@@ -23,8 +21,7 @@
       {% endif %}
     </dd>
   </dl>
-  <form method="post">
-    {% csrf_token %}
+  <form method="get">
     <div class="form-group">
       <label for="repeat-request-cap">{% translate "Maximum paid requests" %}</label>
       <input id="repeat-request-cap"
@@ -32,11 +29,93 @@
              name="request_cap"
              type="number"
              min="1"
-             value="1"
+             value="{{ request_cap }}"
              required />
       <p class="help-block">{% translate "The run stops before sending more requests than this limit." %}</p>
     </div>
-    <button class="btn btn-primary" type="submit"{% if unavailable %} disabled{% endif %}>{% translate "Start paid recommendation run" %}</button>
+    <button class="btn btn-outline-secondary"
+            type="submit"
+            {% if unavailable %} disabled{% endif %}>{% translate "Preview request limit" %}</button>
   </form>
+
+  {% if profile %}
+    <p>{% blocktranslate count counter=candidate_count %}{{ counter }} candidate group{% plural %}{{ counter }} candidate groups{% endblocktranslate %}</p>
+    <p>{% blocktranslate count counter=request_count %}{{ counter }} paid request planned{% plural %}{{ counter }} paid requests planned{% endblocktranslate %}</p>
+    <p>{% blocktranslate count counter=unsent_count %}{{ counter }} group outside the limit{% plural %}{{ counter }} groups outside the limit{% endblocktranslate %}</p>
+    {% if oversized_count %}<p>{% blocktranslate count counter=oversized_count %}{{ counter }} group is too large for a model request and needs manual review.{% plural %}{{ counter }} groups are too large for a model request and need manual review.{% endblocktranslate %}</p>{% endif %}
+    <p class="help-block">{% translate "The paid run rechecks the scope; counts may change if strings or permissions change." %}</p>
+    {% if request_count or oversized_count %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="start" />
+        <input type="hidden" name="request_cap" value="{{ request_cap }}" />
+        {% if request_count %}
+          <button class="btn btn-primary" type="submit">{% translate "Start paid recommendation run" %}</button>
+        {% else %}
+          <button class="btn btn-primary" type="submit">{% translate "Record oversized groups for manual review" %}</button>
+        {% endif %}
+      </form>
+    {% endif %}
+  {% endif %}
+
+  {% if attempt_rows %}
+    <h2>{% translate "Recommendation requests" %}</h2>
+    <p>
+      {% translate "Requests already paid for are listed here. Recommendations from successful requests stay reviewable even when other requests in the same run failed." %}
+    </p>
+    <div class="table-scroll"
+         role="region"
+         tabindex="0"
+         aria-label="{% translate 'Recommendation requests' %}">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th scope="col">{% translate "Started" %}</th>
+            <th scope="col">{% translate "Status" %}</th>
+            <th scope="col">{% translate "Completed" %}</th>
+            <th scope="col">{% translate "Failed" %}</th>
+            <th scope="col">{% translate "Unknown" %}</th>
+            <th scope="col">{% translate "Reserved" %}</th>
+            <th scope="col">{% translate "Sent" %}</th>
+            <th scope="col">{% translate "Overdue sends" %}</th>
+            <th scope="col">{% translate "Results" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in attempt_rows %}
+            <tr>
+              <th scope="row">{{ row.run.created_at|date:"Y-m-d H:i" }}</th>
+              <td>{{ row.status_label }}</td>
+              <td>{{ row.completed }}</td>
+              <td>{{ row.failed }}</td>
+              <td>{{ row.unknown }}</td>
+              <td>{{ row.reserved }}</td>
+              <td>{{ row.sent }}</td>
+              <td>
+                {{ row.overdue }}
+                {% if row.overdue %}
+                  <span class="badge text-bg-danger">{% translate "Overdue" %}</span>
+                {% endif %}
+              </td>
+              <td>{{ row.results }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if can_recover %}
+    <h2>{% translate "Unfinished requests" %}</h2>
+    <p>{% translate "Some requests were reserved but never delivered, or were sent and are now overdue." %}</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reconcile" />
+      <button class="btn btn-outline-secondary" type="submit">{% translate "Reconcile overdue sends and re-enqueue reserved requests" %}</button>
+    </form>
+    <p class="help-block">
+      {% translate "Overdue sends become unknown and reserved requests are delivered again. This never starts a new paid run and never replays an unknown send." %}
+    </p>
+  {% endif %}
 
 {% endblock content %}

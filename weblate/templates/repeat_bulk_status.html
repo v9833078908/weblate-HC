@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block extra_meta %}
+  {% if refresh_seconds %}<meta http-equiv="refresh" content="{{ refresh_seconds }}" />{% endif %}
+{% endblock extra_meta %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item"><a href="{{ project.get_absolute_url }}">{{ project }}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Repeat batch" %}</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+  <main>
+    <h1>{% translate "Repeat batch" %}</h1>
+    <p>
+      {% translate "Batch type:" %} {{ run.get_action_display }}.
+      {% translate "Status:" %} {{ run.get_status_display }}
+    </p>
+    {% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
+
+    <div role="status">
+      {% if run.status == "failed" %}
+        <p class="alert alert-danger">
+          {% blocktranslate count counter=run.done %}Processing stopped after {{ counter }} processed group. Nothing else was changed.{% plural %}Processing stopped after {{ counter }} processed groups. Nothing else was changed.{% endblocktranslate %}
+        </p>
+        {% if failure_reason %}<p class="alert alert-danger" role="alert">{% translate "Reason:" %} {{ failure_reason }}</p>{% endif %}
+      {% elif summary.partial %}
+        <p class="alert alert-warning">
+          {% blocktranslate count counter=summary.untouched %}The batch finished, but {{ counter }} group was not changed. The reasons are in the table below.{% plural %}The batch finished, but {{ counter }} groups were not changed. The reasons are in the table below.{% endblocktranslate %}
+        </p>
+      {% else %}
+        <p class="alert alert-success">{% translate "The batch finished: every group was processed successfully." %}</p>
+      {% endif %}
+    </div>
+
+    <h2>{% translate "Progress" %}</h2>
+    <ul>
+      <li>{% blocktranslate count counter=run.done with total=run.total %}{{ counter }} group processed of {{ total }}.{% plural %}{{ counter }} groups processed of {{ total }}.{% endblocktranslate %}</li>
+      {% if run.action == "undo" %}
+        <li>{% blocktranslate count counter=run.restored %}{{ counter }} place restored.{% plural %}{{ counter }} places restored.{% endblocktranslate %}</li>
+        <li>{% blocktranslate count counter=run.conflict %}{{ counter }} place could not be undone.{% plural %}{{ counter }} places could not be undone.{% endblocktranslate %}</li>
+      {% else %}
+        <li>{% blocktranslate count counter=run.written %}{{ counter }} place changed.{% plural %}{{ counter }} places changed.{% endblocktranslate %}</li>
+        <li>{% blocktranslate count counter=summary.matching %}{{ counter }} place already had the shared translation.{% plural %}{{ counter }} places already had the shared translation.{% endblocktranslate %}</li>
+        <li>{% blocktranslate count counter=summary.excluded %}{{ counter }} place kept as an explicit exception.{% plural %}{{ counter }} places kept as explicit exceptions.{% endblocktranslate %}</li>
+        <li>{% blocktranslate count counter=summary.blocked %}{{ counter }} approved or locked place unchanged.{% plural %}{{ counter }} approved or locked places unchanged.{% endblocktranslate %}</li>
+        <li>{% blocktranslate count counter=summary.stale %}{{ counter }} group was out of date and skipped.{% plural %}{{ counter }} groups were out of date and skipped.{% endblocktranslate %}</li>
+      {% endif %}
+    </ul>
+
+    <p>
+      {% if refresh_seconds %}
+        {% blocktranslate with seconds=refresh_seconds %}This page reloads automatically every {{ seconds }} seconds.{% endblocktranslate %}
+        <a href="{{ pause_url }}">{% translate "Pause auto-refresh" %}</a>
+      {% elif run.status == "queued" or run.status == "running" %}
+        {% translate "Auto-refresh is paused." %}
+        <a href="{{ unpause_url }}">{% translate "Resume auto-refresh" %}</a>
+      {% endif %}
+      <a href="{{ refresh_url }}">{% translate "Refresh now" %}</a>
+    </p>
+
+    {% if can_resume or can_undo or undo_run or apply_run %}
+      <h2>{% translate "Actions" %}</h2>
+      {% if can_resume %}
+        <form method="post" action="{{ status_url }}" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="resume" />
+          {% if paused %}<input type="hidden" name="pause" value="1" />{% endif %}
+          <button class="btn btn-primary" type="submit">{% translate "Resume processing" %}</button>
+        </form>
+      {% endif %}
+      {% if can_undo %}
+        <form method="post" action="{{ status_url }}" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="undo" />
+          {% if paused %}<input type="hidden" name="pause" value="1" />{% endif %}
+          <button class="btn btn-outline-danger" type="submit">{% translate "Cancel this batch" %}</button>
+        </form>
+      {% endif %}
+      {% if undo_run %}
+        <a class="btn btn-outline-secondary"
+           href="{% url 'repeat-bulk-status' project=project.slug language=language.code token=undo_run.token %}">{% translate "Open the undo batch" %}</a>
+      {% endif %}
+      {% if apply_run %}
+        <a class="btn btn-outline-secondary"
+           href="{% url 'repeat-bulk-status' project=project.slug language=language.code token=apply_run.token %}">{% translate "Open the applied batch" %}</a>
+      {% endif %}
+    {% endif %}
+
+    <h2>{% translate "Groups in this batch" %}</h2>
+    <div class="table-scroll"
+         role="region"
+         tabindex="0"
+         aria-label="{% translate 'Groups in this batch' %}">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">{% translate "Source" %}</th>
+            <th scope="col">{% translate "Status" %}</th>
+            <th scope="col">{% translate "Outcome" %}</th>
+            <th scope="col">{% translate "Conflicts" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <th scope="row">{{ item.ordinal }}</th>
+              <td>
+                <code>{{ item.source_text }}</code>
+              </td>
+              <td>
+                {{ item.status_label }}
+                {% if item.reason %}<br />{{ item.reason }}{% endif %}
+              </td>
+              <td>
+                {% if item.counts %}
+                  <ul class="list-unstyled mb-0">
+                    {% for count in item.counts %}<li>{{ count.label }}: {{ count.value }}</li>{% endfor %}
+                  </ul>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                {% if item.conflicts %}
+                  <ul class="list-unstyled mb-0">
+                    {% for conflict in item.conflicts %}
+                      <li>
+                        {% if conflict.url %}
+                          <a href="{{ conflict.url }}"><code>{{ conflict.key }}</code></a>
+                          <code>#{{ conflict.unit_id }}</code>
+                        {% else %}
+                          <code>#{{ conflict.unit_id }}</code>
+                        {% endif %}
+                        — {{ conflict.reason_label }}
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5">{% translate "This batch has no groups." %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+{% endblock content %}

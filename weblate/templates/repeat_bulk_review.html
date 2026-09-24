@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item"><a href="{{ project.get_absolute_url }}">{{ project }}</a></li>
+  <li class="breadcrumb-item"><a href="{{ queue_url }}">{% translate "Repeats" %}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Review and apply" %}</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+  <main>
+    <h1>{% translate "Review and apply repeat recommendations" %}</h1>
+    <p>
+      {% translate "Each row is one model decision for a group of identical source strings. Nothing is written until you apply the selected decisions." %}
+    </p>
+    {% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
+    {% if stale %}
+      <p class="alert alert-warning" role="status">
+        {% blocktranslate count counter=stale %}{{ counter }} recommendation is out of date and needs a refresh before it can be applied.{% plural %}{{ counter }} recommendations are out of date and need a refresh before they can be applied.{% endblocktranslate %}
+      </p>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="apply" />
+      <input type="hidden" name="manifest" value="{{ manifest }}" />
+      <p class="text-muted">
+        {% blocktranslate with expires=expires_at %}This confirmation freezes exactly these decisions and expires at {{ expires }}.{% endblocktranslate %}
+      </p>
+      {% for row in rows %}
+        <section class="card mb-3" aria-labelledby="row-{{ row.result_id }}">
+          <div class="card-header">
+            <label class="form-check">
+              <input class="form-check-input"
+                     type="checkbox"
+                     name="result"
+                     id="result-{{ row.result_id }}"
+                     value="{{ row.result_id }}"
+                     checked />
+              <span class="form-check-label">{% translate "Apply this decision" %}</span>
+            </label>
+            <h2 id="row-{{ row.result_id }}">
+              {% for form in row.source_forms %}<code>{{ form }}</code>{% if not forloop.last %} / {% endif %}{% endfor %}
+            </h2>
+          </div>
+          <div class="card-body">
+            <p>
+              {% translate "Action:" %} {{ row.action_label }}.
+              {% translate "Proposed translation:" %} {% for form in row.target_forms %}<code>{{ form }}</code>{% if not forloop.last %} / {% endif %}{% endfor %}
+            </p>
+            {% if row.rationale %}
+              <p class="text-muted">{% blocktranslate with reason=row.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</p>
+            {% endif %}
+            <ul>
+              <li>{% blocktranslate count counter=row.writable %}{{ counter }} place can change.{% plural %}{{ counter }} places can change.{% endblocktranslate %}</li>
+              {% if row.already_matching %}<li>{% blocktranslate count counter=row.already_matching %}{{ counter }} place already has this translation.{% plural %}{{ counter }} places already have this translation.{% endblocktranslate %}</li>{% endif %}
+              {% for blocked in row.blocked %}<li>{% blocktranslate count counter=blocked.count with label=blocked.reason_label %}{{ counter }} place: {{ label }}{% plural %}{{ counter }} places: {{ label }}{% endblocktranslate %}</li>{% endfor %}
+            </ul>
+            {% if row.exclusions %}
+              <p>{% translate "Explicit exceptions (stay unchanged):" %} {% for unit_id in row.exclusions %}<code>#{{ unit_id }}</code>{% endfor %}</p>
+            {% endif %}
+            <div class="table-scroll"
+                 role="region"
+                 tabindex="0"
+                 aria-label="{% translate 'Places in this group' %}">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th scope="col">{% translate "Key" %}</th>
+                    <th scope="col">{% translate "Component" %}</th>
+                    <th scope="col">{% translate "Current translation" %}</th>
+                    <th scope="col">{% translate "Included in this decision" %}</th>
+                    <th scope="col">{% translate "Will change" %}</th>
+                    <th scope="col">{% translate "Reason" %}</th>
+                    <th scope="col">{% translate "Place" %}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for member in row.members %}
+                    <tr>
+                      <td>
+                        {% if member.url %}<a href="{{ member.url }}"><code>{{ member.key }}</code></a>{% else %}<code>{{ member.key }}</code>{% endif %}
+                      </td>
+                      <td>{{ member.component }}</td>
+                      <td>
+                        <code>{{ member.current_target }}</code>
+                      </td>
+                      <td>
+                        {% if member.excluded %}
+                          {% translate "Excluded" %}
+                        {% else %}
+                          {% translate "Included" %}
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if member.will_change %}
+                          {% translate "Yes" %}
+                        {% else %}
+                          {% translate "No" %}
+                        {% endif %}
+                      </td>
+                      <td>{{ member.reason_label }}</td>
+                      <td>
+                        {% if member.url %}<a href="{{ member.url }}"><code>#{{ member.unit_id }}</code></a>{% else %}<code>#{{ member.unit_id }}</code>{% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      {% empty %}
+        <p class="alert alert-info">{% translate "No current recommendation can be applied. Out-of-date recommendations need a new model run before they return here." %}</p>
+      {% endfor %}
+      {% if rows %}
+        <button class="btn btn-primary" type="submit">{% translate "Apply the selected decisions" %}</button>
+      {% endif %}
+    </form>
+
+    {% if needs_human %}
+      <section aria-labelledby="needs-human">
+        <h2 id="needs-human">{% translate "Needs a human decision" %}</h2>
+        <p>{% translate "The model could not decide these groups. They are never applied automatically." %}</p>
+        <ul>
+          {% for item in needs_human %}
+            <li>
+              <code>{{ item.source_text }}</code>
+              {% if item.rationale %}<span class="text-muted">{% blocktranslate with reason=item.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
+              {% translate "Places:" %}
+              {% for unit in item.units %}<a href="{{ unit.url }}"><code>{{ unit.key }}</code></a>{% if not forloop.last %}, {% endif %}{% endfor %}
+              <a href="{{ item.group_url }}">{% translate "Open the group in the queue" %}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if independent %}
+      <section aria-labelledby="kept-independent">
+        <h2 id="kept-independent">{% translate "Kept independent" %}</h2>
+        <p>{% translate "The model saw distinct meanings here, so these places stay separate translations. They are never applied automatically." %}</p>
+        <ul>
+          {% for item in independent %}
+            <li>
+              <code>{{ item.source_text }}</code>
+              {% if item.rationale %}<span class="text-muted">{% blocktranslate with reason=item.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
+              {% translate "Places:" %}
+              {% for unit in item.units %}<a href="{{ unit.url }}"><code>{{ unit.key }}</code></a>{% if not forloop.last %}, {% endif %}{% endfor %}
+              <a href="{{ item.group_url }}">{% translate "Open the group in the queue" %}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  </main>
+{% endblock content %}
