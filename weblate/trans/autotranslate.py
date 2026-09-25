@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeGuard
 from uuid import uuid4
 
 from celery import current_task
@@ -85,21 +85,26 @@ if TYPE_CHECKING:
 # rather than dropping their strings, but never hold a run for a long one.
 
 
-def _valid_preparation_ids(value: object) -> bool:
+def _valid_preparation_ids(value: object) -> TypeGuard[list[int]]:
     return (
         isinstance(value, list)
-        and all(type(pk) is int and pk > 0 for pk in value)
+        and all(
+            isinstance(pk, int) and not isinstance(pk, bool) and pk > 0 for pk in value
+        )
         and len(value) == len(set(value))
     )
 
 
-def _valid_preparation_counts(value: object, missing_count: int) -> bool:
+def _valid_preparation_counts(
+    value: object, missing_count: int
+) -> TypeGuard[dict[str, int]]:
     return (
         isinstance(value, dict)
         and all(
             isinstance(language, str)
             and bool(language.strip())
-            and type(count) is int
+            and isinstance(count, int)
+            and not isinstance(count, bool)
             and count > 0
             for language, count in value.items()
         )
@@ -288,9 +293,8 @@ class PreparationScope:
     @staticmethod
     def from_json(payload: Mapping[str, Any]) -> PreparationScope:
         msg = "Invalid preparation snapshot"
-        if not isinstance(payload, Mapping) or type(payload.get("version")) is not int:
-            raise ValueError(msg)
-        if payload["version"] != 1:
+        version = payload.get("version") if isinstance(payload, Mapping) else None
+        if not isinstance(version, int) or isinstance(version, bool) or version != 1:
             raise ValueError(msg)
         unit_ids = payload.get("unit_ids")
         missing_ids = payload.get("missing_ids")

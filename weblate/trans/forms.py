@@ -1526,7 +1526,7 @@ class AutoForm(forms.Form):
             if self.is_bound
             else self.initial.get("judge_proposal_only")
         )
-        return self.fields["judge_proposal_only"].to_python(value)
+        return bool(self.fields["judge_proposal_only"].to_python(value))
 
     def _configure_proposal_only(self) -> None:
         if not self.proposal_only:

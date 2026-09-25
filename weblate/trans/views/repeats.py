@@ -286,7 +286,9 @@ def _judge_panel(request, obj, target_language, groups):
             and len(recommended) == 1
         )
         if recommended is not None:
-            item["variants"].sort(key=lambda variant: variant["target"] != recommended)
+            item["variants"].sort(
+                key=lambda variant, target=recommended: variant["target"] != target
+            )
         buckets[item["judge"].bucket] += 1
     project_language = obj.project_languages[target_language]
     drift_ids = set(
