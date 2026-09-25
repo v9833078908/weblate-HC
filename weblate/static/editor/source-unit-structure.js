@@ -36,13 +36,16 @@
       method: "POST",
       headers: {
         "X-CSRFToken":
-          document.cookie
-            .split("; ")
-            .find((row) => row.startsWith("csrftoken="))
-            ?.split("=")[1] || "",
+          document.querySelector("#link-post input[name=csrfmiddlewaretoken]")
+            ?.value || "",
       },
       body: new URLSearchParams(data),
     });
+    if (!response.headers.get("Content-Type")?.includes("application/json")) {
+      throw new Error(
+        `${translate("The server rejected the request.")} (${response.status} ${response.statusText})`,
+      );
+    }
     const payload = await response.json();
     if (!response.ok || payload.error) {
       throw new Error(payload.error || response.statusText);
@@ -176,7 +179,10 @@
         )
           .replace("%(old)s", payload.preview.old_context)
           .replace("%(new)s", payload.preview.new_context)
-          .replace("%(translations)s", payload.preview.affected_translation_count)
+          .replace(
+            "%(translations)s",
+            payload.preview.affected_translation_count,
+          )
           .replace("%(files)s", payload.preview.affected_file_count);
       } else {
         const before = payload.preview.previous_context || translate("start");

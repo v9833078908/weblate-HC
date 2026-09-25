@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest import TestCase
@@ -15,6 +16,7 @@ from unittest.mock import patch
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import connection
+from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import NoReverseMatch, reverse
 from lxml import html
@@ -1338,6 +1340,37 @@ class EditJSONMonoTest(EditTest):
         self.assertGreater(
             len(tree.xpath('//button[contains(@class, "js-move-string")]')), 0
         )
+
+    @override_settings(CSRF_USE_SESSIONS=True, CSRF_COOKIE_HTTPONLY=True)
+    def test_structural_preview_csrf_with_session_token(self) -> None:
+        # Production keeps the CSRF token in the session, so no csrftoken
+        # cookie exists and the dialog must send the token rendered in the page.
+        self.make_manager()
+        unit = self.component.source_translation.unit_set.order_by("pk").first()
+        assert unit is not None
+        url = reverse("rename-key", kwargs={"pk": unit.pk})
+        client = Client(enforce_csrf_checks=True)
+        client.login(username="testuser", password="testpassword")
+
+        page = client.get(unit.get_absolute_url())
+        self.assertNotIn("csrftoken", client.cookies)
+        token = html.fromstring(page.content).xpath(
+            '//form[@id="link-post"]/input[@name="csrfmiddlewaretoken"]/@value'
+        )[0]
+        data = {"stage": "preview", "new_key": "%NEW_KEY2%"}
+
+        self.assertEqual(
+            client.post(url, data, headers={"X-CSRFToken": ""}).status_code, 403
+        )
+        response = client.post(url, data, headers={"X-CSRFToken": token})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["preview"]["new_context"], "%NEW_KEY2%")
+
+        script = (
+            Path(__file__).parents[2] / "static/editor/source-unit-structure.js"
+        ).read_text()
+        self.assertIn("#link-post", script)
+        self.assertNotIn("csrftoken=", script)
 
     def enable_nested_unit_management(self) -> None:
         self.component.manage_units = True
