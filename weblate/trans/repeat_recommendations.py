@@ -354,9 +354,11 @@ def plan_recommendations(
     request_cap: int,
     refresh_group_ids: Iterable[int] = (),
     retry_unknown: bool = False,
+    group_ids: Iterable[int] | None = None,
 ) -> RecommendationPlan:
     """Select and pack paid candidates; shared by the preview page and the run."""
     refresh = set(refresh_group_ids)
+    scope = None if group_ids is None else set(group_ids)
     current = current_recommendations(policy, actor=actor)
     active = _reserved_contexts(
         policy,
@@ -370,6 +372,8 @@ def plan_recommendations(
     unknown_groups = 0
     for context in live_group_contexts(policy, actor=actor).values():
         group_id = context["group"]
+        if scope is not None and group_id not in scope:
+            continue
         identity = (group_id, context_fingerprint(context))
         if (
             len(context["variants"]) < 2
@@ -446,6 +450,7 @@ def prepare_run(
     request_cap: int,
     refresh_group_ids: Iterable[int] = (),
     retry_unknown: bool = False,
+    group_ids: Iterable[int] | None = None,
 ) -> RepeatRecommendationRun:
     """Freeze a visible policy scope and reserve its bounded paid requests."""
     if request_cap < 1:
@@ -467,6 +472,7 @@ def prepare_run(
             request_cap=request_cap,
             refresh_group_ids=refresh_group_ids,
             retry_unknown=retry_unknown,
+            group_ids=group_ids,
         )
         oversized_ids = {context["group"] for context in plan.oversized}
         groups = [

@@ -287,6 +287,37 @@ class RepeatModelTest(ViewTestCase):
         fourth = self.paying_run(policy=policy, request_cap=5)
         self.assertEqual(fourth.attempts.count(), 0)
 
+    def test_scoped_plan_sends_only_named_groups_and_never_repurchases(self) -> None:
+        self.make_manager()
+        policy = self.make_policy()
+        first = get_or_create_group(
+            policy, self.add_group("First scoped", ["One", "Two"])[0]
+        )
+        second = get_or_create_group(
+            policy, self.add_group("Second scoped", ["One", "Two"], start=2000)[0]
+        )
+        self.add_group("Outside scope", ["One", "Two"], start=3000)
+
+        run = self.paying_run(
+            policy=policy, request_cap=5, group_ids=[first.pk, second.pk]
+        )
+
+        self.assertEqual(self.sent_groups(run), {first.pk, second.pk})
+        self.assertEqual(
+            {item["group"] for item in run.snapshot["groups"]}, {first.pk, second.pk}
+        )
+        self.complete_attempt(
+            run.attempts.get(),
+            self.provider_result(first.pk, "use_existing", ["One"]),
+        )
+        again = self.paying_run(
+            policy=policy, request_cap=5, group_ids=[first.pk, second.pk]
+        )
+        self.assertEqual(again.attempts.count(), 0)
+        empty = self.paying_run(policy=policy, request_cap=5, group_ids=[])
+        self.assertEqual(empty.attempts.count(), 0)
+        self.assertEqual(empty.snapshot["groups"], [])
+
     def test_decided_results_are_not_retried_without_explicit_refresh(self) -> None:
         self.make_manager()
         policy = self.make_policy()
