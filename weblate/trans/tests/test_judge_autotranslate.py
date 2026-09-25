@@ -2129,6 +2129,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             execution_version=1,
             scope_cursor=0,
             scope_snapshot=[unit.pk],
+            execution_options={"auto_source": "mt", "judge_proposal_only": True},
             preparation_snapshot=PreparationScope(
                 unit_ids=(unit.pk,),
                 missing_ids=(unit.pk,),

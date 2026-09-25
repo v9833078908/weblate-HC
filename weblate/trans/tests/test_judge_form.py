@@ -346,6 +346,7 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
         self.assertEqual(run.scope_path, self.project_language.get_absolute_url())
         self.assertEqual(run.requested_query, "check:repeat-drift")
         self.assertIs(run.execution_options["judge_proposal_only"], True)
+        self.assertIs(run.execution_options["judge_skip_preparation"], True)
         self.assertEqual(run.execution_options["judge_candidate_severities"], [])
         self.assertEqual(run.preparation_snapshot, {})
         self.assertEqual(run.preparation_phase, "")
@@ -397,6 +398,7 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
         prepare.assert_called_once_with()
         run = ProducerRun.objects.get()
         self.assertIs(run.execution_options["judge_proposal_only"], False)
+        self.assertNotIn("judge_skip_preparation", run.execution_options)
         self.assertEqual(
             run.execution_options["judge_candidate_severities"],
             list(DEFAULT_CANDIDATE_SEVERITIES),

@@ -1829,7 +1829,7 @@ def _judge_preparation_preview(batch: BatchAutoTranslate) -> dict[str, object]:
 _AutoTarget = Translation | Component | Category | Project | ProjectLanguage | Workspace
 
 
-def _start_judge_producer_run(
+def _start_judge_producer_run(  # ruff: ignore[complex-structure]
     request: AuthenticatedHttpRequest, obj: _AutoTarget, autoform: AutoForm
 ) -> HttpResponseRedirect:
     form_obj = (
@@ -1908,6 +1908,8 @@ def _start_judge_producer_run(
         ),
         "overwrite_existing": autoform.cleaned_data.get("overwrite_existing", False),
     }
+    if proposal_only:
+        execution_options["judge_skip_preparation"] = True
     dispatch_task_id = uuid4()
     run = ProducerRun.objects.create(
         actor=request.user,

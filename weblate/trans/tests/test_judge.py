@@ -385,7 +385,11 @@ class ProducerRunDispatchTest(ViewTestCase):
             cap=10,
             scope_snapshot=[unit.pk],
             configuration_snapshot=judge_configuration_snapshot(),
-            execution_options={"auto_source": "others", "judge_proposal_only": True},
+            execution_options={
+                "auto_source": "others",
+                "judge_proposal_only": True,
+                "judge_skip_preparation": True,
+            },
         )
         original_target = unit.target
         original_state = unit.state
@@ -452,7 +456,11 @@ class ProducerRunDispatchTest(ViewTestCase):
             cap=10,
             scope_snapshot=[unit.pk],
             configuration_snapshot=judge_configuration_snapshot(),
-            execution_options={"auto_source": "mt", "judge_proposal_only": True},
+            execution_options={
+                "auto_source": "mt",
+                "judge_proposal_only": True,
+                "judge_skip_preparation": True,
+            },
         )
         with (
             patch(
@@ -481,6 +489,43 @@ class ProducerRunDispatchTest(ViewTestCase):
         self.user.save(update_fields=["is_superuser"])
         project = self.component.project
         unit = self.get_unit()
+        for options in ({}, {"auto_source": "mt", "judge_proposal_only": True}):
+            with self.subTest(options=options):
+                run = ProducerRun.objects.create(
+                    actor=self.user,
+                    dispatch_task_id=uuid.uuid4(),
+                    dispatch_phase="judge-project",
+                    scope_type=ProducerRun.ScopeType.PROJECT,
+                    scope_id=str(project.pk),
+                    scope_label=str(project),
+                    scope_path=project.get_absolute_url(),
+                    requested_query="",
+                    requested_mode="judge",
+                    cap=10,
+                    scope_snapshot=[unit.pk],
+                    configuration_snapshot=judge_configuration_snapshot(),
+                    execution_options=options,
+                )
+                with patch("weblate.trans.autotranslate.run_judge_batch") as run_batch:
+                    self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+                run.refresh_from_db()
+                self.assertEqual(run.status, ProducerRun.Status.FAILED)
+                self.assertIn("queued before", run.failure)
+                run_batch.assert_not_called()
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_project_judge_with_incomplete_preparation_snapshot_is_refused(
+        self,
+    ) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        project = self.component.project
+        unit = self.get_unit()
         run = ProducerRun.objects.create(
             actor=self.user,
             dispatch_task_id=uuid.uuid4(),
@@ -494,12 +539,14 @@ class ProducerRunDispatchTest(ViewTestCase):
             cap=10,
             scope_snapshot=[unit.pk],
             configuration_snapshot=judge_configuration_snapshot(),
+            execution_options={"auto_source": "mt", "judge_proposal_only": True},
+            preparation_snapshot={"version": 1},
+            preparation_phase="pending",
         )
         with patch("weblate.trans.autotranslate.run_judge_batch") as run_batch:
             self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
         run.refresh_from_db()
         self.assertEqual(run.status, ProducerRun.Status.FAILED)
-        self.assertIn("queued before", run.failure)
         run_batch.assert_not_called()
 
 

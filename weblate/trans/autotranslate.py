@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any, Literal
 from uuid import uuid4
@@ -70,7 +71,7 @@ from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Sequence
 
     from weblate.auth.models import User
     from weblate.auth.results import PermissionResult
@@ -264,6 +265,20 @@ class PreparationScope:
 
     @staticmethod
     def from_json(payload: Mapping[str, Any]) -> PreparationScope:
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("version") != 1
+            or not isinstance(payload.get("unit_ids"), list)
+            or not isinstance(payload.get("missing_ids"), list)
+            or not isinstance(payload.get("per_language_missing"), dict)
+            or "mt_engine" not in payload
+            or not (
+                payload.get("mt_engine") is None
+                or isinstance(payload.get("mt_engine"), str)
+            )
+        ):
+            msg = "Invalid preparation snapshot"
+            raise ValueError(msg)
         return PreparationScope(
             unit_ids=tuple(int(pk) for pk in payload.get("unit_ids", [])),
             missing_ids=tuple(int(pk) for pk in payload.get("missing_ids", [])),
@@ -2758,16 +2773,25 @@ class BatchAutoTranslate(BaseAutoTranslate):
             producer_run = self._adopt_producer_run()
             if self.mode == "judge" and producer_run is not None:
                 verdict_only = (
-                    producer_run.execution_options.get("judge_proposal_only") is True
+                    producer_run.execution_options.get("judge_skip_preparation") is True
+                    and producer_run.execution_options.get("judge_proposal_only")
+                    is True
                     and not producer_run.preparation_snapshot
                 )
                 # A project judge run requesting MT must carry its closed
-                # preparation scope. An explicitly verdict-only run judges
-                # stored text and has no preparation snapshot by design.
+                # preparation scope. A UI verdict-only run explicitly records
+                # that it judges stored text without preparation.
                 # Older direct/queued launches build their scope here.
+                if producer_run.preparation_snapshot:
+                    try:
+                        preparation_scope = PreparationScope.from_json(
+                            producer_run.preparation_snapshot
+                        )
+                    except (TypeError, ValueError, KeyError):
+                        preparation_scope = None
                 if (
                     self.producer_run_id is not None
-                    and not producer_run.preparation_snapshot
+                    and preparation_scope is None
                     and producer_run.requested_mode == "judge"
                     and producer_run.dispatch_phase == "judge-project"
                     and not verdict_only
@@ -2782,11 +2806,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                         ),
                     )
                     raise JudgeError(producer_run.failure)
-                if producer_run.preparation_snapshot:
-                    preparation_scope = PreparationScope.from_json(
-                        producer_run.preparation_snapshot
-                    )
-                elif not verdict_only:
+                if preparation_scope is None and not verdict_only:
                     preparation_scope = self.build_preparation_scope()
                     producer_run.preparation_snapshot = preparation_scope.to_json()
                     producer_run.preparation_phase = "pending"
