@@ -1368,6 +1368,7 @@ class AutoForm(forms.Form):
         max_value=100,
     )
     next = forms.CharField(required=False, widget=forms.HiddenInput)
+    judge_proposal_only = forms.BooleanField(required=False, widget=forms.HiddenInput)
     overwrite_existing = forms.BooleanField(
         label=gettext_lazy("Overwrite the existing translation"),
         required=False,
@@ -1503,6 +1504,7 @@ class AutoForm(forms.Form):
             Div("component", css_id="auto_source_others"),
             Div("engines", "threshold", css_id="auto_source_mt"),
             Field("overwrite_existing"),
+            Field("judge_proposal_only"),
         )
 
     def clean(self):

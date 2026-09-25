@@ -389,6 +389,14 @@ def show_project_language(
                 obj,
                 obj=obj.project,
                 user=user,
+                initial={
+                    **{
+                        key: request.GET[key]
+                        for key in ("mode", "q", "judge_proposal_only")
+                        if request.GET.get(key)
+                    },
+                    "next": request.GET.get("next", ""),
+                },
             ),
             "bulk_state_form": optional_form(
                 BulkEditForm,

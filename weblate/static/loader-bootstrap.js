@@ -1466,6 +1466,9 @@ onReady(() => {
         apply.disabled = false;
         return;
       }
+      const proposalOnly =
+        isJudge() &&
+        form.querySelector('[name="judge_proposal_only"]')?.value === "1";
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         controller?.abort();
@@ -1498,23 +1501,34 @@ onReady(() => {
                   true,
                 )
               : gettext("Estimated machine translation cost is unavailable.");
-            const scope = isJudge()
-              ? interpolate(
-                  gettext(
-                    "%(matched)s matching strings: %(processed)s selected for pretranslation and possible judge evaluation, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap.",
-                  ),
-                  data,
-                  true,
-                )
-              : interpolate(
-                  gettext(
-                    "%(matched)s matching strings will be considered by the selected machine translation engines.",
-                  ),
-                  data,
-                  true,
-                );
-            preview.textContent = `${scope} ${cost}`;
-            if (isJudge() && data.preparation) {
+            let scope;
+            if (proposalOnly) {
+              scope = interpolate(
+                gettext(
+                  "%(processed)s matching strings selected for judge evaluation; no strings will be pretranslated.",
+                ),
+                data,
+                true,
+              );
+            } else if (isJudge()) {
+              scope = interpolate(
+                gettext(
+                  "%(matched)s matching strings: %(processed)s selected for pretranslation and possible judge evaluation, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap.",
+                ),
+                data,
+                true,
+              );
+            } else {
+              scope = interpolate(
+                gettext(
+                  "%(matched)s matching strings will be considered by the selected machine translation engines.",
+                ),
+                data,
+                true,
+              );
+            }
+            preview.textContent = proposalOnly ? scope : `${scope} ${cost}`;
+            if (isJudge() && !proposalOnly && data.preparation) {
               const prep = data.preparation;
               const languages = Object.keys(prep.per_language).length;
               const preparation =

@@ -30,6 +30,9 @@
           {% translate "Automatic translation via machine translation uses active machine translation engines to get the best possible translations and applies them in this project." %}
         </p>
       {% endif %}
+      {% if autoform.initial.judge_proposal_only %}
+        <p>{% translate "Verdicts are recorded; string states are not changed and no replacement translations are generated." %}</p>
+      {% endif %}
       {% if judge_row_count is not None %}
         <p class="text-muted" id="id_auto_row_count">
           {% blocktranslate count counter=judge_row_count trimmed %}

@@ -4,10 +4,21 @@
 
 from __future__ import annotations
 
-from django.test import override_settings
+from decimal import Decimal
+from unittest import mock
 
+from django.test import override_settings
+from django.urls import reverse
+from lxml import html
+
+from weblate.trans.autotranslate import BatchAutoTranslate, PreparationScope
 from weblate.trans.forms import AutoForm
+from weblate.trans.judge_loop import DEFAULT_CANDIDATE_SEVERITIES
+from weblate.trans.models.judge import ProducerRun
+from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.tasks import _producer_run_dispatch_kwargs
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.stats import ProjectLanguage
 
 
 @override_settings(
@@ -145,3 +156,203 @@ class JudgeAutoFormTest(ViewTestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn("engines", form.errors)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class VerdictOnlyJudgeLaunchTest(ViewTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        self.project_language = ProjectLanguage(
+            self.project, self.get_translation().language
+        )
+        self.queue_url = reverse(
+            "repeat-queue",
+            kwargs={
+                "project": self.project.slug,
+                "language": self.project_language.language.code,
+            },
+        )
+
+    def test_project_language_link_prefills_verdict_only_launch(self) -> None:
+        response = self.client.get(
+            self.project_language.get_absolute_url(),
+            {
+                "mode": "judge",
+                "q": "check:repeat-drift",
+                "judge_proposal_only": "1",
+                "next": self.queue_url,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context["autoform"]
+        self.assertEqual(form.initial["mode"], "judge")
+        self.assertEqual(form.initial["q"], "check:repeat-drift")
+        page = html.fromstring(response.content)
+        self.assertEqual(
+            page.xpath("//input[@name='judge_proposal_only']/@type"), ["hidden"]
+        )
+        self.assertEqual(
+            page.xpath("//input[@name='judge_proposal_only']/@value"), ["1"]
+        )
+        self.assertEqual(page.xpath("//input[@name='next']/@value"), [self.queue_url])
+        self.assertContains(
+            response,
+            "Verdicts are recorded; string states are not changed and no "
+            "replacement translations are generated.",
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_verdict_only_launch_skips_preparation_and_repair_candidates(self) -> None:
+        unit = self.get_unit()
+        preparation = PreparationScope(
+            unit_ids=(unit.pk,),
+            missing_ids=(),
+            per_language_missing={},
+            mt_engine="openrouter",
+        )
+        with (
+            mock.patch.object(
+                BatchAutoTranslate,
+                "preview_judge_scope_snapshot",
+                return_value=(None, [unit]),
+            ),
+            mock.patch.object(
+                BatchAutoTranslate,
+                "build_preparation_scope",
+                return_value=preparation,
+            ) as prepare,
+            mock.patch("weblate.trans.views.edit.get_queue_length", return_value=0),
+            mock.patch("weblate.trans.views.edit.publish_producer_run_dispatch"),
+        ):
+            response = self.client.post(
+                reverse(
+                    "auto_translation",
+                    kwargs={"path": self.project_language.get_url_path()},
+                ),
+                {
+                    "mode": "judge",
+                    "q": "check:repeat-drift",
+                    "auto_source": "mt",
+                    "engines": [],
+                    "threshold": 80,
+                    "judge_proposal_only": "1",
+                    "next": self.queue_url,
+                },
+            )
+
+        self.assertRedirects(response, self.queue_url)
+        prepare.assert_not_called()
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.scope_type, ProducerRun.ScopeType.PROJECT)
+        self.assertEqual(run.scope_path, self.project_language.get_absolute_url())
+        self.assertEqual(run.requested_query, "check:repeat-drift")
+        self.assertIs(run.execution_options["judge_proposal_only"], True)
+        self.assertEqual(run.execution_options["judge_candidate_severities"], [])
+        self.assertEqual(run.preparation_snapshot, {})
+        self.assertEqual(run.preparation_phase, "")
+        dispatch = _producer_run_dispatch_kwargs(run)
+        self.assertIs(dispatch["judge_proposal_only"], True)
+        self.assertEqual(dispatch["judge_candidate_severities"], ())
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_regular_judge_launch_preserves_preparation_and_repair_candidates(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        preparation = PreparationScope(
+            unit_ids=(unit.pk,),
+            missing_ids=(),
+            per_language_missing={},
+            mt_engine="openrouter",
+        )
+        with (
+            mock.patch.object(
+                BatchAutoTranslate,
+                "preview_judge_scope_snapshot",
+                return_value=(None, [unit]),
+            ),
+            mock.patch.object(
+                BatchAutoTranslate,
+                "build_preparation_scope",
+                return_value=preparation,
+            ) as prepare,
+            mock.patch("weblate.trans.views.edit.get_queue_length", return_value=0),
+            mock.patch("weblate.trans.views.edit.publish_producer_run_dispatch"),
+        ):
+            response = self.client.post(
+                reverse(
+                    "auto_translation",
+                    kwargs={"path": self.project_language.get_url_path()},
+                ),
+                {
+                    "mode": "judge",
+                    "q": "check:repeat-drift",
+                    "auto_source": "mt",
+                    "engines": [],
+                    "threshold": 80,
+                    "next": self.queue_url,
+                },
+            )
+
+        self.assertRedirects(response, self.queue_url)
+        prepare.assert_called_once_with()
+        run = ProducerRun.objects.get()
+        self.assertIs(run.execution_options["judge_proposal_only"], False)
+        self.assertEqual(
+            run.execution_options["judge_candidate_severities"],
+            list(DEFAULT_CANDIDATE_SEVERITIES),
+        )
+        self.assertEqual(run.preparation_snapshot, preparation.to_json())
+        self.assertEqual(run.preparation_phase, "pending")
+
+    @override_settings(JUDGE_MAX_REPAIR_ATTEMPTS=2)
+    def test_verdict_only_preview_prices_initial_judgement_only(self) -> None:
+        for model, cost in (("vendor-a/model", "0.01"), ("vendor-b/model", "0.02")):
+            for _ in range(5):
+                LLMUsageLog.objects.create(
+                    model=model,
+                    service="openrouter",
+                    project_id_snapshot=self.project.pk,
+                    project_slug=self.project.slug,
+                    operation=LLMUsageLog.Operation.JUDGE,
+                    cost_usd=cost,
+                    unit_count=1,
+                )
+        url = reverse(
+            "auto_translation_preview", kwargs={"path": self.translation.get_url_path()}
+        )
+        params = {
+            "mode": "judge",
+            "q": "state:empty",
+            "auto_source": "mt",
+            "engines": [],
+            "threshold": 80,
+        }
+        verdict_only = self.client.get(url, {**params, "judge_proposal_only": "1"})
+        regular = self.client.get(url, params)
+
+        self.assertEqual(verdict_only.status_code, 200)
+        self.assertEqual(regular.status_code, 200)
+        self.assertIsNone(verdict_only.json()["preparation"])
+        self.assertIsNotNone(regular.json()["preparation"])
+        self.assertTrue(verdict_only.json()["judge_cost"]["available"])
+        processed = verdict_only.json()["processed"]
+        self.assertGreater(processed, 0)
+        self.assertEqual(
+            Decimal(verdict_only.json()["judge_cost"]["max"]),
+            Decimal("0.03") * processed,
+        )
+        self.assertEqual(
+            Decimal(regular.json()["judge_cost"]["max"]),
+            Decimal("0.03") * processed * 3,
+        )
