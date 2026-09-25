@@ -8,10 +8,13 @@ Status: **phase 1 (Tasks 1-7) complete on 2026-09-25, including the code
 review fixes recorded under Results. The paid judge run on anvil-saga / fr
 ran on 2026-09-25 (383 open groups: 25 ready, 351 choose, 7 rewrite). Phase 2
 (Tasks 8-10) is superseded by phase 2b (Tasks 11-15, D13-D16), approved by the
-owner on 2026-09-25; phase 2b code (Tasks 11-14 and the Task 15 strings and
-tests) is implemented on `feat/repeat-judge-compare`; the paid comparison
-for anvil-saga / fr has not been started. The 25-ready-group precision
-gate still stands before the owner uses bulk apply (D16).**
+owner on 2026-09-25; phase 2b (Tasks 11-15) is on `main`, and the paid
+comparison for anvil-saga / fr ran on 2026-09-25 (38 requests, $0.64; 383
+open groups: 319 ready, 57 choose, 7 rewrite). Phase 2c (Tasks 16-17,
+D17-D18), approved by the owner on 2026-09-25: Task 17 (bulk review page) is
+on `main`; Task 16 (always preselect the best choice) is in progress on
+`feat/repeat-best-preselect`. The 25-ready-group precision gate still stands
+before the owner uses bulk apply (D16).**
 This version replaces the 2026-09-24 text (judge preselection only, bulk apply
 out of scope). Editing this plan does not authorize deploying it or starting a
 paid judge run or a paid comparison.
@@ -77,7 +80,9 @@ such groups are applied in bulk after one review table.
 | D13 | Auto comparison after the queue's judge run (owner, 2026-09-25). | When a queue judge run reaches `COMPLETED`, one repeat recommendation run (`weblate/trans/repeat_recommendations.py`, prompt `weblate/trans/prompts/repeat_recommendation.txt`) is enqueued for the open groups the judge alone puts in `ready` or `choose` that have no current recommendation (owner amendment, 2026-09-25: `ready` groups are compared too, so the model can confirm or contest a single passed variant; on anvil-saga / fr that is 25 + 351 groups). A queue judge run is `requested_mode="judge"`, `ScopeType.PROJECT` with `scope_path` = the project-language URL of an enabled repeat policy, `execution_options.judge_proposal_only` true, and `requested_query` starting with `check:repeat-drift` (a narrowed `check:repeat-drift AND id:...` run counts; `latest_repeat_judge_run` uses the same prefix). Actor = the judge run's actor; profile and endpoint exactly as `repeat_recommend` builds them (`prepare_run`, seat 1, primary endpoint); the request cap equals the number of groups, so no sendable group is left unsent. `PARTIAL`, `FAILED` and `CANCELLED` runs start no comparison: a cancel is an explicit stop of spend, a failure usually means a provider or configuration problem the comparison would repeat, and a partial run leaves groups unchecked; relaunching the check (cached verdicts are free) and letting it complete starts the comparison. The engine's rules still decide what is paid: current results and active reservations are never repurchased, unknown deliveries are never replayed. The outcome is recorded once in `ProducerRun.summary["repeat_comparison"]`, taken under a row lock, so a redelivered completion finds it and starts nothing. A keyless or unconfigured judge, a missing policy, a deleted actor or an actor without `project.edit` (which `prepare_run` requires) records `skipped` with a reason code and raises nothing; the judge run is already final when the comparison task runs. |
 | D14 | Consent: nothing paid without a click (owner, 2026-09-25). | The one "Check variants with the judge" click covers both paid steps. The verdict-only launch form for the queue's scope states that a comparison of variants follows for groups where the judge accepts several variants, and the launch preview shows its planned volume next to the judge estimate: the upper bound of groups (diverging groups of the policy, one query) and requests (groups / `REPEAT_RECOMMENDATION_BATCH_SIZE`, rounded up; the engine's 128 KiB request bound can split a batch of very large groups further). Wording goes through gettext and the Russian catalogs. |
 | D15 | Card and buckets use the comparison (owner, 2026-09-25, amended the same day). | A `choose` group whose current recommendation is `use_existing` with a target equal to a judge-passed variant becomes `ready`: that target is recommended and preselected (single-form groups only, as today) with "Model rationale: ...". `keep_independent` on a `choose` group preselects "Different meanings: do not link these places" (single-form groups only) with the rationale and stays counted in `choose` (no fifth bucket). `propose_new`, `needs_human`, and `use_existing` pointing at a flagged or unchecked variant stay `choose` with the rationale visible and nothing preselected. A judge-only `ready` group whose recommendation is `use_existing` with the same target stays `ready`; any disagreement (another target, `keep_independent`, `propose_new`, `needs_human`) moves it to `choose` with the rationale visible and nothing preselected. A judge-only `ready` group without a recommendation keeps the judge-only behaviour; `rewrite` and `unchecked` ignore the model. A group with an approved place stays `choose` even when the model picks a passed variant (D4: an approved place is a human decision the model does not override). The judge-only `ready` rule (exactly one passed variant) is unchanged. The panel shows "Comparing variants: N groups" while a recommendation run of the policy is queued or running (N = sendable groups in its frozen snapshot). |
-| D16 | Bulk apply reuses the recommendation review (owner, 2026-09-25). | Every `ready` group with a current `use_existing` result is counted by the banner, so once every `ready` group has a result the `ready` count equals the banner count (test). The queue's `bulk_ready` banner and `repeat_bulk_review` from `docs/product/plans/2026-09-23-repeat-queue-speed-and-bulk-recommendations.md` accept the comparison's results unchanged (same result model, same engine). Tasks 8-10 are superseded: judge-only `ready` groups (no model result) are decided one by one on the card. The 25-ready-group precision read stays a gate before the owner uses bulk apply. Known limits, not changed here: the review lists every current `use_existing` / `propose_new` result checked by default, including ones the queue keeps in `choose`; and a result for a group whose source also has a needs-editing or empty place is skipped as stale at item time (Out of scope, model path follow-up). |
+| D16 | Bulk apply reuses the recommendation review (owner, 2026-09-25). | Every `ready` group with a current `use_existing` result is counted by the banner, so once every `ready` group has a result the `ready` count equals the banner count (test). The queue's `bulk_ready` banner and `repeat_bulk_review` from `docs/product/plans/2026-09-23-repeat-queue-speed-and-bulk-recommendations.md` accept the comparison's results unchanged (same result model, same engine). Tasks 8-10 are superseded: judge-only `ready` groups (no model result) are decided one by one on the card. The 25-ready-group precision read stays a gate before the owner uses bulk apply. Known limits, not changed here: the review lists every current `use_existing` / `propose_new` result checked by default, including ones the queue keeps in `choose` (superseded by D18: only `ready` rows are checked); and a result for a group whose source also has a needs-editing or empty place is skipped as stale at item time (Out of scope, model path follow-up). |
+| D17 | Every open group always carries the best available preselection (owner, 2026-09-25). Supersedes D15 where D15 leaves a group with nothing preselected, and the D15 rule that any model disagreement moves a judge-`ready` group to `choose`. | One pure selection function answers for the card, the bulk review and the banner; first match wins, and a variant the judge flagged is never preselected. (1) The model's `use_existing` target is a judge-passed variant: that variant. (2) Exactly one variant passed: that variant, whatever the model said (a flagged pick, `keep_independent`, `propose_new`, `needs_human`). Example: "Основание" with Armature and Monture flagged, Base passed and the model advising `keep_independent` preselects Base and is `ready`. (A) A variant with an approved place that the judge did not flag. (3) The model's `keep_independent`: "Different meanings: do not link these places". (4) Several passed: the passed variant with the most places (tie: queue order). (5) The model's `propose_new`: "Enter a new translation" prefilled with the model's text. (6) The model's `use_existing` of an unchecked variant, else the unchecked variant with the most places. (7) Every variant flagged and no model text: nothing preselected. No judge run, stale verdicts and unparsed verdicts all read as unchecked (B), so rules 3, 5 and 6 apply; stale model results are ignored as today (D). Partial coverage (some variants unchecked) still preselects among the passed variants (C). The card adds nothing new (F, owner: keep the UI minimal): the preselection is the checked radio, or the prefilled field for rule 5. The existing "Recommended" mark and header badge appear only on a judge-passed pick (rules 1, 2 and 4); every other preselection is a checked control without a mark, and the existing group-level "Model rationale" line already explains a model-sourced one. For rule 7 the existing flagged marks and "Choose an option to continue" hint already say enough. Bulk-ready (checked on the review page, counted in the `ready` tile and banner) means rule 1 or 2 picked a judge-passed existing variant, every variant is checked (D9) and no place is approved (D4); when rule 2 overrides the model, the review row applies the judge's variant, carried through the signed manifest into the item's decision and still guarded by the result and context fingerprints. Plural groups: the card still preselects nothing while variant radios post only the first form (E, Out of scope); bulk rows carry full forms, so a plural group picked by rule 1 or 2 is bulk-ready. `rewrite` groups join the comparison scope after future judge runs so rule 5 can offer them a new translation; the comparison prompt and group context are unchanged, so stored results stay current. |
+| D18 | The bulk review page fits one screen of decisions (owner, 2026-09-25). | The apply button and a live "N groups selected, M places will change" summary sit on the first screen with "Select all ready" and "Clear all". Rows are paged 50 at a time on the client inside one form, so a selection on any page is applied together. Only bulk-ready rows are checked by default; every other applicable row sits unchecked in a collapsed "Needs your attention" section with its reason. A group's places load on demand below its row across the full table width, bounded with a link to the standalone places page. The page reads recommendation contexts in one unit query instead of one preview per group. |
 
 ## Evidence the design rests on
 
@@ -1084,6 +1089,47 @@ Commit `feat(repeats): let the model comparison settle judge buckets` and
 Commit `fix(i18n): translate the judge-then-compare repeat queue` and
 `docs(repeats): record the judge-then-compare results`.
 
+## Phase 2c: best preselection and a usable bulk review (D17-D18)
+
+Why: after the comparison, a group where the model contested the judge's only
+passed variant ("Основание": `keep_independent` against Base) lost its
+preselection, and 57 `choose` plus 7 `rewrite` groups showed nothing checked.
+The bulk review page took 13 seconds and 9000+ queries to render 331 rows,
+had its apply button below every row, and expanded a group's places inside
+one narrow column.
+
+### Task 16: one selection function for card, bulk review and banner (D17)
+
+**Files:**
+
+- Modify: `weblate/trans/repeat_judge.py` (selection function;
+  `_settle_with_model` follows D17; `_start_comparison` adds `rewrite`)
+- Modify: `weblate/trans/views/repeats.py` (card preselection and `bulk_ready`
+  read the selection)
+- Modify: `weblate/trans/repeat_bulk.py` (`plan_bulk` rows for rule-2
+  overrides, including `keep_independent` / `needs_human` results; the
+  manifest carries the override target; `start_bulk` writes it into
+  `decision["target"]`)
+- Modify: `weblate/templates/snippets/repeat_group.html` (checked state only)
+- Test: `weblate/trans/tests/test_repeat_judge.py` (one table of the rule
+  combinations: no judge with and without each model action, partial
+  coverage, approved with and without a flag, all flagged with and without
+  model text, several passed with and without a model pick, the
+  "Основание" case, a plural group), `test_repeat_bulk.py` (the override
+  target is frozen and applied), `test_repeat_views.py` (card per rule;
+  banner equals checked review rows)
+
+No new model, migration, badge or line of card text. Commit
+`feat(repeats): always preselect the best choice for a repeat group`.
+
+### Task 17: bulk review page (D18)
+
+Done on `main`: `156c9b24` (contexts in one unit query), `2bb97d83` (first
+screen apply, 50-row pages, only `ready` rows checked, attention section),
+`21099267` (the banner counts only `ready` groups). Follow-up in progress:
+the places detail spans the table width under its row, and the selection
+summary is translated.
+
 ### Out of scope
 
 - Starting the judge from the queue without the launch form, and any
@@ -1091,16 +1137,20 @@ Commit `fix(i18n): translate the judge-then-compare repeat queue` and
   covers (D14).
 - A separate button or page for the comparison, and a comparison after a
   `PARTIAL`, `FAILED` or `CANCELLED` judge run (D13).
-- Unchecking bulk review rows whose target the judge flagged, and bulk apply
-  of judge-only `ready` groups (Tasks 8-10, superseded by D16).
+- Bulk apply of judge-only `ready` groups without any model result (Tasks
+  8-10, superseded by D16); D18 already leaves rows outside `ready`
+  unchecked, and D17 lets a judge-passed variant override a model result.
 - Deleting the model-recommendation code or its pages.
 - Undo restoring the previous state (it restores text and sets
   `STATE_TRANSLATED`) and removing shared memberships
   (`weblate/trans/repeats.py:740-813`).
 - `apply_preview` stamping `decision_origin="manual"` for bulk writes.
 - Plural groups on the card: variant radios post only the first form
-  (`weblate/templates/snippets/repeat_group.html:59-62`); this plan never
-  preselects them, and bulk items already carry full forms.
+  (`weblate/templates/snippets/repeat_group.html:59-62`); the card never
+  preselects them (D17 E), and bulk items already carry full forms.
+- Language of the rationales: the judge and the model sometimes answer in
+  English although the prompts ask for the source language; a prompt change
+  of its own.
 - Follow-up, model path: `prepare_run` freezes contexts with
   `live_group_contexts` (translated places only) while item time uses
   `_item_context` (all places of the source), so a model recommendation for a
@@ -1217,6 +1267,16 @@ Phase 2:
 | Review page query count and time on the anvil-saga / fr copy | Pending (gated) |
 | Real bulk apply and undo | Pending (gated) |
 
+Phase 2b and 2c on anvil-saga / fr, 2026-09-25:
+
+| Check | Result |
+| --- | --- |
+| Paid comparison | The first attempt was cancelled after 8 sends: a streaming seat profile read the one-JSON response as SSE and hit the 30-second idle timeout. Fixed in `e0b4b3f9` (a non-stream body is read as JSON with the full deadline); `REPEAT_RECOMMENDATION_BATCH_SIZE` lowered to 10. The rerun completed 38 of 38 requests for $0.64: 331 `use_existing`, 40 `needs_human`, 5 `keep_independent`. |
+| Buckets | Judge alone: 25 ready, 351 choose, 7 rewrite. After the comparison: 319 ready, 57 choose, 7 rewrite, 0 unchecked. |
+| Bulk review page (D18) | Before: about 13 s and 9000+ queries. After `156c9b24`: about 1-1.8 s and 41 queries; 319 rows checked, 12 in "Needs your attention". Queue banner, `ready` tile and checked rows all read 319 after `21099267`. |
+| Best preselection (D17) | Pending Task 16. |
+| 25-ready-group precision read | Pending, owner. |
+
 ### GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
@@ -1227,6 +1287,6 @@ Phase 2:
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | - | - |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | - | - |
 
-- **VERDICT:** ENG CLEARED - ready to implement phase 1 after the owner approves this plan; phase 2 waits for the Task 7 gate. Phase 2b (D13-D16) was approved by the owner on 2026-09-25 and has not had its own engineering review.
+- **VERDICT:** ENG CLEARED - ready to implement phase 1 after the owner approves this plan; phase 2 waits for the Task 7 gate. Phase 2b (D13-D16) and phase 2c (D17-D18) were approved by the owner on 2026-09-25 and have not had their own engineering review.
 
 NO UNRESOLVED DECISIONS
