@@ -1552,12 +1552,18 @@ onReady(() => {
               const judgeCost = data.judge_cost.available
                 ? interpolate(
                     gettext(
-                      "Estimated judge cost upper bound: %(min)s to %(max)s USD.",
+                      proposalOnly
+                        ? "Estimated judge cost for the initial check: %(min)s to %(max)s USD."
+                        : "Estimated judge cost upper bound: %(min)s to %(max)s USD.",
                     ),
                     data.judge_cost,
                     true,
                   )
-                : gettext("Estimated judge cost upper bound is unavailable.");
+                : gettext(
+                    proposalOnly
+                      ? "Estimated judge cost for the initial check is unavailable."
+                      : "Estimated judge cost upper bound is unavailable.",
+                  );
               preview.textContent += ` ${judgeCost}`;
             }
             showPreview();
