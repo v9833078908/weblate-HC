@@ -11,9 +11,9 @@ ran on 2026-09-25 (383 open groups: 25 ready, 351 choose, 7 rewrite). Phase 2
 owner on 2026-09-25; phase 2b (Tasks 11-15) is on `main`, and the paid
 comparison for anvil-saga / fr ran on 2026-09-25 (38 requests, $0.64; 383
 open groups: 319 ready, 57 choose, 7 rewrite). Phase 2c (Tasks 16-17,
-D17-D18), approved by the owner on 2026-09-25: Task 17 (bulk review page) is
-on `main`; Task 16 (always preselect the best choice) is in progress on
-`feat/repeat-best-preselect`. The 25-ready-group precision gate still stands
+D17-D18), approved by the owner on 2026-09-25, is on `main`: after it, 334
+ready, 42 choose, 7 rewrite, and every group except the 7 `rewrite` groups
+has a preselection. The 25-ready-group precision gate still stands
 before the owner uses bulk apply (D16).**
 This version replaces the 2026-09-24 text (judge preselection only, bulk apply
 out of scope). Editing this plan does not authorize deploying it or starting a
@@ -1119,16 +1119,25 @@ one narrow column.
   target is frozen and applied), `test_repeat_views.py` (card per rule;
   banner equals checked review rows)
 
-No new model, migration, badge or line of card text. Commit
-`feat(repeats): always preselect the best choice for a repeat group`.
+No new model, migration, badge or line of card text. Done: `d8edde89`,
+`081fafe5`, `03e17dc9` (merged with Task 17). Implementation choices beyond
+D17: a group with two passed variants and an unchecked one keeps its `choose`
+bucket (the judgement rule orders "two or more passed" before "unchecked"),
+preselects among the passed ones and is not bulk-ready, its review row giving
+the reason "not every variant checked"; an approved pick carries no
+"Recommended" mark even when the judge passed it; rule 5 is skipped when the
+model's text equals a flagged variant; the launch form's consent line names
+the `rewrite` groups that are now compared (D14).
 
 ### Task 17: bulk review page (D18)
 
 Done on `main`: `156c9b24` (contexts in one unit query), `2bb97d83` (first
 screen apply, 50-row pages, only `ready` rows checked, attention section),
-`21099267` (the banner counts only `ready` groups). Follow-up in progress:
-the places detail spans the table width under its row, and the selection
-summary is translated.
+`21099267` (the banner counts only `ready` groups), `695493cb`, `5691695d`,
+`97c778f1` (a row's places open below it across the table width and list only
+the places that change, key and current translation, at most 10, then one
+line counting the rest). The selection summary was already translated: the
+English text came from the one-hour cache of `/js/i18n/`.
 
 ### Out of scope
 
@@ -1274,7 +1283,7 @@ Phase 2b and 2c on anvil-saga / fr, 2026-09-25:
 | Paid comparison | The first attempt was cancelled after 8 sends: a streaming seat profile read the one-JSON response as SSE and hit the 30-second idle timeout. Fixed in `e0b4b3f9` (a non-stream body is read as JSON with the full deadline); `REPEAT_RECOMMENDATION_BATCH_SIZE` lowered to 10. The rerun completed 38 of 38 requests for $0.64: 331 `use_existing`, 40 `needs_human`, 5 `keep_independent`. |
 | Buckets | Judge alone: 25 ready, 351 choose, 7 rewrite. After the comparison: 319 ready, 57 choose, 7 rewrite, 0 unchecked. |
 | Bulk review page (D18) | Before: about 13 s and 9000+ queries. After `156c9b24`: about 1-1.8 s and 41 queries; 319 rows checked, 12 in "Needs your attention". Queue banner, `ready` tile and checked rows all read 319 after `21099267`. |
-| Best preselection (D17) | Pending Task 16. |
+| Best preselection (D17) | After the merge: 334 ready, 42 choose, 7 rewrite. Picks: 319 model and judge agree, 15 only passed variant (the judge overrides the model, among them "Основание" -> Base), 38 most-used passed, 4 different meanings, 7 none (every variant flagged, no model text yet). The review page checks 334 rows, 399 places; banner, `ready` tile and checked rows agree. Tests: 192 passed across `test_repeat_judge.py`, `test_repeat_bulk.py`, `test_repeat_views.py`, `test_repeats.py`, `test_judge_form.py`. |
 | 25-ready-group precision read | Pending, owner. |
 
 ### GSTACK REVIEW REPORT
