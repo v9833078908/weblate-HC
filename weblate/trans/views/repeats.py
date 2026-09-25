@@ -370,7 +370,12 @@ def repeat_queue(request, project: str, language: str):
             project=obj, target_language=target_language, actor=request.user
         )
     groups = _queue_groups(request, policy) if policy is not None else []
-    judge_panel = _judge_panel(request, obj, target_language, groups)
+    judge_panel = (
+        _judge_panel(request, obj, target_language, groups)
+        if policy is not None
+        else None
+    )
+    judge_buckets = judge_panel["buckets"] if judge_panel is not None else {}
     requested_status = request.GET.get("status", "open")
     status_aliases = {
         "all": None,
@@ -388,7 +393,7 @@ def repeat_queue(request, project: str, language: str):
         if wanted is None or item["status"] == wanted or item["status"] in wanted
     ]
     requested_judge = request.GET.get("judge")
-    if requested_judge in judge_panel["buckets"]:
+    if requested_judge in judge_buckets:
         filtered_groups = [
             item
             for item in filtered_groups
@@ -408,7 +413,7 @@ def repeat_queue(request, project: str, language: str):
     query.pop("limit", None)
     query.pop("done", None)
     query["status"] = requested_status
-    if requested_judge not in judge_panel["buckets"]:
+    if requested_judge not in judge_buckets:
         query.pop("judge", None)
     page_obj = Paginator(filtered_groups, 20).get_page(request.GET.get("page"))
     current = (
@@ -458,7 +463,7 @@ def repeat_queue(request, project: str, language: str):
             "bulk_review_url": bulk_review_url,
             "judge_panel": judge_panel,
             "judge_filter": requested_judge
-            if requested_judge in judge_panel["buckets"]
+            if requested_judge in judge_buckets
             else None,
         },
     )

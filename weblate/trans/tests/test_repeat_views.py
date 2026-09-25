@@ -65,6 +65,22 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertContains(response, "Repeat queue")
         self.assertContains(response, "No active repeat rule exists")
 
+    def test_queue_without_policy_skips_the_judge_panel(self) -> None:
+        with patch("weblate.trans.views.repeats._judge_panel") as judge_panel:
+            response = self.client.get(
+                reverse(
+                    "repeat-queue",
+                    kwargs={"project": self.project.slug, "language": "cs"},
+                )
+                + "?status=open&judge=ready"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        judge_panel.assert_not_called()
+        self.assertIsNone(response.context["judge_panel"])
+        self.assertIsNone(response.context["judge_filter"])
+        self.assertNotIn("judge=", response.context["query_string"])
+
     def add_repeat(self, source: str, targets: list[str], start: int = 1000):
         translation = self.component.translation_set.get(language_code="cs")
         for position, target in enumerate(targets, start=start):
