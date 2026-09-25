@@ -33095,35 +33095,7 @@ msgstr "Обратный перевод: %(translation)s"
 msgid "Judge's reason: %(reason)s"
 msgstr "Обоснование судьи: %(reason)s"
 
+#: weblate/templates/snippets/repeat_group.html:23
 #, python-format
-msgid "How to sort out %(count)s groups quickly"
-msgid_plural "How to sort out %(count)s groups quickly"
-msgstr[0] "Как быстро разобрать %(count)s группу"
-msgstr[1] "Как быстро разобрать %(count)s группы"
-msgstr[2] "Как быстро разобрать %(count)s групп"
-
-msgid "The judge checks every translation variant and marks errors. Where exactly one variant has none, it is recommended in the group."
-msgstr "Судья проверит каждый вариант перевода и отметит ошибки. Если в группе ровно один вариант без ошибок, он будет рекомендован."
-
-#, python-format
-msgid "Opens the usual judge launch for these %(count)s places. The check is paid: when enough history exists, an estimate is shown before launch; the actual spend is in the run report."
-msgid_plural "Opens the usual judge launch for these %(count)s places. The check is paid: when enough history exists, an estimate is shown before launch; the actual spend is in the run report."
-msgstr[0] "Откроется обычный запуск проверки судьёй для этих %(count)s мест. Проверка платная: если хватает истории, оценка видна перед запуском; фактические расходы - в отчёте проверки."
-msgstr[1] "Откроется обычный запуск проверки судьёй для этих %(count)s мест. Проверка платная: если хватает истории, оценка видна перед запуском; фактические расходы - в отчёте проверки."
-msgstr[2] "Откроется обычный запуск проверки судьёй для этих %(count)s мест. Проверка платная: если хватает истории, оценка видна перед запуском; фактические расходы - в отчёте проверки."
-
-msgid "exactly one variant without errors"
-msgstr "ровно один вариант без ошибок"
-
-msgid "several variants passed, the choice is yours"
-msgstr "судья одобрил несколько вариантов, выбор за вами"
-
-msgid "errors in every variant, a new translation is needed"
-msgstr "ошибки во всех вариантах, нужен новый перевод"
-
-msgid "not checked by the judge"
-msgstr "не проверены судьёй"
-
-#, python-format
-msgid "Back-translation: %(text)s"
-msgstr "Обратный перевод: %(text)s"
+msgid "Recommended: %(target)s"
+msgstr "Рекомендуем: %(target)s"
