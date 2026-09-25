@@ -1,0 +1,42 @@
+{% load i18n %}
+
+<tr data-writable="{{ row.writable }}">
+  <td>
+    <input class="form-check-input"
+           type="checkbox"
+           name="result"
+           id="result-{{ row.result_id }}"
+           aria-labelledby="{{ apply_label }} source-{{ row.result_id }}"
+           value="{{ row.result_id }}"
+           {% if checked %}checked{% endif %} />
+  </td>
+  <td id="source-{{ row.result_id }}" lang="{{ policy.source_language.code }}">
+    {% for form in row.source_forms %}<code>{{ form }}</code>{% if not forloop.last %} / {% endif %}{% endfor %}
+  </td>
+  <td lang="{{ language.code }}">
+    {% for form in row.target_forms %}<code>{{ form }}</code>{% if not forloop.last %} / {% endif %}{% endfor %}
+    {% if row.action == "propose_new" %}<span class="d-block text-muted small">{{ row.action_label }}</span>{% endif %}
+  </td>
+  <td>
+    <details class="rq-places" data-url="{{ row.places_url }}">
+      <summary>
+        {% blocktranslate count counter=row.writable %}{{ counter }} place changes{% plural %}{{ counter }} places change{% endblocktranslate %}
+        <span class="d-block text-muted">{% blocktranslate count counter=row.places %}of {{ counter }} place{% plural %}of {{ counter }} places{% endblocktranslate %}</span>
+      </summary>
+      <div class="rq-places-body">
+        <a href="{{ row.places_url }}">{% translate "Show every place" %}</a>
+      </div>
+    </details>
+  </td>
+  {% if row.attention %}<td>{{ row.attention_label }}</td>{% endif %}
+  <td>
+    {% if row.rationale|length > 140 %}
+      <details>
+        <summary>{{ row.rationale|truncatechars:140 }}</summary>
+        {{ row.rationale }}
+      </details>
+    {% else %}
+      {{ row.rationale }}
+    {% endif %}
+  </td>
+</tr>

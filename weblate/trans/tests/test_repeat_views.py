@@ -861,7 +861,22 @@ class RepeatBulkViewsTest(ViewTestCase):
         content = " ".join(response.content.decode().split())
         self.assertIn(f'value="{value}" checked', content)
 
-    def test_review_renders_rows_places_and_counts(self) -> None:
+    def places_url(self, result) -> str:
+        return reverse(
+            "repeat-bulk-places",
+            kwargs={
+                "project": self.project.slug,
+                "language": "cs",
+                "result_id": result.pk,
+            },
+        )
+
+    def assert_unchecked(self, response, value: int) -> None:
+        content = " ".join(response.content.decode().split())
+        self.assertIn(f'value="{value}"', content)
+        self.assertNotIn(f'value="{value}" checked', content)
+
+    def test_review_renders_compact_rows_and_places_on_demand(self) -> None:
         group, units = self.make_group(
             "A shared sword name", ["Old", "Older", "Shared", "Oddest"]
         )
@@ -878,28 +893,47 @@ class RepeatBulkViewsTest(ViewTestCase):
         response = self.client.get(self.review_url)
 
         self.assertEqual(response.status_code, 200)
-        # The manifest and exactly the reviewed result as a checked form field.
         self.assertContains(response, 'name="manifest"')
         self.assertContains(response, 'name="result"', count=1)
-        self.assert_checked(response, result.pk)
-        # Every source/target plural form, the action and the rationale.
+        # One compact row: source, target, action, rationale and the count.
         self.assertContains(response, "A shared sword name")
         self.assertContains(response, "Propose a new translation")
         self.assertContains(response, "The key names this exact meaning.")
         self.assertContains(response, "<code>Shared</code>")
-        # Conservative writable count; approved is neither writable nor just
-        # labeled excluded.
-        self.assertContains(response, "1 place can change.")
-        self.assertContains(response, "1 place already has this translation.")
-        self.assertContains(response, "1 place: Approved, not changed")
-        self.assertContains(response, "Explicit exceptions (stay unchanged):")
-        self.assertContains(response, f"#{units[0].pk}")
-        self.assertContains(response, "Excluded", count=1)
-        # Per-place rows show key, component and current target with unit ids.
-        self.assertContains(response, "A shared sword name-1000")
-        self.assertContains(response, "A shared sword name-1003")
-        self.assertContains(response, "<code>Oddest</code>")
-        self.assertContains(response, "<code>Older</code>")
+        self.assertContains(response, "1 place change")
+        self.assertContains(response, "of 4 places")
+        # Per-place detail is not rendered until it is asked for.
+        self.assertContains(response, self.places_url(result))
+        self.assertNotContains(response, "A shared sword name-1000")
+        self.assertNotContains(response, "<code>Oddest</code>")
+
+        places = self.client.get(self.places_url(result))
+
+        self.assertEqual(places.status_code, 200)
+        self.assertContains(places, 'class="rq-places-detail"')
+        for unit in units:
+            self.assertContains(places, unit.get_absolute_url())
+        self.assertContains(places, '<code lang="cs">Oddest</code>', html=True)
+        self.assertContains(places, "Approved, not changed")
+        self.assertContains(places, "Already translated this way")
+        self.assertContains(places, "Excluded by the model")
+        self.assertEqual(RepeatDecisionEvent.objects.count(), 0)
+
+    def test_places_refuse_manual_results_and_other_policies(self) -> None:
+        group, units = self.make_group("Manual places", ["M1", "M2"], start=1500)
+        manual = self.make_recommendation(
+            self.make_recommendation_run(),
+            group,
+            units,
+            target=[],
+            action="needs_human",
+        )
+        self.assertEqual(self.client.get(self.places_url(manual)).status_code, 404)
+        other = reverse(
+            "repeat-bulk-places",
+            kwargs={"project": self.project.slug, "language": "de", "result_id": 1},
+        )
+        self.assertEqual(self.client.get(other).status_code, 404)
 
     def test_review_lists_needs_human_and_keep_independent(self) -> None:
         human_group, human_units = self.make_group(
@@ -960,7 +994,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         response = self.client.get(self.review_url)
 
         self.assertContains(response, 'name="result"', count=1)
-        self.assert_checked(response, current.pk)
+        self.assert_unchecked(response, current.pk)
         self.assertNotContains(response, f'value="{stale.pk}"')
         self.assertContains(
             response,
@@ -1052,8 +1086,8 @@ class RepeatBulkViewsTest(ViewTestCase):
         content = response.content.decode()
 
         self.assertContains(response, 'name="result"', count=2)
-        self.assert_checked(response, first.pk)
-        self.assert_checked(response, second.pk)
+        self.assert_unchecked(response, first.pk)
+        self.assert_unchecked(response, second.pk)
         # Stable queue order: short strings first.
         self.assertLess(content.index("Sword"), content.index("A long sentence"))
 
@@ -1072,7 +1106,7 @@ class RepeatBulkViewsTest(ViewTestCase):
 
         response = self.client.get(self.review_url)
 
-        self.assert_checked(response, result.pk)
+        self.assert_unchecked(response, result.pk)
         self.assertContains(response, "Partial provider line")
 
     def test_stale_post_explains_and_refreshes_without_writes(self) -> None:
@@ -2282,6 +2316,163 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertContains(review, 'name="result"', count=2)
         for result in RepeatRecommendationResult.objects.all():
             self.assert_checked(review, result.pk)
+
+    def ready_recommendation(self, source: str, start: int):
+        """One queue-ready group: the model picks the only passed variant."""
+        group, units = self.judged_group(
+            source, [JudgeVerdict.Severity.NONE, JudgeVerdict.Severity.MAJOR], start
+        )
+        return self.make_recommendation(
+            self.make_recommendation_run(),
+            group,
+            units,
+            action="use_existing",
+            target=[f"{source} 0"],
+        )
+
+    def test_review_selects_exactly_the_queue_ready_groups(self) -> None:
+        none = JudgeVerdict.Severity.NONE
+        major = JudgeVerdict.Severity.MAJOR
+        judge_ready = self.ready_recommendation("Judge ready", 29000)
+        model_group, model_units = self.judged_group("Model ready", [none, none], 29010)
+        flagged_group, flagged_units = self.judged_group(
+            "Flagged pick", [none, major], 29020
+        )
+        approved_group, approved_units = self.judged_group(
+            "Approved place", [none, none], 29030
+        )
+        approved_units[1].state = STATE_APPROVED
+        approved_units[1].save(update_fields=["state"])
+        unchecked_group, unchecked_units = self.make_group(
+            "Unchecked pick", ["U1", "U2"], start=29040
+        )
+        new_group, new_units = self.judged_group("New wording", [none, major], 29050)
+        run = self.make_recommendation_run()
+        model_ready = self.make_recommendation(
+            run,
+            model_group,
+            model_units,
+            action="use_existing",
+            target=["Model ready 1"],
+        )
+        attention = {
+            "The judge flagged the variant the model picked.": self.make_recommendation(
+                run,
+                flagged_group,
+                flagged_units,
+                action="use_existing",
+                target=["Flagged pick 1"],
+            ),
+            "Some places are approved, so the choice stays with you.": (
+                self.make_recommendation(
+                    run,
+                    approved_group,
+                    approved_units,
+                    action="use_existing",
+                    target=["Approved place 0"],
+                )
+            ),
+            "The judge has not checked every variant of this group.": (
+                self.make_recommendation(
+                    run,
+                    unchecked_group,
+                    unchecked_units,
+                    action="use_existing",
+                    target=["U1"],
+                )
+            ),
+            "The model proposes a new translation that the judge has not checked.": (
+                self.make_recommendation(
+                    run, new_group, new_units, target=["Fresh wording"]
+                )
+            ),
+        }
+
+        queue = self.client.get(self.queue_url)
+        review = self.client.get(self.review_url)
+
+        ready_count = queue.context["judge_panel"]["buckets"]["ready"]
+        self.assertEqual(ready_count, 2)
+        content = " ".join(review.content.decode().split())
+        self.assertEqual(content.count('name="result"'), 6)
+        self.assertEqual(content.count('" checked'), ready_count)
+        self.assert_checked(review, judge_ready.pk)
+        self.assert_checked(review, model_ready.pk)
+        attention_html = content[content.index('id="bulk-attention"') :]
+        self.assertIn('<details class="rq-attention rq-collapsed">', attention_html)
+        for reason, result in attention.items():
+            with self.subTest(reason=reason):
+                self.assert_unchecked(review, result.pk)
+                self.assertIn(f'value="{result.pk}"', attention_html)
+                self.assertIn(reason, attention_html)
+        self.assertIn("2 groups selected, 2 places will change.", content)
+
+    def test_review_first_screen_leads_with_apply_and_summary(self) -> None:
+        self.ready_recommendation("First screen", 29100)
+
+        response = self.client.get(self.review_url)
+
+        content = " ".join(response.content.decode().split())
+        button = content.index(
+            '<button class="btn btn-primary" type="submit">'
+            "Apply the selected decisions</button>"
+        )
+        self.assertEqual(content.count("Apply the selected decisions"), 1)
+        self.assertLess(button, content.index('name="result"'))
+        self.assertIn(
+            '<p class="rq-bulk-summary" id="bulk-summary" aria-live="polite"> '
+            "1 group selected, 1 place will change. </p>",
+            content,
+        )
+        self.assertIn('data-select="ready">Select all ready</button>', content)
+        self.assertIn('data-select="none">Clear all</button>', content)
+
+    def test_review_pages_stay_in_one_form_and_apply_only_selected(self) -> None:
+        results = [
+            self.ready_recommendation(f"Paged {index}", 29200 + index * 10)
+            for index in range(3)
+        ]
+
+        with patch("weblate.trans.views.repeats.REVIEW_PAGE_SIZE", 2):
+            response = self.client.get(self.review_url)
+
+        content = response.content.decode()
+        form = content[content.index('class="rq-bulk"') : content.index("</form>")]
+        # Pages only hide rows, so every row stays a field of the one form.
+        self.assertEqual(form.count('name="result"'), 3)
+        self.assertIn('data-page-size="2"', form)
+        self.assertIn('class="rq-bulk-pager"', form)
+
+        response = self.client.post(
+            self.review_url,
+            {
+                "action": "apply",
+                "manifest": response.context["manifest"],
+                "result": [str(results[0].pk), str(results[2].pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run = RepeatBulkRun.objects.get()
+        self.assertEqual(
+            list(run.items.order_by("ordinal").values_list("result_id", flat=True)),
+            [results[0].pk, results[2].pk],
+        )
+
+    def test_review_get_queries_do_not_grow_per_row(self) -> None:
+        self.ready_recommendation("Cost row 0", 29300)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get(self.review_url)
+        for index in range(1, 6):
+            self.ready_recommendation(f"Cost row {index}", 29300 + index * 10)
+        with CaptureQueriesContext(connection) as expanded:
+            response = self.client.get(self.review_url)
+
+        self.assertContains(response, 'name="result"', count=6)
+        # A per-row preview or place lookup would add queries for every row.
+        self.assertLessEqual(
+            len(expanded.captured_queries) - len(baseline.captured_queries), 2
+        )
 
     def test_queue_shows_comparing_variants_while_a_run_is_active(self) -> None:
         self.make_group("Comparing", ["One", "Two"], start=28300)

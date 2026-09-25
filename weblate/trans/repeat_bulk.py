@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import prefetch_related_objects
 from django.utils import timezone
 
 from weblate.trans.models import (
@@ -23,6 +24,7 @@ from weblate.trans.models import (
     RepeatGroup,
     RepeatRecommendationResult,
 )
+from weblate.trans.repeat_judge import READY, UNCHECKED, judge_groups
 from weblate.trans.repeat_recommendations import (
     build_group_context,
     context_fingerprint,
@@ -32,12 +34,24 @@ from weblate.trans.repeat_recommendations import (
     recommendation_is_current,
     result_fingerprint,
 )
-from weblate.trans.repeats import apply_preview, policy_units, preview_group, undo_event
+from weblate.trans.repeats import (
+    apply_preview,
+    blocked_reason,
+    policy_overlaps,
+    policy_units,
+    preview_group,
+    repeat_queue_groups,
+    share_translations,
+    undo_event,
+)
 from weblate.trans.util import join_plural
+from weblate.utils.state import STATE_APPROVED
 
 if TYPE_CHECKING:
     from weblate.auth.models import User
+    from weblate.trans.models import Unit
     from weblate.trans.models.repeat import RepeatPolicy
+    from weblate.trans.repeat_judge import GroupJudgement
 
 
 LOGGER = logging.getLogger(__name__)
@@ -55,6 +69,14 @@ CODE_POLICY_DISABLED = "policy-disabled"
 CODE_LATER_DECISION = "later-decision"
 CODE_UNDONE = "undone"
 
+# Why an applicable result is outside the queue's ready bucket.
+ATTENTION_NOT_OPEN = "not-open"
+ATTENTION_NEW_TRANSLATION = "new-translation"
+ATTENTION_FLAGGED = "flagged"
+ATTENTION_UNCHECKED = "unchecked"
+ATTENTION_APPROVED = "approved"
+ATTENTION_DISAGREES = "disagrees"
+
 
 @dataclass(frozen=True)
 class BulkReviewRow:
@@ -71,6 +93,8 @@ class BulkReviewRow:
     writable: int
     already_matching: int
     blocked: dict[str, int]
+    # "" when the queue shows the group as ready, else an ATTENTION_* code.
+    attention: str
 
 
 @dataclass(frozen=True)
@@ -86,50 +110,72 @@ class BulkReview:
     expires_at: datetime
 
 
-def _review_row(result: RepeatRecommendationResult, *, actor: User) -> BulkReviewRow:
-    """Render one result with exactly the eligibility rules execution uses."""
-    preview = preview_group(group=result.group, target=list(result.target), actor=actor)
+def _attention(
+    result: RepeatRecommendationResult,
+    judgement: GroupJudgement | None,
+    units: list[Unit],
+) -> str:
+    """Tell why a result is outside the queue's ready bucket, if it is."""
+    if judgement is None:
+        return ATTENTION_NOT_OPEN
+    if judgement.bucket == READY:
+        return ""
+    if result.action == "propose_new":
+        return ATTENTION_NEW_TRANSLATION
+    picked = judgement.variants.get(tuple(result.target))
+    if picked is not None and picked.mark == "flagged":
+        return ATTENTION_FLAGGED
+    if picked is None or picked.mark == "unchecked" or judgement.bucket == UNCHECKED:
+        return ATTENTION_UNCHECKED
+    if any(unit.state == STATE_APPROVED for unit in units):
+        return ATTENTION_APPROVED
+    return ATTENTION_DISAGREES
+
+
+def _review_row(
+    result: RepeatRecommendationResult,
+    *,
+    units: list[Unit],
+    judgement: GroupJudgement | None,
+    overlapping,
+) -> BulkReviewRow:
+    """Count one result's places with exactly the eligibility rules execution uses."""
+    target = list(result.target)
     exclusions = tuple(sorted(result.exclusions))
     excluded = set(exclusions)
-    members = tuple(
-        {
-            "unit_id": member.unit_id,
-            "key": member.unit.context if member.unit is not None else "",
-            "component": (
-                str(member.unit.translation.component)
-                if member.unit is not None
-                else ""
-            ),
-            "target": list(member.target),
-            "eligible": member.eligible,
-            "reason": member.reason,
-            "excluded": member.unit_id in excluded,
-        }
-        for member in preview.members
-    )
+    members = []
     blocked: dict[str, int] = {}
-    already = 0
-    for member in preview.unchanged:
-        if member.reason == "already-matches":
-            already += 1
+    already = writable = 0
+    for unit in units:
+        reason = blocked_reason(unit, target, overlapping)
+        eligible = not reason and unit.get_target_plurals() != target
+        members.append(
+            {
+                "unit_id": unit.pk,
+                "eligible": eligible,
+                "reason": reason or "already-matches",
+                "excluded": unit.pk in excluded,
+            }
+        )
+        if eligible:
+            writable += unit.pk not in excluded
+        elif reason:
+            blocked[reason] = blocked.get(reason, 0) + 1
         else:
-            blocked[member.reason] = blocked.get(member.reason, 0) + 1
-    writable = sum(
-        member.eligible and member.unit_id not in excluded for member in preview.members
-    )
-    group = result.group
+            already += 1
     return BulkReviewRow(
         result_id=result.pk,
         group_id=result.group_id,
-        source_forms=tuple(group.source_forms),
-        target=tuple(result.target),
+        source_forms=tuple(result.group.source_forms),
+        target=tuple(target),
         action=result.action,
         rationale=result.rationale,
         exclusions=exclusions,
-        members=members,
+        members=tuple(members),
         writable=writable,
         already_matching=already,
         blocked=blocked,
+        attention=_attention(result, judgement, units),
     )
 
 
@@ -138,7 +184,7 @@ def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
     if not actor.has_perm("project.edit", policy.project):
         raise PermissionDenied
     current = current_recommendations(policy, actor=actor)
-    rows = []
+    applicable = []
     independent = []
     needs_human = []
     for result in current.values():
@@ -147,7 +193,41 @@ def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
         elif result.action == "needs_human":
             needs_human.append(result)
         elif result.action in {"use_existing", "propose_new"}:
-            rows.append(_review_row(result, actor=actor))
+            applicable.append(result)
+    # The same groups and judge buckets the queue shows, read once for every
+    # row instead of one preview per group; apply still re-previews each one.
+    queue = (
+        {item["group"].pk: item for item in repeat_queue_groups(policy, user=actor)}
+        if applicable
+        else {}
+    )
+    judgements = judge_groups(
+        (
+            (group_id, item["variants"])
+            for group_id, item in queue.items()
+            if item["status"] == "open"
+        ),
+        current,
+    )
+    units = {
+        result.group_id: queue[result.group_id]["units"]
+        if result.group_id in queue
+        else []
+        for result in applicable
+    }
+    loaded = [unit for group_units in units.values() for unit in group_units]
+    prefetch_related_objects(loaded, "source_unit")
+    share_translations(loaded)
+    overlapping = policy_overlaps(policy, exclude_policy_id=policy.pk)
+    rows = [
+        _review_row(
+            result,
+            units=units[result.group_id],
+            judgement=judgements.get(result.group_id),
+            overlapping=overlapping,
+        )
+        for result in applicable
+    ]
     rows.sort(key=lambda row: queue_importance(row.source_forms[0], len(row.members)))
     stale = (
         RepeatRecommendationResult.objects.filter(group__policy=policy)

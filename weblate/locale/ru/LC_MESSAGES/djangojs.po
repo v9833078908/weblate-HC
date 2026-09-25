@@ -814,3 +814,28 @@ msgstr "Оценка стоимости начальной проверки су
 #, javascript-format
 msgid "Then the model compares variants: up to %(groups)s groups, about %(requests)s LLM requests."
 msgstr "Затем модель сравнит варианты: до %(groups)s групп, около %(requests)s запросов к LLM."
+
+#: weblate/static/js/repeat-bulk-review.js
+#, javascript-format
+msgid "%s group selected,"
+msgid_plural "%s groups selected,"
+msgstr[0] "Выбрана %s группа,"
+msgstr[1] "Выбрано %s группы,"
+msgstr[2] "Выбрано %s групп,"
+
+#: weblate/static/js/repeat-bulk-review.js
+#, javascript-format
+msgid "%s place will change."
+msgid_plural "%s places will change."
+msgstr[0] "изменится %s место."
+msgstr[1] "изменятся %s места."
+msgstr[2] "изменятся %s мест."
+
+#: weblate/static/js/repeat-bulk-review.js
+#, javascript-format
+msgid "Page %s of %s"
+msgstr "Страница %s из %s"
+
+#: weblate/static/js/repeat-bulk-review.js
+msgid "The places could not be loaded."
+msgstr "Не удалось загрузить места."

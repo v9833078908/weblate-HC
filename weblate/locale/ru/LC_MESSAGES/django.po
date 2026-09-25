@@ -33183,3 +33183,145 @@ msgstr "Судья одобрил несколько вариантов"
 #: weblate/templates/snippets/repeat_group.html
 msgid "Recommended"
 msgstr "Рекомендуем"
+
+#: weblate/templates/repeat_bulk_review.html
+#, python-format
+msgid "%(counter)s group selected,"
+msgid_plural "%(counter)s groups selected,"
+msgstr[0] "Выбрана %(counter)s группа,"
+msgstr[1] "Выбрано %(counter)s группы,"
+msgstr[2] "Выбрано %(counter)s групп,"
+
+#: weblate/templates/repeat_bulk_review.html
+#, python-format
+msgid "%(counter)s place will change."
+msgid_plural "%(counter)s places will change."
+msgstr[0] "изменится %(counter)s место."
+msgstr[1] "изменятся %(counter)s места."
+msgstr[2] "изменятся %(counter)s мест."
+
+#: weblate/templates/repeat_bulk_review.html
+msgid "Select all ready"
+msgstr "Выбрать все готовые"
+
+#: weblate/templates/repeat_bulk_review.html
+msgid "Clear all"
+msgstr "Снять все"
+
+#: weblate/templates/repeat_bulk_review.html
+msgid ""
+"Selections on every page are applied together; approved translations are "
+"never overwritten."
+msgstr ""
+"Выбор на всех страницах применяется вместе; утверждённые переводы никогда не "
+"перезаписываются."
+
+#: weblate/templates/repeat_bulk_review.html
+msgid "Ready to apply"
+msgstr "Готово к применению"
+
+#: weblate/templates/repeat_bulk_review.html
+msgid ""
+"The queue shows these groups as ready: the judge passed the variant the "
+"model picked. They are selected."
+msgstr ""
+"В очереди эти группы отмечены как готовые: судья одобрил вариант, который "
+"выбрала модель. Они уже выбраны."
+
+#: weblate/templates/repeat_bulk_review.html
+#: weblate/templates/repeat_bulk_review_row.html
+msgid "Recommended translation"
+msgstr "Рекомендуемый перевод"
+
+#: weblate/templates/repeat_bulk_review.html
+#: weblate/templates/repeat_bulk_places.html
+msgid "Places"
+msgstr "Места"
+
+#: weblate/templates/repeat_bulk_review.html
+msgid "Model rationale"
+msgstr "Обоснование модели"
+
+#: weblate/templates/repeat_bulk_review.html
+msgid "Pages of ready groups"
+msgstr "Страницы готовых групп"
+
+#: weblate/templates/repeat_bulk_review.html
+msgid "No group is ready to apply without your attention."
+msgstr "Нет групп, которые можно применить без вашего внимания."
+
+#: weblate/templates/repeat_bulk_review.html
+msgid "Needs your attention"
+msgstr "Требует вашего внимания"
+
+#: weblate/templates/repeat_bulk_review.html
+msgid ""
+"The model made a recommendation here, but the queue does not show the group "
+"as ready. These are not selected; select one only after reading the reason."
+msgstr ""
+"Здесь у модели есть рекомендация, но в очереди группа не отмечена как "
+"готовая. Эти группы не выбраны; выбирайте их, только прочитав причину."
+
+#: weblate/templates/repeat_bulk_review.html
+#, python-format
+msgid "Show %(counter)s group"
+msgid_plural "Show %(counter)s groups"
+msgstr[0] "Показать %(counter)s группу"
+msgstr[1] "Показать %(counter)s группы"
+msgstr[2] "Показать %(counter)s групп"
+
+#: weblate/templates/repeat_bulk_review.html
+msgid "Why it needs attention"
+msgstr "Почему нужно внимание"
+
+#: weblate/templates/repeat_bulk_review_row.html
+#, python-format
+msgid "%(counter)s place changes"
+msgid_plural "%(counter)s places change"
+msgstr[0] "Изменится %(counter)s место"
+msgstr[1] "Изменятся %(counter)s места"
+msgstr[2] "Изменятся %(counter)s мест"
+
+#: weblate/templates/repeat_bulk_review_row.html
+#, python-format
+msgid "of %(counter)s place"
+msgid_plural "of %(counter)s places"
+msgstr[0] "из %(counter)s места"
+msgstr[1] "из %(counter)s мест"
+msgstr[2] "из %(counter)s мест"
+
+#: weblate/templates/repeat_bulk_review_row.html
+msgid "Show every place"
+msgstr "Показать все места"
+
+#: weblate/templates/repeat_bulk_places.html
+msgid "Recommended translation:"
+msgstr "Рекомендуемый перевод:"
+
+#: weblate/trans/views/repeats.py
+msgid "The queue does not list this group as open."
+msgstr "В очереди эта группа не числится открытой."
+
+#: weblate/trans/views/repeats.py
+msgid "The model proposes a new translation that the judge has not checked."
+msgstr "Модель предлагает новый перевод, который судья ещё не проверял."
+
+#: weblate/trans/views/repeats.py
+msgid "The judge flagged the variant the model picked."
+msgstr "Судья нашёл ошибку в варианте, который выбрала модель."
+
+#: weblate/trans/views/repeats.py
+msgid "The judge has not checked every variant of this group."
+msgstr "Судья проверил не все варианты этой группы."
+
+#: weblate/trans/views/repeats.py
+msgid "Some places are approved, so the choice stays with you."
+msgstr "Некоторые места утверждены, поэтому выбор остаётся за вами."
+
+#: weblate/trans/views/repeats.py
+msgid "The judge and the model disagree about the best variant."
+msgstr "Судья и модель расходятся во мнении о лучшем варианте."
+
+#: weblate/trans/views/repeats.py
+msgid "Excluded by the model"
+msgstr "Исключено моделью"

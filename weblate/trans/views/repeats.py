@@ -33,11 +33,18 @@ from weblate.trans.models import (
     RepeatGroup,
     RepeatPolicy,
     RepeatRecommendationAttempt,
+    RepeatRecommendationResult,
     RepeatRecommendationRun,
     Unit,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.repeat_bulk import (
+    ATTENTION_APPROVED,
+    ATTENTION_DISAGREES,
+    ATTENTION_FLAGGED,
+    ATTENTION_NEW_TRANSLATION,
+    ATTENTION_NOT_OPEN,
+    ATTENTION_UNCHECKED,
     CODE_ACTOR_MISSING,
     CODE_ITEM_ERROR,
     CODE_LATER_DECISION,
@@ -80,6 +87,9 @@ from weblate.trans.repeats import (
 )
 from weblate.trans.util import join_plural
 from weblate.trans.views.judge import user_can_view_producer_run
+
+# Review rows shown at once; every page stays inside the one apply form.
+REVIEW_PAGE_SIZE = 50
 
 
 def _selected_ids(request, name: str) -> set[int]:
@@ -790,68 +800,51 @@ def _review_refresh_error() -> str:
     )
 
 
-def _review_rows_display(review, *, actor) -> list[dict]:
-    """Render review rows with each place's current translation in one lookup."""
-    unit_ids = {member["unit_id"] for row in review.rows for member in row.members}
-    units = {
-        unit.pk: unit
-        for unit in Unit.objects.filter(pk__in=unit_ids)
-        .filter_access(actor)
-        .select_related(
-            "translation__component",
-            "translation__component__project",
-            "translation__component__category",
-            "translation__language",
-            "translation__plural",
-        )
-    }
-    rows = []
-    for row in review.rows:
-        members = []
-        for member in row.members:
-            unit = units.get(member["unit_id"])
-            members.append(
-                {
-                    "unit_id": member["unit_id"],
-                    "url": unit.get_absolute_url() if unit is not None else "",
-                    "key": member["key"],
-                    "component": member["component"],
-                    "current_target": (
-                        _forms_text(unit.get_target_plurals())
-                        if unit is not None
-                        else "—"
-                    ),
-                    "excluded": member["excluded"],
-                    "will_change": member["eligible"] and not member["excluded"],
-                    "reason_label": (
-                        ""
-                        if member["eligible"]
-                        else _member_reason_label(member["reason"])
-                    ),
-                }
-            )
-        rows.append(
-            {
-                "result_id": row.result_id,
-                "group_id": row.group_id,
-                "source_forms": list(row.source_forms),
-                "source_text": _forms_text(row.source_forms),
-                "target_forms": list(row.target),
-                "target_text": _forms_text(row.target),
-                "action": row.action,
-                "action_label": _action_label(row.action),
-                "rationale": row.rationale,
-                "exclusions": list(row.exclusions),
-                "writable": row.writable,
-                "already_matching": row.already_matching,
-                "blocked": [
-                    {"reason_label": _member_reason_label(reason), "count": count}
-                    for reason, count in sorted(row.blocked.items())
-                ],
-                "members": members,
-            }
-        )
-    return rows
+def _attention_label(code: str) -> str:
+    """Map one stable attention code to why the group is not preselected."""
+    return {
+        ATTENTION_NOT_OPEN: gettext("The queue does not list this group as open."),
+        ATTENTION_NEW_TRANSLATION: gettext(
+            "The model proposes a new translation that the judge has not checked."
+        ),
+        ATTENTION_FLAGGED: gettext("The judge flagged the variant the model picked."),
+        ATTENTION_UNCHECKED: gettext(
+            "The judge has not checked every variant of this group."
+        ),
+        ATTENTION_APPROVED: gettext(
+            "Some places are approved, so the choice stays with you."
+        ),
+        ATTENTION_DISAGREES: gettext(
+            "The judge and the model disagree about the best variant."
+        ),
+    }.get(code, code)
+
+
+def _review_rows_display(review, *, project: str, language: str) -> list[dict]:
+    """Render compact review rows; per-place detail is fetched on demand."""
+    return [
+        {
+            "result_id": row.result_id,
+            "source_forms": list(row.source_forms),
+            "target_forms": list(row.target),
+            "action": row.action,
+            "action_label": _action_label(row.action),
+            "rationale": row.rationale,
+            "places": len(row.members),
+            "writable": row.writable,
+            "attention": row.attention,
+            "attention_label": _attention_label(row.attention),
+            "places_url": reverse(
+                "repeat-bulk-places",
+                kwargs={
+                    "project": project,
+                    "language": language,
+                    "result_id": row.result_id,
+                },
+            ),
+        }
+        for row in review.rows
+    ]
 
 
 def _decision_groups_display(results, *, actor, policy, queue_url: str) -> list[dict]:
@@ -898,11 +891,17 @@ def _review_context(
     queue_url = reverse(
         "repeat-queue", kwargs={"project": project, "language": language}
     )
+    rows = _review_rows_display(review, project=project, language=language)
+    ready = [row for row in rows if not row["attention"]]
     return {
         "project": policy.project,
         "language": policy.target_language,
         "policy": policy,
-        "rows": _review_rows_display(review, actor=request.user),
+        "rows": rows,
+        "ready_rows": ready,
+        "attention_rows": [row for row in rows if row["attention"]],
+        "selected_places": sum(row["writable"] for row in ready),
+        "page_size": REVIEW_PAGE_SIZE,
         "needs_human": _decision_groups_display(
             review.needs_human, actor=request.user, policy=policy, queue_url=queue_url
         ),
@@ -970,6 +969,71 @@ def repeat_bulk_review(request, project: str, language: str):
             review=review,
             error=error,
         ),
+    )
+
+
+@login_required
+def repeat_bulk_places(request, project: str, language: str, result_id: int):
+    """Show one reviewed group's places on demand; GET never writes anything."""
+    policy = get_object_or_404(
+        RepeatPolicy,
+        project__slug=project,
+        target_language__code=language,
+        enabled=True,
+    )
+    if not request.user.can_access_project(policy.project):
+        raise PermissionDenied
+    if not request.user.has_perm("project.edit", policy.project):
+        raise PermissionDenied
+    result = get_object_or_404(
+        RepeatRecommendationResult.objects.select_related("group__policy"),
+        pk=result_id,
+        group__policy=policy,
+        action__in={"use_existing", "propose_new"},
+    )
+    preview = preview_group(
+        group=result.group, target=list(result.target), actor=request.user
+    )
+    excluded = set(result.exclusions)
+    members = []
+    for member in preview.members:
+        unit = member.unit
+        if unit is None:
+            continue
+        will_change = member.eligible and member.unit_id not in excluded
+        members.append(
+            {
+                "unit_id": member.unit_id,
+                "url": unit.get_absolute_url(),
+                "key": unit.context,
+                "component": str(unit.translation.component),
+                "current_target": _forms_text(unit.get_target_plurals()),
+                "will_change": will_change,
+                "reason_label": (
+                    ""
+                    if will_change
+                    else gettext("Excluded by the model")
+                    if member.unit_id in excluded
+                    else _member_reason_label(member.reason)
+                ),
+            }
+        )
+    return render(
+        request,
+        "repeat_bulk_places.html",
+        {
+            "project": policy.project,
+            "language": policy.target_language,
+            "source_text": _forms_text(result.group.source_forms),
+            "target_text": _forms_text(result.target),
+            "members": members,
+            "review_url": reverse(
+                "repeat-bulk-review", kwargs={"project": project, "language": language}
+            ),
+            "queue_url": reverse(
+                "repeat-queue", kwargs={"project": project, "language": language}
+            ),
+        },
     )
 
 

@@ -124,6 +124,11 @@ real_patterns = [
         name="repeat-bulk-review",
     ),
     path(
+        "repeats/<slug:project>/<slug:language>/recommendations/<int:result_id>/",
+        weblate.trans.views.repeats.repeat_bulk_places,
+        name="repeat-bulk-places",
+    ),
+    path(
         "repeats/<slug:project>/<slug:language>/bulk/<uuid:token>/",
         weblate.trans.views.repeats.repeat_bulk_status,
         name="repeat-bulk-status",
