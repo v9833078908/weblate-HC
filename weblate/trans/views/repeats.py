@@ -191,22 +191,33 @@ def _decision_summary(request, project: Project):
     return summary
 
 
-def _judge_panel(request, obj, target_language, groups):
+def _judge_panel(request, obj, target_language, groups, policy, current):
     """Classify open groups and summarize the current repeat judge run."""
     open_groups = [item for item in groups if item["status"] == "open"]
     judgements = judge_groups(
-        (item["group"].pk, item["variants"]) for item in open_groups
+        ((item["group"].pk, item["variants"]) for item in open_groups), current
     )
     buckets = dict.fromkeys((READY, CHOOSE, REWRITE, UNCHECKED), 0)
     for item in open_groups:
         item["judge"] = judgements[item["group"].pk]
+        recommendation = current.get(item["group"].pk)
         for variant in item["variants"]:
             variant["judge"] = item["judge"].variants[variant["target"]]
+            variant["model_pick"] = (
+                recommendation is not None
+                and recommendation.action == "use_existing"
+                and tuple(recommendation.target) == variant["target"]
+            )
+        item["model_on_variant"] = any(
+            variant["model_pick"] for variant in item["variants"]
+        )
         recommended = item["judge"].recommended
+        single_form = len(item["variants"][0]["target"]) == 1
         item["preselect"] = (
-            item["judge"].bucket == READY
-            and recommended is not None
-            and len(recommended) == 1
+            item["judge"].bucket == READY and recommended is not None and single_form
+        )
+        item["preselect_keep"] = (
+            item["judge"].model_action == "keep_independent" and single_form
         )
         if recommended is not None:
             item["variants"].sort(
@@ -273,6 +284,16 @@ def _judge_panel(request, obj, target_language, groups):
         },
         "relaunch_places": relaunch_places,
         "outside_places": outside_places,
+        "comparing": sum(
+            sum(bool(group.get("sendable", True)) for group in snapshot.get("groups", ()))
+            for snapshot in RepeatRecommendationRun.objects.filter(
+                policy=policy,
+                status__in={
+                    RepeatRecommendationRun.Status.QUEUED,
+                    RepeatRecommendationRun.Status.RUNNING,
+                },
+            ).values_list("snapshot", flat=True)
+        ),
         "launch_url": judge_launch_url(project_language, queue_url),
         "can_launch": request.user.has_perm("translation.auto", project_language)
         and request.user.has_perm("unit.review", obj)
@@ -295,8 +316,13 @@ def repeat_queue(request, project: str, language: str):
             project=obj, target_language=target_language, actor=request.user
         )
     groups = _queue_groups(request, policy) if policy is not None else []
+    current = (
+        current_recommendations(policy, actor=request.user)
+        if policy is not None
+        else {}
+    )
     judge_panel = (
-        _judge_panel(request, obj, target_language, groups)
+        _judge_panel(request, obj, target_language, groups, policy, current)
         if policy is not None
         else None
     )
@@ -341,11 +367,6 @@ def repeat_queue(request, project: str, language: str):
     if requested_judge not in judge_buckets:
         query.pop("judge", None)
     page_obj = Paginator(filtered_groups, 20).get_page(request.GET.get("page"))
-    current = (
-        current_recommendations(policy, actor=request.user)
-        if policy is not None
-        else {}
-    )
     _add_recommendations(page_obj.object_list, current)
     visible_components = Component.objects.filter(project=obj).filter_access(
         request.user

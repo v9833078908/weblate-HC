@@ -1605,7 +1605,11 @@ class RepeatBulkViewsTest(ViewTestCase):
                 ),
             )
         self.make_recommendation(
-            self.make_recommendation_run(), ready_group, ready, target=["À éviter"]
+            self.make_recommendation_run(),
+            ready_group,
+            ready,
+            target=["Recommandé"],
+            action="use_existing",
         )
         self.make_recommendation(
             self.make_recommendation_run(),
@@ -2030,6 +2034,237 @@ class RepeatBulkViewsTest(ViewTestCase):
             response = self.client.get(self.queue_url)
         self.assertFalse(response.context["judge_panel"]["can_launch"])
         self.assertNotContains(response, "Check variants with the judge</a>")
+
+    @staticmethod
+    def card(response, group) -> str:
+        return (
+            response.content.decode()
+            .split(f'id="g-{group.pk}"', 1)[1]
+            .split("</li>", 1)[0]
+        )
+
+    def judged_group(self, source: str, severities: list[str], start: int):
+        group, units = self.make_group(
+            source, [f"{source} {index}" for index in range(len(severities))], start
+        )
+        for unit, severity in zip(units, severities, strict=True):
+            self.make_judge_verdict(unit, severity)
+        return group, units
+
+    def test_queue_model_comparison_settles_judge_buckets(self) -> None:
+        none = JudgeVerdict.Severity.NONE
+        major = JudgeVerdict.Severity.MAJOR
+        picked, picked_units = self.judged_group("Model picked", [none, none], 28000)
+        keep, keep_units = self.judged_group("Model keeps", [none, none], 28010)
+        human, human_units = self.judged_group("Model unsure", [none, none], 28020)
+        disagree, disagree_units = self.judged_group(
+            "Model disagrees", [none, major], 28030
+        )
+        results = (
+            (picked, picked_units, "use_existing", ["Model picked 1"], "Picked why"),
+            (keep, keep_units, "keep_independent", [], "Keep why"),
+            (human, human_units, "needs_human", [], "Human why"),
+            (
+                disagree,
+                disagree_units,
+                "use_existing",
+                ["Model disagrees 1"],
+                "Disagree why",
+            ),
+        )
+        for group, units, action, target, rationale in results:
+            self.make_recommendation(
+                self.make_recommendation_run(),
+                group,
+                units,
+                action=action,
+                target=target,
+                rationale=rationale,
+            )
+
+        response = self.client.get(self.queue_url)
+
+        self.assertEqual(
+            response.context["judge_panel"]["buckets"],
+            {"ready": 1, "choose": 3, "rewrite": 0, "unchecked": 0},
+        )
+        picked_card = self.card(response, picked)
+        self.assertRegex(
+            picked_card,
+            r'name="target"\s+value="Model picked 1"\s+data-choice="variant"\s+checked',
+        )
+        self.assertIn("Model recommendation", picked_card)
+        self.assertIn("Model rationale: Picked why", picked_card)
+        # The model's pick is its own variant row, not a second radio.
+        self.assertEqual(picked_card.count('value="Model picked 1"'), 1)
+        keep_card = self.card(response, keep)
+        self.assertRegex(keep_card, r'value="keep"\s+data-choice="keep"\s+checked')
+        self.assertIn("Model rationale: Keep why", keep_card)
+        self.assertIn('aria-disabled="false"', keep_card)
+        for group, rationale in ((human, "Human why"), (disagree, "Disagree why")):
+            with self.subTest(group=group.source_forms[0]):
+                card = self.card(response, group)
+                self.assertNotRegex(card, r"(?s)<input[^>]*\schecked")
+                self.assertIn(f"Model rationale: {rationale}", card)
+                self.assertNotIn("Recommended: ", card)
+        self.assertIn("Model recommendation", self.card(response, disagree))
+
+    def test_queue_plural_model_results_preselect_nothing(self) -> None:
+        source = join_plural(["Gate", "Gates"])
+        targets = [
+            join_plural(["Brána", "Brány", "Bran"]),
+            join_plural(["Vrata", "Vrat", "Vrat"]),
+        ]
+        picked, picked_units = self.make_group(source, targets, start=28100)
+        for unit in picked_units:
+            self.make_judge_verdict(unit)
+        keep_source = join_plural(["Door", "Doors"])
+        keep, keep_units = self.make_group(
+            keep_source,
+            [
+                join_plural(["Dveře", "Dveří", "Dveří"]),
+                join_plural(["Vrátka", "Vrátek", "Vrátek"]),
+            ],
+            start=28110,
+        )
+        for unit in keep_units:
+            self.make_judge_verdict(unit)
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            picked,
+            picked_units,
+            action="use_existing",
+            target=["Vrata", "Vrat", "Vrat"],
+        )
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            keep,
+            keep_units,
+            action="keep_independent",
+            target=[],
+        )
+
+        response = self.client.get(self.queue_url)
+
+        items = {item["group"].pk: item for item in response.context["groups"]}
+        self.assertEqual(items[picked.pk]["judge"].bucket, "ready")
+        self.assertEqual(
+            items[picked.pk]["judge"].recommended, ("Vrata", "Vrat", "Vrat")
+        )
+        self.assertFalse(items[picked.pk]["preselect"])
+        self.assertEqual(items[keep.pk]["judge"].bucket, "choose")
+        self.assertFalse(items[keep.pk]["preselect_keep"])
+        for group in (picked, keep):
+            self.assertNotRegex(
+                self.card(response, group), r"(?s)<input[^>]*\schecked"
+            )
+
+    def test_queue_ready_bucket_equals_bulk_banner(self) -> None:
+        none = JudgeVerdict.Severity.NONE
+        major = JudgeVerdict.Severity.MAJOR
+        judge_ready, judge_units = self.judged_group("Judge ready", [none, major], 28200)
+        model_ready, model_units = self.judged_group("Model ready", [none, none], 28210)
+        self.judged_group("Needs rewrite", [major, major], 28220)
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            judge_ready,
+            judge_units,
+            action="use_existing",
+            target=["Judge ready 0"],
+        )
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            model_ready,
+            model_units,
+            action="use_existing",
+            target=["Model ready 0"],
+        )
+
+        response = self.client.get(self.queue_url)
+
+        self.assertEqual(response.context["judge_panel"]["buckets"]["ready"], 2)
+        self.assertEqual(response.context["bulk_ready"], 2)
+        review = self.client.get(self.review_url)
+        self.assertContains(review, 'name="result"', count=2)
+        for result in RepeatRecommendationResult.objects.all():
+            self.assert_checked(review, result.pk)
+
+    def test_queue_shows_comparing_variants_while_a_run_is_active(self) -> None:
+        self.make_group("Comparing", ["One", "Two"], start=28300)
+        snapshot = {"groups": [{"group": 1, "sendable": True}, {"group": 2}]}
+        oversized = {"groups": [{"group": 3, "sendable": False}]}
+        runs = {
+            RepeatRecommendationRun.Status.RUNNING: snapshot,
+            RepeatRecommendationRun.Status.QUEUED: oversized,
+            RepeatRecommendationRun.Status.COMPLETED: snapshot,
+        }
+        for status, frozen in runs.items():
+            run = self.make_recommendation_run(status=status)
+            RepeatRecommendationRun.objects.filter(pk=run.pk).update(snapshot=frozen)
+        active = RepeatRecommendationRun.objects.get(
+            status=RepeatRecommendationRun.Status.RUNNING
+        )
+
+        response = self.client.get(self.queue_url)
+
+        self.assertEqual(response.context["judge_panel"]["comparing"], 2)
+        self.assertContains(response, "Comparing variants: 2 groups")
+
+        RepeatRecommendationRun.objects.filter(pk=active.pk).update(
+            status=RepeatRecommendationRun.Status.COMPLETED
+        )
+        response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["comparing"], 0)
+        self.assertNotContains(response, "Comparing variants")
+
+    def test_queue_model_results_do_not_grow_queries_per_group(self) -> None:
+        def compared_group(source: str, start: int) -> None:
+            group, units = self.judged_group(
+                source, [JudgeVerdict.Severity.NONE] * 2, start
+            )
+            self.make_recommendation(
+                self.make_recommendation_run(),
+                group,
+                units,
+                action="use_existing",
+                target=[f"{source} 0"],
+            )
+
+        def result_queries(capture) -> int:
+            return sum(
+                "trans_repeatrecommendationresult" in query["sql"]
+                for query in capture.captured_queries
+            )
+
+        def measure() -> tuple[int, int, int]:
+            # The engine's own currency check reads each group's live context;
+            # the queue must add nothing per group on top of it.
+            with CaptureQueriesContext(connection) as engine:
+                current_recommendations(self.policy, actor=self.user)
+            with CaptureQueriesContext(connection) as page:
+                response = self.client.get(self.queue_url)
+            self.assertEqual(response.status_code, 200)
+            return (
+                len(page.captured_queries),
+                len(engine.captured_queries),
+                result_queries(page),
+            )
+
+        compared_group("Compared baseline", 28400)
+        baseline = measure()
+        for index in range(4):
+            compared_group(f"Compared {index}", 28500 + index * 10)
+        expanded = measure()
+
+        response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["buckets"]["ready"], 5)
+        # Current results are read once, before judging, for the whole queue.
+        self.assertEqual(baseline[2], expanded[2])
+        # Existing card rendering reads a few rows per group (17 for four
+        # groups, measured before and after the queue judged with results).
+        self.assertLessEqual(
+            (expanded[0] - baseline[0]) - (expanded[1] - baseline[1]), 20
+        )
 
     def test_queue_judge_query_growth_is_bounded(self) -> None:
         def judged_group(source: str, start: int) -> None:

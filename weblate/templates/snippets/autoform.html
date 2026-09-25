@@ -22,7 +22,7 @@
       {% if autoform.proposal_only %}
         <p>{% translate "The judge checks the matching strings and records verdicts. String states are not changed and no replacement translations are generated." %}</p>
         {% if repeat_comparison_follows %}
-          <p>{% translate "After the check, the model compares the variants of repeat groups where the judge accepts several. This comparison is also paid and starts automatically when the check completes." %}</p>
+          <p>{% translate "After the check, the model compares the variants of repeat groups where the judge accepts at least one variant. This comparison is also paid and starts automatically when the check completes." %}</p>
         {% endif %}
       {% elif workspace and object == workspace %}
         <p>

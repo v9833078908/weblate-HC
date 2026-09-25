@@ -167,6 +167,9 @@
           <a href="?status=open&amp;judge=unchecked"
              {% if judge_filter == 'unchecked' %} aria-current="page"{% endif %}>{% translate "Unchecked" %} {{ judge_panel.buckets.unchecked }}</a>
         </nav>
+        {% if judge_panel.comparing %}
+          <p role="status">{% blocktranslate count counter=judge_panel.comparing %}Comparing variants: {{ counter }} group{% plural %}Comparing variants: {{ counter }} groups{% endblocktranslate %}</p>
+        {% endif %}
         {% if judge_panel.state == 'ready' and judge_panel.relaunch_places and judge_panel.can_launch %}
           <p><a href="{{ judge_panel.launch_url }}">{% translate "Check the remaining places" %}</a></p>
         {% endif %}

@@ -49,7 +49,10 @@
       <fieldset>
         <legend>{% translate "What to do with this group?" %}</legend>
         {% if not item.all_approved %}
-          {% if item.recommendation and item.recommendation.target %}
+          {% if item.recommendation and not item.recommendation.target and item.recommendation.rationale %}
+            <p class="text-muted">{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</p>
+          {% endif %}
+          {% if item.recommendation and item.recommendation.target and not item.model_on_variant %}
             <label class="rq-option form-check rq-recommendation">
               <input class="form-check-input"
                      type="radio"
@@ -78,7 +81,11 @@
                 {% elif variant.judge.mark == 'flagged' %}
                   <span class="badge text-bg-warning">{% translate "The judge found an error" %}</span>
                 {% endif %}
+                {% if variant.model_pick %}
+                  <span class="badge text-bg-info">{% translate "Model recommendation" %}</span>
+                {% endif %}
               </span>
+              {% if variant.model_pick and item.recommendation.rationale %}<span class="d-block text-muted">{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
               {% if variant.judge.back_translation %}<span class="d-block text-muted">{% blocktranslate with translation=variant.judge.back_translation %}Back-translation: {{ translation }}{% endblocktranslate %}</span>{% endif %}
               {% if variant.judge.reason %}<span class="d-block text-muted">{% blocktranslate with reason=variant.judge.reason %}Judge's reason: {{ reason }}{% endblocktranslate %}</span>{% endif %}
             </label>
@@ -101,13 +108,14 @@
                  type="radio"
                  name="choice"
                  value="keep"
-                 data-choice="keep" />
+                 data-choice="keep"
+                 {% if item.preselect_keep %}checked{% endif %} />
           <span class="form-check-label">{% translate "Different meanings: do not link these places" %}</span>
         </label>
       </fieldset>
       <button class="btn btn-primary rq-preview"
               type="submit"
-              aria-disabled="{% if item.preselect %}false{% else %}true{% endif %}">{% translate "Show what will change" %}</button>
+              aria-disabled="{% if item.preselect or item.preselect_keep %}false{% else %}true{% endif %}">{% translate "Show what will change" %}</button>
       <p class="rq-hint"
          aria-live="polite"
          data-hint-default="{% translate 'Choose an option to continue.' %}"
