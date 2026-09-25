@@ -4,9 +4,10 @@
 
 Date: 2026-09-24, rewritten in full on 2026-09-25, engineering review folded
 in on 2026-09-25.
-Status: **phase 1 (Tasks 1-6) implemented at `ee3e4012` and Task 7 local
-verification recorded on 2026-09-25. Deployment, the paid judge run and the
-25-ready-group precision gate await explicit approval. Phase 2 has not started.**
+Status: **phase 1 (Tasks 1-6) implemented at `2ce7b2bd`; Task 7 local and
+Russian dev browser/keyboard checks recorded on 2026-09-25. The paid judge run
+and 25-ready-group precision gate await explicit approval. Phase 2 has not
+started.**
 This version replaces the 2026-09-24 text (judge preselection only, bulk apply
 out of scope). Editing this plan does not authorize deploying it or starting a
 paid judge run. Phase 2 (Tasks 8-10) starts only after the phase 1 gate in
@@ -959,6 +960,25 @@ PostgreSQL connection could not authenticate role `postgres` on the local
 socket. `msgfmt --check` passed for both Russian catalogs. `node --check`
 passed for `repeat-queue.js` and `loader-bootstrap.js`.
 
+Post-deployment check on 2026-09-25 used branch HEAD `2ce7b2bd`, after three
+verdict-only form UX commits. The shared dev web container at `localhost:3001`
+was bind-mounted to this branch, preserved its existing data, and became
+healthy. The Russian anvil-saga / fr queue showed 383 open diverging groups and
+1022 `check:repeat-drift` places. Three temporary, non-paid Django-created
+verdicts on group 176 made the panel show ready=1 and unchecked=382. The
+keyboard-only browser check and read-only preview are recorded in the table
+below; the preview said 1 of 3 places would change. All three temporary
+verdicts were deleted, and the project's pre-existing
+`translation_review=False` setting was restored after it was temporarily
+enabled for form access. The verdict-only launch form showed 1022 matched
+strings, no pretranslation, and “Estimated judge cost for the initial check is
+unavailable.” No paid judge run started; this check yielded no spend or real
+precision data.
+
+On HEAD `2ce7b2bd`, the full `test_judge_form.py` run passed: 18 tests and 2
+subtests. The earlier six-file combined run remains the `ee3e4012` result
+recorded above: 293 passed and one pre-existing baseline failure.
+
 Phase 1:
 
 | Check | Result |
@@ -969,9 +989,10 @@ Phase 1:
 | Queue panel states, progress without reserved rows, stopped run, relaunch scope, bucket filter; no paid recommend link | Corresponding `test_repeat_views.py` cases passed. |
 | Card preselection (single-form only), evidence, escaping | Corresponding `test_repeat_views.py` cases passed. |
 | Queue query count constant | `test_queue_judge_query_growth_is_bounded` passed; `test_judge_groups_reads_twenty_groups_with_one_verdict_query` passed. |
-| Russian browser and keyboard check | Not run: requires explicit deployment approval. |
-| Real judge run: buckets, spend, wrong-recommendation rate out of at least 25 | Not run: paid run requires explicit approval after cost preview. No metrics recorded. |
-| Gate decision for phase 2 | Pending the paid run, 25-ready-group precision check and owner approval; phase 2 not started. |
+| Russian browser and keyboard check | Observed on the deployed dev copy: Tab/Enter opened a group; the preselected judge radio had an accessible label, the hint initialized, and preview was enabled. Enter opened a read-only preview showing 1 of 3 places would change. Temporary verdicts and the temporary `translation_review` setting were cleaned up afterward. |
+| Verdict-only launch form | Showed 1022 matched strings, no pretranslation, and “Estimated judge cost for the initial check is unavailable.” |
+| Real judge run: buckets, spend, wrong-recommendation rate out of at least 25 | Pending explicit approval after the cost estimate (currently unavailable) is shown. No paid run started; no spend or real precision data recorded. |
+| Gate decision for phase 2 | Pending the paid run, 25-ready-group precision check and owner approval; phase 2 not started. The temporary three verdicts on group 176 are not precision data. |
 
 Phase 2:
 
