@@ -53,9 +53,7 @@
           <h2 id="bulk-ready" class="h4">
             {% translate "Ready to apply" %} <span class="text-muted">({{ ready_rows|length }})</span>
           </h2>
-          <p class="text-muted">
-            {% translate "The queue shows these groups as ready: the judge passed the variant the model picked. They are selected." %}
-          </p>
+          <p class="text-muted">{% translate "The judge passed these translations. They are selected." %}</p>
           {% if ready_rows %}
             <div class="table-scroll" role="region" tabindex="0" aria-labelledby="bulk-ready">
               <table class="table table-sm rq-bulk-table" data-page-size="{{ page_size }}">

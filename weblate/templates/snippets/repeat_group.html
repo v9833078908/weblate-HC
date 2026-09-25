@@ -17,7 +17,7 @@
         <span class="badge text-bg-success">{% translate "Resolved" %}</span>
       {% elif item.status == 'consistent' %}
         <span class="badge text-bg-light">{% translate "Same translation" %}</span>
-      {% elif item.preselect %}
+      {% elif item.recommend %}
         <span class="badge text-bg-success">{% blocktranslate with target=item.judge.recommended.0 %}Recommended: {{ target }}{% endblocktranslate %}</span>
       {% else %}
         <span class="badge text-bg-secondary">{% translate "Different translations" %}</span>
@@ -46,10 +46,10 @@
       <fieldset>
         <legend>{% translate "What to do with this group?" %}</legend>
         {% if not item.all_approved %}
-          {% if item.recommendation and not item.recommendation.target and item.recommendation.rationale %}
+          {% if item.recommendation.rationale and not item.recommendation.target or item.recommendation.rationale and item.preselect_custom %}
             <p class="text-muted">{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</p>
           {% endif %}
-          {% if item.recommendation and item.recommendation.target and not item.model_on_variant %}
+          {% if item.recommendation and item.recommendation.target and not item.model_on_variant and not item.preselect_custom %}
             <label class="rq-option form-check rq-recommendation">
               <input class="form-check-input"
                      type="radio"
@@ -69,7 +69,7 @@
                      data-choice="variant"
                      {% if item.preselect and variant.target == item.judge.recommended %}checked{% endif %} />
               <span class="form-check-label"><code>{{ variant.target.0 }}</code> — {% blocktranslate count counter=variant.units|length %}used in {{ counter }} place{% plural %}used in {{ counter }} places{% endblocktranslate %}
-                {% if item.preselect and variant.target == item.judge.recommended %}
+                {% if item.recommend and variant.target == item.judge.recommended %}
                   <span class="badge text-bg-success">{% translate "Recommended" %}</span>
                 {% elif variant.judge.mark == 'flagged' %}
                   <span class="badge text-bg-warning">{% translate "The judge found an error" %}</span>
@@ -88,13 +88,14 @@
                    type="radio"
                    name="choice"
                    value="custom"
-                   data-choice="custom" />
+                   data-choice="custom"
+                   {% if item.preselect_custom %}checked{% endif %} />
             <span class="form-check-label">{% translate "Enter a new translation for every place" %}</span>
           </label>
           <input class="form-control rq-custom"
                  name="custom_target"
                  aria-label="{% translate 'New translation for every place' %}"
-                 hidden />
+                 {% if item.preselect_custom %}value="{{ item.recommendation.target.0 }}"{% else %}hidden{% endif %} />
         {% endif %}
         <label class="rq-option form-check">
           <input class="form-check-input"
@@ -108,7 +109,7 @@
       </fieldset>
       <button class="btn btn-primary rq-preview"
               type="submit"
-              aria-disabled="{% if item.preselect or item.preselect_keep %}false{% else %}true{% endif %}">{% translate "Show what will change" %}</button>
+              aria-disabled="{% if item.preselect or item.preselect_keep or item.preselect_custom %}false{% else %}true{% endif %}">{% translate "Show what will change" %}</button>
       <p class="rq-hint"
          aria-live="polite"
          data-hint-default="{% translate 'Choose an option to continue.' %}"

@@ -131,7 +131,7 @@ def schedule_repeat_comparison(run: ProducerRun) -> None:
 
 
 def compare_after_judge(run_id) -> dict[str, object] | None:
-    """Compare the variants of ready and choose groups after a queue check, once."""
+    """Compare the variants of checked groups after a queue check, once."""
     with transaction.atomic():
         run = ProducerRun.objects.select_for_update().filter(pk=run_id).first()
         if (
@@ -169,7 +169,8 @@ def _start_comparison(run: ProducerRun, policy: RepeatPolicy) -> dict[str, objec
     group_ids = sorted(
         group_id
         for group_id, judgement in judgements.items()
-        if judgement.bucket in {READY, CHOOSE}
+        # A rewrite group is compared too, so the model can propose new text.
+        if judgement.bucket in {READY, CHOOSE, REWRITE}
     )
     if not group_ids:
         return {"status": "none", "groups": 0}
@@ -216,47 +217,114 @@ class VariantJudgement:
     reason: str
 
 
+# Why a group's choice is preselected (D17), in priority order.
+PICK_MODEL = "model"  # the model's pick of a variant the judge passed
+PICK_ONLY_PASSED = "only-passed"  # the only variant the judge passed
+PICK_APPROVED = "approved"  # the variant of an approved place, unless flagged
+PICK_KEEP = "keep"  # the model says the places differ: do not link them
+PICK_MOST_PASSED = "most-passed"  # the most-used of several passed variants
+PICK_NEW_TEXT = "new-text"  # the model's single-form text, prefilled
+PICK_UNCHECKED = "unchecked"  # the model's or the most-used unchecked variant
+PICK_NONE = ""  # every variant is flagged
+
+
 @dataclass(frozen=True)
 class GroupJudgement:
     bucket: str
+    # The preselected existing variant, else None (D17).
     recommended: tuple[str, ...] | None
     variants: dict[tuple[str, ...], VariantJudgement]
     # (unit id, verdict pk, target hash) for every judged place, sorted.
     evidence: tuple[tuple[int, int, str], ...]
-    # "use_existing" when the model backs the recommended variant,
-    # "keep_independent" when it advises not to link the places, else "".
-    model_action: str = ""
+    # Why the choice is preselected: a PICK_* code.
+    pick: str = PICK_NONE
+
+    @property
+    def judge_only(self) -> tuple[str, ...] | None:
+        """The only passed variant when it overrides the model (D17 rule 2)."""
+        return self.recommended if self.pick == PICK_ONLY_PASSED else None
 
 
-def _settle_with_model(
-    bucket: str,
-    recommended: tuple[str, ...] | None,
+def _preselect(
+    variants: list[dict],
     judgements: dict[tuple[str, ...], VariantJudgement],
-    *,
-    approved: bool,
     recommendation: RepeatRecommendationResult | None,
-) -> tuple[str, tuple[str, ...] | None, str]:
-    """Apply the model comparison of every variant to a judge bucket (D15)."""
-    if recommendation is None or bucket not in {READY, CHOOSE}:
-        return bucket, recommended, ""
-    target = tuple(recommendation.target)
+) -> tuple[str, tuple[str, ...] | None]:
+    """Pick the best available choice for one group; the first rule wins."""
+    action = recommendation.action if recommendation is not None else ""
+    target = tuple(recommendation.target) if recommendation is not None else ()
     picked = judgements.get(target)
-    agrees = (
-        recommendation.action == "use_existing"
-        and picked is not None
-        and picked.mark == "passed"
+    mark = picked.mark if picked is not None else ""
+    places = {variant["target"]: len(variant["units"]) for variant in variants}
+    passed = [key for key, value in judgements.items() if value.mark == "passed"]
+    unchecked = [key for key, value in judgements.items() if value.mark == "unchecked"]
+    approved = [
+        variant["target"]
+        for variant in variants
+        if judgements[variant["target"]].mark != "flagged"
+        and any(unit.state == STATE_APPROVED for unit in variant["units"])
+    ]
+    # max() keeps the first of equals, so a tie follows the queue order.
+    if action == "use_existing" and mark == "passed":
+        return PICK_MODEL, target
+    if len(passed) == 1:
+        return PICK_ONLY_PASSED, passed[0]
+    if approved:
+        return PICK_APPROVED, max(approved, key=places.__getitem__)
+    if action == "keep_independent":
+        return PICK_KEEP, None
+    if passed:
+        return PICK_MOST_PASSED, max(passed, key=places.__getitem__)
+    # The card prefills one field, so a plural proposal falls through.
+    if action == "propose_new" and len(target) == 1 and mark != "flagged":
+        return PICK_NEW_TEXT, None
+    if action == "use_existing" and mark == "unchecked":
+        return PICK_UNCHECKED, target
+    if unchecked:
+        return PICK_UNCHECKED, max(unchecked, key=places.__getitem__)
+    # Every variant is flagged; a flagged variant is never preselected.
+    return PICK_NONE, None
+
+
+def settle_group(
+    variants: list[dict],
+    judgements: dict[tuple[str, ...], VariantJudgement],
+    recommendation: RepeatRecommendationResult | None,
+) -> tuple[str, str, tuple[str, ...] | None]:
+    """
+    Return one group's bucket, pick and preselected variant.
+
+    The card, the bulk review and the banner all read this one answer.
+    """
+    approved = any(
+        unit.state == STATE_APPROVED
+        for variant in variants
+        for unit in variant["units"]
     )
-    if bucket == READY:
-        if agrees and target == recommended:
-            return bucket, recommended, recommendation.action
-        # A disagreement leaves the decision to the producer.
-        return CHOOSE, None, ""
-    if agrees and not approved:
-        # An approved place stays a human decision (D4).
-        return READY, target, recommendation.action
-    if recommendation.action == "keep_independent":
-        return bucket, recommended, recommendation.action
-    return bucket, recommended, ""
+    passed_targets = [
+        target for target, judgement in judgements.items() if judgement.mark == "passed"
+    ]
+    unchecked = any(judgement.mark == "unchecked" for judgement in judgements.values())
+    if len(passed_targets) >= 2:
+        bucket = CHOOSE
+    elif unchecked:
+        bucket = UNCHECKED
+    elif len(passed_targets) == 1 and approved:
+        bucket = CHOOSE
+    elif len(passed_targets) == 1:
+        bucket = READY
+    elif judgements and all(
+        judgement.mark == "flagged" for judgement in judgements.values()
+    ):
+        bucket = REWRITE
+    else:
+        bucket = UNCHECKED
+    pick, recommended = _preselect(variants, judgements, recommendation)
+    if bucket == CHOOSE and pick == PICK_MODEL and not approved and not unchecked:
+        # The model picked one of several passed variants. An approved place
+        # stays a human decision (D4) and every variant must be checked (D9).
+        bucket = READY
+    return bucket, pick, recommended
 
 
 def judge_group(
@@ -267,13 +335,11 @@ def judge_group(
     """Classify one repeat group using current, collegium-reduced verdicts."""
     judgements: dict[tuple[str, ...], VariantJudgement] = {}
     evidence: list[tuple[int, int, str]] = []
-    approved = False
 
     for variant in variants:
         passed: list[tuple[int, JudgeVerdict]] = []
         flagged: list[tuple[int, JudgeVerdict]] = []
         for unit in variant["units"]:
-            approved |= unit.state == STATE_APPROVED
             verdict = verdicts.get(unit.pk)
             if verdict is None or verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
                 continue
@@ -305,39 +371,14 @@ def judge_group(
                 reason = f"{label}: {primary.get('description', '')}"
         judgements[variant["target"]] = VariantJudgement(mark, back_translation, reason)
 
-    passed_targets = [
-        target for target, judgement in judgements.items() if judgement.mark == "passed"
-    ]
-    if len(passed_targets) >= 2:
-        bucket = CHOOSE
-    elif any(judgement.mark == "unchecked" for judgement in judgements.values()):
-        bucket = UNCHECKED
-    elif len(passed_targets) == 1 and approved:
-        bucket = CHOOSE
-    elif len(passed_targets) == 1:
-        bucket = READY
-    elif judgements and all(
-        judgement.mark == "flagged" for judgement in judgements.values()
-    ):
-        bucket = REWRITE
-    else:
-        bucket = UNCHECKED
-    recommended = passed_targets[0] if bucket == READY else None
-
-    bucket, recommended, model_action = _settle_with_model(
-        bucket,
-        recommended,
-        judgements,
-        approved=approved,
-        recommendation=recommendation,
-    )
+    bucket, pick, recommended = settle_group(variants, judgements, recommendation)
 
     return GroupJudgement(
         bucket=bucket,
         recommended=recommended,
         variants=judgements,
         evidence=tuple(sorted(evidence)),
-        model_action=model_action,
+        pick=pick,
     )
 
 

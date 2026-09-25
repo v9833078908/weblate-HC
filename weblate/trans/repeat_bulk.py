@@ -24,7 +24,7 @@ from weblate.trans.models import (
     RepeatGroup,
     RepeatRecommendationResult,
 )
-from weblate.trans.repeat_judge import READY, UNCHECKED, judge_groups
+from weblate.trans.repeat_judge import READY, judge_groups
 from weblate.trans.repeat_recommendations import (
     build_group_context,
     context_fingerprint,
@@ -95,6 +95,8 @@ class BulkReviewRow:
     blocked: dict[str, int]
     # "" when the queue shows the group as ready, else an ATTENTION_* code.
     attention: str
+    # The judge's only passed variant replaces the model's result (D17 rule 2).
+    judge_override: bool = False
 
 
 @dataclass(frozen=True)
@@ -111,21 +113,25 @@ class BulkReview:
 
 
 def _attention(
-    result: RepeatRecommendationResult,
+    action: str,
+    target: tuple[str, ...],
     judgement: GroupJudgement | None,
     units: list[Unit],
 ) -> str:
-    """Tell why a result is outside the queue's ready bucket, if it is."""
+    """Tell why a row is outside the queue's ready bucket, if it is."""
     if judgement is None:
         return ATTENTION_NOT_OPEN
     if judgement.bucket == READY:
         return ""
-    if result.action == "propose_new":
+    if action == "propose_new":
         return ATTENTION_NEW_TRANSLATION
-    picked = judgement.variants.get(tuple(result.target))
+    picked = judgement.variants.get(target)
     if picked is not None and picked.mark == "flagged":
         return ATTENTION_FLAGGED
-    if picked is None or picked.mark == "unchecked" or judgement.bucket == UNCHECKED:
+    if picked is None or any(
+        variant.mark == "unchecked" for variant in judgement.variants.values()
+    ):
+        # A partly checked group is never ready, whatever it picks (D9).
         return ATTENTION_UNCHECKED
     if any(unit.state == STATE_APPROVED for unit in units):
         return ATTENTION_APPROVED
@@ -140,7 +146,9 @@ def _review_row(
     overlapping,
 ) -> BulkReviewRow:
     """Count one result's places with exactly the eligibility rules execution uses."""
-    target = list(result.target)
+    override = judgement.judge_only if judgement is not None else None
+    target = list(override or result.target)
+    action = "use_existing" if override else result.action
     exclusions = tuple(sorted(result.exclusions))
     excluded = set(exclusions)
     members = []
@@ -168,15 +176,39 @@ def _review_row(
         group_id=result.group_id,
         source_forms=tuple(result.group.source_forms),
         target=tuple(target),
-        action=result.action,
+        action=action,
         rationale=result.rationale,
         exclusions=exclusions,
         members=tuple(members),
         writable=writable,
         already_matching=already,
         blocked=blocked,
-        attention=_attention(result, judgement, units),
+        attention=_attention(action, tuple(target), judgement, units),
+        judge_override=bool(override),
     )
+
+
+def review_target(
+    result: RepeatRecommendationResult, *, actor: User
+) -> tuple[str, ...] | None:
+    """Return the target the review row of one result applies, if any."""
+    item = next(
+        (
+            item
+            for item in repeat_queue_groups(result.group.policy, user=actor)
+            if item["group"].pk == result.group_id and item["status"] == "open"
+        ),
+        None,
+    )
+    if item is not None:
+        judgement = judge_groups(
+            [(result.group_id, item["variants"])], {result.group_id: result}
+        )[result.group_id]
+        if judgement.judge_only:
+            return judgement.judge_only
+    if result.action in {"use_existing", "propose_new"}:
+        return tuple(result.target)
+    return None
 
 
 def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
@@ -184,21 +216,11 @@ def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
     if not actor.has_perm("project.edit", policy.project):
         raise PermissionDenied
     current = current_recommendations(policy, actor=actor)
-    applicable = []
-    independent = []
-    needs_human = []
-    for result in current.values():
-        if result.action == "keep_independent":
-            independent.append(result)
-        elif result.action == "needs_human":
-            needs_human.append(result)
-        elif result.action in {"use_existing", "propose_new"}:
-            applicable.append(result)
     # The same groups and judge buckets the queue shows, read once for every
     # row instead of one preview per group; apply still re-previews each one.
     queue = (
         {item["group"].pk: item for item in repeat_queue_groups(policy, user=actor)}
-        if applicable
+        if current
         else {}
     )
     judgements = judge_groups(
@@ -209,6 +231,20 @@ def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
         ),
         current,
     )
+    applicable = []
+    independent = []
+    needs_human = []
+    for result in current.values():
+        judgement = judgements.get(result.group_id)
+        if judgement is not None and judgement.judge_only:
+            # The card preselects the judge's only passed variant (D17).
+            applicable.append(result)
+        elif result.action == "keep_independent":
+            independent.append(result)
+        elif result.action == "needs_human":
+            needs_human.append(result)
+        elif result.action in {"use_existing", "propose_new"}:
+            applicable.append(result)
     units = {
         result.group_id: queue[result.group_id]["units"]
         if result.group_id in queue
@@ -251,6 +287,8 @@ def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
             str(row.result_id): {
                 "result_fingerprint": result_fingerprint(current[row.group_id]),
                 "context_fingerprint": current[row.group_id].context_fingerprint,
+                # Only a judge override differs from the result's own target.
+                **({"target": list(row.target)} if row.judge_override else {}),
             }
             for row in rows
         },
@@ -360,10 +398,12 @@ def start_bulk(
                     result=result,
                     decision={
                         "action": result.action,
-                        "target": list(result.target),
+                        # A judge override was frozen in the signed manifest.
+                        "target": entries[str(pk)].get("target", list(result.target)),
                         "exclusions": list(result.exclusions),
                         "rationale": result.rationale,
                         "result_fingerprint": result_fingerprint(result),
+                        **({"source": "judge"} if "target" in entries[str(pk)] else {}),
                     },
                     context_fingerprint=result.context_fingerprint,
                 )
