@@ -205,11 +205,49 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
             page.xpath("//input[@name='judge_proposal_only']/@value"), ["1"]
         )
         self.assertEqual(page.xpath("//input[@name='next']/@value"), [self.queue_url])
-        self.assertContains(
-            response,
-            "Verdicts are recorded; string states are not changed and no "
-            "replacement translations are generated.",
+        self.assertContains(response, "The judge checks the matching strings")
+        self.assertEqual(page.xpath("//input[@name='mode']/@value"), ["judge"])
+        self.assertEqual(page.xpath("//input[@name='mode']/@type"), ["hidden"])
+        self.assertEqual(page.xpath("//input[@name='auto_source']/@value"), ["others"])
+        self.assertEqual(page.xpath("//input[@name='threshold']/@type"), ["hidden"])
+        self.assertFalse(page.xpath("//select[@name='mode']"))
+        self.assertFalse(page.xpath("//*[@name='engines']"))
+        self.assertFalse(page.xpath("//*[@name='overwrite_existing']"))
+        self.assertNotContains(response, "translating all strings will")
+        self.assertNotContains(response, "Automatic translation takes existing")
+        self.assertEqual(
+            page.xpath("//input[@id='id_auto_apply']/@value"), ["Run judge check"]
         )
+
+    def test_regular_launch_keeps_translation_controls(self) -> None:
+        response = self.client.get(self.project_language.get_absolute_url())
+        page = html.fromstring(response.content)
+        self.assertEqual(page.xpath("//select[@name='mode']/@name"), ["mode"])
+        self.assertTrue(page.xpath("//*[@name='auto_source']"))
+        self.assertTrue(page.xpath("//*[@name='overwrite_existing']"))
+        self.assertContains(response, "Automatic translation takes existing")
+        self.assertEqual(page.xpath("//input[@id='id_auto_apply']/@value"), ["Apply"])
+
+    def test_verdict_only_rejects_write_mode_and_overwrite_tampering(self) -> None:
+        for changes, error_field in (
+            ({"mode": "translate"}, "mode"),
+            ({"overwrite_existing": "on"}, "overwrite_existing"),
+        ):
+            with self.subTest(changes=changes):
+                form = AutoForm(
+                    obj=self.project,
+                    user=self.user,
+                    data={
+                        "mode": "judge",
+                        "q": "check:repeat-drift",
+                        "auto_source": "others",
+                        "threshold": 80,
+                        "judge_proposal_only": "1",
+                        **changes,
+                    },
+                )
+                self.assertFalse(form.is_valid())
+                self.assertIn(error_field, form.errors)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_verdict_only_launch_skips_preparation_and_repair_candidates(self) -> None:

@@ -1495,20 +1495,58 @@ class AutoForm(forms.Form):
         if self.initial.get("mode") not in allowed_modes:
             self.initial.pop("mode", None)
 
+        self.proposal_only = self._is_proposal_only()
+        self._configure_proposal_only(allowed_modes)
+
         self.helper = FormHelper(self)
         self.helper.form_tag = False
-        self.helper.layout = Layout(
-            Field("mode"),
-            SearchField("q"),
-            InlineRadios("auto_source"),
-            Div("component", css_id="auto_source_others"),
-            Div("engines", "threshold", css_id="auto_source_mt"),
-            Field("overwrite_existing"),
-            Field("judge_proposal_only"),
+        if self.proposal_only:
+            self.helper.layout = Layout(
+                Field("mode"),
+                SearchField("q"),
+                Field("auto_source"),
+                Field("threshold"),
+                Field("judge_proposal_only"),
+            )
+
+        else:
+            self.helper.layout = Layout(
+                Field("mode"),
+                SearchField("q"),
+                InlineRadios("auto_source"),
+                Div("component", css_id="auto_source_others"),
+                Div("engines", "threshold", css_id="auto_source_mt"),
+                Field("overwrite_existing"),
+                Field("judge_proposal_only"),
+            )
+
+    def _is_proposal_only(self) -> bool:
+        if self.is_bound:
+            return self.data.get("judge_proposal_only") in {"1", "true", "on"}
+        return bool(self.initial.get("judge_proposal_only"))
+
+    def _configure_proposal_only(self, allowed_modes: set[str]) -> None:
+        if not self.proposal_only:
+            return
+        self.fields["mode"].choices = (
+            [("judge", gettext("Judge check"))] if "judge" in allowed_modes else []
         )
+        self.fields["mode"].widget = forms.HiddenInput()
+        self.fields["mode"].initial = "judge"
+        self.fields["q"].help_text = ""
+        self.fields["auto_source"].widget = forms.HiddenInput()
+        self.fields["auto_source"].initial = "others"
+        self.fields["threshold"].widget = forms.HiddenInput()
+        self.fields["threshold"].initial = MACHINERY_DEFAULT_THRESHOLD
+        self.initial.update(mode="judge", auto_source="others")
 
     def clean(self):
         super().clean()
+        if self.proposal_only and self.cleaned_data.get("overwrite_existing"):
+            self.add_error(
+                "overwrite_existing",
+                gettext("Overwrite is unavailable for a judge check."),
+            )
         if (
             self.cleaned_data.get("auto_source") == "mt"
             and "engines" in self.cleaned_data

@@ -33099,3 +33099,23 @@ msgstr "Обоснование судьи: %(reason)s"
 #, python-format
 msgid "Recommended: %(target)s"
 msgstr "Рекомендуем: %(target)s"
+
+#: weblate/trans/forms.py weblate/templates/snippets/autoform.html
+msgid "Judge check"
+msgstr "Проверка судьёй"
+
+#: weblate/trans/forms.py
+msgid "Overwrite is unavailable for a judge check."
+msgstr "При проверке судьёй нельзя перезаписывать переводы."
+
+#: weblate/templates/snippets/autoform.html
+msgid "The judge checks the matching strings and records verdicts. String states are not changed and no replacement translations are generated."
+msgstr "Судья проверяет строки по фильтру и записывает вердикты. Состояния строк не меняются, новые варианты перевода не создаются."
+
+#: weblate/templates/snippets/autoform.html
+msgid "A judge check plans up to %(requests)s LLM requests (batches × judges × rounds); a refused batch is retried once."
+msgstr "Проверка судьёй предполагает до %(requests)s запросов к LLM (пакеты × судьи × раунды); отклонённый пакет повторяется один раз."
+
+#: weblate/templates/snippets/autoform.html
+msgid "Run judge check"
+msgstr "Запустить проверку судьёй"
