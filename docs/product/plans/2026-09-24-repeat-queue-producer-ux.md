@@ -4,9 +4,9 @@
 
 Date: 2026-09-24, rewritten in full on 2026-09-25, engineering review folded
 in on 2026-09-25.
-Status: **rewritten after the owner chose "option 3" on 2026-09-25; the
-engineering review's findings and the owner's answers to its four questions
-(D9-D12) are folded in; awaiting the owner's approval before implementation.**
+Status: **phase 1 (Tasks 1-6) implemented at `ee3e4012` and Task 7 local
+verification recorded on 2026-09-25. Deployment, the paid judge run and the
+25-ready-group precision gate await explicit approval. Phase 2 has not started.**
 This version replaces the 2026-09-24 text (judge preselection only, bulk apply
 out of scope). Editing this plan does not authorize deploying it or starting a
 paid judge run. Phase 2 (Tasks 8-10) starts only after the phase 1 gate in
@@ -941,21 +941,37 @@ Commit `docs(repeats): record judge-checked bulk apply` (strings as
 
 ### Results
 
-Pending. Fill from observed output, with the tested commit.
+Local verification of `ee3e4012` on 2026-09-25: the Task 7 combined pytest
+command collected 294 tests: **293 passed, 1 failed** in 456.90 seconds. The
+failure is
+`ProducerRunDispatchTest.test_publishes_and_adopts_a_project_scoped_judge_run_end_to_end`
+in `test_judge.py:414`: the run status was `failed`, expected `completed`.
+The same test failed before the phase 1 changes (93 passed, 1 failed in the
+earlier `test_judge.py` baseline); the combined suite is not green. All other
+tests in the six-file run passed.
+
+`uv run prek run --files` over files changed from `6a971b44` to `ee3e4012`
+passed every applicable hook except repository-wide `reuse lint`, which
+reported pre-existing missing copyright or license information in unrelated
+files; the hooks made no file changes. `makemigrations --check --dry-run`
+exited 0 and printed `No changes detected`; it also warned that the default
+PostgreSQL connection could not authenticate role `postgres` on the local
+socket. `msgfmt --check` passed for both Russian catalogs. `node --check`
+passed for `repeat-queue.js` and `loader-bootstrap.js`.
 
 Phase 1:
 
 | Check | Result |
 | --- | --- |
-| `active_verdicts` equals `active_verdict` and `judge_status_annotations`, one query | Pending |
-| Judgement rule cases (ready / choose / rewrite / unchecked, unchecked variant, one parsed seat, strictest seat, approved, stale) | Pending |
-| Verdict-only launch: no state change, no candidates, no preparation, returns to the queue | Pending |
-| Queue panel states, progress without reserved rows, stopped run, relaunch scope, bucket filter; no paid recommend link | Pending |
-| Card preselection (single-form only), evidence, escaping | Pending |
-| Queue query count constant | Pending |
-| Russian browser and keyboard check | Pending |
-| Real judge run: buckets, spend, wrong-recommendation rate out of at least 25 | Pending (paid, gated) |
-| Gate decision for phase 2 | Pending (owner) |
+| `active_verdicts` equals `active_verdict` and `judge_status_annotations`, one query | Covered by passing `test_judge.py` cases; one unrelated end-to-end dispatch case failed as recorded above. |
+| Judgement rule cases (ready / choose / rewrite / unchecked, unchecked variant, one parsed seat, strictest seat, approved, stale) | `test_repeat_judge.py`: all 18 tests passed. |
+| Verdict-only launch: no state change, no candidates, no preparation, returns to the queue | Corresponding `test_judge_form.py` and `test_judge_autotranslate.py` cases passed. |
+| Queue panel states, progress without reserved rows, stopped run, relaunch scope, bucket filter; no paid recommend link | Corresponding `test_repeat_views.py` cases passed. |
+| Card preselection (single-form only), evidence, escaping | Corresponding `test_repeat_views.py` cases passed. |
+| Queue query count constant | `test_queue_judge_query_growth_is_bounded` passed; `test_judge_groups_reads_twenty_groups_with_one_verdict_query` passed. |
+| Russian browser and keyboard check | Not run: requires explicit deployment approval. |
+| Real judge run: buckets, spend, wrong-recommendation rate out of at least 25 | Not run: paid run requires explicit approval after cost preview. No metrics recorded. |
+| Gate decision for phase 2 | Pending the paid run, 25-ready-group precision check and owner approval; phase 2 not started. |
 
 Phase 2:
 
