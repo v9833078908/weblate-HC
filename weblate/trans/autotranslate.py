@@ -2810,7 +2810,16 @@ class BatchAutoTranslate(BaseAutoTranslate):
                             producer_run.preparation_snapshot
                         )
                     except (TypeError, ValueError, KeyError):
-                        preparation_scope = None
+                        # Rebuilding would silently reopen the closed scope.
+                        self._finish_producer_run(
+                            producer_run,
+                            ProducerRun.Status.FAILED,
+                            gettext(
+                                "This run has an invalid preparation snapshot "
+                                "and cannot resume. Start a new run."
+                            ),
+                        )
+                        raise JudgeError(producer_run.failure) from None
                 if (
                     self.producer_run_id is not None
                     and preparation_scope is None

@@ -547,6 +547,7 @@ class ProducerRunDispatchTest(ViewTestCase):
             self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
         run.refresh_from_db()
         self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIn("invalid preparation snapshot", run.failure)
         run_batch.assert_not_called()
 
 
