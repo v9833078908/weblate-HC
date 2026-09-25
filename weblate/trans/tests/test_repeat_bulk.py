@@ -18,6 +18,7 @@ from weblate.auth.models import Group, User, setup_project_groups
 from weblate.lang.models import Language
 from weblate.trans import repeat_bulk
 from weblate.trans.models import (
+    JudgeVerdict,
     RepeatBulkItem,
     RepeatBulkRun,
     RepeatDecisionEvent,
@@ -26,6 +27,7 @@ from weblate.trans.models import (
     RepeatRecommendationResult,
     RepeatRecommendationRun,
 )
+from weblate.trans.models.judge import compute_target_hash
 from weblate.trans.repeat_bulk import (
     CODE_ITEM_ERROR,
     CODE_NO_WRITE,
@@ -441,6 +443,116 @@ class RepeatBulkReviewBindingTest(RepeatBulkServiceFixtures, ViewTestCase):
         self.assertEqual(
             [entry["unit"] for entry in item.outcome["written"]], [included.pk]
         )
+
+
+class RepeatBulkJudgeOverrideTest(RepeatBulkServiceFixtures, ViewTestCase):
+    """The judge's only passed variant replaces the model's target (D17 rule 2)."""
+
+    def judged_result(self, policy, source: str, action: str, target: list[str]):
+        """Основание / fr: the judge passes only "Base" among three variants."""
+        group = self.make_group(policy, source, ["Armature", "Base", "Monture"])
+        for unit in self.group_units[group.pk]:
+            JudgeVerdict.objects.create(
+                unit=unit,
+                target_hash=compute_target_hash(unit.get_target_plurals()),
+                context_hash="repeat-context",
+                judge_model="vendor/model-a",
+                seat=1,
+                max_severity=(
+                    JudgeVerdict.Severity.NONE
+                    if unit.target == "Base"
+                    else JudgeVerdict.Severity.MAJOR
+                ),
+            )
+        return self.make_result(
+            self.make_run(policy), group, target, action=action
+        ).result
+
+    def test_override_target_is_reviewed_frozen_and_applied(self) -> None:
+        policy = self.make_policy()
+        results = [
+            self.judged_result(policy, "Основание keep", "keep_independent", []),
+            self.judged_result(policy, "Основание human", "needs_human", []),
+            self.judged_result(policy, "Основание new", "propose_new", ["Socle"]),
+            self.judged_result(
+                policy, "Основание flagged", "use_existing", ["Armature"]
+            ),
+        ]
+        plain = self.make_result(
+            self.make_run(policy),
+            self.make_group(policy, "Unjudged", ["Old one", "Old two"]),
+            ["New shared"],
+        ).result
+
+        review = plan_bulk(policy=policy, actor=self.user)
+
+        rows = {row.result_id: row for row in review.rows}
+        self.assertEqual(set(rows), {result.pk for result in [*results, plain]})
+        self.assertEqual(review.independent, ())
+        self.assertEqual(review.needs_human, ())
+        for result in results:
+            with self.subTest(action=result.action):
+                row = rows[result.pk]
+                self.assertEqual(row.target, ("Base",))
+                self.assertEqual(row.action, "use_existing")
+                self.assertTrue(row.judge_override)
+                self.assertEqual(row.attention, "")
+        self.assertFalse(rows[plain.pk].judge_override)
+        self.assertEqual(rows[plain.pk].target, ("New shared",))
+        entries = signing.loads(review.manifest, salt=REPEAT_BULK_MANIFEST_SALT)[
+            "results"
+        ]
+        self.assertEqual(entries[str(results[0].pk)]["target"], ["Base"])
+        self.assertNotIn("target", entries[str(plain.pk)])
+
+        run = start_bulk(
+            policy=policy,
+            actor=self.user,
+            manifest=review.manifest,
+            result_ids=[result.pk for result in [*results, plain]],
+        )
+        process_apply_items(run_id=run.pk)
+
+        items = {item.result_id: item for item in run.items.all()}
+        for result in results:
+            with self.subTest(applied=result.action):
+                item = items[result.pk]
+                self.assertEqual(item.status, RepeatBulkItem.Status.APPLIED)
+                self.assertEqual(item.decision["target"], ["Base"])
+                self.assertEqual(item.decision["source"], "judge")
+                self.assertEqual(item.decision["action"], result.action)
+                armature, base, monture = self.group_units[result.group_id]
+                for unit in (armature, base, monture):
+                    unit.refresh_from_db()
+                # The model's exclusion of the first place still holds.
+                self.assertEqual(armature.target, "Armature")
+                self.assertEqual(base.target, "Base")
+                self.assertEqual(monture.target, "Base")
+                self.assertEqual(
+                    [entry["unit"] for entry in item.outcome["written"]],
+                    [monture.pk],
+                )
+        self.assertEqual(items[plain.pk].decision["target"], ["New shared"])
+        self.assertNotIn("source", items[plain.pk].decision)
+
+    def test_override_is_bound_to_the_reviewed_context(self) -> None:
+        policy = self.make_policy()
+        result = self.judged_result(policy, "Основание", "keep_independent", [])
+        review = plan_bulk(policy=policy, actor=self.user)
+        before = self.write_snapshot()
+
+        self.group_units[result.group_id][2].translate(
+            self.user, ["Edited by hand"], STATE_TRANSLATED, propagate=False
+        )
+
+        with self.assertRaises(ValidationError):
+            start_bulk(
+                policy=policy,
+                actor=self.user,
+                manifest=review.manifest,
+                result_ids=[result.pk],
+            )
+        self.assertEqual(self.write_snapshot(), before)
 
 
 class RepeatBulkStaleConfirmationTest(RepeatBulkServiceFixtures, ViewTestCase):

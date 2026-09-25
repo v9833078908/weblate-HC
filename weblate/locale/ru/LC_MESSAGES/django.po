@@ -33125,8 +33125,8 @@ msgid "The judge checks the matching strings and records verdicts. String states
 msgstr "Судья проверяет строки по фильтру и записывает вердикты. Состояния строк не меняются, новые варианты перевода не создаются."
 
 #: weblate/templates/snippets/autoform.html
-msgid "After the check, the model compares the variants of repeat groups where the judge accepts at least one variant. This comparison is also paid and starts automatically when the check completes."
-msgstr "После проверки модель сравнивает варианты в группах повторов, где судья принял хотя бы один вариант. Это сравнение тоже платное и запускается автоматически, когда проверка завершится."
+msgid "After the check, the model compares the variants of repeat groups where the judge accepts at least one variant or flags every variant. This comparison is also paid and starts automatically when the check completes."
+msgstr "После проверки модель сравнивает варианты в группах повторов, где судья принял хотя бы один вариант или нашёл ошибку в каждом. Это сравнение тоже платное и запускается автоматически, когда проверка завершится."
 
 #: weblate/templates/snippets/autoform.html
 msgid "A judge check plans up to %(requests)s LLM requests (batches × judges × rounds); a refused batch is retried once."
@@ -33222,11 +33222,11 @@ msgstr "Готово к применению"
 
 #: weblate/templates/repeat_bulk_review.html
 msgid ""
-"The queue shows these groups as ready: the judge passed the variant the "
-"model picked. They are selected."
+"The queue shows these groups as ready: the judge passed the recommended "
+"translation. They are selected."
 msgstr ""
-"В очереди эти группы отмечены как готовые: судья одобрил вариант, который "
-"выбрала модель. Они уже выбраны."
+"В очереди эти группы отмечены как готовые: судья одобрил рекомендуемый "
+"перевод. Они уже выбраны."
 
 #: weblate/templates/repeat_bulk_review.html
 #: weblate/templates/repeat_bulk_review_row.html
@@ -33325,3 +33325,16 @@ msgstr "Судья и модель расходятся во мнении о л�
 #: weblate/trans/views/repeats.py
 msgid "Excluded by the model"
 msgstr "Исключено моделью"
+
+#: weblate/templates/snippets/repeat_group.html
+msgid "The judge found an error in every translation, so none is preselected. Enter a new translation."
+msgstr "Судья нашёл ошибку в каждом переводе, поэтому ни один не выбран заранее. Введите новый перевод."
+
+#: weblate/trans/views/repeats.py
+msgid "The judge passed only this variant."
+msgstr "Судья одобрил только этот вариант."
+
+#: weblate/trans/views/repeats.py
+#, python-format
+msgid "The judge passed only this variant. The model advised: %(rationale)s"
+msgstr "Судья одобрил только этот вариант. Совет модели: %(rationale)s"

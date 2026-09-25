@@ -55,6 +55,7 @@ from weblate.trans.repeat_bulk import (
     CODE_UNDONE,
     plan_bulk,
     resume_bulk,
+    review_target,
     start_bulk,
     start_undo,
 )
@@ -223,12 +224,10 @@ def _judge_panel(request, obj, target_language, groups, policy, current):
         )
         recommended = item["judge"].recommended
         single_form = len(item["variants"][0]["target"]) == 1
-        item["preselect"] = (
-            item["judge"].bucket == READY and recommended is not None and single_form
-        )
-        item["preselect_keep"] = (
-            item["judge"].model_action == "keep_independent" and single_form
-        )
+        # Every group preselects its best available choice (D17).
+        item["preselect"] = recommended is not None and single_form
+        item["preselect_keep"] = item["judge"].rule == 3 and single_form
+        item["preselect_custom"] = item["judge"].rule == 5 and single_form
         if recommended is not None:
             item["variants"].sort(
                 key=lambda variant, target=recommended: variant["target"] != target
@@ -393,12 +392,12 @@ def repeat_queue(request, project: str, language: str):
     )
     if policy is not None and request.user.has_perm("project.edit", obj):
         # The banner counts what the review page preselects: ready groups
-        # with a current, applicable result, so it matches the ready tile.
+        # with a current result, so it matches the ready tile. A ready group
+        # applies the judge's variant whatever the model said (D17).
         bulk_ready = sum(
             item["status"] == "open"
             and item["judge"].bucket == READY
-            and (result := current.get(item["group"].pk)) is not None
-            and result.action in {"use_existing", "propose_new"}
+            and item["group"].pk in current
             for item in groups
         )
     return render(
@@ -823,6 +822,17 @@ def _attention_label(code: str) -> str:
     }.get(code, code)
 
 
+def _row_rationale(row) -> str:
+    """Say plainly when the judge's variant replaces the model's advice."""
+    if not row.judge_override:
+        return row.rationale
+    if not row.rationale:
+        return gettext("The judge passed only this variant.")
+    return gettext(
+        "The judge passed only this variant. The model advised: %(rationale)s"
+    ) % {"rationale": row.rationale}
+
+
 def _review_rows_display(review, *, project: str, language: str) -> list[dict]:
     """Render compact review rows; per-place detail is fetched on demand."""
     return [
@@ -832,7 +842,7 @@ def _review_rows_display(review, *, project: str, language: str) -> list[dict]:
             "target_forms": list(row.target),
             "action": row.action,
             "action_label": _action_label(row.action),
-            "rationale": row.rationale,
+            "rationale": _row_rationale(row),
             "places": len(row.members),
             "writable": row.writable,
             "attention": row.attention,
@@ -992,11 +1002,11 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
         RepeatRecommendationResult.objects.select_related("group__policy"),
         pk=result_id,
         group__policy=policy,
-        action__in={"use_existing", "propose_new"},
     )
-    preview = preview_group(
-        group=result.group, target=list(result.target), actor=request.user
-    )
+    target = review_target(result, actor=request.user)
+    if target is None:
+        raise Http404
+    preview = preview_group(group=result.group, target=list(target), actor=request.user)
     excluded = set(result.exclusions)
     members = []
     for member in preview.members:
@@ -1028,7 +1038,7 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
             "project": policy.project,
             "language": policy.target_language,
             "source_text": _forms_text(result.group.source_forms),
-            "target_text": _forms_text(result.target),
+            "target_text": _forms_text(target),
             "members": members,
             "review_url": reverse(
                 "repeat-bulk-review", kwargs={"project": project, "language": language}

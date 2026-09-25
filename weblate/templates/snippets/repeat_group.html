@@ -17,7 +17,7 @@
         <span class="badge text-bg-success">{% translate "Resolved" %}</span>
       {% elif item.status == 'consistent' %}
         <span class="badge text-bg-light">{% translate "Same translation" %}</span>
-      {% elif item.preselect %}
+      {% elif item.preselect and item.judge.bucket == 'ready' %}
         <span class="badge text-bg-success">{% blocktranslate with target=item.judge.recommended.0 %}Recommended: {{ target }}{% endblocktranslate %}</span>
       {% else %}
         <span class="badge text-bg-secondary">{% translate "Different translations" %}</span>
@@ -49,7 +49,10 @@
           {% if item.recommendation and not item.recommendation.target and item.recommendation.rationale %}
             <p class="text-muted">{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</p>
           {% endif %}
-          {% if item.recommendation and item.recommendation.target and not item.model_on_variant %}
+          {% if item.judge.rule == 7 %}
+            <p class="text-muted">{% translate "The judge found an error in every translation, so none is preselected. Enter a new translation." %}</p>
+          {% endif %}
+          {% if item.recommendation and item.recommendation.target and not item.model_on_variant and not item.preselect_custom %}
             <label class="rq-option form-check rq-recommendation">
               <input class="form-check-input"
                      type="radio"
@@ -88,13 +91,15 @@
                    type="radio"
                    name="choice"
                    value="custom"
-                   data-choice="custom" />
+                   data-choice="custom"
+                   {% if item.preselect_custom %}checked{% endif %} />
             <span class="form-check-label">{% translate "Enter a new translation for every place" %}</span>
+            {% if item.preselect_custom and item.recommendation.rationale %}<span class="d-block text-muted">{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
           </label>
           <input class="form-control rq-custom"
                  name="custom_target"
                  aria-label="{% translate 'New translation for every place' %}"
-                 hidden />
+                 {% if item.preselect_custom %}value="{{ item.recommendation.target.0 }}"{% else %}hidden{% endif %} />
         {% endif %}
         <label class="rq-option form-check">
           <input class="form-check-input"
@@ -108,7 +113,7 @@
       </fieldset>
       <button class="btn btn-primary rq-preview"
               type="submit"
-              aria-disabled="{% if item.preselect or item.preselect_keep %}false{% else %}true{% endif %}">{% translate "Show what will change" %}</button>
+              aria-disabled="{% if item.preselect or item.preselect_keep or item.preselect_custom %}false{% else %}true{% endif %}">{% translate "Show what will change" %}</button>
       <p class="rq-hint"
          aria-live="polite"
          data-hint-default="{% translate 'Choose an option to continue.' %}"

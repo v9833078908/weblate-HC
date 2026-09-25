@@ -131,7 +131,7 @@ def schedule_repeat_comparison(run: ProducerRun) -> None:
 
 
 def compare_after_judge(run_id) -> dict[str, object] | None:
-    """Compare the variants of ready and choose groups after a queue check, once."""
+    """Compare the variants of checked groups after a queue check, once."""
     with transaction.atomic():
         run = ProducerRun.objects.select_for_update().filter(pk=run_id).first()
         if (
@@ -169,7 +169,8 @@ def _start_comparison(run: ProducerRun, policy: RepeatPolicy) -> dict[str, objec
     group_ids = sorted(
         group_id
         for group_id, judgement in judgements.items()
-        if judgement.bucket in {READY, CHOOSE}
+        # A rewrite group is compared too, so the model can propose new text.
+        if judgement.bucket in {READY, CHOOSE, REWRITE}
     )
     if not group_ids:
         return {"status": "none", "groups": 0}
@@ -219,44 +220,51 @@ class VariantJudgement:
 @dataclass(frozen=True)
 class GroupJudgement:
     bucket: str
+    # The preselected existing variant (rules 1, 2, 4 and 6 of D17), else None.
     recommended: tuple[str, ...] | None
     variants: dict[tuple[str, ...], VariantJudgement]
     # (unit id, verdict pk, target hash) for every judged place, sorted.
     evidence: tuple[tuple[int, int, str], ...]
-    # "use_existing" when the model backs the recommended variant,
-    # "keep_independent" when it advises not to link the places, else "".
-    model_action: str = ""
+    # The D17 rule that chose the preselection: 3 preselects "do not link",
+    # 5 a new translation with the model's text, 7 nothing.
+    rule: int = 7
+
+    @property
+    def judge_only(self) -> tuple[str, ...] | None:
+        """The only passed variant when it overrides the model (D17 rule 2)."""
+        return self.recommended if self.rule == 2 else None
 
 
-def _settle_with_model(
-    bucket: str,
-    recommended: tuple[str, ...] | None,
+def _preselect(
+    variants: list[dict],
     judgements: dict[tuple[str, ...], VariantJudgement],
-    *,
-    approved: bool,
     recommendation: RepeatRecommendationResult | None,
-) -> tuple[str, tuple[str, ...] | None, str]:
-    """Apply the model comparison of every variant to a judge bucket (D15)."""
-    if recommendation is None or bucket not in {READY, CHOOSE}:
-        return bucket, recommended, ""
-    target = tuple(recommendation.target)
+) -> tuple[int, tuple[str, ...] | None]:
+    """Pick the best available choice for one group; the first D17 rule wins."""
+    action = recommendation.action if recommendation is not None else ""
+    target = tuple(recommendation.target) if recommendation is not None else ()
     picked = judgements.get(target)
-    agrees = (
-        recommendation.action == "use_existing"
-        and picked is not None
-        and picked.mark == "passed"
-    )
-    if bucket == READY:
-        if agrees and target == recommended:
-            return bucket, recommended, recommendation.action
-        # A disagreement leaves the decision to the producer.
-        return CHOOSE, None, ""
-    if agrees and not approved:
-        # An approved place stays a human decision (D4).
-        return READY, target, recommendation.action
-    if recommendation.action == "keep_independent":
-        return bucket, recommended, recommendation.action
-    return bucket, recommended, ""
+    mark = picked.mark if picked is not None else ""
+    places = {variant["target"]: len(variant["units"]) for variant in variants}
+    passed = [key for key, value in judgements.items() if value.mark == "passed"]
+    unchecked = [key for key, value in judgements.items() if value.mark == "unchecked"]
+    if action == "use_existing" and mark == "passed":
+        return 1, target
+    if len(passed) == 1:
+        return 2, passed[0]
+    if action == "keep_independent":
+        return 3, None
+    if passed:
+        # max() keeps the first of equals, so a tie follows the queue order.
+        return 4, max(passed, key=places.__getitem__)
+    if action == "propose_new" and mark != "flagged":
+        return 5, None
+    if action == "use_existing" and mark == "unchecked":
+        return 6, target
+    if unchecked:
+        return 6, max(unchecked, key=places.__getitem__)
+    # Every variant is flagged; a flagged variant is never preselected.
+    return 7, None
 
 
 def judge_group(
@@ -322,22 +330,18 @@ def judge_group(
         bucket = REWRITE
     else:
         bucket = UNCHECKED
-    recommended = passed_targets[0] if bucket == READY else None
-
-    bucket, recommended, model_action = _settle_with_model(
-        bucket,
-        recommended,
-        judgements,
-        approved=approved,
-        recommendation=recommendation,
-    )
+    rule, recommended = _preselect(variants, judgements, recommendation)
+    if bucket == CHOOSE and rule == 1 and not approved:
+        # The model picked one of several passed variants; an approved place
+        # stays a human decision (D4, D15).
+        bucket = READY
 
     return GroupJudgement(
         bucket=bucket,
         recommended=recommended,
         variants=judgements,
         evidence=tuple(sorted(evidence)),
-        model_action=model_action,
+        rule=rule,
     )
 
 

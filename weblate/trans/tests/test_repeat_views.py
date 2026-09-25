@@ -244,7 +244,7 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Save repeat rule")
 
-    def test_queue_renders_unselected_decision_and_preview_selection(self) -> None:
+    def test_queue_renders_preselected_decision_and_preview_selection(self) -> None:
         """The Variant-C queue always sends a decision through the preview."""
         translation = self.component.translation_set.get(language_code="cs")
         source = "A repeat that needs a decision"
@@ -286,7 +286,13 @@ class RepeatQueueViewTest(ViewTestCase):
         )
 
         self.assertContains(response, "What to do with this group?")
-        self.assertContains(response, 'aria-disabled="true"')
+        # Nothing is judged yet: the first of the equally used variants is
+        # preselected (D17), and the decision still goes through the preview.
+        self.assertContains(response, 'aria-disabled="false"')
+        self.assertRegex(
+            response.content.decode(),
+            r'name="target"\s+value="One"\s+data-choice="variant"\s+checked',
+        )
         self.assertNotContains(response, 'checked="checked"')
         group = policy.groups.get()
 
@@ -1627,7 +1633,7 @@ class RepeatBulkViewsTest(ViewTestCase):
             ),
         )
 
-    def test_queue_cards_show_judge_evidence_and_preselect_only_ready_variant(
+    def test_queue_cards_show_judge_evidence_and_preselect_the_best_variant(
         self,
     ) -> None:
         ready_group, ready = self.make_group(
@@ -1724,10 +1730,25 @@ class RepeatBulkViewsTest(ViewTestCase):
             .split(f'id="g-{flagged_group.pk}"', 1)[1]
             .split("</li>", 1)[0]
         )
+        # A proposal equal to a flagged variant is never preselected (D17).
         self.assertNotRegex(flagged_card, r'(?s)<input[^>]*\schecked(?:="checked")?')
         self.assertNotIn("Recommended: ", flagged_card)
+        self.assertIn(
+            "The judge found an error in every translation, so none is "
+            "preselected. Enter a new translation.",
+            flagged_card,
+        )
+        # Nothing checked yet: the most-used variant is still the best guess.
         unchecked_item = rendered_groups[unchecked_group.pk]
-        self.assertFalse(unchecked_item["preselect"])
+        self.assertTrue(unchecked_item["preselect"])
+        unchecked_card = self.card(response, unchecked_group)
+        self.assertRegex(
+            unchecked_card,
+            r'name="target"\s+value="One"\s+data-choice="variant"\s+checked',
+        )
+        self.assertIn(">Recommended</span>", unchecked_card)
+        self.assertNotIn("Recommended: ", unchecked_card)
+        self.assertNotIn("The judge found an error in every", unchecked_card)
 
     def test_queue_plural_ready_group_is_not_preselected(self) -> None:
         source = join_plural(["Gate", "Gates"])
@@ -2228,7 +2249,7 @@ class RepeatBulkViewsTest(ViewTestCase):
 
         self.assertEqual(
             response.context["judge_panel"]["buckets"],
-            {"ready": 1, "choose": 3, "rewrite": 0, "unchecked": 0},
+            {"ready": 2, "choose": 2, "rewrite": 0, "unchecked": 0},
         )
         picked_card = self.card(response, picked)
         self.assertRegex(
@@ -2245,16 +2266,27 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertRegex(keep_card, r'value="keep"\s+data-choice="keep"\s+checked')
         self.assertIn("Model rationale: Keep why", keep_card)
         self.assertIn('aria-disabled="false"', keep_card)
-        for group, rationale in ((human, "Human why"), (disagree, "Disagree why")):
-            with self.subTest(group=group.source_forms[0]):
-                card = self.card(response, group)
-                self.assertNotRegex(card, r"(?s)<input[^>]*\schecked")
-                self.assertIn(f"Model rationale: {rationale}", card)
-                self.assertNotIn("Recommended: ", card)
-        # A model pick of a flagged variant shows the judge's error once and
-        # the model's rationale beside it.
+        # Two passed variants and an unsure model: the first of the equally
+        # used passed variants is preselected, outside the ready bucket (D17).
+        human_card = self.card(response, human)
+        self.assertRegex(
+            human_card,
+            r'name="target"\s+value="Model unsure 0"\s+data-choice="variant"\s+checked',
+        )
+        self.assertIn("Model rationale: Human why", human_card)
+        self.assertNotIn("Recommended: ", human_card)
+        # The judge passed only one variant: it beats the model's flagged pick.
         disagree_card = self.card(response, disagree)
+        self.assertRegex(
+            disagree_card,
+            r'name="target"\s+value="Model disagrees 0"\s+data-choice="variant"\s+checked',
+        )
+        self.assertIn("Recommended: Model disagrees 0", disagree_card)
+        self.assertEqual(disagree_card.count(" checked"), 1)
+        # The model's pick of the flagged variant shows the judge's error once
+        # and the model's rationale beside it.
         self.assertIn("The judge found an error", disagree_card)
+        self.assertIn("Model rationale: Disagree why", disagree_card)
         self.assertNotIn("Model recommendation", disagree_card)
         for group in (picked, keep, human, disagree):
             with self.subTest(header=group.source_forms[0]):
@@ -2310,6 +2342,95 @@ class RepeatBulkViewsTest(ViewTestCase):
         for group in (picked, keep):
             self.assertNotRegex(self.card(response, group), r"(?s)<input[^>]*\schecked")
 
+    def test_queue_card_preselects_the_judge_variant_over_keep_independent(
+        self,
+    ) -> None:
+        # Основание / fr: only "Base" passed; the model said the places differ.
+        group, units = self.make_group(
+            "Основание", ["Armature", "Base", "Monture"], start=28150
+        )
+        for unit in units:
+            self.make_judge_verdict(
+                unit,
+                JudgeVerdict.Severity.NONE
+                if unit.target == "Base"
+                else JudgeVerdict.Severity.MAJOR,
+            )
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            group,
+            units,
+            action="keep_independent",
+            target=[],
+            rationale="Different contexts suggest different referents.",
+        )
+
+        response = self.client.get(self.queue_url)
+
+        item = next(
+            item for item in response.context["groups"] if item["group"] == group
+        )
+        self.assertEqual(item["judge"].bucket, "ready")
+        self.assertFalse(item["preselect_keep"])
+        card = self.card(response, group)
+        self.assertRegex(
+            card, r'name="target"\s+value="Base"\s+data-choice="variant"\s+checked'
+        )
+        self.assertEqual(card.count(" checked"), 1)
+        self.assertIn("Recommended: Base", card)
+        self.assertIn(
+            "Model rationale: Different contexts suggest different referents.", card
+        )
+        self.assertEqual(response.context["bulk_ready"], 1)
+
+    def test_queue_card_prefills_the_model_text_when_every_variant_is_flagged(
+        self,
+    ) -> None:
+        major = JudgeVerdict.Severity.MAJOR
+        group, units = self.judged_group("All wrong", [major, major], 28160)
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            group,
+            units,
+            target=["Socle"],
+            rationale="Neither variant names a base.",
+        )
+
+        response = self.client.get(self.queue_url)
+
+        card = self.card(response, group)
+        self.assertRegex(card, r'value="custom"\s+data-choice="custom"\s+checked')
+        self.assertRegex(card, r'name="custom_target"[^>]*value="Socle"')
+        self.assertNotRegex(card, r'name="custom_target"[^>]*hidden')
+        self.assertIn('aria-disabled="false"', card)
+        self.assertIn("Model rationale: Neither variant names a base.", card)
+        # The model's text lives in the custom field, not in a second radio.
+        self.assertNotIn("Model recommendation", card)
+        self.assertEqual(card.count("Socle"), 1)
+        self.assertNotIn("The judge found an error in every", card)
+        self.assertEqual(response.context["bulk_ready"], 0)
+
+    def test_review_places_follow_the_judge_override(self) -> None:
+        none = JudgeVerdict.Severity.NONE
+        major = JudgeVerdict.Severity.MAJOR
+        group, units = self.judged_group("Override places", [none, major], 28170)
+        result = self.make_recommendation(
+            self.make_recommendation_run(),
+            group,
+            units,
+            action="keep_independent",
+            target=[],
+        )
+
+        places = self.client.get(self.places_url(result))
+
+        self.assertEqual(places.status_code, 200)
+        self.assertEqual(places.context["target_text"], "Override places 0")
+        changing = [
+            member for member in places.context["members"] if member["will_change"]
+        ]
+        self.assertEqual([member["unit_id"] for member in changing], [units[1].pk])
+
     def test_queue_ready_bucket_equals_bulk_banner(self) -> None:
         none = JudgeVerdict.Severity.NONE
         major = JudgeVerdict.Severity.MAJOR
@@ -2332,27 +2453,50 @@ class RepeatBulkViewsTest(ViewTestCase):
             action="use_existing",
             target=["Model ready 0"],
         )
-        # The model picks the variant the judge flagged: the queue keeps the
-        # group in "choose", so neither the tile nor the banner counts it.
-        flagged, flagged_units = self.judged_group(
-            "Model picks flagged", [none, major], 28230
-        )
-        contested = self.make_recommendation(
+        # The judge passed only one variant: whatever the model said, the
+        # group stays ready with that variant, in the tile and the banner (D17).
+        for source, start, action, target in (
+            ("Model picks flagged", 28230, "use_existing", ["Model picks flagged 1"]),
+            ("Model keeps apart", 28240, "keep_independent", []),
+        ):
+            group, units = self.judged_group(source, [none, major, major], start)
+            self.make_recommendation(
+                self.make_recommendation_run(),
+                group,
+                units,
+                action=action,
+                target=target,
+            )
+        # Two passed variants and an unsure model: preselected on the card,
+        # but neither ready nor a review row.
+        unsure, unsure_units = self.judged_group("Model unsure", [none, none], 28250)
+        self.make_recommendation(
             self.make_recommendation_run(),
-            flagged,
-            flagged_units,
-            action="use_existing",
-            target=["Model picks flagged 1"],
+            unsure,
+            unsure_units,
+            action="needs_human",
+            target=[],
+        )
+        # Every variant flagged, a new text proposed: an attention row only.
+        rewrite, rewrite_units = self.judged_group(
+            "Model rewrites", [major, major], 28260
+        )
+        proposal = self.make_recommendation(
+            self.make_recommendation_run(),
+            rewrite,
+            rewrite_units,
+            target=["Fresh wording"],
         )
 
         response = self.client.get(self.queue_url)
 
-        self.assertEqual(response.context["judge_panel"]["buckets"]["ready"], 2)
-        self.assertEqual(response.context["bulk_ready"], 2)
+        self.assertEqual(response.context["judge_panel"]["buckets"]["ready"], 4)
+        self.assertEqual(response.context["bulk_ready"], 4)
         review = self.client.get(self.review_url)
-        self.assertContains(review, 'name="result"', count=3)
-        for result in RepeatRecommendationResult.objects.exclude(pk=contested.pk):
-            self.assert_checked(review, result.pk)
+        self.assertContains(review, 'name="result"', count=5)
+        content = " ".join(review.content.decode().split())
+        self.assertEqual(content.count('" checked'), 4)
+        self.assert_unchecked(review, proposal.pk)
 
     def ready_recommendation(self, source: str, start: int):
         """One queue-ready group: the model picks the only passed variant."""
@@ -2373,7 +2517,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         judge_ready = self.ready_recommendation("Judge ready", 29000)
         model_group, model_units = self.judged_group("Model ready", [none, none], 29010)
         flagged_group, flagged_units = self.judged_group(
-            "Flagged pick", [none, major], 29020
+            "Flagged pick", [none, none, major], 29020
         )
         approved_group, approved_units = self.judged_group(
             "Approved place", [none, none], 29030
@@ -2383,7 +2527,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         unchecked_group, unchecked_units = self.make_group(
             "Unchecked pick", ["U1", "U2"], start=29040
         )
-        new_group, new_units = self.judged_group("New wording", [none, major], 29050)
+        new_group, new_units = self.judged_group("New wording", [major, major], 29050)
         run = self.make_recommendation_run()
         model_ready = self.make_recommendation(
             run,
@@ -2392,13 +2536,27 @@ class RepeatBulkViewsTest(ViewTestCase):
             action="use_existing",
             target=["Model ready 1"],
         )
+        # The judge passed only one variant; the model's pick or new text is
+        # replaced by it, so these rows are ready too (D17).
+        overrides = [
+            self.make_recommendation(
+                run,
+                *self.judged_group(source, [none, major], start),
+                action=action,
+                target=target,
+            )
+            for source, start, action, target in (
+                ("Override pick", 29060, "use_existing", ["Override pick 1"]),
+                ("Override wording", 29070, "propose_new", ["Other wording"]),
+            )
+        ]
         attention = {
             "The judge flagged the variant the model picked.": self.make_recommendation(
                 run,
                 flagged_group,
                 flagged_units,
                 action="use_existing",
-                target=["Flagged pick 1"],
+                target=["Flagged pick 2"],
             ),
             "Some places are approved, so the choice stays with you.": (
                 self.make_recommendation(
@@ -2429,12 +2587,26 @@ class RepeatBulkViewsTest(ViewTestCase):
         review = self.client.get(self.review_url)
 
         ready_count = queue.context["judge_panel"]["buckets"]["ready"]
-        self.assertEqual(ready_count, 2)
+        self.assertEqual(ready_count, 4)
         content = " ".join(review.content.decode().split())
-        self.assertEqual(content.count('name="result"'), 6)
+        self.assertEqual(content.count('name="result"'), 8)
         self.assertEqual(content.count('" checked'), ready_count)
         self.assert_checked(review, judge_ready.pk)
         self.assert_checked(review, model_ready.pk)
+        for result in overrides:
+            self.assert_checked(review, result.pk)
+        self.assertEqual(
+            content.count("<code>Override pick 0</code>")
+            + content.count("<code>Override wording 0</code>"),
+            2,
+        )
+        self.assertNotIn("<code>Other wording</code>", content)
+        self.assertEqual(content.count("The judge passed only this variant."), 2)
+        self.assertIn(
+            "The judge passed only this variant. The model advised: "
+            "The key names this exact meaning.",
+            content,
+        )
         attention_html = content[content.index('id="bulk-attention"') :]
         self.assertIn('<details class="rq-attention rq-collapsed">', attention_html)
         for reason, result in attention.items():
@@ -2442,7 +2614,7 @@ class RepeatBulkViewsTest(ViewTestCase):
                 self.assert_unchecked(review, result.pk)
                 self.assertIn(f'value="{result.pk}"', attention_html)
                 self.assertIn(reason, attention_html)
-        self.assertIn("2 groups selected, 2 places will change.", content)
+        self.assertIn("4 groups selected, 4 places will change.", content)
 
     def test_review_first_screen_leads_with_apply_and_summary(self) -> None:
         self.ready_recommendation("First screen", 29100)
