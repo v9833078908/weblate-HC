@@ -130,9 +130,48 @@
              href="?status=resolved">{% translate "Resolved" %} <span class="badge text-bg-secondary">{{ status_counts.resolved }}</span></a>
           <a{% if status == 'all' %} aria-current="page"{% endif %} href="?status=all">{% translate "All" %} <span class="badge text-bg-secondary">{{ status_counts.all }}</span></a>
         </nav>
-        <a class="btn btn-outline-primary"
-           href="{% url 'repeat-recommend' project=project.slug language=language.code %}">{% translate "Prepare recommendations" %} <span class="badge text-bg-warning">{% translate "Paid" context "Costs money to run" %}</span></a>
       </div>
+      <section class="alert alert-info" aria-label="{% translate 'Judge check for repeats' %}">
+        {% if judge_panel.state == 'running' %}
+          <h2 class="h5">{% translate "The judge is checking variants" %}</h2>
+          <p>{% blocktranslate with checked=judge_panel.checked total=judge_panel.total %}Checked {{ checked }} of {{ total }} places{% endblocktranslate %}.</p>
+          <a href="{{ judge_panel.run.get_absolute_url }}">{% translate "View judge run" %}</a>
+        {% else %}
+          {% if judge_panel.state == 'ready' %}
+            <h2 class="h5">{% translate "Judge check results" %}</h2>
+          {% else %}
+            <h2 class="h5">{% translate "Check variants with the judge" %}</h2>
+          {% endif %}
+          <p>{% blocktranslate count counter=judge_panel.places %}The repeat check covers {{ counter }} place.{% plural %}The repeat check covers {{ counter }} places.{% endblocktranslate %}
+            {% if judge_panel.places != judge_panel.queue_places %}
+              {% blocktranslate count counter=judge_panel.queue_places %}The open queue contains {{ counter }} place.{% plural %}The open queue contains {{ counter }} places.{% endblocktranslate %}
+            {% endif %}
+          </p>
+          {% if judge_panel.can_launch %}
+            <a class="btn btn-primary" href="{{ judge_panel.launch_url }}">{% translate "Check variants with the judge" %}</a>
+            <p class="small text-muted">{% translate "When enough priced history exists, the cost estimate appears before you launch. Actual spend appears in the run report." %}</p>
+          {% endif %}
+        {% endif %}
+        {% if judge_panel.stopped %}
+          <p>{% translate "The last check stopped before it finished." %}</p>
+        {% endif %}
+        <nav aria-label="{% translate 'Judge result filters' %}">
+          <a href="?status=open&amp;judge=ready"
+             {% if judge_filter == 'ready' %} aria-current="page"{% endif %}>{% translate "Ready" %} {{ judge_panel.buckets.ready }}</a>
+          <a href="?status=open&amp;judge=choose"
+             {% if judge_filter == 'choose' %} aria-current="page"{% endif %}>{% translate "Choose yourself" %} {{ judge_panel.buckets.choose }}</a>
+          <a href="?status=open&amp;judge=rewrite"
+             {% if judge_filter == 'rewrite' %} aria-current="page"{% endif %}>{% translate "Rewrite" %} {{ judge_panel.buckets.rewrite }}</a>
+          <a href="?status=open&amp;judge=unchecked"
+             {% if judge_filter == 'unchecked' %} aria-current="page"{% endif %}>{% translate "Unchecked" %} {{ judge_panel.buckets.unchecked }}</a>
+        </nav>
+        {% if judge_panel.state == 'ready' and judge_panel.relaunch_places and judge_panel.can_launch %}
+          <p><a href="{{ judge_panel.launch_url }}">{% translate "Check the remaining places" %}</a></p>
+        {% endif %}
+        {% if judge_panel.outside_places %}
+          <p>{% blocktranslate count counter=judge_panel.outside_places %}{{ counter }} place is outside the repeat check; the judge does not check it.{% plural %}{{ counter }} places are outside the repeat check; the judge does not check them.{% endblocktranslate %}</p>
+        {% endif %}
+      </section>
       {% if bulk_ready %}
         <p class="alert alert-info" role="status">
           {% blocktranslate count counter=bulk_ready %}{{ counter }} current recommendation is ready to review and apply.{% plural %}{{ counter }} current recommendations are ready to review and apply.{% endblocktranslate %}

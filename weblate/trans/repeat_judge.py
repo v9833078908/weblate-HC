@@ -9,11 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from operator import itemgetter
 from typing import TYPE_CHECKING
+from urllib.parse import urlencode
 
 from weblate.trans.models.judge import (
     JUDGE_CATEGORY_LABELS,
     SEVERITY_RANK,
     JudgeVerdict,
+    ProducerRun,
     active_verdicts,
 )
 from weblate.utils.state import STATE_APPROVED
@@ -23,6 +25,36 @@ if TYPE_CHECKING:
 
 READY, CHOOSE, REWRITE, UNCHECKED = "ready", "choose", "rewrite", "unchecked"
 REPEAT_JUDGE_QUERY = "check:repeat-drift"
+
+
+def latest_repeat_judge_run(project_language) -> ProducerRun | None:
+    """Find the newest proposal-only run launched for this language's queue."""
+    return (
+        ProducerRun.objects.filter(
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(project_language.project.pk),
+            requested_mode="judge",
+            scope_path=project_language.get_absolute_url(),
+            requested_query=REPEAT_JUDGE_QUERY,
+            execution_options__judge_proposal_only=True,
+        )
+        .order_by("-created")
+        .first()
+    )
+
+
+def judge_launch_url(project_language, queue_url: str) -> str:
+    """Open the standard judge form with the repeat scope filled in."""
+    params = urlencode(
+        {
+            "mode": "judge",
+            "q": REPEAT_JUDGE_QUERY,
+            "judge_proposal_only": "1",
+            "overwrite_existing": "",
+            "next": queue_url,
+        }
+    )
+    return f"{project_language.get_absolute_url()}?{params}#auto"
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,8 @@ from django.utils import timezone
 from weblate.auth.models import Group
 from weblate.checks.models import CHECKS
 from weblate.trans.models import (
+    JudgeVerdict,
+    ProducerRun,
     RepeatBulkItem,
     RepeatBulkRun,
     RepeatDecisionEvent,
@@ -26,11 +28,13 @@ from weblate.trans.models import (
     RepeatRecommendationResult,
     RepeatRecommendationRun,
 )
+from weblate.trans.models.judge import compute_target_hash
 from weblate.trans.repeat_bulk import (
     process_apply_items,
     process_next_apply_item,
     process_undo_items,
 )
+from weblate.trans.repeat_judge import REPEAT_JUDGE_QUERY, judge_launch_url
 from weblate.trans.repeat_recommendations import (
     build_group_context,
     context_fingerprint,
@@ -1493,3 +1497,115 @@ class RepeatBulkViewsTest(ViewTestCase):
             response, "1 current recommendation is ready to review and apply."
         )
         self.assertLessEqual(len(capture.captured_queries), 60)
+
+    def make_judge_run(self, **fields) -> ProducerRun:
+        project_language = self.project.project_languages[self.translation.language]
+        values = {
+            "actor": self.user,
+            "scope_type": ProducerRun.ScopeType.PROJECT,
+            "scope_id": str(self.project.pk),
+            "scope_label": str(project_language),
+            "scope_path": project_language.get_absolute_url(),
+            "requested_query": REPEAT_JUDGE_QUERY,
+            "requested_mode": "judge",
+            "execution_options": {"judge_proposal_only": True},
+            "cap": 3,
+            "status": ProducerRun.Status.RUNNING,
+        }
+        values.update(fields)
+        return ProducerRun.objects.create(**values)
+
+    def make_judge_verdict(self, unit, severity=JudgeVerdict.Severity.NONE):
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="repeat-context",
+            judge_model="vendor/model-a",
+            seat=1,
+            unparsed=False,
+            max_severity=severity,
+            errors=(
+                [
+                    {
+                        "severity": severity,
+                        "category": "mistranslation",
+                        "description": "Wrong meaning",
+                    }
+                ]
+                if severity == JudgeVerdict.Severity.MAJOR
+                else []
+            ),
+        )
+
+    def test_queue_judge_launch_url_and_no_paid_recommendation_link(self) -> None:
+        self.make_group("Judge start", ["One", "Two"], start=26000)
+        project_language = self.project.project_languages[self.translation.language]
+        response = self.client.get(self.queue_url)
+
+        self.assertEqual(response.context["judge_panel"]["state"], "start")
+        self.assertEqual(
+            response.context["judge_panel"]["launch_url"],
+            judge_launch_url(project_language, self.queue_url),
+        )
+        self.assertNotContains(
+            response,
+            reverse(
+                "repeat-recommend",
+                kwargs={"project": self.project.slug, "language": "cs"},
+            ),
+        )
+
+    def test_queue_judge_running_uses_coverage_not_recorded(self) -> None:
+        self.make_group("Judge progress", ["One", "Two"], start=26100)
+        run = self.make_judge_run()
+        with patch.object(
+            ProducerRun, "get_coverage", return_value={"total": 1022, "pending": 602}
+        ):
+            response = self.client.get(self.queue_url)
+
+        self.assertEqual(response.context["judge_panel"]["state"], "running")
+        self.assertContains(response, "Checked 420 of 1022 places")
+        self.assertContains(response, run.get_absolute_url())
+
+    def test_queue_ignores_non_proposal_run_and_reports_stopped_run(self) -> None:
+        self.make_group("Judge status", ["One", "Two"], start=26200)
+        self.make_judge_run(execution_options={"judge_proposal_only": False})
+        response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["state"], "start")
+        run = self.make_judge_run(status=ProducerRun.Status.FAILED)
+        response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["run"], run)
+        self.assertContains(response, "The last check stopped before it finished.")
+
+    def test_queue_judge_filter_ignores_unknown_value(self) -> None:
+        self.make_group("Judge filter", ["One", "Two"], start=26300)
+        response = self.client.get(self.queue_url + "?status=open&judge=unchecked")
+        self.assertEqual(response.context["total_count"], 1)
+        self.assertEqual(response.context["judge_panel"]["buckets"]["unchecked"], 1)
+        response = self.client.get(self.queue_url + "?status=open&judge=unknown")
+        self.assertEqual(response.context["total_count"], 1)
+
+    def test_queue_judge_buckets_and_ready_filter(self) -> None:
+        _, ready = self.make_group("Ready bucket", ["R1", "R2"], start=26400)
+        _, choose = self.make_group("Choose bucket", ["C1", "C2"], start=26500)
+        _, rewrite = self.make_group("Rewrite bucket", ["W1", "W2"], start=26600)
+        self.make_group("Unchecked bucket", ["U1", "U2"], start=26700)
+        self.make_judge_verdict(ready[0])
+        self.make_judge_verdict(ready[1], JudgeVerdict.Severity.MAJOR)
+        for unit in choose:
+            self.make_judge_verdict(unit)
+        for unit in rewrite:
+            self.make_judge_verdict(unit, JudgeVerdict.Severity.MAJOR)
+
+        response = self.client.get(self.queue_url)
+        self.assertEqual(
+            response.context["judge_panel"]["buckets"],
+            {"ready": 1, "choose": 1, "rewrite": 1, "unchecked": 1},
+        )
+        self.assertEqual(response.context["judge_panel"]["state"], "ready")
+        self.assertNotContains(response, "judge-bulk-review")
+        response = self.client.get(self.queue_url + "?status=open&judge=ready")
+        self.assertEqual(response.context["total_count"], 1)
+        self.assertEqual(
+            response.context["groups"][0]["group"].source_forms, ["Ready bucket"]
+        )

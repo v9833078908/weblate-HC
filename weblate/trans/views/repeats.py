@@ -18,12 +18,14 @@ from weblate.lang.models import Language
 from weblate.trans.forms import RepeatPolicyForm
 from weblate.trans.judge import (
     JudgeError,
+    judge_configuration_ready,
     judge_primary_endpoint,
     resolve_judge_seat_profile,
 )
 from weblate.trans.models import (
     Component,
     Label,
+    ProducerRun,
     Project,
     RepeatBulkItem,
     RepeatBulkRun,
@@ -48,6 +50,16 @@ from weblate.trans.repeat_bulk import (
     resume_bulk,
     start_bulk,
     start_undo,
+)
+from weblate.trans.repeat_judge import (
+    CHOOSE,
+    READY,
+    REPEAT_JUDGE_QUERY,
+    REWRITE,
+    UNCHECKED,
+    judge_groups,
+    judge_launch_url,
+    latest_repeat_judge_run,
 )
 from weblate.trans.repeat_recommendations import (
     current_recommendations,
@@ -255,6 +267,80 @@ def _decision_summary(request, project: Project):
     return summary
 
 
+def _judge_panel(request, obj, target_language, groups):
+    """Classify open groups and summarize the current repeat judge run."""
+    open_groups = [item for item in groups if item["status"] == "open"]
+    judgements = judge_groups(
+        (item["group"].pk, item["variants"]) for item in open_groups
+    )
+    buckets = dict.fromkeys((READY, CHOOSE, REWRITE, UNCHECKED), 0)
+    for item in open_groups:
+        item["judge"] = judgements[item["group"].pk]
+        buckets[item["judge"].bucket] += 1
+    project_language = obj.project_languages[target_language]
+    drift_ids = set(
+        Unit.objects.filter(
+            translation__component__project=obj,
+            translation__language=target_language,
+        )
+        .filter_access(request.user)
+        .search(REPEAT_JUDGE_QUERY)
+        .values_list("pk", flat=True)
+    )
+    queue_places = sum(len(item["units"]) for item in open_groups)
+    relaunch_places = outside_places = 0
+    for item in open_groups:
+        if item["judge"].bucket != UNCHECKED:
+            continue
+        judged_ids = {unit_id for unit_id, _, _ in item["judge"].evidence}
+        for variant in item["variants"]:
+            for unit in variant["units"]:
+                if unit.pk in judged_ids:
+                    continue
+                if unit.pk in drift_ids:
+                    relaunch_places += 1
+                else:
+                    outside_places += 1
+    run = latest_repeat_judge_run(project_language)
+    running = run is not None and run.status in {
+        ProducerRun.Status.QUEUED,
+        ProducerRun.Status.RUNNING,
+        ProducerRun.Status.CANCEL_REQUESTED,
+    }
+    coverage = run.get_coverage() if running else {}
+    queue_url = reverse(
+        "repeat-queue", kwargs={"project": obj.slug, "language": target_language.code}
+    )
+    return {
+        "state": (
+            "running"
+            if running
+            else "ready"
+            if any(buckets[bucket] for bucket in (READY, CHOOSE, REWRITE))
+            else "start"
+        ),
+        "places": len(drift_ids),
+        "queue_places": queue_places,
+        "buckets": buckets,
+        "run": run,
+        "checked": coverage.get("total", 0) - coverage.get("pending", 0),
+        "total": coverage.get("total", 0),
+        "stopped": run is not None
+        and run.status
+        in {
+            ProducerRun.Status.FAILED,
+            ProducerRun.Status.CANCELLED,
+            ProducerRun.Status.PARTIAL,
+        },
+        "relaunch_places": relaunch_places,
+        "outside_places": outside_places,
+        "launch_url": judge_launch_url(project_language, queue_url),
+        "can_launch": request.user.has_perm("translation.auto", project_language)
+        and request.user.has_perm("unit.review", obj)
+        and judge_configuration_ready(),
+    }
+
+
 @login_required
 def repeat_queue(request, project: str, language: str):
     """Render one project/language repeat queue using the variant-C hierarchy."""
@@ -270,6 +356,7 @@ def repeat_queue(request, project: str, language: str):
             project=obj, target_language=target_language, actor=request.user
         )
     groups = _queue_groups(request, policy) if policy is not None else []
+    judge_panel = _judge_panel(request, obj, target_language, groups)
     requested_status = request.GET.get("status", "open")
     status_aliases = {
         "all": None,
@@ -286,6 +373,13 @@ def repeat_queue(request, project: str, language: str):
         for item in groups
         if wanted is None or item["status"] == wanted or item["status"] in wanted
     ]
+    requested_judge = request.GET.get("judge")
+    if requested_judge in judge_panel["buckets"]:
+        filtered_groups = [
+            item
+            for item in filtered_groups
+            if item["status"] == "open" and item["judge"].bucket == requested_judge
+        ]
     status_counts = {
         "all": len(groups),
         "open": sum(item["status"] == "open" for item in groups),
@@ -300,6 +394,8 @@ def repeat_queue(request, project: str, language: str):
     query.pop("limit", None)
     query.pop("done", None)
     query["status"] = requested_status
+    if requested_judge not in judge_panel["buckets"]:
+        query.pop("judge", None)
     page_obj = Paginator(filtered_groups, 20).get_page(request.GET.get("page"))
     current = (
         current_recommendations(policy, actor=request.user)
@@ -346,6 +442,10 @@ def repeat_queue(request, project: str, language: str):
             "decision": _decision_summary(request, obj),
             "bulk_ready": bulk_ready,
             "bulk_review_url": bulk_review_url,
+            "judge_panel": judge_panel,
+            "judge_filter": requested_judge
+            if requested_judge in judge_panel["buckets"]
+            else None,
         },
     )
 
