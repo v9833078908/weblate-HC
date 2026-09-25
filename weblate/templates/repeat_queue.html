@@ -135,7 +135,9 @@
         {% if judge_panel.state == 'running' %}
           <h2 class="h5">{% translate "The judge is checking variants" %}</h2>
           <p>{% blocktranslate with checked=judge_panel.checked total=judge_panel.total %}Checked {{ checked }} of {{ total }} places{% endblocktranslate %}.</p>
-          <a href="{{ judge_panel.run.get_absolute_url }}">{% translate "View judge run" %}</a>
+          {% if judge_panel.can_view_run %}
+            <a href="{{ judge_panel.run.get_absolute_url }}">{% translate "View judge run" %}</a>
+          {% endif %}
         {% else %}
           {% if judge_panel.state == 'ready' %}
             <h2 class="h5">{% translate "Judge check results" %}</h2>

@@ -82,6 +82,7 @@ from weblate.trans.repeats import (
     undo_event,
 )
 from weblate.trans.util import join_plural
+from weblate.trans.views.judge import user_can_view_producer_run
 from weblate.utils.state import STATE_APPROVED
 
 
@@ -308,6 +309,7 @@ def _judge_panel(request, obj, target_language, groups):
         ProducerRun.Status.CANCEL_REQUESTED,
     }
     coverage = run.get_coverage() if running else {}
+    total = coverage.get("total") or 0
     queue_url = reverse(
         "repeat-queue", kwargs={"project": obj.slug, "language": target_language.code}
     )
@@ -323,8 +325,10 @@ def _judge_panel(request, obj, target_language, groups):
         "queue_places": queue_places,
         "buckets": buckets,
         "run": run,
-        "checked": coverage.get("total", 0) - coverage.get("pending", 0),
-        "total": coverage.get("total", 0),
+        "can_view_run": run is not None
+        and user_can_view_producer_run(request.user, obj, run),
+        "checked": max(0, total - coverage.get("pending", 0)),
+        "total": total,
         "stopped": run is not None
         and run.status
         in {

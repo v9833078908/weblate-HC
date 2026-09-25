@@ -1580,14 +1580,82 @@ class RepeatBulkViewsTest(ViewTestCase):
 
     def test_queue_judge_running_uses_coverage_not_recorded(self) -> None:
         self.make_group("Judge progress", ["One", "Two"], start=26100)
-        run = self.make_judge_run()
-        with patch.object(
-            ProducerRun, "get_coverage", return_value={"total": 1022, "pending": 602}
+        run = self.make_judge_run(execution_version=1)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            override_settings(JUDGE_ENABLED=True),
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch.object(
+                ProducerRun,
+                "get_coverage",
+                return_value={"total": 1022, "pending": 602},
+            ),
         ):
             response = self.client.get(self.queue_url)
 
         self.assertEqual(response.context["judge_panel"]["state"], "running")
         self.assertContains(response, "Checked 420 of 1022 places")
+        self.assertTrue(response.context["judge_panel"]["can_view_run"])
+        self.assertContains(response, run.get_absolute_url())
+
+    def test_queue_hides_running_report_without_report_permission(self) -> None:
+        self.make_group("Hidden report", ["One", "Two"], start=26110)
+        run = self.make_judge_run(execution_version=1)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+        for denied in ("translation.auto", "unit.review"):
+            with self.subTest(denied=denied):
+
+                def has_perm(user, perm, obj=None, *, denied_permission=denied):
+                    return perm != denied_permission and original_has_perm(
+                        user, perm, obj
+                    )
+
+                with (
+                    override_settings(JUDGE_ENABLED=True),
+                    patch.object(
+                        user_class, "has_perm", autospec=True, side_effect=has_perm
+                    ),
+                ):
+                    response = self.client.get(self.queue_url)
+                self.assertEqual(response.context["judge_panel"]["state"], "running")
+                self.assertFalse(response.context["judge_panel"]["can_view_run"])
+                self.assertNotContains(response, run.get_absolute_url())
+        with override_settings(JUDGE_ENABLED=False):
+            response = self.client.get(self.queue_url)
+        self.assertFalse(response.context["judge_panel"]["can_view_run"])
+        self.assertNotContains(response, run.get_absolute_url())
+
+    def test_queue_shows_report_when_launch_configuration_unavailable(self) -> None:
+        self.make_group("Report without launch", ["One", "Two"], start=26120)
+        run = self.make_judge_run(execution_version=1)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            override_settings(JUDGE_ENABLED=True),
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch(
+                "weblate.trans.views.repeats.judge_configuration_ready",
+                return_value=False,
+            ),
+        ):
+            response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["state"], "running")
+        self.assertFalse(response.context["judge_panel"]["can_launch"])
+        self.assertTrue(response.context["judge_panel"]["can_view_run"])
         self.assertContains(response, run.get_absolute_url())
 
     def test_queue_reserved_pending_rows_are_not_counted_as_checked(self) -> None:
