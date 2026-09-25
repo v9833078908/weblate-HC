@@ -254,6 +254,31 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
         self.assertFalse(form.proposal_only)
         self.assertFalse(form.cleaned_data["judge_proposal_only"])
 
+    def test_true_hidden_proposal_flag_round_trips_to_post(self) -> None:
+        initial = AutoForm(
+            obj=self.project,
+            user=self.user,
+            initial={"mode": "judge", "judge_proposal_only": True},
+        )
+        hidden_value = initial["judge_proposal_only"].value()
+        self.assertTrue(initial.proposal_only)
+        self.assertEqual(hidden_value, True)
+
+        posted = AutoForm(
+            obj=self.project,
+            user=self.user,
+            data={
+                "mode": "judge",
+                "q": "check:repeat-drift",
+                "auto_source": "others",
+                "threshold": 80,
+                "judge_proposal_only": str(hidden_value),
+            },
+        )
+        self.assertTrue(posted.proposal_only)
+        self.assertTrue(posted.is_valid(), posted.errors)
+        self.assertTrue(posted.cleaned_data["judge_proposal_only"])
+
     def test_verdict_only_rejects_write_mode_and_overwrite_tampering(self) -> None:
         for changes, error_field in (
             ({"mode": "translate"}, "mode"),
