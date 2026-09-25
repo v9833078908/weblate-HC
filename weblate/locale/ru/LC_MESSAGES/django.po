@@ -32981,7 +32981,7 @@ msgstr "Судья проверяет варианты"
 
 #: weblate/templates/repeat_queue.html:137
 msgid "Checked %(checked)s of %(total)s places"
-msgstr "Проверено %(checked)s из %(total)s мест"
+msgstr "Проверка мест: %(checked)s из %(total)s"
 
 #: weblate/templates/repeat_queue.html:139
 msgid "View judge run"
@@ -33077,7 +33077,7 @@ msgstr "Судья проверил этот перевод в одном из �
 
 #: weblate/templates/snippets/repeat_group.html:74
 msgid "Recommended: checked by the judge"
-msgstr "Рекомендуем: проверен судьёй"
+msgstr "Рекомендуем: вариант проверен судьёй"
 
 #: weblate/templates/snippets/repeat_group.html:76
 msgid "Checked by the judge"
