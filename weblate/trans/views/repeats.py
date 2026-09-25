@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
+from collections import Counter
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -1026,16 +1028,25 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
     members.sort(key=lambda member: not member["will_change"])
     show_component = len({member["component"] for member in members}) > 1
     if request.GET.get("inline"):
-        # The review page expands a row with this fragment, not the full page.
+        # The review page expands a row with this fragment, not the full page:
+        # places that change are listed, the others are only counted.
+        changing = [member for member in members if member["will_change"]]
+        unchanged = Counter(
+            member["reason_label"] for member in members if not member["will_change"]
+        )
         return render(
             request,
             "repeat_bulk_places_detail.html",
             {
                 "language": policy.target_language,
-                "members": members[:INLINE_PLACES],
+                "members": changing[:INLINE_PLACES],
                 "show_component": show_component,
-                "remaining": max(len(members) - INLINE_PLACES, 0),
+                "remaining": max(len(changing) - INLINE_PLACES, 0),
                 "places_url": request.path,
+                "matching": unchanged.pop(
+                    _member_reason_label("already-matches"), 0
+                ),
+                "blocked": list(unchanged.items()),
             },
         )
     return render(

@@ -926,12 +926,16 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertContains(places, "Excluded by the model")
         self.assertEqual(RepeatDecisionEvent.objects.count(), 0)
 
-    def test_places_inline_fragment_lists_changes_first_and_links_the_rest(
+    def test_places_inline_fragment_lists_changes_and_counts_the_rest(
         self,
     ) -> None:
         group, units = self.make_group(
-            "An inline sword name", ["Shared", "Old", "Older", "Oldest"], start=1600
+            "An inline sword name",
+            ["Shared", "Old", "Older", "Oldest", "Odd"],
+            start=1600,
         )
+        units[4].state = STATE_APPROVED
+        units[4].save(update_fields=["state"])
         result = self.make_recommendation(
             self.make_recommendation_run(), group, units, target=["Shared"]
         )
@@ -942,15 +946,19 @@ class RepeatBulkViewsTest(ViewTestCase):
 
         self.assertEqual(inline.status_code, 200)
         self.assertTemplateNotUsed(inline, "base.html")
-        # Places that change come first; the rest link to the full list.
+        # Only places that change are listed; the rest link to the full list.
         self.assertEqual(
             [member["key"] for member in inline.context["members"]],
             [units[1].context, units[2].context],
         )
         self.assertContains(inline, 'class="rq-places-detail"')
-        self.assertContains(inline, "Will change", count=2)
-        self.assertContains(inline, f'<a href="{url}">Show the remaining 2</a>')
-        self.assertNotContains(inline, units[0].context)
+        self.assertContains(inline, f'<a href="{url}">Show the remaining 1</a>')
+        for unit in (units[0], units[3], units[4]):
+            self.assertNotContains(inline, unit.context)
+        # Unchanged places are only counted, in one line.
+        self.assertContains(inline, "1 more place is already translated this way.")
+        self.assertContains(inline, "Approved, not changed: 1.")
+        self.assertNotContains(inline, "Will change")
         # One component only, so no column repeats it on every place.
         self.assertFalse(inline.context["show_component"])
         self.assertNotContains(inline, '<th scope="col">Component</th>', html=True)
@@ -960,9 +968,12 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertTemplateUsed(full, "base.html")
         self.assertEqual(
             [member["key"] for member in full.context["members"]],
-            [unit.context for unit in (units[1], units[2], units[3], units[0])],
+            [unit.context for unit in (units[1], units[2], units[3], units[0], units[4])],
         )
+        self.assertContains(full, "Will change", count=3)
         self.assertContains(full, "Already translated this way")
+        self.assertContains(full, "Approved, not changed")
+        self.assertNotContains(full, '<th scope="col">Component</th>', html=True)
         self.assertNotContains(full, "Show the remaining")
         self.assertEqual(RepeatDecisionEvent.objects.count(), 0)
 

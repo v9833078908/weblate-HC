@@ -33298,6 +33298,14 @@ msgstr "Показать все места"
 msgid "Recommended translation:"
 msgstr "Рекомендуемый перевод:"
 
+#: weblate/templates/repeat_bulk_places_detail.html
+#, python-format
+msgid "%(counter)s more place is already translated this way."
+msgid_plural "%(counter)s more places are already translated this way."
+msgstr[0] "Ещё %(counter)s место уже переведено так."
+msgstr[1] "Ещё %(counter)s места уже переведены так."
+msgstr[2] "Ещё %(counter)s мест уже переведены так."
+
 #: weblate/trans/views/repeats.py
 msgid "The queue does not list this group as open."
 msgstr "В очереди эта группа не числится открытой."
