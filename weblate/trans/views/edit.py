@@ -106,6 +106,7 @@ from weblate.trans.models.judge import (
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.models.unit import fill_in_source_translation
+from weblate.trans.repeat_judge import REPEAT_JUDGE_QUERY, comparison_upper_bound
 from weblate.trans.tasks import (
     auto_translate,
     generate_judge_candidate,
@@ -1799,6 +1800,14 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
             "judge_cost": judge_cost,
             "pretranslation_cost": pretranslation_cost,
             "preparation": preparation,
+            "repeat_comparison": (
+                comparison_upper_bound(obj, request.user)
+                if judge_preview is not None
+                and isinstance(obj, ProjectLanguage)
+                and autoform.cleaned_data["judge_proposal_only"]
+                and autoform.cleaned_data["q"].startswith(REPEAT_JUDGE_QUERY)
+                else None
+            ),
         }
     )
 

@@ -1575,6 +1575,15 @@ onReady(() => {
               }
               preview.textContent += ` ${judgeCost}`;
             }
+            if (proposalOnly && data.repeat_comparison?.groups > 0) {
+              preview.textContent += ` ${interpolate(
+                gettext(
+                  "Then the model compares variants: up to %(groups)s groups, about %(requests)s LLM requests.",
+                ),
+                data.repeat_comparison,
+                true,
+              )}`;
+            }
             showPreview();
             apply.disabled = isJudge() && data.processed === 0;
           })

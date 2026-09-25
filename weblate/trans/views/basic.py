@@ -84,6 +84,7 @@ from weblate.trans.models.judge import (
 from weblate.trans.models.loc_kit import LocKitImportDraft
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
+from weblate.trans.repeat_judge import REPEAT_JUDGE_QUERY
 from weblate.trans.util import render, sort_unicode, translation_percent
 from weblate.trans.views.judge import recent_producer_runs
 from weblate.trans.views.reports import get_reports_context
@@ -348,6 +349,23 @@ def show_project_language(
             if component.can_add_new_language(user, fast=True)
         ]
 
+    autoform = optional_form(
+        AutoForm,
+        user,
+        "translation.auto",
+        obj,
+        obj=obj.project,
+        user=user,
+        initial={
+            **{
+                key: request.GET[key]
+                for key in ("mode", "q", "judge_proposal_only")
+                if request.GET.get(key)
+            },
+            "next": request.GET.get("next", ""),
+        },
+    )
+
     return render(
         request,
         "language-project.html",
@@ -382,22 +400,10 @@ def show_project_language(
                 ProjectLanguageDeleteForm, user, "translation.delete", obj, obj=obj
             ),
             "replace_form": optional_form(ReplaceForm, user, "unit.edit", obj, obj=obj),
-            "autoform": optional_form(
-                AutoForm,
-                user,
-                "translation.auto",
-                obj,
-                obj=obj.project,
-                user=user,
-                initial={
-                    **{
-                        key: request.GET[key]
-                        for key in ("mode", "q", "judge_proposal_only")
-                        if request.GET.get(key)
-                    },
-                    "next": request.GET.get("next", ""),
-                },
-            ),
+            "autoform": autoform,
+            "repeat_comparison_follows": autoform is not None
+            and autoform.proposal_only
+            and str(autoform.initial.get("q", "")).startswith(REPEAT_JUDGE_QUERY),
             "bulk_state_form": optional_form(
                 BulkEditForm,
                 user,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from math import ceil
 from operator import itemgetter
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
@@ -24,9 +25,12 @@ from weblate.trans.models.judge import (
     ProducerRun,
     active_verdicts,
 )
-from weblate.trans.repeat_recommendations import prepare_run
-from weblate.trans.repeats import repeat_queue_groups
-from weblate.utils.state import STATE_APPROVED
+from weblate.trans.repeat_recommendations import (
+    REPEAT_RECOMMENDATION_BATCH_SIZE,
+    prepare_run,
+)
+from weblate.trans.repeats import policy_units, repeat_queue_groups
+from weblate.utils.state import STATE_APPROVED, STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -74,6 +78,34 @@ def repeat_judge_policy(run: ProducerRun) -> RepeatPolicy | None:
         if project_language.get_absolute_url() == run.scope_path:
             return policy
     return None
+
+
+def comparison_upper_bound(project_language, user) -> dict[str, int] | None:
+    """Bound the follow-up comparison before any verdict of the check exists."""
+    policy = RepeatPolicy.objects.filter(
+        project=project_language.project,
+        target_language=project_language.language,
+        enabled=True,
+    ).first()
+    if policy is None:
+        return None
+    # Only a group translated in two ways can be left to choose, so the
+    # diverging groups bound the comparison without building the queue.
+    targets: dict[tuple[str, int], set[str]] = {}
+    for source, plural_number, target in (
+        policy_units(policy)
+        .filter_access(user)
+        .filter(state__gte=STATE_TRANSLATED)
+        .order_by()
+        .values_list("source", "translation__plural__number", "target")
+        .distinct()
+    ):
+        targets.setdefault((source, plural_number), set()).add(target)
+    groups = sum(len(values) > 1 for values in targets.values())
+    return {
+        "groups": groups,
+        "requests": ceil(groups / REPEAT_RECOMMENDATION_BATCH_SIZE),
+    }
 
 
 def schedule_repeat_comparison(run: ProducerRun) -> None:

@@ -14,10 +14,14 @@ from lxml import html
 from weblate.trans.autotranslate import BatchAutoTranslate, PreparationScope
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge_loop import DEFAULT_CANDIDATE_SEVERITIES
+from weblate.trans.models import RepeatPolicy
 from weblate.trans.models.judge import ProducerRun
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.repeats import save_policy
 from weblate.trans.tasks import _producer_run_dispatch_kwargs
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.hash import calculate_hash
+from weblate.utils.state import STATE_TRANSLATED
 from weblate.utils.stats import ProjectLanguage
 
 
@@ -459,3 +463,90 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
             Decimal(regular.json()["judge_cost"]["max"]),
             Decimal("0.03") * processed * 3,
         )
+
+    def test_queue_launch_states_the_follow_up_comparison(self) -> None:
+        notice = "After the check, the model compares the variants"
+        params = {"mode": "judge", "judge_proposal_only": "1"}
+        url = self.project_language.get_absolute_url()
+
+        queue = self.client.get(url, {**params, "q": "check:repeat-drift"})
+        other = self.client.get(url, {**params, "q": "state:empty"})
+        regular = self.client.get(url, {"mode": "judge", "q": "check:repeat-drift"})
+
+        self.assertContains(queue, notice)
+        self.assertNotContains(other, notice)
+        self.assertNotContains(regular, notice)
+
+    def add_repeat(self, source: str, targets: list[str], start: int) -> None:
+        translation = self.get_translation()
+        for position, target in enumerate(targets, start=start):
+            context = f"{source}-{position}"
+            source_unit = self.component.source_translation.unit_set.create(
+                id_hash=calculate_hash(source, context),
+                position=position,
+                context=context,
+                source=source,
+                target=source,
+                state=STATE_TRANSLATED,
+            )
+            translation.unit_set.create(
+                id_hash=calculate_hash(source, context),
+                position=position,
+                source_unit=source_unit,
+                context=context,
+                source=source,
+                target=target,
+                state=STATE_TRANSLATED,
+            )
+
+    def test_queue_preview_bounds_the_follow_up_comparison(self) -> None:
+        params = {
+            "mode": "judge",
+            "q": "check:repeat-drift",
+            "auto_source": "others",
+            "threshold": 80,
+            "judge_proposal_only": "1",
+        }
+        url = reverse(
+            "auto_translation_preview",
+            kwargs={"path": self.project_language.get_url_path()},
+        )
+        self.add_repeat("Diverging one", ["A", "B"], 5000)
+        self.add_repeat("Diverging two", ["A", "B", "C"], 5100)
+        self.add_repeat("Diverging three", ["A", "B"], 5200)
+        self.add_repeat("Consistent", ["Same", "Same"], 5300)
+
+        self.assertIsNone(self.client.get(url, params).json()["repeat_comparison"])
+
+        save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=self.project_language.language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+        response = self.client.get(url, params)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["repeat_comparison"], {"groups": 3, "requests": 1}
+        )
+        with mock.patch(
+            "weblate.trans.repeat_judge.REPEAT_RECOMMENDATION_BATCH_SIZE", 2
+        ):
+            response = self.client.get(url, params)
+        self.assertEqual(
+            response.json()["repeat_comparison"], {"groups": 3, "requests": 2}
+        )
+        for changed in ({"q": "state:empty"}, {"judge_proposal_only": ""}):
+            with self.subTest(changed=changed):
+                response = self.client.get(url, {**params, **changed})
+                self.assertIsNone(response.json()["repeat_comparison"])
+        translation_url = reverse(
+            "auto_translation_preview",
+            kwargs={"path": self.translation.get_url_path()},
+        )
+        response = self.client.get(translation_url, params)
+        self.assertIsNone(response.json()["repeat_comparison"])
