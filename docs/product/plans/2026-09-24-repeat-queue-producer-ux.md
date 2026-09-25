@@ -1028,7 +1028,7 @@ the variants of repeat groups where the judge accepts at least one variant.
 This comparison is also paid and starts automatically when the check
 completes." when the form is verdict-only and its query starts with
 `check:repeat-drift`. The preview for that scope returns
-`{"groups": N, "requests": ceil(N / 25)}` (N = diverging groups of the enabled
+`{"groups": N, "requests": ceil(N / 10)}` (N = diverging groups of the enabled
 policy visible to the user, one values query) and the JS appends "Then the
 variants are compared: up to %(groups)s groups, about %(requests)s LLM
 requests." Tests: the line appears only for that scope; the preview returns

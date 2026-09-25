@@ -40,6 +40,7 @@ from weblate.trans.judge import (
     judge_fallback_endpoint,
     judge_primary_endpoint,
     judge_seat_profiles,
+    post_chat_completion,
     render_preview,
     request_verdicts,
     resolve_judge_fallback_seat_profile,
@@ -3129,6 +3130,40 @@ class JudgeLiteLLMPayloadTest(TestCase):
         self.assertFalse(result.unparsed, result.failure_kind)
         self.assertEqual(body["stream_options"], {"include_usage": True})
         self.assertFalse(body["enable_thinking"])
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_STREAM_SEAT_1=True,
+    )
+    @http_mock.activate
+    def test_non_stream_body_is_read_as_json_on_a_streaming_seat(self) -> None:
+        # Repeat recommendations reuse the seat profile but ask for one JSON
+        # response; reading it as SSE rejected every answer as an envelope.
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            json={
+                "choices": [
+                    {"message": {"content": '{"results": []}'}, "finish_reason": "stop"}
+                ],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 2},
+            },
+        )
+        profile = resolve_judge_seat_profile(1)
+        self.assertTrue(profile.stream)
+
+        response = post_chat_completion(
+            {"model": profile.model, "stream": False, "messages": []},
+            profile,
+            title="test",
+        )
+
+        self.assertTrue(response.transport_succeeded, response.failure_kind)
+        self.assertEqual(
+            response.payload["choices"][0]["message"]["content"], '{"results": []}'
+        )
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",

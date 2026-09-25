@@ -1672,6 +1672,10 @@ def post_chat_completion(
     payload: dict, profile: JudgeSeatProfile, *, title: str
 ) -> _BatchResponse:
     """Post one bounded OpenAI-compatible request without judge semantics."""
+    if profile.stream and payload.get("stream") is not True:
+        # The body asks for one JSON response: read it as one, with the full
+        # deadline, instead of as SSE bounded by the stream idle timeout.
+        profile = replace(profile, stream=False)
     return _post_batch(payload, profile, title=title)
 
 
