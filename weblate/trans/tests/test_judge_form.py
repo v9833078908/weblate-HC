@@ -228,6 +228,32 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
         self.assertContains(response, "Automatic translation takes existing")
         self.assertEqual(page.xpath("//input[@id='id_auto_apply']/@value"), ["Apply"])
 
+    def test_zero_proposal_flag_keeps_regular_get_and_post_mode(self) -> None:
+        response = self.client.get(
+            self.project_language.get_absolute_url(),
+            {"judge_proposal_only": "0"},
+        )
+        page = html.fromstring(response.content)
+        self.assertEqual(page.xpath("//select[@name='mode']/@name"), ["mode"])
+        self.assertTrue(page.xpath("//*[@name='overwrite_existing']"))
+        self.assertContains(response, "Automatic translation takes existing")
+        self.assertNotContains(response, "Run judge check")
+
+        form = AutoForm(
+            obj=self.project,
+            user=self.user,
+            data={
+                "mode": "translate",
+                "q": "state:empty",
+                "auto_source": "others",
+                "threshold": 80,
+                "judge_proposal_only": "0",
+            },
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.proposal_only)
+        self.assertFalse(form.cleaned_data["judge_proposal_only"])
+
     def test_verdict_only_rejects_write_mode_and_overwrite_tampering(self) -> None:
         for changes, error_field in (
             ({"mode": "translate"}, "mode"),

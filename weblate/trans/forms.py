@@ -1521,9 +1521,12 @@ class AutoForm(forms.Form):
             )
 
     def _is_proposal_only(self) -> bool:
-        if self.is_bound:
-            return self.data.get("judge_proposal_only") in {"1", "true", "on"}
-        return bool(self.initial.get("judge_proposal_only"))
+        value = (
+            self.data.get("judge_proposal_only")
+            if self.is_bound
+            else self.initial.get("judge_proposal_only")
+        )
+        return value in {True, "1", "true", "on"}
 
     def _configure_proposal_only(self, allowed_modes: set[str]) -> None:
         if not self.proposal_only:
