@@ -772,6 +772,9 @@ class RepeatBulkViewsTest(ViewTestCase):
     def test_queue_card_and_banner_discard_changed_recommendation(self) -> None:
         """An ordinary Unit edit invalidates both displays without a group bump."""
         group, units = self.make_group("Sword", ["Blade", "Sabre"])
+        # The banner counts ready groups: the judge passed the model's pick.
+        for unit in units:
+            self.make_judge_verdict(unit)
         result = self.make_recommendation(
             self.make_recommendation_run(
                 status=RepeatRecommendationRun.Status.COMPLETED
@@ -779,6 +782,7 @@ class RepeatBulkViewsTest(ViewTestCase):
             group,
             units,
             target=["Blade"],
+            action="use_existing",
         )
         before = self.client.get(self.queue_url)
         self.assertEqual(before.context["bulk_ready"], 1)
@@ -986,7 +990,11 @@ class RepeatBulkViewsTest(ViewTestCase):
             self.make_recommendation_run(), current_group, current_units, target=["Cur"]
         )
         stale = self.make_recommendation(
-            self.make_recommendation_run(), stale_group, stale_units, target=["Sta"]
+            self.make_recommendation_run(),
+            stale_group,
+            stale_units,
+            action="use_existing",
+            target=["S1"],
         )
         stale_units[0].target = "Human rewrite"
         stale_units[0].save(update_fields=["target"])
@@ -1389,11 +1397,22 @@ class RepeatBulkViewsTest(ViewTestCase):
         stale_group, stale_units = self.make_group(
             "Stale banner", ["S1", "S2"], start=21500
         )
+        # The banner counts ready groups: the judge passed the model's pick.
+        for unit in (*first_units, *second_units, *human_units, *stale_units):
+            self.make_judge_verdict(unit)
         self.make_recommendation(
-            self.make_recommendation_run(), first_group, first_units, target=["Ban"]
+            self.make_recommendation_run(),
+            first_group,
+            first_units,
+            action="use_existing",
+            target=["B1"],
         )
         self.make_recommendation(
-            self.make_recommendation_run(), second_group, second_units, target=["Bax"]
+            self.make_recommendation_run(),
+            second_group,
+            second_units,
+            action="use_existing",
+            target=["C1"],
         )
         self.make_recommendation(
             self.make_recommendation_run(),
@@ -1538,8 +1557,14 @@ class RepeatBulkViewsTest(ViewTestCase):
 
     def test_queue_banner_query_cost_is_bounded(self) -> None:
         group, units = self.make_group("Banner count line", ["BC1", "BC2"], start=25000)
+        for unit in units:
+            self.make_judge_verdict(unit)
         self.make_recommendation(
-            self.make_recommendation_run(), group, units, target=["Ban"]
+            self.make_recommendation_run(),
+            group,
+            units,
+            action="use_existing",
+            target=["BC1"],
         )
 
         with CaptureQueriesContext(connection) as capture:
@@ -2307,14 +2332,26 @@ class RepeatBulkViewsTest(ViewTestCase):
             action="use_existing",
             target=["Model ready 0"],
         )
+        # The model picks the variant the judge flagged: the queue keeps the
+        # group in "choose", so neither the tile nor the banner counts it.
+        flagged, flagged_units = self.judged_group(
+            "Model picks flagged", [none, major], 28230
+        )
+        contested = self.make_recommendation(
+            self.make_recommendation_run(),
+            flagged,
+            flagged_units,
+            action="use_existing",
+            target=["Model picks flagged 1"],
+        )
 
         response = self.client.get(self.queue_url)
 
         self.assertEqual(response.context["judge_panel"]["buckets"]["ready"], 2)
         self.assertEqual(response.context["bulk_ready"], 2)
         review = self.client.get(self.review_url)
-        self.assertContains(review, 'name="result"', count=2)
-        for result in RepeatRecommendationResult.objects.all():
+        self.assertContains(review, 'name="result"', count=3)
+        for result in RepeatRecommendationResult.objects.exclude(pk=contested.pk):
             self.assert_checked(review, result.pk)
 
     def ready_recommendation(self, source: str, start: int):

@@ -392,11 +392,14 @@ def repeat_queue(request, project: str, language: str):
         "repeat-bulk-review", kwargs={"project": project, "language": language}
     )
     if policy is not None and request.user.has_perm("project.edit", obj):
-        # The banner counts the same current, applicable results the review
-        # page freezes, across every recommendation run.
+        # The banner counts what the review page preselects: ready groups
+        # with a current, applicable result, so it matches the ready tile.
         bulk_ready = sum(
-            result.action in {"use_existing", "propose_new"}
-            for result in current.values()
+            item["status"] == "open"
+            and item["judge"].bucket == READY
+            and (result := current.get(item["group"].pk)) is not None
+            and result.action in {"use_existing", "propose_new"}
+            for item in groups
         )
     return render(
         request,
