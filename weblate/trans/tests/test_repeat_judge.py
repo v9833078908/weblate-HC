@@ -6,26 +6,45 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from django.db import connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 
-from weblate.trans.models import JudgeVerdict, Unit
+from weblate.trans.autotranslate import BatchAutoTranslate
+from weblate.trans.judge import JudgeError
+from weblate.trans.models import (
+    JudgeVerdict,
+    ProducerRun,
+    RepeatPolicy,
+    RepeatRecommendationRun,
+    Unit,
+)
 from weblate.trans.models.judge import compute_target_hash
 from weblate.trans.repeat_judge import (
     CHOOSE,
     READY,
+    REPEAT_JUDGE_QUERY,
     REWRITE,
     UNCHECKED,
+    compare_after_judge,
     judge_group,
     judge_groups,
 )
+from weblate.trans.repeat_recommendations import (
+    build_group_context,
+    context_fingerprint,
+)
+from weblate.trans.repeats import get_or_create_group, save_policy
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.util import join_plural
 from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_APPROVED, STATE_TRANSLATED
 
 
-class RepeatJudgeTest(ViewTestCase):
+class RepeatJudgeFixtures(ViewTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.translation = self.component.translation_set.get(language_code="cs")
@@ -96,6 +115,8 @@ class RepeatJudgeTest(ViewTestCase):
     def judge(self, variants):
         return judge_groups([(1, variants)])[1]
 
+
+class RepeatJudgeTest(RepeatJudgeFixtures):
     def test_one_passed_and_one_flagged_is_ready_with_reason_and_evidence(self) -> None:
         variants = self.add_group("Gate", ["Pass", "Flag"])
         passed = self.make_verdict(variants[0]["units"][0])
@@ -329,3 +350,231 @@ class RepeatJudgeTest(ViewTestCase):
         self.assertEqual(
             result.variants["Pass",].back_translation, "The original meaning"
         )
+
+
+class RepeatComparisonTriggerTest(RepeatJudgeFixtures):
+    """A completed queue judge run compares the variants it left to choose."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.make_manager()
+        self.policy = save_policy(
+            policy=RepeatPolicy(
+                project=self.project,
+                source_language=self.component.source_language,
+                target_language=self.translation.language,
+            ),
+            components=[self.component],
+            labels=[],
+            actor=self.user,
+        )
+        self.project_language = self.project.project_languages[
+            self.translation.language
+        ]
+
+    def add_judged_group(self, source: str, severities: list[str]):
+        variants = self.add_group(source, [f"{source} {i}" for i in range(2)])
+        for variant, severity in zip(variants, severities, strict=True):
+            if severity:
+                self.make_verdict(variant["units"][0], severity)
+        return get_or_create_group(self.policy, variants[0]["units"][0])
+
+    def make_run(self, **fields) -> ProducerRun:
+        values = {
+            "actor": self.user,
+            "scope_type": ProducerRun.ScopeType.PROJECT,
+            "scope_id": str(self.project.pk),
+            "scope_label": str(self.project_language),
+            "scope_path": self.project_language.get_absolute_url(),
+            "requested_query": REPEAT_JUDGE_QUERY,
+            "requested_mode": "judge",
+            "execution_options": {"judge_proposal_only": True},
+            "cap": 4,
+            "status": ProducerRun.Status.RUNNING,
+        }
+        values.update(fields)
+        return ProducerRun.objects.create(**values)
+
+    def finish(self, run: ProducerRun, status=ProducerRun.Status.COMPLETED):
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            enforce_permissions=False,
+        )
+        with (
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=SimpleNamespace(
+                    profile_fingerprint="p" * 64,
+                    model="test-model",
+                    temperature=0,
+                    response_format="json_object",
+                    provider="test",
+                    reasoning="",
+                ),
+            ),
+            patch("weblate.trans.repeat_recommendations.queue_attempt") as queue,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            batch._finish_producer_run(  # ruff: ignore[private-member-access]
+                run, status
+            )
+        run.refresh_from_db()
+        return queue
+
+    def sent_groups(self) -> set[int]:
+        return {
+            group["group"]
+            for run in RepeatRecommendationRun.objects.all()
+            for attempt in run.attempts.all()
+            for group in attempt.request_snapshot["groups"]
+        }
+
+    def test_completed_queue_run_compares_choose_groups_without_results(self) -> None:
+        none = JudgeVerdict.Severity.NONE
+        major = JudgeVerdict.Severity.MAJOR
+        choose = self.add_judged_group("Choose", [none, none])
+        decided = self.add_judged_group("Decided", [none, none])
+        self.add_judged_group("Ready", [none, major])
+        self.add_judged_group("Rewrite", [major, major])
+        self.add_judged_group("Unchecked", [none, ""])
+        units = list(self.translation.unit_set.filter(source="Decided").order_by("pk"))
+        earlier = RepeatRecommendationRun.objects.create(
+            policy=self.policy,
+            actor=self.user,
+            snapshot={},
+            snapshot_fingerprint="s",
+            profile_fingerprint="p",
+            prompt_fingerprint="t",
+            request_cap=1,
+            status=RepeatRecommendationRun.Status.COMPLETED,
+        )
+        context = build_group_context(policy=self.policy, group=decided, units=units)
+        earlier.results.create(
+            group=decided,
+            group_revision=decided.revision,
+            snapshot_fingerprint="s",
+            context_fingerprint=context_fingerprint(context),
+            action="use_existing",
+            target=["Decided 0"],
+        )
+        run = self.make_run(requested_query=f"{REPEAT_JUDGE_QUERY} AND id:1")
+
+        queue = self.finish(run)
+
+        self.assertEqual(RepeatRecommendationRun.objects.count(), 2)
+        self.assertEqual(self.sent_groups(), {choose.pk})
+        self.assertEqual(queue.call_count, 1)
+        comparison = RepeatRecommendationRun.objects.exclude(pk=earlier.pk).get()
+        self.assertEqual(comparison.actor, self.user)
+        self.assertEqual(
+            run.summary["repeat_comparison"],
+            {"status": "started", "run": comparison.pk, "groups": 1},
+        )
+        # A redelivered completion or a second finalization starts nothing.
+        self.assertIsNone(compare_after_judge(run.pk))
+        self.finish(run)
+        self.assertEqual(RepeatRecommendationRun.objects.count(), 2)
+
+    def test_other_runs_start_no_comparison(self) -> None:
+        none = JudgeVerdict.Severity.NONE
+        self.add_judged_group("Choose", [none, none])
+        runs = [
+            self.make_run(execution_options={"judge_proposal_only": False}),
+            self.make_run(requested_query="check:other"),
+            self.make_run(requested_mode="translate"),
+            self.make_run(scope_path=self.project.get_absolute_url()),
+        ]
+        for run in runs:
+            with self.subTest(run=run.pk):
+                self.finish(run)
+                self.assertNotIn("repeat_comparison", run.summary)
+        for status in (ProducerRun.Status.FAILED, ProducerRun.Status.CANCELLED):
+            with self.subTest(status=status):
+                run = self.make_run()
+                self.finish(run, status)
+                self.assertNotIn("repeat_comparison", run.summary)
+                self.assertIsNone(compare_after_judge(run.pk))
+        partial = self.make_run(status=ProducerRun.Status.CANCEL_REQUESTED)
+        self.finish(partial)
+        self.assertNotEqual(partial.status, ProducerRun.Status.COMPLETED)
+        self.assertFalse(RepeatRecommendationRun.objects.exists())
+
+    def test_no_choose_group_records_none(self) -> None:
+        self.add_judged_group(
+            "Ready", [JudgeVerdict.Severity.NONE, JudgeVerdict.Severity.MAJOR]
+        )
+        run = self.make_run()
+
+        self.finish(run)
+
+        self.assertEqual(
+            run.summary["repeat_comparison"], {"status": "none", "groups": 0}
+        )
+        self.assertFalse(RepeatRecommendationRun.objects.exists())
+
+    def test_unavailable_judge_and_missing_permission_are_recorded(self) -> None:
+        none = JudgeVerdict.Severity.NONE
+        self.add_judged_group("Choose", [none, none])
+        run = self.make_run()
+        with patch(
+            "weblate.trans.repeat_judge.prepare_run",
+            side_effect=JudgeError("The LLM judge is not configured."),
+        ):
+            self.finish(run)
+        self.assertEqual(
+            run.summary["repeat_comparison"],
+            {"status": "skipped", "reason": "judge-unavailable"},
+        )
+
+        self.project.remove_user(self.user)
+        self.user.groups.clear()
+        run = self.make_run()
+        self.finish(run)
+        self.assertEqual(
+            run.summary["repeat_comparison"],
+            {"status": "skipped", "reason": "permission"},
+        )
+        self.assertFalse(RepeatRecommendationRun.objects.exists())
+
+    def test_disabled_policy_starts_nothing(self) -> None:
+        self.add_judged_group(
+            "Choose", [JudgeVerdict.Severity.NONE, JudgeVerdict.Severity.NONE]
+        )
+        RepeatPolicy.objects.filter(pk=self.policy.pk).update(enabled=False)
+        run = self.make_run()
+
+        self.finish(run)
+
+        self.assertNotIn("repeat_comparison", run.summary)
+        self.assertFalse(RepeatRecommendationRun.objects.exists())
+
+    @override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="")
+    def test_keyless_judge_raises_nothing(self) -> None:
+        none = JudgeVerdict.Severity.NONE
+        self.add_judged_group("Choose", [none, none])
+        run = self.make_run()
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            enforce_permissions=False,
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            batch._finish_producer_run(  # ruff: ignore[private-member-access]
+                run, ProducerRun.Status.COMPLETED
+            )
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertEqual(
+            run.summary["repeat_comparison"],
+            {"status": "skipped", "reason": "judge-unavailable"},
+        )
+        self.assertFalse(RepeatRecommendationRun.objects.exists())

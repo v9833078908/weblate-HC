@@ -2680,6 +2680,10 @@ class BatchAutoTranslate(BaseAutoTranslate):
         run.summary = summary
         run.warnings = self.get_warnings()
         run.save(update_fields=["status", "finished", "failure", "summary", "warnings"])
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.repeat_judge import schedule_repeat_comparison
+
+        schedule_repeat_comparison(run)
 
     def _can_process_translation(self, translation: Translation) -> bool:
         return not self.enforce_permissions or bool(

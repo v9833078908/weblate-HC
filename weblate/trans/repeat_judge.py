@@ -6,11 +6,17 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from operator import itemgetter
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
+
+from weblate.trans.judge import JudgeError
+from weblate.trans.models import RepeatPolicy
 from weblate.trans.models.judge import (
     JUDGE_CATEGORY_LABELS,
     SEVERITY_RANK,
@@ -18,13 +24,17 @@ from weblate.trans.models.judge import (
     ProducerRun,
     active_verdicts,
 )
+from weblate.trans.repeat_recommendations import prepare_run
+from weblate.trans.repeats import repeat_queue_groups
 from weblate.utils.state import STATE_APPROVED
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+LOGGER = logging.getLogger(__name__)
 READY, CHOOSE, REWRITE, UNCHECKED = "ready", "choose", "rewrite", "unchecked"
 REPEAT_JUDGE_QUERY = "check:repeat-drift"
+COMPARISON_KEY = "repeat_comparison"
 
 
 def latest_repeat_judge_run(project_language) -> ProducerRun | None:
@@ -35,12 +45,120 @@ def latest_repeat_judge_run(project_language) -> ProducerRun | None:
             scope_id=str(project_language.project.pk),
             requested_mode="judge",
             scope_path=project_language.get_absolute_url(),
-            requested_query=REPEAT_JUDGE_QUERY,
+            requested_query__startswith=REPEAT_JUDGE_QUERY,
             execution_options__judge_proposal_only=True,
         )
         .order_by("-created")
         .first()
     )
+
+
+def is_repeat_judge_run(run: ProducerRun) -> bool:
+    """Tell from its request whether a run is a verdict-only repeat queue check."""
+    return (
+        run.requested_mode == "judge"
+        and run.scope_type == ProducerRun.ScopeType.PROJECT
+        and run.execution_options.get("judge_proposal_only") is True
+        and run.requested_query.startswith(REPEAT_JUDGE_QUERY)
+    )
+
+
+def repeat_judge_policy(run: ProducerRun) -> RepeatPolicy | None:
+    """Return the enabled repeat policy whose queue launched this run."""
+    if not run.scope_id.isdigit():
+        return None
+    for policy in RepeatPolicy.objects.filter(
+        project_id=int(run.scope_id), enabled=True
+    ).select_related("project", "target_language"):
+        project_language = policy.project.project_languages[policy.target_language]
+        if project_language.get_absolute_url() == run.scope_path:
+            return policy
+    return None
+
+
+def schedule_repeat_comparison(run: ProducerRun) -> None:
+    """Publish the variant comparison once a completed queue check commits."""
+    if run.status != ProducerRun.Status.COMPLETED or not is_repeat_judge_run(run):
+        return
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.tasks import compare_repeat_variants
+
+    run_id = str(run.pk)
+
+    def publish() -> None:
+        try:
+            compare_repeat_variants.delay(run_id)
+        except Exception:
+            # The judge run is final; a lost publication only loses the
+            # follow-up, which the queue can start again from a new check.
+            LOGGER.exception("Failed to publish the repeat comparison for %s", run_id)
+
+    transaction.on_commit(publish)
+
+
+def compare_after_judge(run_id) -> dict[str, object] | None:
+    """Compare the variants a completed queue check left to choose, at most once."""
+    with transaction.atomic():
+        run = ProducerRun.objects.select_for_update().filter(pk=run_id).first()
+        if (
+            run is None
+            or run.status != ProducerRun.Status.COMPLETED
+            or not is_repeat_judge_run(run)
+            or COMPARISON_KEY in run.summary
+        ):
+            # A redelivered completion finds the recorded outcome.
+            return None
+        policy = repeat_judge_policy(run)
+        if policy is None:
+            # Launched outside a queue with an enabled rule.
+            return None
+        outcome = _start_comparison(run, policy)
+        run.summary = {**run.summary, COMPARISON_KEY: outcome}
+        run.save(update_fields=["summary"])
+    return outcome
+
+
+def _start_comparison(run: ProducerRun, policy: RepeatPolicy) -> dict[str, object]:
+    actor = run.actor
+    if actor is None:
+        return {"status": "skipped", "reason": "no-actor"}
+    if not actor.has_perm("project.edit", policy.project):
+        return {"status": "skipped", "reason": "permission"}
+    open_groups = [
+        item
+        for item in repeat_queue_groups(policy, user=actor)
+        if item["status"] == "open"
+    ]
+    judgements = judge_groups(
+        (item["group"].pk, item["variants"]) for item in open_groups
+    )
+    group_ids = sorted(
+        group_id
+        for group_id, judgement in judgements.items()
+        if judgement.bucket == CHOOSE
+    )
+    if not group_ids:
+        return {"status": "none", "groups": 0}
+    try:
+        # One request carries at least one group, so this cap leaves no
+        # sendable group unsent; current results are never bought again.
+        comparison = prepare_run(
+            policy=policy,
+            actor=actor,
+            request_cap=len(group_ids),
+            group_ids=group_ids,
+        )
+    except JudgeError:
+        return {"status": "skipped", "reason": "judge-unavailable"}
+    except PermissionDenied:
+        return {"status": "skipped", "reason": "permission"}
+    return {
+        "status": "started",
+        "run": comparison.pk,
+        "groups": sum(
+            bool(group.get("sendable", True)) for group in comparison.snapshot["groups"]
+        ),
+    }
 
 
 def judge_launch_url(project_language, queue_url: str) -> str:
