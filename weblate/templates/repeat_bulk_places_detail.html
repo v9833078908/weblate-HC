@@ -2,13 +2,14 @@
 
 <div class="rq-places-detail">
   <table class="table table-sm">
-    <caption class="visually-hidden">{% translate "Places in this group" %}</caption>
     <thead>
       <tr>
         <th scope="col">{% translate "Key" %}</th>
-        <th scope="col">{% translate "Component" %}</th>
+        {% if show_component %}
+          <th scope="col">{% translate "Component" %}</th>
+        {% endif %}
         <th scope="col">{% translate "Current translation" %}</th>
-        <th scope="col">{% translate "After applying" %}</th>
+        <th scope="col">{% translate "Outcome" %}</th>
       </tr>
     </thead>
     <tbody>
@@ -17,16 +18,15 @@
           <td>
             <a href="{{ member.url }}"><code>{{ member.key }}</code></a>
           </td>
-          <td>{{ member.component }}</td>
+          {% if show_component %}<td>{{ member.component }}</td>{% endif %}
           <td>
             <code lang="{{ language.code }}">{{ member.current_target }}</code>
           </td>
           <td>
             {% if member.will_change %}
-              <code lang="{{ language.code }}">{{ target_text }}</code>
+              {% translate "Will change" %}
             {% else %}
-              {% translate "No change" %}
-              <span class="d-block text-muted">{{ member.reason_label }}</span>
+              {{ member.reason_label }}
             {% endif %}
           </td>
         </tr>

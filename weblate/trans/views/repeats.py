@@ -1024,7 +1024,7 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
             }
         )
     members.sort(key=lambda member: not member["will_change"])
-    target_text = _forms_text(result.target)
+    show_component = len({member["component"] for member in members}) > 1
     if request.GET.get("inline"):
         # The review page expands a row with this fragment, not the full page.
         return render(
@@ -1032,8 +1032,8 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
             "repeat_bulk_places_detail.html",
             {
                 "language": policy.target_language,
-                "target_text": target_text,
                 "members": members[:INLINE_PLACES],
+                "show_component": show_component,
                 "remaining": max(len(members) - INLINE_PLACES, 0),
                 "places_url": request.path,
             },
@@ -1045,8 +1045,9 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
             "project": policy.project,
             "language": policy.target_language,
             "source_text": _forms_text(result.group.source_forms),
-            "target_text": target_text,
+            "target_text": _forms_text(result.target),
             "members": members,
+            "show_component": show_component,
             "review_url": reverse(
                 "repeat-bulk-review", kwargs={"project": project, "language": language}
             ),

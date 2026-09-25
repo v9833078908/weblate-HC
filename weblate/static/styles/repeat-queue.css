@@ -215,7 +215,7 @@
 
 .rq-places-detail .table {
   --bs-table-bg: transparent;
-  min-width: 48rem;
+  min-width: 36rem;
   margin-bottom: 0.25rem;
   font-size: 0.875rem;
 }

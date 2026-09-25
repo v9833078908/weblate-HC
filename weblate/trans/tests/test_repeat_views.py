@@ -948,9 +948,12 @@ class RepeatBulkViewsTest(ViewTestCase):
             [units[1].context, units[2].context],
         )
         self.assertContains(inline, 'class="rq-places-detail"')
-        self.assertContains(inline, '<code lang="cs">Shared</code>', html=True)
+        self.assertContains(inline, "Will change", count=2)
         self.assertContains(inline, f'<a href="{url}">Show the remaining 2</a>')
         self.assertNotContains(inline, units[0].context)
+        # One component only, so no column repeats it on every place.
+        self.assertFalse(inline.context["show_component"])
+        self.assertNotContains(inline, '<th scope="col">Component</th>', html=True)
 
         full = self.client.get(url)
 
@@ -959,7 +962,7 @@ class RepeatBulkViewsTest(ViewTestCase):
             [member["key"] for member in full.context["members"]],
             [unit.context for unit in (units[1], units[2], units[3], units[0])],
         )
-        self.assertContains(full, "No change")
+        self.assertContains(full, "Already translated this way")
         self.assertNotContains(full, "Show the remaining")
         self.assertEqual(RepeatDecisionEvent.objects.count(), 0)
 
