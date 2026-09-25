@@ -32970,3 +32970,160 @@ msgid ""
 "This batch cannot accept that action now: it is still being processed, was "
 "already undone, or has nothing left to process. Nothing was changed."
 msgstr "Пакет сейчас не может принять это действие: обработка ещё идёт, пакет уже отменён или нечего продолжать. Ничего не изменено."
+
+#: weblate/templates/repeat_queue.html:134
+msgid "Judge check for repeats"
+msgstr "Проверка повторов судьёй"
+
+#: weblate/templates/repeat_queue.html:136
+msgid "The judge is checking variants"
+msgstr "Судья проверяет варианты"
+
+#: weblate/templates/repeat_queue.html:137
+msgid "Checked %(checked)s of %(total)s places"
+msgstr "Проверено %(checked)s из %(total)s мест"
+
+#: weblate/templates/repeat_queue.html:139
+msgid "View judge run"
+msgstr "Открыть прогон судьи"
+
+#: weblate/templates/repeat_queue.html:143
+msgid "Judge check results"
+msgstr "Результаты проверки судьёй"
+
+#: weblate/templates/repeat_queue.html:145
+#: weblate/templates/repeat_queue.html:153
+msgid "Check variants with the judge"
+msgstr "Проверить варианты судьёй"
+
+#: weblate/templates/repeat_queue.html:147
+#, python-format
+msgid "The repeat check covers %(counter)s place."
+msgid_plural "The repeat check covers %(counter)s places."
+msgstr[0] "Проверка повторов охватывает %(counter)s место."
+msgstr[1] "Проверка повторов охватывает %(counter)s места."
+msgstr[2] "Проверка повторов охватывает %(counter)s мест."
+
+#: weblate/templates/repeat_queue.html:149
+msgid "The open queue contains %(counter)s place."
+msgid_plural "The open queue contains %(counter)s places."
+msgstr[0] "В открытой очереди %(counter)s место."
+msgstr[1] "В открытой очереди %(counter)s места."
+msgstr[2] "В открытой очереди %(counter)s мест."
+
+#: weblate/templates/repeat_queue.html:154
+msgid ""
+"When enough priced history exists, the cost estimate appears before you "
+"launch. Actual spend appears in the run report."
+msgstr "Если накоплено достаточно данных о ценах, оценка появится перед запуском. Фактические расходы указаны в отчёте прогона."
+
+#: weblate/templates/repeat_queue.html:158
+msgid "The last check stopped before it finished."
+msgstr "Последняя проверка остановилась, не дойдя до конца."
+
+#: weblate/templates/repeat_queue.html:160
+msgid "Judge result filters"
+msgstr "Фильтры результатов проверки судьёй"
+
+#: weblate/templates/repeat_queue.html:162
+msgid "Ready"
+msgstr "Готово"
+
+#: weblate/templates/repeat_queue.html:164
+msgid "Choose yourself"
+msgstr "Выбрать самостоятельно"
+
+#: weblate/templates/repeat_queue.html:166
+msgid "Rewrite"
+msgstr "Нужен новый перевод"
+
+#: weblate/templates/repeat_queue.html:168
+msgid "Unchecked"
+msgstr "Не проверено"
+
+#: weblate/templates/repeat_queue.html:171
+msgid "Check the remaining places"
+msgstr "Проверить оставшиеся места"
+
+#: weblate/templates/repeat_queue.html:174
+#, python-format
+msgid ""
+"%(counter)s place is outside the repeat check; the judge does not check it."
+msgid_plural ""
+"%(counter)s places are outside the repeat check; the judge does not check "
+"them."
+msgstr[0] "%(counter)s место вне проверки повторов, судья его не проверяет."
+msgstr[1] "%(counter)s места вне проверки повторов, судья их не проверяет."
+msgstr[2] "%(counter)s мест вне проверки повторов, судья их не проверяет."
+
+#: weblate/templates/snippets/autoform.html:38
+msgid "The current filter matches %(counter)s string."
+msgid_plural "The current filter matches %(counter)s strings."
+msgstr[0] "По текущему фильтру найдена %(counter)s строка."
+msgstr[1] "По текущему фильтру найдены %(counter)s строки."
+msgstr[2] "По текущему фильтру найдено %(counter)s строк."
+
+#: weblate/templates/snippets/autoform.html:34
+msgid ""
+"Verdicts are recorded; string states are not changed and no replacement "
+"translations are generated."
+msgstr "Вердикты записываются; состояния строк не меняются, новые варианты перевода не создаются."
+
+#: weblate/templates/snippets/repeat_group.html:38
+msgid ""
+"The judge checked this translation in one of its places. Look through the "
+"preview before confirming."
+msgstr "Судья проверил этот перевод в одном из мест. Перед подтверждением просмотрите, что изменится."
+
+#: weblate/templates/snippets/repeat_group.html:74
+msgid "Recommended: checked by the judge"
+msgstr "Рекомендуем: проверен судьёй"
+
+#: weblate/templates/snippets/repeat_group.html:76
+msgid "Checked by the judge"
+msgstr "Проверен судьёй"
+
+#: weblate/templates/snippets/repeat_group.html:79
+msgid "The judge found an error"
+msgstr "Судья нашёл ошибку"
+
+#: weblate/templates/snippets/repeat_group.html:82
+msgid "Back-translation: %(translation)s"
+msgstr "Обратный перевод: %(translation)s"
+
+#: weblate/templates/snippets/repeat_group.html:83
+msgid "Judge's reason: %(reason)s"
+msgstr "Обоснование судьи: %(reason)s"
+
+#, python-format
+msgid "How to sort out %(count)s groups quickly"
+msgid_plural "How to sort out %(count)s groups quickly"
+msgstr[0] "Как быстро разобрать %(count)s группу"
+msgstr[1] "Как быстро разобрать %(count)s группы"
+msgstr[2] "Как быстро разобрать %(count)s групп"
+
+msgid "The judge checks every translation variant and marks errors. Where exactly one variant has none, it is recommended in the group."
+msgstr "Судья проверит каждый вариант перевода и отметит ошибки. Если в группе ровно один вариант без ошибок, он будет рекомендован."
+
+#, python-format
+msgid "Opens the usual judge launch for these %(count)s places. The check is paid: when enough history exists, an estimate is shown before launch; the actual spend is in the run report."
+msgid_plural "Opens the usual judge launch for these %(count)s places. The check is paid: when enough history exists, an estimate is shown before launch; the actual spend is in the run report."
+msgstr[0] "Откроется обычный запуск проверки судьёй для этих %(count)s мест. Проверка платная: если хватает истории, оценка видна перед запуском; фактические расходы - в отчёте проверки."
+msgstr[1] "Откроется обычный запуск проверки судьёй для этих %(count)s мест. Проверка платная: если хватает истории, оценка видна перед запуском; фактические расходы - в отчёте проверки."
+msgstr[2] "Откроется обычный запуск проверки судьёй для этих %(count)s мест. Проверка платная: если хватает истории, оценка видна перед запуском; фактические расходы - в отчёте проверки."
+
+msgid "exactly one variant without errors"
+msgstr "ровно один вариант без ошибок"
+
+msgid "several variants passed, the choice is yours"
+msgstr "судья одобрил несколько вариантов, выбор за вами"
+
+msgid "errors in every variant, a new translation is needed"
+msgstr "ошибки во всех вариантах, нужен новый перевод"
+
+msgid "not checked by the judge"
+msgstr "не проверены судьёй"
+
+#, python-format
+msgid "Back-translation: %(text)s"
+msgstr "Обратный перевод: %(text)s"

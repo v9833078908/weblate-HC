@@ -40,13 +40,21 @@ Weblate UI remains the primary surface today.
 
 ## Product truths that designs must respect
 
-- **Two paid triggers, and only two, for the repeat workflow**: an explicit
-  "prepare recommendations" command and an opt-in on the MT form. Opening a page,
-  filtering, and preview are free; an unknown price is never displayed as `$0`
-  (`docs/product/plans/2026-09-17-repeat-drift-reconciliation-and-managed-reuse.md`, §1).
-- **Nothing is written without preview**: approved targets are never overwritten,
-  the UI preselects nothing, and every mass write is preceded by an explicit
-  confirmation screen.
+- **Two paid triggers, and only two, for repeat recommendations**: an explicit
+  "prepare recommendations" command and an opt-in on the MT form. The judge
+  check linked from the repeat queue opens the standard judge launch form with
+  queue places prefilled and verdict-only mode selected; it generates no repair
+  candidates or pretranslations, and the queue itself starts no paid run.
+  Opening a page, filtering, and preview are free; an unknown price is never
+  displayed as `$0`
+  (`docs/product/plans/2026-09-17-repeat-drift-reconciliation-and-managed-reuse.md`, §1;
+  `docs/product/plans/2026-09-24-repeat-queue-producer-ux.md`).
+- **Nothing is written without preview**: approved targets are never overwritten.
+  The UI preselects nothing except a single-form repeat variant that the LLM
+  judge passed as the only variant without errors for its exact current text;
+  that preselected choice still goes through preview and confirmation. Every
+  mass write is preceded by an explicit confirmation screen
+  (`docs/product/plans/2026-09-24-repeat-queue-producer-ux.md`).
 - **Permissions are the existing ones** (`project.edit`, `unit.edit`,
   `upload.perform`, `unit.review`, `translation.auto`); the console and the native
   UI check the same `has_perm` (`producer-console-design-and-roadmap.md`, §4.2).
