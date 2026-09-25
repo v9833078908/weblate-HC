@@ -1695,7 +1695,11 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
     )
     judge_preview = batch.preview_judge_scope() if mode == "judge" else None
     mt_preview = batch.preview_mt_scope() if mode != "judge" else None
-    preparation = _judge_preparation_preview(batch) if judge_preview else None
+    preparation = (
+        _judge_preparation_preview(batch)
+        if judge_preview and not autoform.cleaned_data["judge_proposal_only"]
+        else None
+    )
     preview = judge_preview or mt_preview
     judge_cost: dict[str, str | bool] = {"available": False}
     if judge_preview is not None:
@@ -1722,7 +1726,11 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
                         (
                             high
                             * judge_preview.processed
-                            * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
+                            * (
+                                1
+                                if autoform.cleaned_data["judge_proposal_only"]
+                                else settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1
+                            )
                         ).normalize(),
                         "f",
                     ),
@@ -1821,7 +1829,7 @@ def _judge_preparation_preview(batch: BatchAutoTranslate) -> dict[str, object]:
 _AutoTarget = Translation | Component | Category | Project | ProjectLanguage | Workspace
 
 
-def _start_judge_producer_run(
+def _start_judge_producer_run(  # ruff: ignore[complex-structure]
     request: AuthenticatedHttpRequest, obj: _AutoTarget, autoform: AutoForm
 ) -> HttpResponseRedirect:
     form_obj = (
@@ -1845,9 +1853,12 @@ def _start_judge_producer_run(
         overwrite_existing=autoform.cleaned_data.get("overwrite_existing", False),
     )
     _preview, units = batch.preview_judge_scope_snapshot(execution_version=1)
-    preparation_requested = autoform.cleaned_data.get(
-        "auto_source"
-    ) == "mt" and not autoform.cleaned_data.get("overwrite_existing", False)
+    proposal_only = autoform.cleaned_data.get("judge_proposal_only", False)
+    preparation_requested = (
+        autoform.cleaned_data.get("auto_source") == "mt"
+        and not autoform.cleaned_data.get("overwrite_existing", False)
+        and not proposal_only
+    )
     if preparation_requested:
         try:
             preparation_scope = batch.build_preparation_scope()
@@ -1889,12 +1900,16 @@ def _start_judge_producer_run(
         "auto_source": autoform.cleaned_data["auto_source"],
         "engines": autoform.cleaned_data["engines"],
         "threshold": autoform.cleaned_data["threshold"],
-        "judge_proposal_only": False,
+        "judge_proposal_only": proposal_only,
         "judge_pretranslate": False,
         "judge_mutating_repairs": False,
-        "judge_candidate_severities": list(DEFAULT_CANDIDATE_SEVERITIES),
+        "judge_candidate_severities": (
+            [] if proposal_only else list(DEFAULT_CANDIDATE_SEVERITIES)
+        ),
         "overwrite_existing": autoform.cleaned_data.get("overwrite_existing", False),
     }
+    if proposal_only:
+        execution_options["judge_skip_preparation"] = True
     dispatch_task_id = uuid4()
     run = ProducerRun.objects.create(
         actor=request.user,

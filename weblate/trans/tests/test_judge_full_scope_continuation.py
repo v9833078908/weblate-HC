@@ -12,7 +12,8 @@ from django.test import override_settings
 from django.utils import timezone
 
 from weblate.trans import autotranslate
-from weblate.trans.autotranslate import BatchAutoTranslate
+from weblate.trans.autotranslate import BatchAutoTranslate, PreparationScope
+from weblate.trans.judge import JudgeError
 from weblate.trans.models.judge import JudgeRunUnit, ProducerRun
 from weblate.trans.models.unit import Unit
 from weblate.trans.tasks import (
@@ -75,7 +76,12 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
             "dispatch_task_id": uuid4(),
             "dispatch_phase": "judge-project",
             "dispatch_requested_at": timezone.now(),
-            "preparation_snapshot": {"missing": []},
+            "preparation_snapshot": PreparationScope(
+                unit_ids=tuple(u.pk for u in self.units),
+                missing_ids=(),
+                per_language_missing={},
+                mt_engine=None,
+            ).to_json(),
             "preparation_phase": "ready",
             "status": ProducerRun.Status.QUEUED,
             "execution_options": {
@@ -287,6 +293,54 @@ class JudgeFullScopeContinuationTest(ViewTestCase):
             run.refresh_from_db()
             self.assertEqual(run.status, ProducerRun.Status.CANCELLED)
             mock_pub.assert_not_called()
+
+    def test_invalid_preparation_snapshot_fails_a_later_chunk(self) -> None:
+        """A continuation must not rebuild and reopen a closed scope it cannot read."""
+        task_id = str(uuid4())
+        invalid_snapshot = {"version": 1}
+        run = self._make_run(
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            dispatch_phase="",
+            status=ProducerRun.Status.RUNNING,
+            scope_cursor=2,
+            dispatch_task_id=task_id,
+            task_id=task_id,
+            preparation_snapshot=invalid_snapshot,
+        )
+        with (
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.autotranslate.AutoTranslate.perform") as perform,
+            patch(
+                "weblate.trans.autotranslate.BatchAutoTranslate.build_preparation_scope"
+            ) as build_scope,
+        ):
+            mock_task.request.id = task_id
+            batch = BatchAutoTranslate(
+                self.component,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            with self.assertRaises(JudgeError):
+                batch.perform(
+                    auto_source="mt",
+                    engines=[],
+                    threshold=80,
+                    source_component_ids=None,
+                )
+
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIn("invalid preparation snapshot", run.failure)
+        self.assertEqual(run.preparation_snapshot, invalid_snapshot)
+        self.assertEqual(run.preparation_phase, "ready")
+        build_scope.assert_not_called()
+        perform.assert_not_called()
 
     def test_provider_error_leaves_run_running_for_version_1(self) -> None:
         task_id = str(uuid4())

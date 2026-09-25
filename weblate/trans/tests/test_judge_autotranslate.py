@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.db import IntegrityError
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 
 from weblate.trans.actions import ActionEvents
 from weblate.trans.autotranslate import (
@@ -39,6 +39,48 @@ from weblate.utils.state import (
     STATE_FUZZY,
     STATE_TRANSLATED,
 )
+
+
+class PreparationScopeSnapshotTest(SimpleTestCase):
+    def test_valid_snapshot_round_trip(self) -> None:
+        for scope in (
+            PreparationScope(
+                unit_ids=(1, 2, 3),
+                missing_ids=(1, 3),
+                per_language_missing={"fr": 2},
+                mt_engine="openrouter",
+            ),
+            PreparationScope(
+                unit_ids=(1,),
+                missing_ids=(),
+                per_language_missing={},
+                mt_engine=None,
+            ),
+        ):
+            with self.subTest(scope=scope):
+                self.assertEqual(PreparationScope.from_json(scope.to_json()), scope)
+
+    def test_rejects_invalid_snapshot_semantics(self) -> None:
+        valid = PreparationScope(
+            unit_ids=(1, 2),
+            missing_ids=(1,),
+            per_language_missing={"fr": 1},
+            mt_engine="openrouter",
+        ).to_json()
+        invalid_changes = {
+            "out-of-scope missing": {"missing_ids": [3]},
+            "boolean id": {"unit_ids": [True, 2]},
+            "negative id": {"unit_ids": [-1, 2]},
+            "duplicate id": {"unit_ids": [1, 1]},
+            "inconsistent count": {"per_language_missing": {"fr": 2}},
+            "boolean count": {"per_language_missing": {"fr": True}},
+            "empty language": {"per_language_missing": {"": 1}},
+            "boolean version": {"version": True},
+            "empty engine": {"mt_engine": ""},
+        }
+        for case, changes in invalid_changes.items():
+            with self.subTest(case=case), self.assertRaises(ValueError):
+                PreparationScope.from_json({**valid, **changes})
 
 
 @override_settings(
@@ -2129,6 +2171,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             execution_version=1,
             scope_cursor=0,
             scope_snapshot=[unit.pk],
+            execution_options={"auto_source": "mt", "judge_proposal_only": True},
             preparation_snapshot=PreparationScope(
                 unit_ids=(unit.pk,),
                 missing_ids=(unit.pk,),

@@ -14,10 +14,14 @@ from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
 
 from weblate.auth.models import Group
 from weblate.checks.models import CHECKS
 from weblate.trans.models import (
+    JudgeRunUnit,
+    JudgeVerdict,
+    ProducerRun,
     RepeatBulkItem,
     RepeatBulkRun,
     RepeatDecisionEvent,
@@ -26,11 +30,13 @@ from weblate.trans.models import (
     RepeatRecommendationResult,
     RepeatRecommendationRun,
 )
+from weblate.trans.models.judge import compute_target_hash
 from weblate.trans.repeat_bulk import (
     process_apply_items,
     process_next_apply_item,
     process_undo_items,
 )
+from weblate.trans.repeat_judge import REPEAT_JUDGE_QUERY
 from weblate.trans.repeat_recommendations import (
     build_group_context,
     context_fingerprint,
@@ -40,6 +46,7 @@ from weblate.trans.repeat_recommendations import (
 )
 from weblate.trans.repeats import fingerprint, get_or_create_group, save_policy
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.util import join_plural
 from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_APPROVED, STATE_TRANSLATED
 
@@ -58,6 +65,22 @@ class RepeatQueueViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Repeat queue")
         self.assertContains(response, "No active repeat rule exists")
+
+    def test_queue_without_policy_skips_the_judge_panel(self) -> None:
+        with patch("weblate.trans.views.repeats._judge_panel") as judge_panel:
+            response = self.client.get(
+                reverse(
+                    "repeat-queue",
+                    kwargs={"project": self.project.slug, "language": "cs"},
+                )
+                + "?status=open&judge=ready"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        judge_panel.assert_not_called()
+        self.assertIsNone(response.context["judge_panel"])
+        self.assertIsNone(response.context["judge_filter"])
+        self.assertNotIn("judge=", response.context["query_string"])
 
     def add_repeat(self, source: str, targets: list[str], start: int = 1000):
         translation = self.component.translation_set.get(language_code="cs")
@@ -1493,3 +1516,546 @@ class RepeatBulkViewsTest(ViewTestCase):
             response, "1 current recommendation is ready to review and apply."
         )
         self.assertLessEqual(len(capture.captured_queries), 60)
+
+    def make_judge_run(self, **fields) -> ProducerRun:
+        project_language = self.project.project_languages[self.translation.language]
+        values = {
+            "actor": self.user,
+            "scope_type": ProducerRun.ScopeType.PROJECT,
+            "scope_id": str(self.project.pk),
+            "scope_label": str(project_language),
+            "scope_path": project_language.get_absolute_url(),
+            "requested_query": REPEAT_JUDGE_QUERY,
+            "requested_mode": "judge",
+            "execution_options": {"judge_proposal_only": True},
+            "cap": 3,
+            "status": ProducerRun.Status.RUNNING,
+        }
+        values.update(fields)
+        return ProducerRun.objects.create(**values)
+
+    def make_judge_verdict(
+        self,
+        unit,
+        severity=JudgeVerdict.Severity.NONE,
+        *,
+        back_translation="",
+        description="Wrong meaning",
+    ):
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="repeat-context",
+            judge_model="vendor/model-a",
+            seat=1,
+            unparsed=False,
+            max_severity=severity,
+            back_translation=back_translation,
+            errors=(
+                [
+                    {
+                        "severity": severity,
+                        "category": "mistranslation",
+                        "description": description,
+                    }
+                ]
+                if severity
+                in {
+                    JudgeVerdict.Severity.MAJOR,
+                    JudgeVerdict.Severity.CRITICAL,
+                }
+                else []
+            ),
+        )
+
+    def test_queue_cards_show_judge_evidence_and_preselect_only_ready_variant(
+        self,
+    ) -> None:
+        ready_group, ready = self.make_group(
+            "Judge checked ready", ["Recommandé", "À éviter"], start=26320
+        )
+        flagged_group, flagged = self.make_group(
+            "Judge checked flagged",
+            ["<b>x</b><script>y</script>", "<color=#FF0000>"],
+            start=26330,
+        )
+        _passed_group, passed = self.make_group(
+            "Judge checked passed", ["Pass one", "Pass two"], start=26335
+        )
+        unchecked_group, _ = self.make_group(
+            "Judge unchecked", ["One", "Two"], start=26340
+        )
+        self.make_judge_verdict(ready[0], back_translation="The checked translation")
+        self.make_judge_verdict(
+            ready[1], JudgeVerdict.Severity.MAJOR, description="Wrong source meaning"
+        )
+        self.make_judge_verdict(
+            flagged[0], JudgeVerdict.Severity.MAJOR, description="Other reason"
+        )
+        self.make_judge_verdict(
+            flagged[1],
+            JudgeVerdict.Severity.CRITICAL,
+            description="<color=#FF0000>",
+        )
+        for unit in passed:
+            self.make_judge_verdict(
+                unit,
+                back_translation=(
+                    "<b>x</b><script>y</script>" if unit == passed[0] else ""
+                ),
+            )
+        self.make_recommendation(
+            self.make_recommendation_run(), ready_group, ready, target=["À éviter"]
+        )
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            flagged_group,
+            flagged,
+            target=["<b>x</b><script>y</script>"],
+        )
+
+        response = self.client.get(self.queue_url)
+
+        self.assertContains(response, "Recommended: checked by the judge")
+        self.assertContains(
+            response,
+            "The judge checked this translation in one of its places. Look through the preview before confirming.",
+        )
+        self.assertContains(response, "The checked translation")
+        self.assertContains(
+            response,
+            "Back-translation: &lt;b&gt;x&lt;/b&gt;&lt;script&gt;y&lt;/script&gt;",
+        )
+        self.assertContains(response, "Checked by the judge")
+        self.assertContains(response, "The judge found an error")
+        self.assertContains(response, "&lt;color=#FF0000&gt;")
+        self.assertNotContains(response, "<script>y</script>")
+
+        rendered_groups = {
+            item["group"].pk: item for item in response.context["groups"]
+        }
+        ready_item = rendered_groups[ready_group.pk]
+        self.assertEqual(ready_item["variants"][0]["target"], ("Recommandé",))
+        self.assertTrue(ready_item["preselect"])
+        ready_card = (
+            response.content.decode()
+            .split(f'id="g-{ready_group.pk}"', 1)[1]
+            .split("</li>", 1)[0]
+        )
+        self.assertRegex(
+            ready_card,
+            r'name="target"\s+value="Recommandé"\s+data-choice="variant"\s+checked',
+        )
+        self.assertRegex(ready_card, r'aria-disabled="false"')
+        self.assertIn("Recommended: Recommandé", ready_card)
+        self.assertNotRegex(
+            ready_card,
+            r'name="target"\s+value="À éviter"\s+data-choice="variant"\s+checked',
+        )
+        flagged_item = rendered_groups[flagged_group.pk]
+        self.assertFalse(flagged_item["preselect"])
+        flagged_card = (
+            response.content.decode()
+            .split(f'id="g-{flagged_group.pk}"', 1)[1]
+            .split("</li>", 1)[0]
+        )
+        self.assertNotRegex(flagged_card, r'(?s)<input[^>]*\schecked(?:="checked")?')
+        self.assertNotIn("Recommended: ", flagged_card)
+        unchecked_item = rendered_groups[unchecked_group.pk]
+        self.assertFalse(unchecked_item["preselect"])
+
+    def test_queue_plural_ready_group_is_not_preselected(self) -> None:
+        source = join_plural(["Gate", "Gates"])
+        units = []
+        for position, forms in enumerate(
+            (["Brána", "Brány", "Bran"], ["Vrata", "Vrat", "Vrat"]), start=27300
+        ):
+            context = f"plural-gate-{position}"
+            source_unit = self.component.source_translation.unit_set.create(
+                id_hash=calculate_hash(source, context),
+                position=position,
+                context=context,
+                source=source,
+                target=source,
+                state=STATE_TRANSLATED,
+            )
+            units.append(
+                self.translation.unit_set.create(
+                    id_hash=calculate_hash(source, context),
+                    position=position,
+                    source_unit=source_unit,
+                    context=context,
+                    source=source,
+                    target=join_plural(forms),
+                    state=STATE_TRANSLATED,
+                )
+            )
+        group = get_or_create_group(self.policy, units[0])
+        self.make_judge_verdict(units[0])
+        self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+
+        response = self.client.get(self.queue_url)
+
+        item = next(
+            item for item in response.context["groups"] if item["group"] == group
+        )
+        self.assertEqual(item["judge"].bucket, "ready")
+        self.assertEqual(
+            item["judge"].recommended, tuple(units[0].get_target_plurals())
+        )
+        self.assertGreater(len(item["judge"].recommended), 1)
+        self.assertFalse(item["preselect"])
+        card = (
+            response.content.decode()
+            .split(f'id="g-{group.pk}"', 1)[1]
+            .split("</li>", 1)[0]
+        )
+        self.assertNotRegex(card, r'(?s)<input[^>]*\schecked(?:="checked")?')
+        self.assertNotIn("Recommended: ", card)
+
+    def test_queue_judge_launch_url_and_no_paid_recommendation_link(self) -> None:
+        self.make_group("Judge start", ["One", "Two"], start=26000)
+        project_language = self.project.project_languages[self.translation.language]
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch(
+                "weblate.trans.views.repeats.judge_configuration_ready",
+                return_value=True,
+            ),
+        ):
+            response = self.client.get(self.queue_url)
+
+        self.assertEqual(response.context["judge_panel"]["state"], "start")
+        self.assertTrue(response.context["judge_panel"]["can_launch"])
+        self.assertEqual(
+            response.context["judge_panel"]["launch_url"],
+            f"{project_language.get_absolute_url()}?mode=judge&q=check%3Arepeat-drift"
+            "&judge_proposal_only=1&overwrite_existing="
+            f"&next=%2Frepeats%2F{self.project.slug}%2Fcs%2F#auto",
+        )
+        self.assertContains(
+            response, escape(response.context["judge_panel"]["launch_url"])
+        )
+        self.assertNotContains(
+            response,
+            reverse(
+                "repeat-recommend",
+                kwargs={"project": self.project.slug, "language": "cs"},
+            ),
+        )
+
+    def test_queue_judge_running_uses_coverage_not_recorded(self) -> None:
+        self.make_group("Judge progress", ["One", "Two"], start=26100)
+        run = self.make_judge_run(execution_version=1)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            override_settings(JUDGE_ENABLED=True),
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch.object(
+                ProducerRun,
+                "get_coverage",
+                return_value={"total": 1022, "pending": 602},
+            ),
+        ):
+            response = self.client.get(self.queue_url)
+
+        self.assertEqual(response.context["judge_panel"]["state"], "running")
+        self.assertContains(response, "Checked 420 of 1022 places")
+        self.assertTrue(response.context["judge_panel"]["can_view_run"])
+        self.assertContains(response, run.get_absolute_url())
+
+        with patch.object(
+            ProducerRun, "get_coverage", return_value={"total": 1, "pending": 1}
+        ):
+            response = self.client.get(self.queue_url)
+        self.assertContains(response, "Checked 0 of 1 place.")
+
+    def test_queue_hides_running_report_without_report_permission(self) -> None:
+        self.make_group("Hidden report", ["One", "Two"], start=26110)
+        run = self.make_judge_run(execution_version=1)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+        for denied in ("translation.auto", "unit.review"):
+            with self.subTest(denied=denied):
+
+                def has_perm(user, perm, obj=None, *, denied_permission=denied):
+                    return perm != denied_permission and original_has_perm(
+                        user, perm, obj
+                    )
+
+                with (
+                    override_settings(JUDGE_ENABLED=True),
+                    patch.object(
+                        user_class, "has_perm", autospec=True, side_effect=has_perm
+                    ),
+                ):
+                    response = self.client.get(self.queue_url)
+                self.assertEqual(response.context["judge_panel"]["state"], "running")
+                self.assertFalse(response.context["judge_panel"]["can_view_run"])
+                self.assertNotContains(response, run.get_absolute_url())
+        with override_settings(JUDGE_ENABLED=False):
+            response = self.client.get(self.queue_url)
+        self.assertFalse(response.context["judge_panel"]["can_view_run"])
+        self.assertNotContains(response, run.get_absolute_url())
+
+    def test_queue_shows_report_when_launch_configuration_unavailable(self) -> None:
+        self.make_group("Report without launch", ["One", "Two"], start=26120)
+        run = self.make_judge_run(execution_version=1)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            override_settings(JUDGE_ENABLED=True),
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch(
+                "weblate.trans.views.repeats.judge_configuration_ready",
+                return_value=False,
+            ),
+        ):
+            response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["state"], "running")
+        self.assertFalse(response.context["judge_panel"]["can_launch"])
+        self.assertTrue(response.context["judge_panel"]["can_view_run"])
+        self.assertContains(response, run.get_absolute_url())
+
+    def test_queue_reserved_pending_rows_are_not_counted_as_checked(self) -> None:
+        _, units = self.make_group(
+            "Reserved places", ["One", "Two", "Three"], start=26150
+        )
+        run = self.make_judge_run(
+            scope_snapshot=[unit.pk for unit in units], execution_version=1
+        )
+        for unit in units:
+            JudgeRunUnit.objects.create(
+                run=run,
+                unit=unit,
+                unit_id_snapshot=unit.pk,
+                translation_id=unit.translation_id,
+                component_id=self.component.pk,
+                project_id=self.project.pk,
+                input_target=unit.get_target_plurals(),
+                input_target_hash=compute_target_hash(unit.get_target_plurals()),
+                context_hash="repeat-context",
+                outcome=JudgeRunUnit.Outcome.PENDING,
+            )
+
+        response = self.client.get(self.queue_url)
+        self.assertContains(response, "Checked 0 of 3 places")
+        self.assertEqual(response.context["judge_panel"]["checked"], 0)
+
+    def test_queue_ignores_non_proposal_run_and_reports_stopped_run(self) -> None:
+        self.make_group("Judge status", ["One", "Two"], start=26200)
+        self.make_judge_run(execution_options={"judge_proposal_only": False})
+        response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["state"], "start")
+        run = self.make_judge_run(status=ProducerRun.Status.FAILED)
+        response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["run"], run)
+        self.assertEqual(response.context["judge_panel"]["state"], "start")
+        self.assertContains(response, "The last check stopped before it finished.")
+
+    def test_queue_stopped_run_with_verdicts_is_ready(self) -> None:
+        _, units = self.make_group("Stopped with verdicts", ["One", "Two"], start=26250)
+        self.make_judge_verdict(units[0])
+        self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+        for status in (
+            ProducerRun.Status.FAILED,
+            ProducerRun.Status.CANCELLED,
+            ProducerRun.Status.PARTIAL,
+        ):
+            with self.subTest(status=status):
+                self.make_judge_run(status=status)
+                response = self.client.get(self.queue_url)
+                self.assertEqual(response.context["judge_panel"]["state"], "ready")
+                self.assertTrue(response.context["judge_panel"]["stopped"])
+                self.assertContains(
+                    response, "The last check stopped before it finished."
+                )
+
+    def test_queue_latest_run_requires_exact_scope_path_id_and_query(self) -> None:
+        self.make_group("Exact run", ["One", "Two"], start=26280)
+        matching = self.make_judge_run(status=ProducerRun.Status.COMPLETED)
+        self.make_judge_run(scope_id="other")
+        self.make_judge_run(scope_path="/other/language/")
+        self.make_judge_run(requested_query="check:other")
+
+        response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["run"], matching)
+        self.assertEqual(response.context["judge_panel"]["state"], "start")
+
+    def test_queue_judge_filter_ignores_unknown_value(self) -> None:
+        self.make_group("Judge filter", ["One", "Two"], start=26300)
+        response = self.client.get(self.queue_url + "?status=open&judge=unchecked")
+        self.assertEqual(response.context["total_count"], 1)
+        self.assertEqual(response.context["judge_panel"]["buckets"]["unchecked"], 1)
+        response = self.client.get(self.queue_url + "?status=open&judge=unknown")
+        self.assertEqual(response.context["total_count"], 1)
+
+    def test_queue_judge_buckets_and_ready_filter(self) -> None:
+        _, ready = self.make_group("Ready bucket", ["R1", "R2"], start=26400)
+        _, choose = self.make_group("Choose bucket", ["C1", "C2"], start=26500)
+        _, rewrite = self.make_group("Rewrite bucket", ["W1", "W2"], start=26600)
+        self.make_group("Unchecked bucket", ["U1", "U2"], start=26700)
+        self.make_judge_verdict(ready[0])
+        self.make_judge_verdict(ready[1], JudgeVerdict.Severity.MAJOR)
+        for unit in choose:
+            self.make_judge_verdict(unit)
+        for unit in rewrite:
+            self.make_judge_verdict(unit, JudgeVerdict.Severity.MAJOR)
+
+        response = self.client.get(self.queue_url)
+        self.assertEqual(
+            response.context["judge_panel"]["buckets"],
+            {"ready": 1, "choose": 1, "rewrite": 1, "unchecked": 1},
+        )
+        self.assertEqual(response.context["judge_panel"]["state"], "ready")
+        self.assertNotContains(response, "judge-bulk-review")
+        response = self.client.get(self.queue_url + "?status=open&judge=ready")
+        self.assertEqual(response.context["total_count"], 1)
+        self.assertEqual(
+            response.context["groups"][0]["group"].source_forms, ["Ready bucket"]
+        )
+
+    def test_queue_unchecked_places_inside_check_offer_relaunch(self) -> None:
+        _, units = self.make_group("Remaining places", ["One", "Two"], start=26800)
+        _, ready_units = self.make_group("Ready places", ["Yes", "No"], start=26850)
+        self.project.check_flags = "repeat-drift"
+        self.project.save(update_fields=["check_flags"])
+        CHECKS["repeat-drift"].perform_batch(self.component)
+        self.make_judge_verdict(units[0])
+        self.make_judge_verdict(ready_units[0])
+        self.make_judge_verdict(ready_units[1], JudgeVerdict.Severity.MAJOR)
+
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch(
+                "weblate.trans.views.repeats.judge_configuration_ready",
+                return_value=True,
+            ),
+        ):
+            response = self.client.get(self.queue_url)
+
+        panel = response.context["judge_panel"]
+        self.assertEqual(panel["state"], "ready")
+        self.assertTrue(panel["can_launch"])
+        self.assertEqual(panel["buckets"]["ready"], 1)
+        self.assertEqual(panel["buckets"]["unchecked"], 1)
+        self.assertEqual(panel["relaunch_places"], 1)
+        self.assertEqual(panel["outside_places"], 0)
+        self.assertContains(response, "Check the remaining places")
+        self.assertContains(response, escape(panel["launch_url"]), count=2)
+
+    def test_queue_ignored_place_is_outside_check_and_counts_differ(self) -> None:
+        _, units = self.make_group(
+            "Excluded place", ["One", "Two", "Three"], start=26900
+        )
+        units[2].extra_flags = "ignore-repeat-drift"
+        units[2].save(update_fields=["extra_flags"])
+        self.project.check_flags = "repeat-drift"
+        self.project.save(update_fields=["check_flags"])
+        CHECKS["repeat-drift"].perform_batch(self.component)
+        self.make_judge_verdict(units[0])
+        self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+
+        response = self.client.get(self.queue_url)
+        panel = response.context["judge_panel"]
+        self.assertEqual(panel["places"], 2)
+        self.assertEqual(panel["queue_places"], 3)
+        self.assertEqual(panel["relaunch_places"], 0)
+        self.assertEqual(panel["outside_places"], 1)
+        self.assertContains(response, "The open queue contains 3 places.")
+        self.assertContains(
+            response,
+            "1 place is outside the repeat check; the judge does not check it.",
+        )
+        self.assertNotContains(response, "Check the remaining places")
+
+    def test_queue_launch_requires_both_permissions_and_judge_configuration(
+        self,
+    ) -> None:
+        self.make_group("Launch permissions", ["One", "Two"], start=27000)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+        for denied in ("unit.review", "translation.auto"):
+            with self.subTest(denied=denied):
+
+                def has_perm(user, perm, obj=None, *, denied_permission=denied):
+                    return perm != denied_permission and original_has_perm(
+                        user, perm, obj
+                    )
+
+                with (
+                    patch.object(
+                        user_class, "has_perm", autospec=True, side_effect=has_perm
+                    ),
+                    patch(
+                        "weblate.trans.views.repeats.judge_configuration_ready",
+                        return_value=True,
+                    ),
+                ):
+                    response = self.client.get(self.queue_url)
+                self.assertFalse(response.context["judge_panel"]["can_launch"])
+                self.assertNotContains(response, "Check variants with the judge</a>")
+        with patch(
+            "weblate.trans.views.repeats.judge_configuration_ready", return_value=False
+        ):
+            response = self.client.get(self.queue_url)
+        self.assertFalse(response.context["judge_panel"]["can_launch"])
+        self.assertNotContains(response, "Check variants with the judge</a>")
+
+    def test_queue_judge_query_growth_is_bounded(self) -> None:
+        def judged_group(source: str, start: int) -> None:
+            _, units = self.make_group(source, ["One", "Two"], start=start)
+            self.make_judge_verdict(units[0])
+            self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+
+        def verdict_queries(capture) -> int:
+            return sum(
+                "trans_judgeverdict" in query["sql"]
+                for query in capture.captured_queries
+            )
+
+        judged_group("Cost baseline", 27100)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get(self.queue_url)
+        for index in range(4):
+            judged_group(f"Cost group {index}", 27200 + index * 10)
+        with CaptureQueriesContext(connection) as expanded:
+            response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["buckets"]["ready"], 5)
+        # One active-verdict read serves every group on the page.
+        self.assertEqual(verdict_queries(baseline), 1)
+        self.assertEqual(verdict_queries(expanded), 1)
+        # Existing group rendering has per-group reads; the judge panel must
+        # not add another query for each verdict or place.
+        self.assertLessEqual(
+            len(expanded.captured_queries) - len(baseline.captured_queries), 12
+        )

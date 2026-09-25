@@ -1368,6 +1368,7 @@ class AutoForm(forms.Form):
         max_value=100,
     )
     next = forms.CharField(required=False, widget=forms.HiddenInput)
+    judge_proposal_only = forms.BooleanField(required=False, widget=forms.HiddenInput)
     overwrite_existing = forms.BooleanField(
         label=gettext_lazy("Overwrite the existing translation"),
         required=False,
@@ -1494,19 +1495,59 @@ class AutoForm(forms.Form):
         if self.initial.get("mode") not in allowed_modes:
             self.initial.pop("mode", None)
 
+        self.proposal_only = "judge" in allowed_modes and self._is_proposal_only()
+        self._configure_proposal_only()
+
         self.helper = FormHelper(self)
         self.helper.form_tag = False
-        self.helper.layout = Layout(
-            Field("mode"),
-            SearchField("q"),
-            InlineRadios("auto_source"),
-            Div("component", css_id="auto_source_others"),
-            Div("engines", "threshold", css_id="auto_source_mt"),
-            Field("overwrite_existing"),
+        if self.proposal_only:
+            self.helper.layout = Layout(
+                Field("mode"),
+                SearchField("q"),
+                Field("auto_source"),
+                Field("threshold"),
+                Field("judge_proposal_only"),
+            )
+
+        else:
+            self.helper.layout = Layout(
+                Field("mode"),
+                SearchField("q"),
+                InlineRadios("auto_source"),
+                Div("component", css_id="auto_source_others"),
+                Div("engines", "threshold", css_id="auto_source_mt"),
+                Field("overwrite_existing"),
+                Field("judge_proposal_only"),
+            )
+
+    def _is_proposal_only(self) -> bool:
+        value = (
+            self.data.get("judge_proposal_only")
+            if self.is_bound
+            else self.initial.get("judge_proposal_only")
         )
+        return bool(self.fields["judge_proposal_only"].to_python(value))
+
+    def _configure_proposal_only(self) -> None:
+        if not self.proposal_only:
+            return
+        self.fields["mode"].choices = [("judge", gettext("Judge check"))]
+        self.fields["mode"].widget = forms.HiddenInput()
+        self.fields["mode"].initial = "judge"
+        self.fields["q"].help_text = ""
+        self.fields["auto_source"].widget = forms.HiddenInput()
+        self.fields["auto_source"].initial = "others"
+        self.fields["threshold"].widget = forms.HiddenInput()
+        self.fields["threshold"].initial = MACHINERY_DEFAULT_THRESHOLD
+        self.initial.update(mode="judge", auto_source="others")
 
     def clean(self):
         super().clean()
+        if self.proposal_only and self.cleaned_data.get("overwrite_existing"):
+            self.add_error(
+                "overwrite_existing",
+                gettext("Overwrite is unavailable for a judge check."),
+            )
         if (
             self.cleaned_data.get("auto_source") == "mt"
             and "engines" in self.cleaned_data

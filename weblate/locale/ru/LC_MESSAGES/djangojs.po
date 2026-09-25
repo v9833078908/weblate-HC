@@ -794,3 +794,18 @@ msgstr "Обработано %(done)s из %(total)s"
 
 msgid "The background task failed."
 msgstr "Фоновая задача завершилась с ошибкой."
+
+#: weblate/static/loader-bootstrap.js:1508
+msgid ""
+"%(processed)s matching strings selected for judge evaluation; no strings "
+"will be pretranslated."
+msgstr "Для проверки судьёй выбрано строк: %(processed)s; строки не будут предварительно переведены."
+
+#: weblate/static/loader-bootstrap.js:1557
+#, javascript-format
+msgid "Estimated judge cost for the initial check: %(min)s to %(max)s USD."
+msgstr "Оценка стоимости начальной проверки судьёй: от %(min)s до %(max)s USD."
+
+#: weblate/static/loader-bootstrap.js:1563
+msgid "Estimated judge cost for the initial check is unavailable."
+msgstr "Оценка стоимости начальной проверки судьёй недоступна."

@@ -4,8 +4,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeGuard
 from uuid import uuid4
 
 from celery import current_task
@@ -70,7 +71,7 @@ from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Sequence
 
     from weblate.auth.models import User
     from weblate.auth.results import PermissionResult
@@ -82,6 +83,33 @@ if TYPE_CHECKING:
 # A refusal that outlived the request retries stops the service for everyone, so
 # batches of a run started meanwhile are skipped. Wait for a short stop to pass
 # rather than dropping their strings, but never hold a run for a long one.
+
+
+def _valid_preparation_ids(value: object) -> TypeGuard[list[int]]:
+    return (
+        isinstance(value, list)
+        and all(
+            isinstance(pk, int) and not isinstance(pk, bool) and pk > 0 for pk in value
+        )
+        and len(value) == len(set(value))
+    )
+
+
+def _valid_preparation_counts(
+    value: object, missing_count: int
+) -> TypeGuard[dict[str, int]]:
+    return (
+        isinstance(value, dict)
+        and all(
+            isinstance(language, str)
+            and bool(language.strip())
+            and isinstance(count, int)
+            and not isinstance(count, bool)
+            and count > 0
+            for language, count in value.items()
+        )
+        and sum(value.values()) == missing_count
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,18 +292,31 @@ class PreparationScope:
 
     @staticmethod
     def from_json(payload: Mapping[str, Any]) -> PreparationScope:
+        msg = "Invalid preparation snapshot"
+        version = payload.get("version") if isinstance(payload, Mapping) else None
+        if not isinstance(version, int) or isinstance(version, bool) or version != 1:
+            raise ValueError(msg)
+        unit_ids = payload.get("unit_ids")
+        missing_ids = payload.get("missing_ids")
+        per_language_missing = payload.get("per_language_missing")
+        mt_engine = payload.get("mt_engine")
+        if (
+            not _valid_preparation_ids(unit_ids)
+            or not _valid_preparation_ids(missing_ids)
+            or not set(missing_ids).issubset(unit_ids)
+            or not _valid_preparation_counts(per_language_missing, len(missing_ids))
+            or "mt_engine" not in payload
+            or (
+                mt_engine is not None
+                and (not isinstance(mt_engine, str) or not mt_engine.strip())
+            )
+        ):
+            raise ValueError(msg)
         return PreparationScope(
-            unit_ids=tuple(int(pk) for pk in payload.get("unit_ids", [])),
-            missing_ids=tuple(int(pk) for pk in payload.get("missing_ids", [])),
-            per_language_missing={
-                str(language): int(count)
-                for language, count in payload.get("per_language_missing", {}).items()
-            },
-            mt_engine=(
-                str(engine)
-                if isinstance(engine := payload.get("mt_engine"), str)
-                else None
-            ),
+            unit_ids=tuple(unit_ids),
+            missing_ids=tuple(missing_ids),
+            per_language_missing=dict(per_language_missing),
+            mt_engine=mt_engine,
         )
 
 
@@ -2757,16 +2798,38 @@ class BatchAutoTranslate(BaseAutoTranslate):
         if judge_preview is not None:
             producer_run = self._adopt_producer_run()
             if self.mode == "judge" and producer_run is not None:
-                # Only a producer-dispatched bulk judge run (phase
-                # ``judge-project``) carries the mandatory preparation
-                # contract; a queued run without a snapshot predates it and
-                # must not silently resume with the new MT volume. Older
-                # direct/queued test launches build their scope here.
+                verdict_only = (
+                    producer_run.execution_options.get("judge_skip_preparation") is True
+                    and producer_run.execution_options.get("judge_proposal_only")
+                    is True
+                    and not producer_run.preparation_snapshot
+                )
+                # A project judge run requesting MT must carry its closed
+                # preparation scope. A UI verdict-only run explicitly records
+                # that it judges stored text without preparation.
+                # Older direct/queued launches build their scope here.
+                if producer_run.preparation_snapshot:
+                    try:
+                        preparation_scope = PreparationScope.from_json(
+                            producer_run.preparation_snapshot
+                        )
+                    except (TypeError, ValueError, KeyError):
+                        # Rebuilding would silently reopen the closed scope.
+                        self._finish_producer_run(
+                            producer_run,
+                            ProducerRun.Status.FAILED,
+                            gettext(
+                                "This run has an invalid preparation snapshot "
+                                "and cannot resume. Start a new run."
+                            ),
+                        )
+                        raise JudgeError(producer_run.failure) from None
                 if (
                     self.producer_run_id is not None
-                    and not producer_run.preparation_snapshot
+                    and preparation_scope is None
                     and producer_run.requested_mode == "judge"
                     and producer_run.dispatch_phase == "judge-project"
+                    and not verdict_only
                 ):
                     self._finish_producer_run(
                         producer_run,
@@ -2778,11 +2841,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                         ),
                     )
                     raise JudgeError(producer_run.failure)
-                if producer_run.preparation_snapshot:
-                    preparation_scope = PreparationScope.from_json(
-                        producer_run.preparation_snapshot
-                    )
-                else:
+                if preparation_scope is None and not verdict_only:
                     preparation_scope = self.build_preparation_scope()
                     producer_run.preparation_snapshot = preparation_scope.to_json()
                     producer_run.preparation_phase = "pending"

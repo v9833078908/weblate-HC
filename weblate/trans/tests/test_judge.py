@@ -36,12 +36,15 @@ from weblate.trans.models.judge import (
     JudgeCandidateMetadata,
     JudgeResolutionError,
     JudgeVerdict,
+    active_verdict,
+    active_verdicts,
     compute_context_hash,
     compute_decision_revision,
     compute_target_hash,
     compute_target_storage_hash,
     current_round,
     current_verdict,
+    judge_status_annotations,
     resolve_verdict,
     state_for_verdict,
     verdict_for_severity,
@@ -143,6 +146,124 @@ class JudgeSeverityGateTest(SimpleTestCase):
                 JudgeVerdict.Verdict.UNPARSED, enable_review=True, may_approve=True
             )
         )
+
+
+class ActiveVerdictsTest(ViewTestCase):
+    def make_verdict(self, unit: Unit, **kwargs) -> JudgeVerdict:
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", "c")
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        kwargs.setdefault("unparsed", False)
+        kwargs.setdefault("max_severity", JudgeVerdict.Severity.NONE)
+        return JudgeVerdict.objects.create(unit=unit, **kwargs)
+
+    def assert_batch_matches_single_and_annotation(self, units: list[Unit]) -> None:
+        for consensus in (True, False):
+            with (
+                self.subTest(consensus=consensus),
+                override_settings(JUDGE_CONSENSUS_REJECT=consensus),
+            ):
+                with self.assertNumQueries(1):
+                    batched = active_verdicts(units)
+                self.assertEqual(set(batched), {unit.pk for unit in units})
+                annotated = {
+                    unit.pk: unit.judge_active_severity
+                    for unit in Unit.objects.filter(
+                        pk__in=[unit.pk for unit in units]
+                    ).annotate(**judge_status_annotations())
+                }
+                for unit in units:
+                    single = active_verdict(unit)
+                    batch = batched[unit.pk]
+                    self.assertEqual(
+                        getattr(batch, "pk", None), getattr(single, "pk", None)
+                    )
+                    self.assertEqual(
+                        getattr(batch, "verdict", None),
+                        getattr(single, "verdict", None),
+                    )
+                    self.assertEqual(
+                        getattr(batch, "effective_severity", None),
+                        annotated[unit.pk],
+                    )
+                    if batch is not None:
+                        with self.assertNumQueries(0):
+                            _ = (
+                                batch.errors,
+                                batch.back_translation,
+                                batch.primary_error,
+                            )
+
+    def test_matches_active_verdict_per_unit_in_one_query(self) -> None:
+        Unit.objects.create(
+            translation=self.get_translation(),
+            id_hash=5000,
+            source="batch candidate source",
+            target="batch candidate target",
+            state=STATE_TRANSLATED,
+            position=5000,
+        )
+        units = list(
+            self.get_translation()
+            .unit_set.select_related("translation__component", "translation__plural")
+            .order_by("pk")[:5]
+        )
+        self.assertEqual(len(units), 5)
+        passed, flagged, one_seat, stale, candidate_only = units
+        passed.target = "batch passed target"
+        passed.save(update_fields=["target"])
+        stale.target = "batch stale target"
+        stale.save(update_fields=["target"])
+
+        self.make_verdict(passed, seat=1, back_translation="passed evidence")
+        self.make_verdict(passed, seat=2, max_severity="minor")
+        major = self.make_verdict(
+            flagged,
+            seat=1,
+            max_severity="major",
+            errors=[{"severity": "major", "description": "Wrong meaning"}],
+        )
+        self.make_verdict(flagged, seat=1, unparsed=True)
+        self.make_verdict(one_seat, seat=1)
+        self.make_verdict(one_seat, seat=2, unparsed=True)
+        # This hash is current for another unit, but stale for this unit.
+        self.make_verdict(
+            stale,
+            target_hash=compute_target_hash(passed.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(passed.target),
+        )
+        self.make_verdict(candidate_only, subject=JudgeVerdict.Subject.CANDIDATE)
+
+        self.assert_batch_matches_single_and_annotation(units)
+        self.assertEqual(active_verdicts(units)[flagged.pk].pk, major.pk)
+        self.assertIsNone(active_verdicts(units)[stale.pk])
+        self.assertIsNone(active_verdicts(units)[candidate_only.pk])
+
+    def test_disputed_critical_follows_consensus_setting(self) -> None:
+        unit = (
+            self.get_translation()
+            .unit_set.select_related("translation__component", "translation__plural")
+            .order_by("pk")
+            .first()
+        )
+        self.assertIsNotNone(unit)
+        critical = self.make_verdict(unit, seat=1, max_severity="critical")
+        self.make_verdict(unit, seat=2, max_severity="minor")
+
+        self.assert_batch_matches_single_and_annotation([unit])
+        for consensus, expected_severity, expected_verdict in (
+            (True, "major", JudgeVerdict.Verdict.FLAG),
+            (False, "critical", JudgeVerdict.Verdict.REJECT),
+        ):
+            with override_settings(JUDGE_CONSENSUS_REJECT=consensus):
+                batch = active_verdicts([unit])[unit.pk]
+                self.assertEqual(batch.pk, critical.pk)
+                self.assertEqual(batch.effective_severity, expected_severity)
+                self.assertEqual(batch.verdict, expected_verdict)
 
 
 class ProducerRunIdempotencyTest(ViewTestCase):
@@ -250,6 +371,7 @@ class ProducerRunDispatchTest(ViewTestCase):
         self.component.project.save(update_fields=["translation_review"])
         project = self.component.project
         unit = self.get_unit()
+        unit.translate(self.user, ["Judged target"], STATE_TRANSLATED)
         run = ProducerRun.objects.create(
             actor=self.user,
             dispatch_task_id=uuid.uuid4(),
@@ -263,7 +385,14 @@ class ProducerRunDispatchTest(ViewTestCase):
             cap=10,
             scope_snapshot=[unit.pk],
             configuration_snapshot=judge_configuration_snapshot(),
+            execution_options={
+                "auto_source": "others",
+                "judge_proposal_only": True,
+                "judge_skip_preparation": True,
+            },
         )
+        original_target = unit.target
+        original_state = unit.state
 
         def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             out = {}
@@ -294,6 +423,132 @@ class ProducerRunDispatchTest(ViewTestCase):
         self.assertIsNotNone(run.dispatch_published_at)
         judged_units = run_batch.call_args.args[0]
         self.assertEqual([judged.pk for judged in judged_units], [unit.pk])
+        unit.refresh_from_db()
+        self.assertEqual((unit.target, unit.state), (original_target, original_state))
+        self.assertEqual(run.preparation_snapshot, {})
+        self.assertEqual(run.preparation_phase, "")
+        self.assertFalse(Suggestion.objects.filter(unit=unit).exists())
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_verdict_only_project_judge_with_mt_source_skips_preparation(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        project = self.component.project
+        project.translation_review = True
+        project.save(update_fields=["translation_review"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Judged target"], STATE_TRANSLATED)
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-project",
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(project.pk),
+            scope_label=str(project),
+            scope_path=project.get_absolute_url(),
+            requested_query="",
+            requested_mode="judge",
+            cap=10,
+            scope_snapshot=[unit.pk],
+            configuration_snapshot=judge_configuration_snapshot(),
+            execution_options={
+                "auto_source": "mt",
+                "judge_proposal_only": True,
+                "judge_skip_preparation": True,
+            },
+        )
+        with (
+            patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run_batch,
+            patch(
+                "weblate.trans.autotranslate.BatchAutoTranslate.build_preparation_scope"
+            ) as build_scope,
+        ):
+            self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertTrue(run_batch.called, run.summary)
+        build_scope.assert_not_called()
+        self.assertEqual(run.preparation_snapshot, {})
+        self.assertEqual(run.preparation_phase, "")
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_legacy_project_judge_without_preparation_is_refused(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        project = self.component.project
+        unit = self.get_unit()
+        for options in ({}, {"auto_source": "mt", "judge_proposal_only": True}):
+            with self.subTest(options=options):
+                run = ProducerRun.objects.create(
+                    actor=self.user,
+                    dispatch_task_id=uuid.uuid4(),
+                    dispatch_phase="judge-project",
+                    scope_type=ProducerRun.ScopeType.PROJECT,
+                    scope_id=str(project.pk),
+                    scope_label=str(project),
+                    scope_path=project.get_absolute_url(),
+                    requested_query="",
+                    requested_mode="judge",
+                    cap=10,
+                    scope_snapshot=[unit.pk],
+                    configuration_snapshot=judge_configuration_snapshot(),
+                    execution_options=options,
+                )
+                with patch("weblate.trans.autotranslate.run_judge_batch") as run_batch:
+                    self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+                run.refresh_from_db()
+                self.assertEqual(run.status, ProducerRun.Status.FAILED)
+                self.assertIn("queued before", run.failure)
+                run_batch.assert_not_called()
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_project_judge_with_incomplete_preparation_snapshot_is_refused(
+        self,
+    ) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        project = self.component.project
+        unit = self.get_unit()
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-project",
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(project.pk),
+            scope_label=str(project),
+            scope_path=project.get_absolute_url(),
+            requested_query="",
+            requested_mode="judge",
+            cap=10,
+            scope_snapshot=[unit.pk],
+            configuration_snapshot=judge_configuration_snapshot(),
+            execution_options={"auto_source": "mt", "judge_proposal_only": True},
+            preparation_snapshot={"version": 1},
+            preparation_phase="pending",
+        )
+        with patch("weblate.trans.autotranslate.run_judge_batch") as run_batch:
+            self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIn("invalid preparation snapshot", run.failure)
+        run_batch.assert_not_called()
 
 
 class JudgePrimaryErrorTest(SimpleTestCase):

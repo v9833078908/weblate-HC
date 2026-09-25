@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -31,7 +32,7 @@ from django.db.models import (
 from django.db.models.functions import MD5
 from django.utils import timezone
 from django.utils.html import escape
-from django.utils.translation import gettext, gettext_lazy
+from django.utils.translation import gettext, gettext_lazy, pgettext_lazy
 
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models.unit import Unit
@@ -53,6 +54,21 @@ JUDGE_REPAIR_REQUIREMENT = (
     "Fix all listed errors while preserving the remaining meaning, placeholders, and "
     "markup."
 )
+
+# The judge prompt's fixed error vocabulary (weblate/trans/judge.py
+# CATEGORIES), shown capitalized in the run report and repeat queue.
+JUDGE_CATEGORY_LABELS = {
+    "terminology": gettext_lazy("Terminology"),
+    "mistranslation": gettext_lazy("Mistranslation"),
+    "omission": gettext_lazy("Omission"),
+    "addition": gettext_lazy("Addition"),
+    "fluency": gettext_lazy("Fluency"),
+    "punctuation": gettext_lazy("Punctuation"),
+    "markup": gettext_lazy("Markup"),
+    # A plain "Register" already means the sign-up verb elsewhere in this
+    # project's translations; this is the linguistic register/tone sense.
+    "register": pgettext_lazy("Judge error category", "Register"),
+}
 
 # These are deliberately limited to request-shape and resolved-profile data.
 # In particular, do not add request text, response text, credentials, or full
@@ -1362,6 +1378,48 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
 def active_verdict(unit: Unit) -> JudgeVerdict | None:
     """Return the collegium verdict that still describes the stored text."""
     return collegium_verdict(active_round(unit))
+
+
+def active_verdicts(units: Sequence[Unit]) -> dict[int, JudgeVerdict | None]:
+    """Return ``active_verdict`` for many units with one query."""
+    target_hashes = {
+        unit.pk: compute_target_hash(unit.get_target_plurals()) for unit in units
+    }
+    if not target_hashes:
+        return {}
+
+    newest: dict[tuple[int, int], JudgeVerdict] = {}
+    rows = (
+        JudgeVerdict.objects.filter(
+            unit_id__in=target_hashes,
+            target_hash__in=set(target_hashes.values()),
+            subject=JudgeVerdict.Subject.LIVE,
+            unparsed=False,
+        )
+        .only(
+            "id",
+            "unit",
+            "seat",
+            "max_severity",
+            "unparsed",
+            "errors",
+            "back_translation",
+            "target_hash",
+            "timestamp",
+        )
+        .order_by("unit_id", "seat", "-timestamp", "-pk")
+    )
+    for row in rows:
+        # A hash may be current for one unit and stale for another.
+        if row.target_hash == target_hashes[row.unit_id]:
+            newest.setdefault((row.unit_id, row.seat), row)
+
+    rounds: dict[int, list[JudgeVerdict]] = defaultdict(list)
+    for (unit_id, _seat), row in sorted(newest.items()):
+        rounds[unit_id].append(row)
+    return {
+        unit_id: collegium_verdict(rounds.get(unit_id, [])) for unit_id in target_hashes
+    }
 
 
 def has_complete_current_evidence(unit: Unit, *, seats: Sequence[int]) -> bool:

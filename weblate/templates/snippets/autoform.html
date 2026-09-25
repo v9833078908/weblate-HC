@@ -11,11 +11,17 @@
     <div class="card-header">
       <h4 class="card-title">
         {% documentation_icon 'user/translating' 'auto-translation' right=True %}
-        {% translate "Automatic translation" %}
+        {% if autoform.proposal_only %}
+          {% translate "Judge check" %}
+        {% else %}
+          {% translate "Automatic translation" %}
+        {% endif %}
       </h4>
     </div>
     <div class="card-body">
-      {% if workspace and object == workspace %}
+      {% if autoform.proposal_only %}
+        <p>{% translate "The judge checks the matching strings and records verdicts. String states are not changed and no replacement translations are generated." %}</p>
+      {% elif workspace and object == workspace %}
         <p>
           {% translate "Automatic translation takes existing translations in this workspace and applies them to matching strings." %}
         </p>
@@ -40,16 +46,22 @@
         </p>
         {% if judge_request_estimate is not None %}
           <p class="text-muted" id="id_auto_request_estimate">
-            {% blocktranslate with requests=judge_request_estimate trimmed %}
-              A judge run plans up to {{ requests }} LLM requests (batches × judges × rounds); a refused batch is retried once. Empty strings additionally cost machine translation.
-            {% endblocktranslate %}
+            {% if autoform.proposal_only %}
+              {% blocktranslate with requests=judge_request_estimate trimmed %}
+                A judge check plans up to {{ requests }} LLM requests (batches × judges × rounds); a refused batch is retried once.
+              {% endblocktranslate %}
+            {% else %}
+              {% blocktranslate with requests=judge_request_estimate trimmed %}
+                A judge run plans up to {{ requests }} LLM requests (batches × judges × rounds); a refused batch is retried once. Empty strings additionally cost machine translation.
+              {% endblocktranslate %}
+            {% endif %}
           </p>
         {% endif %}
         <p class="text-muted" id="id_auto_duration_estimate">
           {% translate "A judge run holds an automatic translation slot for tens of minutes per few hundred strings, so other projects may wait." %}
         </p>
       {% endif %}
-      {% if judge_verdicts_exist %}
+      {% if judge_verdicts_exist and not autoform.proposal_only %}
         <div class="alert alert-warning" role="alert" id="judge-verdicts-exist">
           {% translate "This translation already has judge verdicts. Running translate or approved modes with a broad filter will overwrite judge-approved strings." %}
         </div>
@@ -64,7 +76,7 @@
     <div class="card-footer">
       <input id="id_auto_apply"
              type="submit"
-             value="{% translate "Apply" %}"
+             value="{% if autoform.proposal_only %}{% translate "Run judge check" %}{% else %}{% translate "Apply" %}{% endif %}"
              class="btn btn-primary" />
     </div>
   </div>
