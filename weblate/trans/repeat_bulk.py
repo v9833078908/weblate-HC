@@ -24,7 +24,7 @@ from weblate.trans.models import (
     RepeatGroup,
     RepeatRecommendationResult,
 )
-from weblate.trans.repeat_judge import READY, UNCHECKED, judge_groups
+from weblate.trans.repeat_judge import READY, judge_groups
 from weblate.trans.repeat_recommendations import (
     build_group_context,
     context_fingerprint,
@@ -128,7 +128,10 @@ def _attention(
     picked = judgement.variants.get(target)
     if picked is not None and picked.mark == "flagged":
         return ATTENTION_FLAGGED
-    if picked is None or picked.mark == "unchecked" or judgement.bucket == UNCHECKED:
+    if picked is None or any(
+        variant.mark == "unchecked" for variant in judgement.variants.values()
+    ):
+        # A partly checked group is never ready, whatever it picks (D9).
         return ATTENTION_UNCHECKED
     if any(unit.state == STATE_APPROVED for unit in units):
         return ATTENTION_APPROVED

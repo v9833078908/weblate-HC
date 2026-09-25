@@ -61,6 +61,11 @@ from weblate.trans.repeat_bulk import (
 )
 from weblate.trans.repeat_judge import (
     CHOOSE,
+    PICK_KEEP,
+    PICK_MODEL,
+    PICK_MOST_PASSED,
+    PICK_NEW_TEXT,
+    PICK_ONLY_PASSED,
     READY,
     REPEAT_JUDGE_QUERY,
     REWRITE,
@@ -224,10 +229,16 @@ def _judge_panel(request, obj, target_language, groups, policy, current):
         )
         recommended = item["judge"].recommended
         single_form = len(item["variants"][0]["target"]) == 1
-        # Every group preselects its best available choice (D17).
+        # Every group preselects its best available choice (D17); only a
+        # variant the judge passed is marked as recommended.
         item["preselect"] = recommended is not None and single_form
-        item["preselect_keep"] = item["judge"].rule == 3 and single_form
-        item["preselect_custom"] = item["judge"].rule == 5 and single_form
+        item["recommend"] = item["preselect"] and item["judge"].pick in {
+            PICK_MODEL,
+            PICK_ONLY_PASSED,
+            PICK_MOST_PASSED,
+        }
+        item["preselect_keep"] = item["judge"].pick == PICK_KEEP and single_form
+        item["preselect_custom"] = item["judge"].pick == PICK_NEW_TEXT and single_form
         if recommended is not None:
             item["variants"].sort(
                 key=lambda variant, target=recommended: variant["target"] != target

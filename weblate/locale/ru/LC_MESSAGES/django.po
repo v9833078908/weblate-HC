@@ -33221,12 +33221,8 @@ msgid "Ready to apply"
 msgstr "Готово к применению"
 
 #: weblate/templates/repeat_bulk_review.html
-msgid ""
-"The queue shows these groups as ready: the judge passed the recommended "
-"translation. They are selected."
-msgstr ""
-"В очереди эти группы отмечены как готовые: судья одобрил рекомендуемый "
-"перевод. Они уже выбраны."
+msgid "The judge passed these translations. They are selected."
+msgstr "Судья одобрил эти переводы. Они уже выбраны."
 
 #: weblate/templates/repeat_bulk_review.html
 #: weblate/templates/repeat_bulk_review_row.html
@@ -33325,10 +33321,6 @@ msgstr "Судья и модель расходятся во мнении о л�
 #: weblate/trans/views/repeats.py
 msgid "Excluded by the model"
 msgstr "Исключено моделью"
-
-#: weblate/templates/snippets/repeat_group.html
-msgid "The judge found an error in every translation, so none is preselected. Enter a new translation."
-msgstr "Судья нашёл ошибку в каждом переводе, поэтому ни один не выбран заранее. Введите новый перевод."
 
 #: weblate/trans/views/repeats.py
 msgid "The judge passed only this variant."

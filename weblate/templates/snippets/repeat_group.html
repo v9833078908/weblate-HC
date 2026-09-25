@@ -17,7 +17,7 @@
         <span class="badge text-bg-success">{% translate "Resolved" %}</span>
       {% elif item.status == 'consistent' %}
         <span class="badge text-bg-light">{% translate "Same translation" %}</span>
-      {% elif item.preselect and item.judge.bucket == 'ready' %}
+      {% elif item.recommend %}
         <span class="badge text-bg-success">{% blocktranslate with target=item.judge.recommended.0 %}Recommended: {{ target }}{% endblocktranslate %}</span>
       {% else %}
         <span class="badge text-bg-secondary">{% translate "Different translations" %}</span>
@@ -46,11 +46,8 @@
       <fieldset>
         <legend>{% translate "What to do with this group?" %}</legend>
         {% if not item.all_approved %}
-          {% if item.recommendation and not item.recommendation.target and item.recommendation.rationale %}
+          {% if item.recommendation.rationale and not item.recommendation.target or item.recommendation.rationale and item.preselect_custom %}
             <p class="text-muted">{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</p>
-          {% endif %}
-          {% if item.judge.rule == 7 %}
-            <p class="text-muted">{% translate "The judge found an error in every translation, so none is preselected. Enter a new translation." %}</p>
           {% endif %}
           {% if item.recommendation and item.recommendation.target and not item.model_on_variant and not item.preselect_custom %}
             <label class="rq-option form-check rq-recommendation">
@@ -72,7 +69,7 @@
                      data-choice="variant"
                      {% if item.preselect and variant.target == item.judge.recommended %}checked{% endif %} />
               <span class="form-check-label"><code>{{ variant.target.0 }}</code> — {% blocktranslate count counter=variant.units|length %}used in {{ counter }} place{% plural %}used in {{ counter }} places{% endblocktranslate %}
-                {% if item.preselect and variant.target == item.judge.recommended %}
+                {% if item.recommend and variant.target == item.judge.recommended %}
                   <span class="badge text-bg-success">{% translate "Recommended" %}</span>
                 {% elif variant.judge.mark == 'flagged' %}
                   <span class="badge text-bg-warning">{% translate "The judge found an error" %}</span>
@@ -94,7 +91,6 @@
                    data-choice="custom"
                    {% if item.preselect_custom %}checked{% endif %} />
             <span class="form-check-label">{% translate "Enter a new translation for every place" %}</span>
-            {% if item.preselect_custom and item.recommendation.rationale %}<span class="d-block text-muted">{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
           </label>
           <input class="form-control rq-custom"
                  name="custom_target"
