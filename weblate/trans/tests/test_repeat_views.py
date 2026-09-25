@@ -14,10 +14,12 @@ from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
 
 from weblate.auth.models import Group
 from weblate.checks.models import CHECKS
 from weblate.trans.models import (
+    JudgeRunUnit,
     JudgeVerdict,
     ProducerRun,
     RepeatBulkItem,
@@ -34,7 +36,7 @@ from weblate.trans.repeat_bulk import (
     process_next_apply_item,
     process_undo_items,
 )
-from weblate.trans.repeat_judge import REPEAT_JUDGE_QUERY, judge_launch_url
+from weblate.trans.repeat_judge import REPEAT_JUDGE_QUERY
 from weblate.trans.repeat_recommendations import (
     build_group_context,
     context_fingerprint,
@@ -1545,8 +1547,14 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertEqual(response.context["judge_panel"]["state"], "start")
         self.assertEqual(
             response.context["judge_panel"]["launch_url"],
-            judge_launch_url(project_language, self.queue_url),
+            f"{project_language.get_absolute_url()}?mode=judge&q=check%3Arepeat-drift"
+            "&judge_proposal_only=1&overwrite_existing="
+            f"&next=%2Frepeats%2F{self.project.slug}%2Fcs%2F#auto",
         )
+        if response.context["judge_panel"]["can_launch"]:
+            self.assertContains(
+                response, escape(response.context["judge_panel"]["launch_url"])
+            )
         self.assertNotContains(
             response,
             reverse(
@@ -1567,6 +1575,31 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertContains(response, "Checked 420 of 1022 places")
         self.assertContains(response, run.get_absolute_url())
 
+    def test_queue_reserved_pending_rows_are_not_counted_as_checked(self) -> None:
+        _, units = self.make_group(
+            "Reserved places", ["One", "Two", "Three"], start=26150
+        )
+        run = self.make_judge_run(
+            scope_snapshot=[unit.pk for unit in units], execution_version=1
+        )
+        for unit in units:
+            JudgeRunUnit.objects.create(
+                run=run,
+                unit=unit,
+                unit_id_snapshot=unit.pk,
+                translation_id=unit.translation_id,
+                component_id=self.component.pk,
+                project_id=self.project.pk,
+                input_target=unit.get_target_plurals(),
+                input_target_hash=compute_target_hash(unit.get_target_plurals()),
+                context_hash="repeat-context",
+                outcome=JudgeRunUnit.Outcome.PENDING,
+            )
+
+        response = self.client.get(self.queue_url)
+        self.assertContains(response, "Checked 0 of 3 places")
+        self.assertEqual(response.context["judge_panel"]["checked"], 0)
+
     def test_queue_ignores_non_proposal_run_and_reports_stopped_run(self) -> None:
         self.make_group("Judge status", ["One", "Two"], start=26200)
         self.make_judge_run(execution_options={"judge_proposal_only": False})
@@ -1576,6 +1609,35 @@ class RepeatBulkViewsTest(ViewTestCase):
         response = self.client.get(self.queue_url)
         self.assertEqual(response.context["judge_panel"]["run"], run)
         self.assertContains(response, "The last check stopped before it finished.")
+
+    def test_queue_stopped_run_with_verdicts_is_ready(self) -> None:
+        _, units = self.make_group("Stopped with verdicts", ["One", "Two"], start=26250)
+        self.make_judge_verdict(units[0])
+        self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+        for status in (
+            ProducerRun.Status.FAILED,
+            ProducerRun.Status.CANCELLED,
+            ProducerRun.Status.PARTIAL,
+        ):
+            with self.subTest(status=status):
+                self.make_judge_run(status=status)
+                response = self.client.get(self.queue_url)
+                self.assertEqual(response.context["judge_panel"]["state"], "ready")
+                self.assertTrue(response.context["judge_panel"]["stopped"])
+                self.assertContains(
+                    response, "The last check stopped before it finished."
+                )
+
+    def test_queue_latest_run_requires_exact_scope_path_id_and_query(self) -> None:
+        self.make_group("Exact run", ["One", "Two"], start=26280)
+        matching = self.make_judge_run(status=ProducerRun.Status.COMPLETED)
+        self.make_judge_run(scope_id="other")
+        self.make_judge_run(scope_path="/other/language/")
+        self.make_judge_run(requested_query="check:other")
+
+        response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["run"], matching)
+        self.assertEqual(response.context["judge_panel"]["state"], "start")
 
     def test_queue_judge_filter_ignores_unknown_value(self) -> None:
         self.make_group("Judge filter", ["One", "Two"], start=26300)
@@ -1608,4 +1670,93 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertEqual(response.context["total_count"], 1)
         self.assertEqual(
             response.context["groups"][0]["group"].source_forms, ["Ready bucket"]
+        )
+
+    def test_queue_unchecked_places_inside_check_offer_relaunch(self) -> None:
+        _, units = self.make_group("Remaining places", ["One", "Two"], start=26800)
+        self.project.check_flags = "repeat-drift"
+        self.project.save(update_fields=["check_flags"])
+        CHECKS["repeat-drift"].perform_batch(self.component)
+        self.make_judge_verdict(units[0])
+
+        response = self.client.get(self.queue_url)
+        panel = response.context["judge_panel"]
+        self.assertEqual(panel["relaunch_places"], 1)
+        self.assertEqual(panel["outside_places"], 0)
+        if panel["can_launch"]:
+            self.assertContains(response, "Check the remaining places")
+
+    def test_queue_ignored_place_is_outside_check_and_counts_differ(self) -> None:
+        _, units = self.make_group(
+            "Excluded place", ["One", "Two", "Three"], start=26900
+        )
+        units[2].extra_flags = "ignore-repeat-drift"
+        units[2].save(update_fields=["extra_flags"])
+        self.project.check_flags = "repeat-drift"
+        self.project.save(update_fields=["check_flags"])
+        CHECKS["repeat-drift"].perform_batch(self.component)
+        self.make_judge_verdict(units[0])
+        self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+
+        response = self.client.get(self.queue_url)
+        panel = response.context["judge_panel"]
+        self.assertEqual(panel["places"], 2)
+        self.assertEqual(panel["queue_places"], 3)
+        self.assertEqual(panel["relaunch_places"], 0)
+        self.assertEqual(panel["outside_places"], 1)
+        self.assertContains(response, "The open queue contains 3 places.")
+        self.assertContains(
+            response,
+            "1 place is outside the repeat check; the judge does not check it.",
+        )
+        self.assertNotContains(response, "Check the remaining places")
+
+    def test_queue_launch_requires_both_permissions_and_judge_configuration(
+        self,
+    ) -> None:
+        self.make_group("Launch permissions", ["One", "Two"], start=27000)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+        for denied in ("unit.review", "translation.auto"):
+            with self.subTest(denied=denied):
+
+                def has_perm(user, perm, obj=None, *, denied_permission=denied):
+                    return perm != denied_permission and original_has_perm(
+                        user, perm, obj
+                    )
+
+                with (
+                    patch.object(
+                        user_class, "has_perm", autospec=True, side_effect=has_perm
+                    ),
+                    patch(
+                        "weblate.trans.views.repeats.judge_configuration_ready",
+                        return_value=True,
+                    ),
+                ):
+                    response = self.client.get(self.queue_url)
+                self.assertFalse(response.context["judge_panel"]["can_launch"])
+                self.assertNotContains(response, "Check variants with the judge</a>")
+        with patch(
+            "weblate.trans.views.repeats.judge_configuration_ready", return_value=False
+        ):
+            response = self.client.get(self.queue_url)
+        self.assertFalse(response.context["judge_panel"]["can_launch"])
+        self.assertNotContains(response, "Check variants with the judge</a>")
+
+    def test_queue_judge_query_growth_is_bounded(self) -> None:
+        self.make_group("Cost baseline", ["One", "Two"], start=27100)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get(self.queue_url)
+        for index in range(4):
+            self.make_group(
+                f"Cost group {index}", ["One", "Two"], start=27200 + index * 10
+            )
+        with CaptureQueriesContext(connection) as expanded:
+            response = self.client.get(self.queue_url)
+        self.assertEqual(response.context["judge_panel"]["buckets"]["unchecked"], 5)
+        # Existing group rendering has per-group reads; the judge panel must
+        # not add another query for each verdict or place.
+        self.assertLessEqual(
+            len(expanded.captured_queries) - len(baseline.captured_queries), 12
         )
