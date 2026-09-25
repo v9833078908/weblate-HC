@@ -18,47 +18,12 @@
     <h1>
       <code>{{ source_text }}</code>
     </h1>
-    <div class="rq-places-detail">
-      <p>
-        {% translate "Recommended translation:" %} <code lang="{{ language.code }}">{{ target_text }}</code>
-      </p>
-      <div class="table-scroll"
-           role="region"
-           tabindex="0"
-           aria-label="{% translate 'Places in this group' %}">
-        <table class="table table-sm">
-          <thead>
-            <tr>
-              <th scope="col">{% translate "Key" %}</th>
-              <th scope="col">{% translate "Component" %}</th>
-              <th scope="col">{% translate "Current translation" %}</th>
-              <th scope="col">{% translate "Will change" %}</th>
-              <th scope="col">{% translate "Reason" %}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for member in members %}
-              <tr>
-                <td>
-                  <a href="{{ member.url }}"><code>{{ member.key }}</code></a>
-                </td>
-                <td>{{ member.component }}</td>
-                <td>
-                  <code lang="{{ language.code }}">{{ member.current_target }}</code>
-                </td>
-                <td>
-                  {% if member.will_change %}
-                    {% translate "Yes" %}
-                  {% else %}
-                    {% translate "No" %}
-                  {% endif %}
-                </td>
-                <td>{{ member.reason_label }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <p>
+      {% translate "Recommended translation:" %} <code lang="{{ language.code }}">{{ target_text }}</code>
+    </p>
+    <div class="table-scroll"
+         role="region"
+         tabindex="0"
+         aria-label="{% translate 'Places in this group' %}">{% include "repeat_bulk_places_detail.html" %}</div>
   </main>
 {% endblock content %}

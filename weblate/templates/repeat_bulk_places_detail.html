@@ -1,0 +1,39 @@
+{% load i18n %}
+
+<div class="rq-places-detail">
+  <table class="table table-sm">
+    <caption class="visually-hidden">{% translate "Places in this group" %}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{% translate "Key" %}</th>
+        <th scope="col">{% translate "Component" %}</th>
+        <th scope="col">{% translate "Current translation" %}</th>
+        <th scope="col">{% translate "After applying" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in members %}
+        <tr>
+          <td>
+            <a href="{{ member.url }}"><code>{{ member.key }}</code></a>
+          </td>
+          <td>{{ member.component }}</td>
+          <td>
+            <code lang="{{ language.code }}">{{ member.current_target }}</code>
+          </td>
+          <td>
+            {% if member.will_change %}
+              <code lang="{{ language.code }}">{{ target_text }}</code>
+            {% else %}
+              {% translate "No change" %}
+              <span class="d-block text-muted">{{ member.reason_label }}</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if remaining %}
+    <a href="{{ places_url }}">{% blocktranslate with count=remaining %}Show the remaining {{ count }}{% endblocktranslate %}</a>
+  {% endif %}
+</div>

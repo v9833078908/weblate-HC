@@ -77,12 +77,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Per-place detail is loaded only when a row is opened.
+  // Per-place detail is loaded only when a row is opened, and shown in a row
+  // of its own under the group so it gets the full table width.
   for (const details of form.querySelectorAll(".rq-places")) {
     details.addEventListener("toggle", async () => {
+      const row = details.closest("tr");
+      let detail = row.nextElementSibling;
+      if (!detail?.classList.contains("rq-places-row")) {
+        if (!details.open) return;
+        detail = document.createElement("tr");
+        detail.className = "rq-places-row";
+        detail.insertCell();
+        const cell = detail.insertCell();
+        cell.colSpan = row.cells.length - 1;
+        // The body keeps the id the summary's aria-controls points to.
+        cell.append(details.querySelector(".rq-places-body"));
+        row.after(detail);
+      }
+      detail.hidden = !details.open;
       if (!details.open || details.dataset.loaded) return;
       details.dataset.loaded = "1";
-      const body = details.querySelector(".rq-places-body");
+      const body = detail.querySelector(".rq-places-body");
       const fallback = body.querySelector("a");
       body.setAttribute("aria-busy", "true");
       try {

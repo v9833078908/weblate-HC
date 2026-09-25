@@ -18,12 +18,12 @@
     {% if row.action == "propose_new" %}<span class="d-block text-muted small">{{ row.action_label }}</span>{% endif %}
   </td>
   <td>
-    <details class="rq-places" data-url="{{ row.places_url }}">
-      <summary>
+    <details class="rq-places" data-url="{{ row.places_url }}?inline=1">
+      <summary aria-controls="places-{{ row.result_id }}">
         {% blocktranslate count counter=row.writable %}{{ counter }} place changes{% plural %}{{ counter }} places change{% endblocktranslate %}
         <span class="d-block text-muted">{% blocktranslate count counter=row.places %}of {{ counter }} place{% plural %}of {{ counter }} places{% endblocktranslate %}</span>
       </summary>
-      <div class="rq-places-body">
+      <div class="rq-places-body" id="places-{{ row.result_id }}">
         <a href="{{ row.places_url }}">{% translate "Show every place" %}</a>
       </div>
     </details>

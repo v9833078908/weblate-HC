@@ -908,6 +908,9 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertContains(response, "of 4 places")
         # Per-place detail is not rendered until it is asked for.
         self.assertContains(response, self.places_url(result))
+        self.assertContains(response, f'data-url="{self.places_url(result)}?inline=1"')
+        self.assertContains(response, f'aria-controls="places-{result.pk}"')
+        self.assertContains(response, f'id="places-{result.pk}"')
         self.assertNotContains(response, "A shared sword name-1000")
         self.assertNotContains(response, "<code>Oddest</code>")
 
@@ -921,6 +924,43 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertContains(places, "Approved, not changed")
         self.assertContains(places, "Already translated this way")
         self.assertContains(places, "Excluded by the model")
+        self.assertEqual(RepeatDecisionEvent.objects.count(), 0)
+
+    def test_places_inline_fragment_lists_changes_first_and_links_the_rest(
+        self,
+    ) -> None:
+        group, units = self.make_group(
+            "An inline sword name", ["Shared", "Old", "Older", "Oldest"], start=1600
+        )
+        result = self.make_recommendation(
+            self.make_recommendation_run(), group, units, target=["Shared"]
+        )
+        url = self.places_url(result)
+
+        with patch("weblate.trans.views.repeats.INLINE_PLACES", 2):
+            inline = self.client.get(url, {"inline": "1"})
+
+        self.assertEqual(inline.status_code, 200)
+        self.assertTemplateNotUsed(inline, "base.html")
+        # Places that change come first; the rest link to the full list.
+        self.assertEqual(
+            [member["key"] for member in inline.context["members"]],
+            [units[1].context, units[2].context],
+        )
+        self.assertContains(inline, 'class="rq-places-detail"')
+        self.assertContains(inline, '<code lang="cs">Shared</code>', html=True)
+        self.assertContains(inline, f'<a href="{url}">Show the remaining 2</a>')
+        self.assertNotContains(inline, units[0].context)
+
+        full = self.client.get(url)
+
+        self.assertTemplateUsed(full, "base.html")
+        self.assertEqual(
+            [member["key"] for member in full.context["members"]],
+            [unit.context for unit in (units[1], units[2], units[3], units[0])],
+        )
+        self.assertContains(full, "No change")
+        self.assertNotContains(full, "Show the remaining")
         self.assertEqual(RepeatDecisionEvent.objects.count(), 0)
 
     def test_places_refuse_manual_results_and_other_policies(self) -> None:

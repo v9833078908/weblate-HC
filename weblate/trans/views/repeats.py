@@ -90,6 +90,8 @@ from weblate.trans.views.judge import user_can_view_producer_run
 
 # Review rows shown at once; every page stays inside the one apply form.
 REVIEW_PAGE_SIZE = 50
+# Places shown when a review row is expanded; the rest link to the full list.
+INLINE_PLACES = 10
 
 
 def _selected_ids(request, name: str) -> set[int]:
@@ -1021,6 +1023,21 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
                 ),
             }
         )
+    members.sort(key=lambda member: not member["will_change"])
+    target_text = _forms_text(result.target)
+    if request.GET.get("inline"):
+        # The review page expands a row with this fragment, not the full page.
+        return render(
+            request,
+            "repeat_bulk_places_detail.html",
+            {
+                "language": policy.target_language,
+                "target_text": target_text,
+                "members": members[:INLINE_PLACES],
+                "remaining": max(len(members) - INLINE_PLACES, 0),
+                "places_url": request.path,
+            },
+        )
     return render(
         request,
         "repeat_bulk_places.html",
@@ -1028,7 +1045,7 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
             "project": policy.project,
             "language": policy.target_language,
             "source_text": _forms_text(result.group.source_forms),
-            "target_text": _forms_text(result.target),
+            "target_text": target_text,
             "members": members,
             "review_url": reverse(
                 "repeat-bulk-review", kwargs={"project": project, "language": language}

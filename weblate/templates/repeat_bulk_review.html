@@ -57,7 +57,7 @@
             {% translate "The queue shows these groups as ready: the judge passed the variant the model picked. They are selected." %}
           </p>
           {% if ready_rows %}
-            <div class="table-scroll">
+            <div class="table-scroll" role="region" tabindex="0" aria-labelledby="bulk-ready">
               <table class="table table-sm rq-bulk-table" data-page-size="{{ page_size }}">
                 <thead>
                   <tr>
@@ -99,7 +99,10 @@
               <summary>
                 {% blocktranslate count counter=attention_rows|length %}Show {{ counter }} group{% plural %}Show {{ counter }} groups{% endblocktranslate %}
               </summary>
-              <div class="table-scroll">
+              <div class="table-scroll"
+                   role="region"
+                   tabindex="0"
+                   aria-labelledby="bulk-attention">
                 <table class="table table-sm rq-bulk-table">
                   <thead>
                     <tr>
@@ -136,14 +139,16 @@
           <summary>
             {% blocktranslate count counter=needs_human|length %}Show {{ counter }} group{% plural %}Show {{ counter }} groups{% endblocktranslate %}
           </summary>
-          <ul>
+          <ul class="rq-decisions">
             {% for item in needs_human %}
               <li>
                 <code>{{ item.source_text }}</code>
-                {% if item.rationale %}<span class="text-muted">{% blocktranslate with reason=item.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
-                {% translate "Places:" %}
-                {% for unit in item.units %}<a href="{{ unit.url }}"><code>{{ unit.key }}</code></a>{% if not forloop.last %}, {% endif %}{% endfor %}
-                <a href="{{ item.group_url }}">{% translate "Open the group in the queue" %}</a>
+                {% if item.rationale %}<span class="d-block text-muted">{% blocktranslate with reason=item.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
+                <span class="d-block">
+                  {% translate "Places:" %}
+                  {% for unit in item.units %}<a href="{{ unit.url }}"><code>{{ unit.key }}</code></a>{% if not forloop.last %}, {% endif %}{% endfor %}
+                  <a class="ms-3" href="{{ item.group_url }}">{% translate "Open the group in the queue" %}</a>
+                </span>
               </li>
             {% endfor %}
           </ul>
@@ -159,14 +164,16 @@
           <summary>
             {% blocktranslate count counter=independent|length %}Show {{ counter }} group{% plural %}Show {{ counter }} groups{% endblocktranslate %}
           </summary>
-          <ul>
+          <ul class="rq-decisions">
             {% for item in independent %}
               <li>
                 <code>{{ item.source_text }}</code>
-                {% if item.rationale %}<span class="text-muted">{% blocktranslate with reason=item.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
-                {% translate "Places:" %}
-                {% for unit in item.units %}<a href="{{ unit.url }}"><code>{{ unit.key }}</code></a>{% if not forloop.last %}, {% endif %}{% endfor %}
-                <a href="{{ item.group_url }}">{% translate "Open the group in the queue" %}</a>
+                {% if item.rationale %}<span class="d-block text-muted">{% blocktranslate with reason=item.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
+                <span class="d-block">
+                  {% translate "Places:" %}
+                  {% for unit in item.units %}<a href="{{ unit.url }}"><code>{{ unit.key }}</code></a>{% if not forloop.last %}, {% endif %}{% endfor %}
+                  <a class="ms-3" href="{{ item.group_url }}">{% translate "Open the group in the queue" %}</a>
+                </span>
               </li>
             {% endfor %}
           </ul>
