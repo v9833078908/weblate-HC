@@ -51,8 +51,8 @@ Weblate UI remains the primary surface today.
   `docs/product/plans/2026-09-24-repeat-queue-producer-ux.md`).
 - **Nothing is written without preview**: approved targets are never overwritten.
   The repeat queue preselects the best available choice for every single-form
-  group (D17: a passed variant first, never a flagged one); a preselected
-  choice still goes through preview and confirmation. Every
+  group (D17), never a variant the LLM judge flagged; a preselected choice
+  still goes through preview and confirmation. Every
   mass write is preceded by an explicit confirmation screen
   (`docs/product/plans/2026-09-24-repeat-queue-producer-ux.md`).
 - **Permissions are the existing ones** (`project.edit`, `unit.edit`,
