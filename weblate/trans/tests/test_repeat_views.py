@@ -46,6 +46,7 @@ from weblate.trans.repeat_recommendations import (
 )
 from weblate.trans.repeats import fingerprint, get_or_create_group, save_policy
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.util import join_plural
 from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_APPROVED, STATE_TRANSLATED
 
@@ -1646,6 +1647,7 @@ class RepeatBulkViewsTest(ViewTestCase):
             r'name="target"\s+value="Recommandé"\s+data-choice="variant"\s+checked',
         )
         self.assertRegex(ready_card, r'aria-disabled="false"')
+        self.assertIn("Recommended: Recommandé", ready_card)
         self.assertNotRegex(
             ready_card,
             r'name="target"\s+value="À éviter"\s+data-choice="variant"\s+checked',
@@ -1658,8 +1660,58 @@ class RepeatBulkViewsTest(ViewTestCase):
             .split("</li>", 1)[0]
         )
         self.assertNotRegex(flagged_card, r'(?s)<input[^>]*\schecked(?:="checked")?')
+        self.assertNotIn("Recommended: ", flagged_card)
         unchecked_item = rendered_groups[unchecked_group.pk]
         self.assertFalse(unchecked_item["preselect"])
+
+    def test_queue_plural_ready_group_is_not_preselected(self) -> None:
+        source = join_plural(["Gate", "Gates"])
+        units = []
+        for position, forms in enumerate(
+            (["Brána", "Brány", "Bran"], ["Vrata", "Vrat", "Vrat"]), start=27300
+        ):
+            context = f"plural-gate-{position}"
+            source_unit = self.component.source_translation.unit_set.create(
+                id_hash=calculate_hash(source, context),
+                position=position,
+                context=context,
+                source=source,
+                target=source,
+                state=STATE_TRANSLATED,
+            )
+            units.append(
+                self.translation.unit_set.create(
+                    id_hash=calculate_hash(source, context),
+                    position=position,
+                    source_unit=source_unit,
+                    context=context,
+                    source=source,
+                    target=join_plural(forms),
+                    state=STATE_TRANSLATED,
+                )
+            )
+        group = get_or_create_group(self.policy, units[0])
+        self.make_judge_verdict(units[0])
+        self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+
+        response = self.client.get(self.queue_url)
+
+        item = next(
+            item for item in response.context["groups"] if item["group"] == group
+        )
+        self.assertEqual(item["judge"].bucket, "ready")
+        self.assertEqual(
+            item["judge"].recommended, tuple(units[0].get_target_plurals())
+        )
+        self.assertGreater(len(item["judge"].recommended), 1)
+        self.assertFalse(item["preselect"])
+        card = (
+            response.content.decode()
+            .split(f'id="g-{group.pk}"', 1)[1]
+            .split("</li>", 1)[0]
+        )
+        self.assertNotRegex(card, r'(?s)<input[^>]*\schecked(?:="checked")?')
+        self.assertNotIn("Recommended: ", card)
 
     def test_queue_judge_launch_url_and_no_paid_recommendation_link(self) -> None:
         self.make_group("Judge start", ["One", "Two"], start=26000)
@@ -1974,16 +2026,28 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertNotContains(response, "Check variants with the judge</a>")
 
     def test_queue_judge_query_growth_is_bounded(self) -> None:
-        self.make_group("Cost baseline", ["One", "Two"], start=27100)
+        def judged_group(source: str, start: int) -> None:
+            _, units = self.make_group(source, ["One", "Two"], start=start)
+            self.make_judge_verdict(units[0])
+            self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+
+        def verdict_queries(capture) -> int:
+            return sum(
+                "trans_judgeverdict" in query["sql"]
+                for query in capture.captured_queries
+            )
+
+        judged_group("Cost baseline", 27100)
         with CaptureQueriesContext(connection) as baseline:
             self.client.get(self.queue_url)
         for index in range(4):
-            self.make_group(
-                f"Cost group {index}", ["One", "Two"], start=27200 + index * 10
-            )
+            judged_group(f"Cost group {index}", 27200 + index * 10)
         with CaptureQueriesContext(connection) as expanded:
             response = self.client.get(self.queue_url)
-        self.assertEqual(response.context["judge_panel"]["buckets"]["unchecked"], 5)
+        self.assertEqual(response.context["judge_panel"]["buckets"]["ready"], 5)
+        # One active-verdict read serves every group on the page.
+        self.assertEqual(verdict_queries(baseline), 1)
+        self.assertEqual(verdict_queries(expanded), 1)
         # Existing group rendering has per-group reads; the judge panel must
         # not add another query for each verdict or place.
         self.assertLessEqual(
