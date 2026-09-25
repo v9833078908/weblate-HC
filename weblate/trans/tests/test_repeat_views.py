@@ -1779,6 +1779,12 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertTrue(response.context["judge_panel"]["can_view_run"])
         self.assertContains(response, run.get_absolute_url())
 
+        with patch.object(
+            ProducerRun, "get_coverage", return_value={"total": 1, "pending": 1}
+        ):
+            response = self.client.get(self.queue_url)
+        self.assertContains(response, "Checked 0 of 1 place.")
+
     def test_queue_hides_running_report_without_report_permission(self) -> None:
         self.make_group("Hidden report", ["One", "Two"], start=26110)
         run = self.make_judge_run(execution_version=1)

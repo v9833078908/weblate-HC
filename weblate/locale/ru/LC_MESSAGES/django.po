@@ -32980,8 +32980,12 @@ msgid "The judge is checking variants"
 msgstr "Судья проверяет варианты"
 
 #: weblate/templates/repeat_queue.html:137
-msgid "Checked %(checked)s of %(total)s places"
-msgstr "Проверка мест: %(checked)s из %(total)s"
+#, python-format
+msgid "Checked %(checked)s of %(total)s place"
+msgid_plural "Checked %(checked)s of %(total)s places"
+msgstr[0] "Проверено %(checked)s из %(total)s места"
+msgstr[1] "Проверено %(checked)s из %(total)s мест"
+msgstr[2] "Проверено %(checked)s из %(total)s мест"
 
 #: weblate/templates/repeat_queue.html:139
 msgid "View judge run"

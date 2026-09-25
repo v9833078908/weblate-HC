@@ -134,7 +134,7 @@
       <section class="alert alert-info" aria-label="{% translate 'Judge check for repeats' %}">
         {% if judge_panel.state == 'running' %}
           <h2 class="h5">{% translate "The judge is checking variants" %}</h2>
-          <p>{% blocktranslate with checked=judge_panel.checked total=judge_panel.total %}Checked {{ checked }} of {{ total }} places{% endblocktranslate %}.</p>
+          <p>{% blocktranslate with checked=judge_panel.checked count total=judge_panel.total %}Checked {{ checked }} of {{ total }} place{% plural %}Checked {{ checked }} of {{ total }} places{% endblocktranslate %}.</p>
           {% if judge_panel.can_view_run %}
             <a href="{{ judge_panel.run.get_absolute_url }}">{% translate "View judge run" %}</a>
           {% endif %}
