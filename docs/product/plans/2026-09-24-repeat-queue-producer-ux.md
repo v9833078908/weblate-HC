@@ -5,13 +5,14 @@
 Date: 2026-09-24, rewritten in full on 2026-09-25, engineering review folded
 in on 2026-09-25.
 Status: **phase 1 (Tasks 1-7) complete on 2026-09-25, including the code
-review fixes recorded under Results, apart from the paid judge run and the
-25-ready-group precision gate, which await explicit owner approval. Phase 2 has
-not started.**
+review fixes recorded under Results. The paid judge run on anvil-saga / fr
+ran on 2026-09-25 (383 open groups: 25 ready, 351 choose, 7 rewrite). Phase 2
+(Tasks 8-10) is superseded by phase 2b (Tasks 11-15, D13-D16), approved by the
+owner on 2026-09-25; phase 2b is in progress. The 25-ready-group precision
+gate still stands before the owner uses bulk apply (D16).**
 This version replaces the 2026-09-24 text (judge preselection only, bulk apply
 out of scope). Editing this plan does not authorize deploying it or starting a
-paid judge run. Phase 2 (Tasks 8-10) starts only after the phase 1 gate in
-Task 7.
+paid judge run or a paid comparison.
 
 **Goal:** A producer who cannot read the target language clears most of a
 repeat queue (anvil-saga / fr: 383 diverging groups, 1022 places) by letting
@@ -70,7 +71,11 @@ such groups are applied in bulk after one review table.
 | D9 | Every variant of a group must be checked before the group can be `ready` (review Q1, answer A). | One passed variant next to an unchecked one is `unchecked`, not `ready`: an unchecked variant could also pass, which would make the group "choose yourself". |
 | D10 | The queue's judge run records verdicts only (review Q2, answer A). | A proposal-only launch stores `judge_candidate_severities=[]` and skips the machine-translation preparation: no repair candidate is paid for, since this flow never shows one and bulk apply overwrites flagged places. |
 | D11 | A place's verdict is the existing collegium rule, unchanged (review Q3, answer B; the owner revised an earlier answer A on 2026-09-25). | `active_verdict` / `collegium_verdict` (`weblate/trans/models/judge.py:1336-1364`): when both seats answered, the strictest wins; when one seat failed in transport, the other seat's parsed verdict stands. No seat-count requirement. The queue must show the same verdict as the editor card; a disagreement between seats is already safe because the strictest wins; the only difference from requiring both seats is a one-seat transport failure, and the phase 1 paid run with its 25-group check shows whether that matters. Tighten later if it does. |
-| D12 | Two phases (review Q4, answer A). | Phase 1 = Tasks 1-7: judgements, panel, card, and a gated paid run with a precision check of at least 25 ready groups. Phase 2 = Tasks 8-10 (bulk apply) starts only if at most one in five is wrong and the owner approves phase 2. |
+| D12 | Two phases (review Q4, answer A). | Phase 1 = Tasks 1-7: judgements, panel, card, and a gated paid run with a precision check of at least 25 ready groups. Phase 2 = Tasks 8-10 (bulk apply) starts only if at most one in five is wrong and the owner approves phase 2. Superseded for phase 2 by D13-D16. |
+| D13 | Auto comparison after the queue's judge run (owner, 2026-09-25). | When a queue judge run reaches `COMPLETED`, one repeat recommendation run (`weblate/trans/repeat_recommendations.py`, prompt `weblate/trans/prompts/repeat_recommendation.txt`) is enqueued for the open groups the judge left in `choose` that have no current recommendation. A queue judge run is `requested_mode="judge"`, `ScopeType.PROJECT` with `scope_path` = the project-language URL of an enabled repeat policy, `execution_options.judge_proposal_only` true, and `requested_query` starting with `check:repeat-drift` (a narrowed `check:repeat-drift AND id:...` run counts; `latest_repeat_judge_run` uses the same prefix). Actor = the judge run's actor; profile and endpoint exactly as `repeat_recommend` builds them (`prepare_run`, seat 1, primary endpoint); the request cap equals the number of groups, so no sendable group is left unsent. `PARTIAL`, `FAILED` and `CANCELLED` runs start no comparison: a cancel is an explicit stop of spend, a failure usually means a provider or configuration problem the comparison would repeat, and a partial run leaves groups unchecked; relaunching the check (cached verdicts are free) and letting it complete starts the comparison. The engine's rules still decide what is paid: current results and active reservations are never repurchased, unknown deliveries are never replayed. The outcome is recorded once in `ProducerRun.summary["repeat_comparison"]`, taken under a row lock, so a redelivered completion finds it and starts nothing. A keyless or unconfigured judge, a missing policy, a deleted actor or an actor without `project.edit` (which `prepare_run` requires) records `skipped` with a reason code and raises nothing; the judge run is already final when the comparison task runs. |
+| D14 | Consent: nothing paid without a click (owner, 2026-09-25). | The one "Check variants with the judge" click covers both paid steps. The verdict-only launch form for the queue's scope states that a comparison of variants follows for groups where the judge accepts several variants, and the launch preview shows its planned volume next to the judge estimate: the upper bound of groups (diverging groups of the policy, one query) and requests (groups / `REPEAT_RECOMMENDATION_BATCH_SIZE`, rounded up; the engine's 128 KiB request bound can split a batch of very large groups further). Wording goes through gettext and the Russian catalogs. |
+| D15 | Card and buckets use the comparison (owner, 2026-09-25). | A `choose` group whose current recommendation is `use_existing` with a target equal to a judge-passed variant becomes `ready`: that target is recommended and preselected (single-form groups only, as today) with "Model rationale: ...". `keep_independent` preselects "Different meanings: do not link these places" with the rationale and stays counted in `choose` (no fifth bucket). `propose_new`, `needs_human`, and `use_existing` pointing at a flagged or unchecked variant stay `choose` with the rationale visible and nothing preselected. A group with an approved place stays `choose` even when the model picks a passed variant (D4: an approved place is a human decision the model does not override). The judge-only `ready` rule (exactly one passed variant) is unchanged. The panel shows "Comparing variants: N groups" while a recommendation run of the policy is queued or running (N = sendable groups in its frozen snapshot). |
+| D16 | Bulk apply reuses the recommendation review (owner, 2026-09-25). | The queue's `bulk_ready` banner and `repeat_bulk_review` from `docs/product/plans/2026-09-23-repeat-queue-speed-and-bulk-recommendations.md` accept the comparison's results unchanged (same result model, same engine). Tasks 8-10 are superseded: judge-only `ready` groups (no model result) are decided one by one on the card. The 25-ready-group precision read stays a gate before the owner uses bulk apply. Known limits, not changed here: the review lists every current `use_existing` / `propose_new` result checked by default, including ones the queue keeps in `choose`; and a result for a group whose source also has a needs-editing or empty place is skipped as stale at item time (Out of scope, model path follow-up). |
 
 ## Evidence the design rests on
 
@@ -741,6 +746,9 @@ separately).
 
 ## Phase 2: bulk apply (after the Task 7 gate)
 
+**Superseded on 2026-09-25 by phase 2b (D13-D16); Tasks 8-10 are kept for
+history and are not implemented.**
+
 ### Task 8: bulk apply from judgements
 
 **Files:**
@@ -918,10 +926,165 @@ Verification:
 Commit `docs(repeats): record judge-checked bulk apply` (strings as
 `fix(i18n): translate judge-checked bulk apply` if committed separately).
 
+---
+
+## Phase 2b: judge, then compare (D13-D16, replaces Tasks 8-10)
+
+Why: on anvil-saga / fr after the judge run, 351 of 383 open groups are
+`choose` (the judge passed two or more variants) and 319 of 383 are ties in
+place counts. The per-place question "is this translation wrong?" cannot pick
+between acceptable synonyms; the existing recommendation engine compares all
+variants of a group and answers with a rationale.
+
+No test contacts a provider: `prepare_run` is exercised with
+`resolve_judge_seat_profile`, `judge_primary_endpoint` and `queue_attempt`
+patched as in `weblate/trans/tests/test_repeats.py` (`paying_run`).
+
+### Task 11: request-free queue groups and a scoped recommendation plan
+
+**Files:**
+
+- Modify: `weblate/trans/repeats.py` (new `repeat_queue_groups`)
+- Modify: `weblate/trans/views/repeats.py` (`_queue_groups` delegates, keeps
+  the sort)
+- Modify: `weblate/trans/repeat_recommendations.py` (`plan_recommendations`,
+  `prepare_run`)
+- Test: `weblate/trans/tests/test_repeats.py`
+
+Steps:
+
+- Move `_group_status` and the request-free core of `_queue_groups`
+  (`weblate/trans/views/repeats.py:100-179`) to
+  `repeat_queue_groups(policy, *, user, component_ids=(), label_ids=())` in
+  `weblate/trans/repeats.py`; `_queue_groups(request, policy)` parses the
+  selectors, delegates and sorts as today. The comparison task and the queue
+  then classify the same groups.
+- `plan_recommendations(..., group_ids=None)` and
+  `prepare_run(..., group_ids=None)`: when `group_ids` is given, only those
+  groups are candidates. Every other rule (consistent, resolved, current,
+  active reservation, unknown delivery) still applies inside the scope.
+- Tests: a scoped plan sends only the named groups; a scoped group with a
+  current result is not repurchased; an empty scope reserves nothing; the
+  queue tests stay green after the move.
+
+Commit `refactor(repeats): classify queue groups without a request` and
+`feat(repeats): scope a recommendation plan to chosen groups`.
+
+### Task 12: compare after a completed queue judge run (D13)
+
+**Files:**
+
+- Modify: `weblate/trans/repeat_judge.py` (`is_repeat_judge_run`,
+  `schedule_repeat_comparison`, `compare_after_judge`; prefix match in
+  `latest_repeat_judge_run`)
+- Modify: `weblate/trans/autotranslate.py` (`_finish_producer_run`, the single
+  place a producer run becomes terminal)
+- Modify: `weblate/trans/tasks.py` (`compare_repeat_variants`)
+- Test: `weblate/trans/tests/test_repeat_judge.py`
+
+Steps:
+
+- `_finish_producer_run` calls `schedule_repeat_comparison(run)` after it saves
+  a `COMPLETED` status. The hook publishes `compare_repeat_variants` through
+  `transaction.on_commit`; a publication failure is logged and never reaches
+  the judge run.
+- `compare_after_judge(run_id)` locks the `ProducerRun` row, returns when the
+  run is not a queue judge run, not `COMPLETED`, or already carries
+  `summary["repeat_comparison"]`; otherwise it classifies the policy's open
+  groups with `repeat_queue_groups` and `judge_groups`, takes the `choose`
+  ids and calls `prepare_run(policy=..., actor=run.actor,
+  request_cap=len(ids), group_ids=ids)`. It records
+  `{"status": "queued", "run": <id>, "groups": <sendable>}`,
+  `{"status": "none", "groups": 0}` when nothing is `choose`, or
+  `{"status": "skipped", "reason": "judge-unavailable" | "permission" |
+  "no-policy" | "no-actor"}`.
+- Tests: completion of a queue run enqueues exactly one task and one
+  recommendation run scoped to `choose` groups without current results; a
+  narrowed query counts; a non-queue judge run, a `FAILED` / `CANCELLED` /
+  `PARTIAL` run and a second (redelivered) call start nothing more; a
+  keyless judge and an actor without `project.edit` record `skipped` and
+  raise nothing.
+
+Commit `feat(repeats): compare choose-yourself variants after the queue's judge run`.
+
+### Task 13: consent on the launch form (D14)
+
+**Files:**
+
+- Modify: `weblate/trans/repeat_judge.py` (`comparison_upper_bound`)
+- Modify: `weblate/trans/views/basic.py` (`show_project_language` context)
+- Modify: `weblate/templates/snippets/autoform.html` (one line)
+- Modify: `weblate/trans/views/edit.py` (`auto_translation_preview` returns
+  `repeat_comparison`)
+- Modify: `weblate/static/loader-bootstrap.js` (preview sentence)
+- Test: `weblate/trans/tests/test_judge_form.py`
+
+Steps: the project-language page shows "After the check, the model compares
+the variants of groups where the judge accepts several. This is a separate
+paid step." when the form is verdict-only and its query starts with
+`check:repeat-drift`. The preview for that scope returns
+`{"groups": N, "requests": ceil(N / 25)}` (N = diverging groups of the enabled
+policy visible to the user, one values query) and the JS appends "Then the
+variants are compared: up to %(groups)s groups, about %(requests)s LLM
+requests." Tests: the line appears only for that scope; the preview returns
+the bound for a project-language and omits it for another query or scope.
+
+Commit `feat(repeats): state the follow-up comparison before the judge launch`.
+
+### Task 14: card, buckets and comparing line (D15)
+
+**Files:**
+
+- Modify: `weblate/trans/repeat_judge.py` (`judge_group` / `judge_groups`
+  take recommendations; `GroupJudgement.model_action`)
+- Modify: `weblate/trans/views/repeats.py` (read current recommendations once,
+  before judging; `_add_recommendations` marks the variant the model picked;
+  panel `comparing`)
+- Modify: `weblate/templates/snippets/repeat_group.html`,
+  `weblate/templates/repeat_queue.html`
+- Test: `weblate/trans/tests/test_repeat_judge.py`,
+  `weblate/trans/tests/test_repeat_views.py`
+
+Steps: the recommendations passed to `judge_groups` are the same
+`current_recommendations` dict the page already reads, so no query is added
+per group. The model's `use_existing` target is shown on its variant row
+("Model recommendation" badge and "Model rationale: ..."); the separate model
+radio stays only for a target that is not an existing variant. A group-level
+rationale line covers `needs_human` and `keep_independent`. Tests: the D15
+rules including a plural group (no preselection), a flagged target, an
+approved place and `keep_independent`; the comparing line; query growth of the
+queue stays bounded.
+
+Commit `feat(repeats): let the model comparison settle judge-passed variants`.
+
+### Task 15: strings, bulk check and verification
+
+- Russian strings in `weblate/locale/ru/LC_MESSAGES/django.po` and
+  `djangojs.po`, no fuzzy entries, `msgfmt -c` passes.
+- D16: a test that a comparison result for a model-`ready` group appears in
+  the `bulk_ready` count and as a checked row of `repeat_bulk_review`
+  unchanged.
+- Verification as in Task 7 plus `test_judge_form.py`,
+  `test_judge_autotranslate.py`; pylint and mypy report no new findings on the
+  changed files; `makemigrations --check` prints "No changes detected" (no
+  migration: the outcome lives in `ProducerRun.summary`).
+- Gated, paid: starting the comparison for anvil-saga / fr's existing
+  `choose` groups (the judge runs finished before this code existed) needs
+  the owner's approval; then read the model-`ready` groups against the
+  precision gate before any bulk apply.
+
+Commit `fix(i18n): translate the judge-then-compare repeat queue` and
+`docs(repeats): record the judge-then-compare results`.
+
 ### Out of scope
 
 - Starting the judge from the queue without the launch form, and any
-  background run.
+  background run other than the D13 comparison, which the launch click
+  covers (D14).
+- A separate button or page for the comparison, and a comparison after a
+  `PARTIAL`, `FAILED` or `CANCELLED` judge run (D13).
+- Unchecking bulk review rows whose target the judge flagged, and bulk apply
+  of judge-only `ready` groups (Tasks 8-10, superseded by D16).
 - Deleting the model-recommendation code or its pages.
 - Undo restoring the previous state (it restores text and sets
   `STATE_TRANSLATED`) and removing shared memberships
@@ -1052,10 +1215,10 @@ Phase 2:
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | - | - |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | - | - |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 27 findings (2 P1, 12 P2, 13 P3): 4 owner decisions resolved on 2026-09-25 (Q1 A, Q2 A, Q3 B after revision, Q4 A; recorded as D9-D12); 23 fixes folded into Tasks 1-10; 18 test gaps added to the tasks; 0 open |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 27 findings (2 P1, 12 P2, 13 P3): 4 owner decisions resolved on 2026-09-25 (Q1 A, Q2 A, Q3 B after revision, Q4 A; recorded as D9-D12); 4 owner decisions added on 2026-09-25 after the paid judge run (judge then compare, recorded as D13-D16; Tasks 8-10 superseded by Tasks 11-15); 23 fixes folded into Tasks 1-10; 18 test gaps added to the tasks; 0 open |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | - | - |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | - | - |
 
-- **VERDICT:** ENG CLEARED - ready to implement phase 1 after the owner approves this plan; phase 2 waits for the Task 7 gate.
+- **VERDICT:** ENG CLEARED - ready to implement phase 1 after the owner approves this plan; phase 2 waits for the Task 7 gate. Phase 2b (D13-D16) was approved by the owner on 2026-09-25 and has not had its own engineering review.
 
 NO UNRESOLVED DECISIONS
