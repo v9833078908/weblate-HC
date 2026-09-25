@@ -545,9 +545,22 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         check.perform_batch(self.enable_repeat_drift())
         self.assertFalse(Check.objects.filter(name="repeat-drift").exists())
 
-    def test_group_cap_is_reported(self) -> None:
+    def test_groups_beyond_one_chunk_are_all_reported(self) -> None:
         check = RepeatDriftCheck()
         check.batch_limit = 1
+        self.add_unit(self.translation_1, "one_a", "One", "Jeden")
+        self.add_unit(self.translation_1, "one_b", "One", "Jedna")
+        self.add_unit(self.translation_1, "two_a", "Two", "Dva")
+        self.add_unit(self.translation_1, "two_b", "Two", "Dvě")
+
+        with self.assertNoLogs("weblate", level="WARNING"):
+            units = list(check.check_component(self.component))
+
+        self.assertEqual(len(units), 4)
+
+    def test_group_cap_is_reported(self) -> None:
+        check = RepeatDriftCheck()
+        check.group_limit = 1
         self.add_unit(self.translation_1, "one_a", "One", "Jeden")
         self.add_unit(self.translation_1, "one_b", "One", "Jedna")
         self.add_unit(self.translation_1, "two_a", "Two", "Dva")

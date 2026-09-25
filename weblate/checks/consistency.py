@@ -308,7 +308,12 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
     propagates = "repeat"
     batch_project_wide = True
     skip_suggestions = True
+    # Source hashes fetched per query; bounds memory, never the result.
     batch_limit = 200
+    # Diverging groups reported per plural form before the pass stops. Groups
+    # past it lose their checks on every recount, so it sits far above real
+    # projects (anvil-saga fr: 386) and only guards against a runaway scope.
+    group_limit = 5000
     # Fires on every member of a repeat group, including the correct one, so
     # a drifting pair always reports at least one false positive by design.
     # Already excluded from the MT prompt (weblate/machinery/llm.py) and from
@@ -426,15 +431,15 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
                         continue
                     yield from members
                     found_groups += 1
-                    if found_groups == self.batch_limit:
+                    if found_groups == self.group_limit:
                         LOGGER.warning(
                             "repeat-drift: hit the %d group cap on %s (plural %d)",
-                            self.batch_limit,
+                            self.group_limit,
                             component.project.slug,
                             plural_id,
                         )
                         break
-                if found_groups == self.batch_limit:
+                if found_groups == self.group_limit:
                     break
 
 
