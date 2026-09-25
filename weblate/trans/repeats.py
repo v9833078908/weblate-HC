@@ -834,3 +834,96 @@ def detect_policy_groups(
         for key, ids in grouped.items()
         if len(ids) > 1
     ]
+
+
+def _queue_group_status(group, units, variant_count: int, rule_conflict: bool) -> str:
+    """Return the user-facing queue state, separate from recipient notes."""
+    approved_targets = {
+        tuple(unit.get_target_plurals())
+        for unit in units
+        if unit.state == STATE_APPROVED
+    }
+    if rule_conflict:
+        return "rule-conflict"
+    if len(approved_targets) > 1:
+        return "approved-conflict"
+    if group.shared_target or group.decision_origin == "independent":
+        return "resolved"
+    if variant_count == 1:
+        return "consistent"
+    return "open"
+
+
+def repeat_queue_groups(
+    policy: RepeatPolicy,
+    *,
+    user: User,
+    component_ids: Iterable[int] = (),
+    label_ids: Iterable[int] = (),
+) -> list[dict[str, Any]]:
+    """Build permission-safe, unsorted repeat queue groups for one policy."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.repeat import RepeatGroup
+
+    component_ids = set(component_ids)
+    label_ids = set(label_ids)
+    visible_units = policy_units(policy).filter_access(user)
+    if component_ids:
+        visible_units = visible_units.filter(
+            translation__component_id__in=component_ids
+        )
+    if label_ids:
+        visible_units = visible_units.filter(
+            source_unit__labels__in=label_ids
+        ).distinct()
+
+    candidates = detect_policy_groups(policy, user=user)
+    units_by_pk = {
+        unit.pk: unit
+        for unit in visible_units.filter(
+            pk__in=[pk for candidate in candidates for pk in candidate.unit_ids]
+        )
+    }
+    existing_groups = {
+        (group.source_hash, group.plural_number): group
+        for group in RepeatGroup.objects.filter(policy=policy)
+    }
+    # Overlap depends only on the policy, not on the group.
+    rule_conflict = bool(policy_overlaps(policy, exclude_policy_id=policy.pk))
+
+    groups = []
+    for candidate in candidates:
+        units = [
+            units_by_pk[pk] for pk in sorted(candidate.unit_ids) if pk in units_by_pk
+        ]
+        if len(units) < 2:
+            continue
+        source_forms = list(candidate.source_forms)
+        group = existing_groups.get(
+            (
+                source_fingerprint(source_forms, candidate.plural_number),
+                candidate.plural_number,
+            )
+        )
+        if group is None or group.source_forms != source_forms:
+            group = get_or_create_group(policy, units[0])
+        variants: dict[tuple[str, ...], list[Unit]] = {}
+        for unit in units:
+            variants.setdefault(tuple(unit.get_target_plurals()), []).append(unit)
+        status = _queue_group_status(group, units, len(variants), rule_conflict)
+        groups.append(
+            {
+                "group": group,
+                "units": units,
+                "variants": [
+                    {"target": target, "units": grouped_units}
+                    for target, grouped_units in sorted(
+                        variants.items(), key=lambda item: (-len(item[1]), item[0])
+                    )
+                ],
+                "status": status,
+                "approved_conflict": status == "approved-conflict",
+                "all_approved": all(unit.state == STATE_APPROVED for unit in units),
+            }
+        )
+    return groups

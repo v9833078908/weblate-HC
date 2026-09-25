@@ -71,19 +71,15 @@ from weblate.trans.repeat_recommendations import (
 )
 from weblate.trans.repeats import (
     apply_preview,
-    detect_policy_groups,
     ensure_default_policy,
-    get_or_create_group,
-    policy_overlaps,
     policy_units,
     preview_group,
     preview_keep_group,
-    source_fingerprint,
+    repeat_queue_groups,
     undo_event,
 )
 from weblate.trans.util import join_plural
 from weblate.trans.views.judge import user_can_view_producer_run
-from weblate.utils.state import STATE_APPROVED
 
 
 def _selected_ids(request, name: str) -> set[int]:
@@ -97,87 +93,14 @@ def _selected_ids(request, name: str) -> set[int]:
     return result
 
 
-def _group_status(group, units, variant_count: int, rule_conflict: bool) -> str:
-    """Return the user-facing queue state, separate from recipient notes."""
-    approved_targets = {
-        tuple(unit.get_target_plurals())
-        for unit in units
-        if unit.state == STATE_APPROVED
-    }
-    if rule_conflict:
-        return "rule-conflict"
-    if len(approved_targets) > 1:
-        return "approved-conflict"
-    if group.shared_target or group.decision_origin == "independent":
-        return "resolved"
-    if variant_count == 1:
-        return "consistent"
-    return "open"
-
-
 def _queue_groups(request, policy):
     """Build filtered, permission-safe view data for the repeat queue."""
-    component_ids = _selected_ids(request, "component")
-    label_ids = _selected_ids(request, "label")
-    visible_units = policy_units(policy).filter_access(request.user)
-    if component_ids:
-        visible_units = visible_units.filter(
-            translation__component_id__in=component_ids
-        )
-    if label_ids:
-        visible_units = visible_units.filter(
-            source_unit__labels__in=label_ids
-        ).distinct()
-
-    candidates = detect_policy_groups(policy, user=request.user)
-    units_by_pk = {
-        unit.pk: unit
-        for unit in visible_units.filter(
-            pk__in=[pk for candidate in candidates for pk in candidate.unit_ids]
-        )
-    }
-    existing_groups = {
-        (group.source_hash, group.plural_number): group
-        for group in RepeatGroup.objects.filter(policy=policy)
-    }
-    # Overlap depends only on the policy, not on the group.
-    rule_conflict = bool(policy_overlaps(policy, exclude_policy_id=policy.pk))
-
-    groups = []
-    for candidate in candidates:
-        units = [
-            units_by_pk[pk] for pk in sorted(candidate.unit_ids) if pk in units_by_pk
-        ]
-        if len(units) < 2:
-            continue
-        source_forms = list(candidate.source_forms)
-        group = existing_groups.get(
-            (
-                source_fingerprint(source_forms, candidate.plural_number),
-                candidate.plural_number,
-            )
-        )
-        if group is None or group.source_forms != source_forms:
-            group = get_or_create_group(policy, units[0])
-        variants = {}
-        for unit in units:
-            variants.setdefault(tuple(unit.get_target_plurals()), []).append(unit)
-        status = _group_status(group, units, len(variants), rule_conflict)
-        groups.append(
-            {
-                "group": group,
-                "units": units,
-                "variants": [
-                    {"target": target, "units": grouped_units}
-                    for target, grouped_units in sorted(
-                        variants.items(), key=lambda item: (-len(item[1]), item[0])
-                    )
-                ],
-                "status": status,
-                "approved_conflict": status == "approved-conflict",
-                "all_approved": all(unit.state == STATE_APPROVED for unit in units),
-            }
-        )
+    groups = repeat_queue_groups(
+        policy,
+        user=request.user,
+        component_ids=_selected_ids(request, "component"),
+        label_ids=_selected_ids(request, "label"),
+    )
     status_order = {
         "rule-conflict": 0,
         "approved-conflict": 1,
