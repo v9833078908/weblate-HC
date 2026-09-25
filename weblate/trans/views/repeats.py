@@ -285,7 +285,10 @@ def _judge_panel(request, obj, target_language, groups, policy, current):
         "relaunch_places": relaunch_places,
         "outside_places": outside_places,
         "comparing": sum(
-            sum(bool(group.get("sendable", True)) for group in snapshot.get("groups", ()))
+            sum(
+                bool(group.get("sendable", True))
+                for group in snapshot.get("groups", ())
+            )
             for snapshot in RepeatRecommendationRun.objects.filter(
                 policy=policy,
                 status__in={

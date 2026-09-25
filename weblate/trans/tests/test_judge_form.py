@@ -504,7 +504,7 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
             "mode": "judge",
             "q": "check:repeat-drift",
             "auto_source": "others",
-            "threshold": 80,
+            "threshold": "80",
             "judge_proposal_only": "1",
         }
         url = reverse(

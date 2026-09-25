@@ -371,9 +371,7 @@ class RepeatModelComparisonTest(RepeatJudgeFixtures):
     def test_use_existing_on_a_passed_variant_is_ready(self) -> None:
         variants = self.passed_group(["One", "Two"])
 
-        result = self.judge_with(
-            variants, self.recommendation("use_existing", ["Two"])
-        )
+        result = self.judge_with(variants, self.recommendation("use_existing", ["Two"]))
 
         self.assertEqual(result.bucket, READY)
         self.assertEqual(result.recommended, ("Two",))
@@ -384,9 +382,7 @@ class RepeatModelComparisonTest(RepeatJudgeFixtures):
         variants += self.add_group("Gate", ["Bad"])
         self.make_verdict(variants[2]["units"][0], JudgeVerdict.Severity.MAJOR)
 
-        result = self.judge_with(
-            variants, self.recommendation("use_existing", ["Bad"])
-        )
+        result = self.judge_with(variants, self.recommendation("use_existing", ["Bad"]))
 
         self.assertEqual(result.bucket, CHOOSE)
         self.assertIsNone(result.recommended)
@@ -397,9 +393,7 @@ class RepeatModelComparisonTest(RepeatJudgeFixtures):
         unit = variants[0]["units"][0]
         unit.state = STATE_APPROVED
 
-        result = self.judge_with(
-            variants, self.recommendation("use_existing", ["Two"])
-        )
+        result = self.judge_with(variants, self.recommendation("use_existing", ["Two"]))
 
         self.assertEqual(result.bucket, CHOOSE)
         self.assertIsNone(result.recommended)

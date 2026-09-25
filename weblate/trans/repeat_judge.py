@@ -228,6 +228,37 @@ class GroupJudgement:
     model_action: str = ""
 
 
+def _settle_with_model(
+    bucket: str,
+    recommended: tuple[str, ...] | None,
+    judgements: dict[tuple[str, ...], VariantJudgement],
+    *,
+    approved: bool,
+    recommendation: RepeatRecommendationResult | None,
+) -> tuple[str, tuple[str, ...] | None, str]:
+    """Apply the model comparison of every variant to a judge bucket (D15)."""
+    if recommendation is None or bucket not in {READY, CHOOSE}:
+        return bucket, recommended, ""
+    target = tuple(recommendation.target)
+    picked = judgements.get(target)
+    agrees = (
+        recommendation.action == "use_existing"
+        and picked is not None
+        and picked.mark == "passed"
+    )
+    if bucket == READY:
+        if agrees and target == recommended:
+            return bucket, recommended, recommendation.action
+        # A disagreement leaves the decision to the producer.
+        return CHOOSE, None, ""
+    if agrees and not approved:
+        # An approved place stays a human decision (D4).
+        return READY, target, recommendation.action
+    if recommendation.action == "keep_independent":
+        return bucket, recommended, recommendation.action
+    return bucket, recommended, ""
+
+
 def judge_group(
     variants: list[dict],
     verdicts: dict[int, JudgeVerdict | None],
@@ -293,30 +324,13 @@ def judge_group(
         bucket = UNCHECKED
     recommended = passed_targets[0] if bucket == READY else None
 
-    model_action = ""
-    if recommendation is not None and bucket in {READY, CHOOSE}:
-        # The model compared every variant of the group (D15).
-        target = tuple(recommendation.target)
-        picked = judgements.get(target)
-        agrees = (
-            recommendation.action == "use_existing"
-            and picked is not None
-            and picked.mark == "passed"
-        )
-        if bucket == READY:
-            if agrees and target == recommended:
-                model_action = recommendation.action
-            else:
-                # A disagreement leaves the decision to the producer.
-                bucket = CHOOSE
-                recommended = None
-        elif agrees and not approved:
-            # An approved place stays a human decision (D4).
-            bucket = READY
-            recommended = target
-            model_action = recommendation.action
-        elif recommendation.action == "keep_independent":
-            model_action = recommendation.action
+    bucket, recommended, model_action = _settle_with_model(
+        bucket,
+        recommended,
+        judgements,
+        approved=approved,
+        recommendation=recommendation,
+    )
 
     return GroupJudgement(
         bucket=bucket,

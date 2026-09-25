@@ -2060,7 +2060,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         disagree, disagree_units = self.judged_group(
             "Model disagrees", [none, major], 28030
         )
-        results = (
+        results: tuple[tuple[object, list, str, list[str], str], ...] = (
             (picked, picked_units, "use_existing", ["Model picked 1"], "Picked why"),
             (keep, keep_units, "keep_independent", [], "Keep why"),
             (human, human_units, "needs_human", [], "Human why"),
@@ -2155,14 +2155,14 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertEqual(items[keep.pk]["judge"].bucket, "choose")
         self.assertFalse(items[keep.pk]["preselect_keep"])
         for group in (picked, keep):
-            self.assertNotRegex(
-                self.card(response, group), r"(?s)<input[^>]*\schecked"
-            )
+            self.assertNotRegex(self.card(response, group), r"(?s)<input[^>]*\schecked")
 
     def test_queue_ready_bucket_equals_bulk_banner(self) -> None:
         none = JudgeVerdict.Severity.NONE
         major = JudgeVerdict.Severity.MAJOR
-        judge_ready, judge_units = self.judged_group("Judge ready", [none, major], 28200)
+        judge_ready, judge_units = self.judged_group(
+            "Judge ready", [none, major], 28200
+        )
         model_ready, model_units = self.judged_group("Model ready", [none, none], 28210)
         self.judged_group("Needs rewrite", [major, major], 28220)
         self.make_recommendation(
