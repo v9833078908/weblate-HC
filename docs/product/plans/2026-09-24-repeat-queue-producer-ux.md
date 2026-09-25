@@ -4,10 +4,10 @@
 
 Date: 2026-09-24, rewritten in full on 2026-09-25, engineering review folded
 in on 2026-09-25.
-Status: **phase 1 (Tasks 1-6) implemented at `2ce7b2bd`; Task 7 local and
-Russian dev browser/keyboard checks recorded on 2026-09-25. The paid judge run
-and 25-ready-group precision gate await explicit approval. Phase 2 has not
-started.**
+Status: **phase 1 (Tasks 1-7) complete on 2026-09-25, including the code
+review fixes recorded under Results, apart from the paid judge run and the
+25-ready-group precision gate, which await explicit owner approval. Phase 2 has
+not started.**
 This version replaces the 2026-09-24 text (judge preselection only, bulk apply
 out of scope). Editing this plan does not authorize deploying it or starting a
 paid judge run. Phase 2 (Tasks 8-10) starts only after the phase 1 gate in
@@ -979,6 +979,49 @@ On HEAD `2ce7b2bd`, the full `test_judge_form.py` run passed: 18 tests and 2
 subtests. The earlier six-file combined run remains the `ee3e4012` result
 recorded above: 293 passed and one pre-existing baseline failure.
 
+Code review fixes on 2026-09-25 (after `e4815ce3`):
+
+- An unreadable stored preparation snapshot now fails the run for every scope
+  with "This run has an invalid preparation snapshot and cannot resume."
+  Before, it was treated like an empty snapshot: a `judge-project` run failed
+  with the misleading "queued before the mandatory translation step" text and
+  other scopes rebuilt the closed scope, resetting `preparation_phase` even on
+  a later chunk. Only an empty snapshot is still rebuilt. The strict snapshot
+  validation of `e4815ce3` had also broken seven
+  `test_judge_full_scope_continuation.py` cases whose fixture stored
+  `{"missing": []}`; the fixture now stores a valid empty-preparation snapshot.
+- The queue view skips `_judge_panel` (drift search and run lookup) when no
+  policy exists, and the `?judge=` filter ignores the bucket then.
+- New tests: a plural `ready` group gets no checked radio and no
+  "Recommended: <target>" header badge, while a single-form one shows the
+  badge; the query-growth test gives every group verdicts and asserts one
+  active-verdict query per page, so a per-group verdict read fails it.
+- A `?judge_proposal_only=1` link opened by a user without the judge mode now
+  renders the regular form instead of an unsubmittable "Judge check" form.
+- "Checked %(checked)s of %(total)s places" is a plural message counted on the
+  total, with all three Russian forms.
+- New mypy (7) and pylint (4) findings introduced by the branch were fixed.
+
+Deviation: the Task 6 panel copy was not added - "How to sort out %(count)s
+groups quickly", the paid-check notice ("Opens the usual judge launch ... The
+check is paid ..."), "The judge checks every translation variant ...",
+"Verdicts are recorded ..." and the four bucket descriptions. The owner
+declined it on 2026-09-25.
+
+After these fixes, the Task 7 combined pytest command on the host collected
+306 tests: **303 passed, 3 failed** in 438 seconds. The three failures are
+`JudgeAutoTranslateTest` preparation cases
+(`test_dispatched_bulk_judge_prepares_before_judging`,
+`test_preparation_covers_a_string_beyond_the_judge_cap`,
+`test_preparation_fills_missing_then_judges`) raising `KeyError: 'openrouter'`
+on the host; they fail the same way on `main` and are an environment issue,
+not this branch. The `ProducerRunDispatchTest` end-to-end failure recorded
+above no longer reproduces. `test_judge_full_scope_continuation.py`: 14
+passed. `makemigrations --check --dry-run` printed `No changes detected`;
+`msgfmt -c` passed for the Russian catalog; `prek` passed every applicable
+hook on the changed files except the pre-existing repository-wide
+`reuse lint`.
+
 Phase 1:
 
 | Check | Result |
@@ -987,8 +1030,8 @@ Phase 1:
 | Judgement rule cases (ready / choose / rewrite / unchecked, unchecked variant, one parsed seat, strictest seat, approved, stale) | `test_repeat_judge.py`: all 18 tests passed. |
 | Verdict-only launch: no state change, no candidates, no preparation, returns to the queue | Corresponding `test_judge_form.py` and `test_judge_autotranslate.py` cases passed. |
 | Queue panel states, progress without reserved rows, stopped run, relaunch scope, bucket filter; no paid recommend link | Corresponding `test_repeat_views.py` cases passed. |
-| Card preselection (single-form only), evidence, escaping | Corresponding `test_repeat_views.py` cases passed. |
-| Queue query count constant | `test_queue_judge_query_growth_is_bounded` passed; `test_judge_groups_reads_twenty_groups_with_one_verdict_query` passed. |
+| Card preselection (single-form only), evidence, escaping | Corresponding `test_repeat_views.py` cases passed, including `test_queue_plural_ready_group_is_not_preselected`. |
+| Queue query count constant | `test_queue_judge_query_growth_is_bounded` (groups with verdicts, one verdict query per page) passed; `test_judge_groups_reads_twenty_groups_with_one_verdict_query` passed. |
 | Russian browser and keyboard check | Observed on the deployed dev copy: Tab/Enter opened a group; the preselected judge radio had an accessible label, the hint initialized, and preview was enabled. Enter opened a read-only preview showing 1 of 3 places would change. Temporary verdicts and the temporary `translation_review` setting were cleaned up afterward. |
 | Verdict-only launch form | Showed 1022 matched strings, no pretranslation, and “Estimated judge cost for the initial check is unavailable.” |
 | Real judge run: buckets, spend, wrong-recommendation rate out of at least 25 | Pending explicit approval after the cost estimate (currently unavailable) is shown. No paid run started; no spend or real precision data recorded. |
