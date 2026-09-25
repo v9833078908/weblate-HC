@@ -53,6 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
         : hint.dataset.hintDefault;
     };
     form.addEventListener("change", updateDecision);
+    updateDecision();
     // Block on click, not submit: the global double-submission guard in
     // loader-bootstrap.js would otherwise mark the form as submitted and
     // ignore every later click.

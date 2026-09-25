@@ -277,6 +277,16 @@ def _judge_panel(request, obj, target_language, groups):
     buckets = dict.fromkeys((READY, CHOOSE, REWRITE, UNCHECKED), 0)
     for item in open_groups:
         item["judge"] = judgements[item["group"].pk]
+        for variant in item["variants"]:
+            variant["judge"] = item["judge"].variants[variant["target"]]
+        recommended = item["judge"].recommended
+        item["preselect"] = (
+            item["judge"].bucket == READY
+            and recommended is not None
+            and len(recommended) == 1
+        )
+        if recommended is not None:
+            item["variants"].sort(key=lambda variant: variant["target"] != recommended)
         buckets[item["judge"].bucket] += 1
     project_language = obj.project_languages[target_language]
     drift_ids = set(

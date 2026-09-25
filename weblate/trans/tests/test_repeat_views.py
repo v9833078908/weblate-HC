@@ -1517,7 +1517,14 @@ class RepeatBulkViewsTest(ViewTestCase):
         values.update(fields)
         return ProducerRun.objects.create(**values)
 
-    def make_judge_verdict(self, unit, severity=JudgeVerdict.Severity.NONE):
+    def make_judge_verdict(
+        self,
+        unit,
+        severity=JudgeVerdict.Severity.NONE,
+        *,
+        back_translation="",
+        description="Wrong meaning",
+    ):
         return JudgeVerdict.objects.create(
             unit=unit,
             target_hash=compute_target_hash(unit.get_target_plurals()),
@@ -1526,18 +1533,117 @@ class RepeatBulkViewsTest(ViewTestCase):
             seat=1,
             unparsed=False,
             max_severity=severity,
+            back_translation=back_translation,
             errors=(
                 [
                     {
                         "severity": severity,
                         "category": "mistranslation",
-                        "description": "Wrong meaning",
+                        "description": description,
                     }
                 ]
-                if severity == JudgeVerdict.Severity.MAJOR
+                if severity
+                in {
+                    JudgeVerdict.Severity.MAJOR,
+                    JudgeVerdict.Severity.CRITICAL,
+                }
                 else []
             ),
         )
+
+    def test_queue_cards_show_judge_evidence_and_preselect_only_ready_variant(
+        self,
+    ) -> None:
+        ready_group, ready = self.make_group(
+            "Judge checked ready", ["Recommandé", "À éviter"], start=26320
+        )
+        flagged_group, flagged = self.make_group(
+            "Judge checked flagged",
+            ["<b>x</b><script>y</script>", "<color=#FF0000>"],
+            start=26330,
+        )
+        _passed_group, passed = self.make_group(
+            "Judge checked passed", ["Pass one", "Pass two"], start=26335
+        )
+        unchecked_group, _ = self.make_group(
+            "Judge unchecked", ["One", "Two"], start=26340
+        )
+        self.make_judge_verdict(ready[0], back_translation="The checked translation")
+        self.make_judge_verdict(
+            ready[1], JudgeVerdict.Severity.MAJOR, description="Wrong source meaning"
+        )
+        self.make_judge_verdict(
+            flagged[0], JudgeVerdict.Severity.MAJOR, description="Other reason"
+        )
+        self.make_judge_verdict(
+            flagged[1],
+            JudgeVerdict.Severity.CRITICAL,
+            description="<color=#FF0000>",
+        )
+        for unit in passed:
+            self.make_judge_verdict(
+                unit,
+                back_translation=(
+                    "<b>x</b><script>y</script>" if unit == passed[0] else ""
+                ),
+            )
+        self.make_recommendation(
+            self.make_recommendation_run(), ready_group, ready, target=["À éviter"]
+        )
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            flagged_group,
+            flagged,
+            target=["<b>x</b><script>y</script>"],
+        )
+
+        response = self.client.get(self.queue_url)
+
+        self.assertContains(response, "Recommended: checked by the judge")
+        self.assertContains(
+            response,
+            "The judge checked this translation in one of its places. Look through the preview before confirming.",
+        )
+        self.assertContains(response, "The checked translation")
+        self.assertContains(
+            response,
+            "Back-translation: &lt;b&gt;x&lt;/b&gt;&lt;script&gt;y&lt;/script&gt;",
+        )
+        self.assertContains(response, "Checked by the judge")
+        self.assertContains(response, "The judge found an error")
+        self.assertContains(response, "&lt;color=#FF0000&gt;")
+        self.assertNotContains(response, "<script>y</script>")
+
+        rendered_groups = {
+            item["group"].pk: item for item in response.context["groups"]
+        }
+        ready_item = rendered_groups[ready_group.pk]
+        self.assertEqual(ready_item["variants"][0]["target"], ("Recommandé",))
+        self.assertTrue(ready_item["preselect"])
+        ready_card = (
+            response.content.decode()
+            .split(f'id="g-{ready_group.pk}"', 1)[1]
+            .split("</li>", 1)[0]
+        )
+        self.assertRegex(
+            ready_card,
+            r'name="target"\s+value="Recommandé"\s+data-choice="variant"\s+checked',
+        )
+        self.assertRegex(ready_card, r'aria-disabled="false"')
+        self.assertNotRegex(
+            ready_card,
+            r'name="target"\s+value="À éviter"\s+data-choice="variant"\s+checked',
+        )
+        flagged_item = rendered_groups[flagged_group.pk]
+        self.assertFalse(flagged_item["preselect"])
+        flagged_card = (
+            response.content.decode()
+            .split(f'id="g-{flagged_group.pk}"', 1)[1]
+            .split("</li>", 1)[0]
+        )
+        self.assertNotRegex(flagged_card, r'(?s)<input[^>]*\schecked(?:="checked")?')
+        unchecked_item = rendered_groups[unchecked_group.pk]
+        self.assertFalse(unchecked_item["preselect"])
 
     def test_queue_judge_launch_url_and_no_paid_recommendation_link(self) -> None:
         self.make_group("Judge start", ["One", "Two"], start=26000)

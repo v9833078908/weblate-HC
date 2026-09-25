@@ -19,6 +19,9 @@
       {% else %}
         <span class="badge text-bg-secondary">{% translate "Different translations" %}</span>
       {% endif %}
+      {% if item.preselect %}
+        <span class="badge text-bg-success">{% blocktranslate with target=item.judge.recommended.0 %}Recommended: {{ target }}{% endblocktranslate %}</span>
+      {% endif %}
     </button>
   </h2>
   <section id="group-{{ item.group.pk }}"
@@ -30,6 +33,9 @@
       <p>{% translate "The translation is already the same everywhere, so nothing needs fixing. Make it shared: a later edit then updates every place, and new strings with this text reuse it instead of being translated again." %}</p>
     {% elif item.status == 'open' or item.approved_conflict %}
       <p>{% blocktranslate count counter=item.variants|length %}This text is translated in {{ counter }} way. Choose one translation for every place.{% plural %}This text is translated in {{ counter }} different ways. Choose one translation for every place.{% endblocktranslate %}</p>
+    {% endif %}
+    {% if item.judge.bucket == 'ready' %}
+      <p class="text-muted">{% translate "The judge checked this translation in one of its places. Look through the preview before confirming." %}</p>
     {% endif %}
     {% if item.approved_conflict %}
       <p class="alert alert-warning">{% translate "Approved translations differ. They remain unchanged; you can still write a selected translation to eligible non-approved occurrences." %}</p>
@@ -60,8 +66,21 @@
                      type="radio"
                      name="target"
                      value="{{ variant.target.0 }}"
-                     data-choice="variant" />
-              <span class="form-check-label"><code>{{ variant.target.0 }}</code> — {% blocktranslate count counter=variant.units|length %}used in {{ counter }} place{% plural %}used in {{ counter }} places{% endblocktranslate %}</span>
+                     data-choice="variant"
+                     {% if item.preselect and variant.target == item.judge.recommended %}checked{% endif %} />
+              <span class="form-check-label"><code>{{ variant.target.0 }}</code> — {% blocktranslate count counter=variant.units|length %}used in {{ counter }} place{% plural %}used in {{ counter }} places{% endblocktranslate %}
+                {% if variant.judge.mark == 'passed' %}
+                  {% if item.preselect and variant.target == item.judge.recommended %}
+                    <span class="badge text-bg-success">{% translate "Recommended: checked by the judge" %}</span>
+                  {% else %}
+                    <span class="badge text-bg-success">{% translate "Checked by the judge" %}</span>
+                  {% endif %}
+                {% elif variant.judge.mark == 'flagged' %}
+                  <span class="badge text-bg-warning">{% translate "The judge found an error" %}</span>
+                {% endif %}
+              </span>
+              {% if variant.judge.back_translation %}<span class="d-block text-muted">{% blocktranslate with translation=variant.judge.back_translation %}Back-translation: {{ translation }}{% endblocktranslate %}</span>{% endif %}
+              {% if variant.judge.reason %}<span class="d-block text-muted">{% blocktranslate with reason=variant.judge.reason %}Judge's reason: {{ reason }}{% endblocktranslate %}</span>{% endif %}
             </label>
           {% endfor %}
           <label class="rq-option form-check">
@@ -86,7 +105,9 @@
           <span class="form-check-label">{% translate "Different meanings: do not link these places" %}</span>
         </label>
       </fieldset>
-      <button class="btn btn-primary rq-preview" type="submit" aria-disabled="true">{% translate "Show what will change" %}</button>
+      <button class="btn btn-primary rq-preview"
+              type="submit"
+              aria-disabled="{% if item.preselect %}false{% else %}true{% endif %}">{% translate "Show what will change" %}</button>
       <p class="rq-hint"
          aria-live="polite"
          data-hint-default="{% translate 'Choose an option to continue.' %}"
