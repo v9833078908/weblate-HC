@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from weblate.auth.models import User
     from weblate.lang.models import Language
-    from weblate.trans.models import Component, Label, Project
+    from weblate.trans.models import Component, Label, Project, Translation
     from weblate.trans.models.repeat import RepeatGroup, RepeatMembership, RepeatPolicy
 
 
@@ -441,6 +441,28 @@ class RepeatPreview:
         return [member for member in self.members if not member.eligible]
 
 
+def blocked_reason(unit: Unit, target: list[str], overlapping) -> str:
+    """Return why one place cannot take a shared target, or "" when it can."""
+    if any(unit_matches_policy(unit, other) for other in overlapping):
+        return "rule-conflict"
+    if unit.state == STATE_APPROVED and unit.get_target_plurals() != target:
+        return "approved"
+    if unit.translation.component.locked:
+        return "locked"
+    if any(len(value) > unit.get_max_length() for value in target):
+        return "max-length"
+    return ""
+
+
+def share_translations(units: Iterable[Unit]) -> None:
+    """Point units of one translation at one instance so flags are read once."""
+    translations: dict[int, Translation] = {}
+    for unit in units:
+        unit.translation = translations.setdefault(
+            unit.translation_id, unit.translation
+        )
+
+
 def preview_group(
     *, group: RepeatGroup, target: list[str], actor: User
 ) -> RepeatPreview:
@@ -457,15 +479,7 @@ def preview_group(
     ):
         if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
             continue
-        reason = ""
-        if any(unit_matches_policy(unit, other) for other in overlapping):
-            reason = "rule-conflict"
-        elif unit.state == STATE_APPROVED and unit.get_target_plurals() != target:
-            reason = "approved"
-        elif unit.translation.component.locked:
-            reason = "locked"
-        elif any(len(value) > unit.get_max_length() for value in target):
-            reason = "max-length"
+        reason = blocked_reason(unit, target, overlapping)
         members.append(
             RepeatPreviewMember(
                 unit_id=unit.pk,

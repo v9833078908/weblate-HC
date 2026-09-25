@@ -35,6 +35,7 @@ from weblate.trans.repeats import (
     fingerprint,
     get_or_create_group,
     policy_units,
+    share_translations,
     unit_fingerprint,
 )
 
@@ -111,8 +112,9 @@ def build_group_context(
                 "component": member.translation.component.slug,
                 "context": member.context,
                 "explanation": member.source_unit.explanation,
+                # Read through .all() so a caller's prefetch is used.
                 "labels": sorted(
-                    member.source_unit.labels.values_list("name", flat=True)
+                    label.name for label in member.source_unit.labels.all()
                 ),
                 "source_forms": list(member.get_source_plurals()),
                 "target_forms": list(target),
@@ -178,10 +180,20 @@ def live_group_contexts(
         (tuple(group.source_forms), group.plural_number): group
         for group in RepeatGroup.objects.filter(policy=policy)
     }
+    candidates = detect_policy_groups(policy, user=actor)
+    units_by_pk = {
+        unit.pk: unit
+        for unit in visible_units.filter(
+            pk__in=[pk for candidate in candidates for pk in candidate.unit_ids]
+        )
+    }
+    share_translations(units_by_pk.values())
     contexts = {}
-    for candidate in detect_policy_groups(policy, user=actor):
+    for candidate in candidates:
         identity = (tuple(candidate.source_forms), candidate.plural_number)
-        units = list(visible_units.filter(pk__in=candidate.unit_ids).order_by("pk"))
+        units = [
+            units_by_pk[pk] for pk in sorted(candidate.unit_ids) if pk in units_by_pk
+        ]
         if not units:
             continue
         group = groups.get(identity)
