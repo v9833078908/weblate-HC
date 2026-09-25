@@ -371,6 +371,7 @@ class ProducerRunDispatchTest(ViewTestCase):
         self.component.project.save(update_fields=["translation_review"])
         project = self.component.project
         unit = self.get_unit()
+        unit.translate(self.user, ["Judged target"], STATE_TRANSLATED)
         run = ProducerRun.objects.create(
             actor=self.user,
             dispatch_task_id=uuid.uuid4(),
@@ -384,7 +385,10 @@ class ProducerRunDispatchTest(ViewTestCase):
             cap=10,
             scope_snapshot=[unit.pk],
             configuration_snapshot=judge_configuration_snapshot(),
+            execution_options={"auto_source": "others", "judge_proposal_only": True},
         )
+        original_target = unit.target
+        original_state = unit.state
 
         def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             out = {}
@@ -415,6 +419,88 @@ class ProducerRunDispatchTest(ViewTestCase):
         self.assertIsNotNone(run.dispatch_published_at)
         judged_units = run_batch.call_args.args[0]
         self.assertEqual([judged.pk for judged in judged_units], [unit.pk])
+        unit.refresh_from_db()
+        self.assertEqual((unit.target, unit.state), (original_target, original_state))
+        self.assertEqual(run.preparation_snapshot, {})
+        self.assertEqual(run.preparation_phase, "")
+        self.assertFalse(Suggestion.objects.filter(unit=unit).exists())
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_verdict_only_project_judge_with_mt_source_skips_preparation(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        project = self.component.project
+        project.translation_review = True
+        project.save(update_fields=["translation_review"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Judged target"], STATE_TRANSLATED)
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-project",
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(project.pk),
+            scope_label=str(project),
+            scope_path=project.get_absolute_url(),
+            requested_query="",
+            requested_mode="judge",
+            cap=10,
+            scope_snapshot=[unit.pk],
+            configuration_snapshot=judge_configuration_snapshot(),
+            execution_options={"auto_source": "mt", "judge_proposal_only": True},
+        )
+        with (
+            patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run_batch,
+            patch(
+                "weblate.trans.autotranslate.BatchAutoTranslate.build_preparation_scope"
+            ) as build_scope,
+        ):
+            self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertTrue(run_batch.called, run.summary)
+        build_scope.assert_not_called()
+        self.assertEqual(run.preparation_snapshot, {})
+        self.assertEqual(run.preparation_phase, "")
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_legacy_project_judge_without_preparation_is_refused(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        project = self.component.project
+        unit = self.get_unit()
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-project",
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(project.pk),
+            scope_label=str(project),
+            scope_path=project.get_absolute_url(),
+            requested_query="",
+            requested_mode="judge",
+            cap=10,
+            scope_snapshot=[unit.pk],
+            configuration_snapshot=judge_configuration_snapshot(),
+        )
+        with patch("weblate.trans.autotranslate.run_judge_batch") as run_batch:
+            self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIn("queued before", run.failure)
+        run_batch.assert_not_called()
 
 
 class JudgePrimaryErrorTest(SimpleTestCase):

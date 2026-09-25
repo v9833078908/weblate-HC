@@ -2757,16 +2757,20 @@ class BatchAutoTranslate(BaseAutoTranslate):
         if judge_preview is not None:
             producer_run = self._adopt_producer_run()
             if self.mode == "judge" and producer_run is not None:
-                # Only a producer-dispatched bulk judge run (phase
-                # ``judge-project``) carries the mandatory preparation
-                # contract; a queued run without a snapshot predates it and
-                # must not silently resume with the new MT volume. Older
-                # direct/queued test launches build their scope here.
+                verdict_only = (
+                    producer_run.execution_options.get("judge_proposal_only") is True
+                    and not producer_run.preparation_snapshot
+                )
+                # A project judge run requesting MT must carry its closed
+                # preparation scope. An explicitly verdict-only run judges
+                # stored text and has no preparation snapshot by design.
+                # Older direct/queued launches build their scope here.
                 if (
                     self.producer_run_id is not None
                     and not producer_run.preparation_snapshot
                     and producer_run.requested_mode == "judge"
                     and producer_run.dispatch_phase == "judge-project"
+                    and not verdict_only
                 ):
                     self._finish_producer_run(
                         producer_run,
@@ -2782,7 +2786,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     preparation_scope = PreparationScope.from_json(
                         producer_run.preparation_snapshot
                     )
-                else:
+                elif not verdict_only:
                     preparation_scope = self.build_preparation_scope()
                     producer_run.preparation_snapshot = preparation_scope.to_json()
                     producer_run.preparation_phase = "pending"
