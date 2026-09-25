@@ -85,6 +85,28 @@ if TYPE_CHECKING:
 # rather than dropping their strings, but never hold a run for a long one.
 
 
+def _valid_preparation_ids(value: object) -> bool:
+    return (
+        isinstance(value, list)
+        and all(type(pk) is int and pk > 0 for pk in value)
+        and len(value) == len(set(value))
+    )
+
+
+def _valid_preparation_counts(value: object, missing_count: int) -> bool:
+    return (
+        isinstance(value, dict)
+        and all(
+            isinstance(language, str)
+            and bool(language.strip())
+            and type(count) is int
+            and count > 0
+            for language, count in value.items()
+        )
+        and sum(value.values()) == missing_count
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class JudgeScopePreview:
     matched: int
@@ -265,32 +287,32 @@ class PreparationScope:
 
     @staticmethod
     def from_json(payload: Mapping[str, Any]) -> PreparationScope:
+        msg = "Invalid preparation snapshot"
+        if not isinstance(payload, Mapping) or type(payload.get("version")) is not int:
+            raise ValueError(msg)
+        if payload["version"] != 1:
+            raise ValueError(msg)
+        unit_ids = payload.get("unit_ids")
+        missing_ids = payload.get("missing_ids")
+        per_language_missing = payload.get("per_language_missing")
+        mt_engine = payload.get("mt_engine")
         if (
-            not isinstance(payload, Mapping)
-            or payload.get("version") != 1
-            or not isinstance(payload.get("unit_ids"), list)
-            or not isinstance(payload.get("missing_ids"), list)
-            or not isinstance(payload.get("per_language_missing"), dict)
+            not _valid_preparation_ids(unit_ids)
+            or not _valid_preparation_ids(missing_ids)
+            or not set(missing_ids).issubset(unit_ids)
+            or not _valid_preparation_counts(per_language_missing, len(missing_ids))
             or "mt_engine" not in payload
-            or not (
-                payload.get("mt_engine") is None
-                or isinstance(payload.get("mt_engine"), str)
+            or (
+                mt_engine is not None
+                and (not isinstance(mt_engine, str) or not mt_engine.strip())
             )
         ):
-            msg = "Invalid preparation snapshot"
             raise ValueError(msg)
         return PreparationScope(
-            unit_ids=tuple(int(pk) for pk in payload.get("unit_ids", [])),
-            missing_ids=tuple(int(pk) for pk in payload.get("missing_ids", [])),
-            per_language_missing={
-                str(language): int(count)
-                for language, count in payload.get("per_language_missing", {}).items()
-            },
-            mt_engine=(
-                str(engine)
-                if isinstance(engine := payload.get("mt_engine"), str)
-                else None
-            ),
+            unit_ids=tuple(unit_ids),
+            missing_ids=tuple(missing_ids),
+            per_language_missing=dict(per_language_missing),
+            mt_engine=mt_engine,
         )
 
 
