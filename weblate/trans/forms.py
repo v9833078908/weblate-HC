@@ -1495,8 +1495,8 @@ class AutoForm(forms.Form):
         if self.initial.get("mode") not in allowed_modes:
             self.initial.pop("mode", None)
 
-        self.proposal_only = self._is_proposal_only()
-        self._configure_proposal_only(allowed_modes)
+        self.proposal_only = "judge" in allowed_modes and self._is_proposal_only()
+        self._configure_proposal_only()
 
         self.helper = FormHelper(self)
         self.helper.form_tag = False
@@ -1528,12 +1528,10 @@ class AutoForm(forms.Form):
         )
         return self.fields["judge_proposal_only"].to_python(value)
 
-    def _configure_proposal_only(self, allowed_modes: set[str]) -> None:
+    def _configure_proposal_only(self) -> None:
         if not self.proposal_only:
             return
-        self.fields["mode"].choices = (
-            [("judge", gettext("Judge check"))] if "judge" in allowed_modes else []
-        )
+        self.fields["mode"].choices = [("judge", gettext("Judge check"))]
         self.fields["mode"].widget = forms.HiddenInput()
         self.fields["mode"].initial = "judge"
         self.fields["q"].help_text = ""

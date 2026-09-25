@@ -254,6 +254,18 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
         self.assertFalse(form.proposal_only)
         self.assertFalse(form.cleaned_data["judge_proposal_only"])
 
+    @override_settings(JUDGE_ENABLED=False)
+    def test_proposal_flag_without_judge_mode_keeps_regular_form(self) -> None:
+        response = self.client.get(
+            self.project_language.get_absolute_url(),
+            {"mode": "judge", "judge_proposal_only": "1"},
+        )
+        self.assertFalse(response.context["autoform"].proposal_only)
+        page = html.fromstring(response.content)
+        self.assertEqual(page.xpath("//select[@name='mode']/@name"), ["mode"])
+        self.assertNotIn("judge", page.xpath("//select[@name='mode']/option/@value"))
+        self.assertNotContains(response, "Run judge check")
+
     def test_true_hidden_proposal_flag_round_trips_to_post(self) -> None:
         initial = AutoForm(
             obj=self.project,
