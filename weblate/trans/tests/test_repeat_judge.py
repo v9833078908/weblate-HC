@@ -352,8 +352,145 @@ class RepeatJudgeTest(RepeatJudgeFixtures):
         )
 
 
+class RepeatModelComparisonTest(RepeatJudgeFixtures):
+    """A current model comparison settles only groups the judge left to choose."""
+
+    @staticmethod
+    def recommendation(action: str, target=()) -> SimpleNamespace:
+        return SimpleNamespace(action=action, target=list(target), rationale="Why")
+
+    def judge_with(self, variants, recommendation):
+        return judge_groups([(1, variants)], {1: recommendation})[1]
+
+    def passed_group(self, targets):
+        variants = self.add_group("Gate", targets)
+        for variant in variants:
+            self.make_verdict(variant["units"][0])
+        return variants
+
+    def test_use_existing_on_a_passed_variant_is_ready(self) -> None:
+        variants = self.passed_group(["One", "Two"])
+
+        result = self.judge_with(
+            variants, self.recommendation("use_existing", ["Two"])
+        )
+
+        self.assertEqual(result.bucket, READY)
+        self.assertEqual(result.recommended, ("Two",))
+        self.assertEqual(result.model_action, "use_existing")
+
+    def test_use_existing_on_a_flagged_variant_stays_choose(self) -> None:
+        variants = self.passed_group(["One", "Two"])
+        variants += self.add_group("Gate", ["Bad"])
+        self.make_verdict(variants[2]["units"][0], JudgeVerdict.Severity.MAJOR)
+
+        result = self.judge_with(
+            variants, self.recommendation("use_existing", ["Bad"])
+        )
+
+        self.assertEqual(result.bucket, CHOOSE)
+        self.assertIsNone(result.recommended)
+        self.assertEqual(result.model_action, "")
+
+    def test_use_existing_with_an_approved_place_stays_choose(self) -> None:
+        variants = self.passed_group(["One", "Two"])
+        unit = variants[0]["units"][0]
+        unit.state = STATE_APPROVED
+
+        result = self.judge_with(
+            variants, self.recommendation("use_existing", ["Two"])
+        )
+
+        self.assertEqual(result.bucket, CHOOSE)
+        self.assertIsNone(result.recommended)
+
+    def test_keep_independent_stays_choose_and_marks_the_keep_option(self) -> None:
+        variants = self.passed_group(["One", "Two"])
+
+        result = self.judge_with(variants, self.recommendation("keep_independent"))
+
+        self.assertEqual(result.bucket, CHOOSE)
+        self.assertIsNone(result.recommended)
+        self.assertEqual(result.model_action, "keep_independent")
+
+    def test_other_actions_stay_choose(self) -> None:
+        for recommendation in (
+            self.recommendation("propose_new", ["Three"]),
+            self.recommendation("needs_human"),
+            None,
+        ):
+            with self.subTest(recommendation=recommendation):
+                variants = self.passed_group(["One", "Two"])
+                result = self.judge_with(variants, recommendation)
+                self.assertEqual(result.bucket, CHOOSE)
+                self.assertIsNone(result.recommended)
+                self.assertEqual(result.model_action, "")
+
+    def ready_group(self):
+        variants = self.add_group("Gate", ["Pass", "Flag"])
+        self.make_verdict(variants[0]["units"][0])
+        self.make_verdict(variants[1]["units"][0], JudgeVerdict.Severity.MAJOR)
+        return variants
+
+    def test_ready_group_stays_ready_when_the_model_agrees(self) -> None:
+        variants = self.ready_group()
+
+        result = self.judge_with(
+            variants, self.recommendation("use_existing", ["Pass"])
+        )
+
+        self.assertEqual(result.bucket, READY)
+        self.assertEqual(result.recommended, ("Pass",))
+        self.assertEqual(result.model_action, "use_existing")
+
+    def test_ready_group_moves_to_choose_when_the_model_disagrees(self) -> None:
+        for recommendation in (
+            self.recommendation("use_existing", ["Flag"]),
+            self.recommendation("keep_independent"),
+            self.recommendation("propose_new", ["Three"]),
+            self.recommendation("needs_human"),
+        ):
+            with self.subTest(action=recommendation.action):
+                result = self.judge_with(self.ready_group(), recommendation)
+                self.assertEqual(result.bucket, CHOOSE)
+                self.assertIsNone(result.recommended)
+                self.assertEqual(result.model_action, "")
+
+    def test_ready_group_without_a_recommendation_is_unchanged(self) -> None:
+        result = self.judge_with(self.ready_group(), None)
+
+        self.assertEqual(result.bucket, READY)
+        self.assertEqual(result.recommended, ("Pass",))
+        self.assertEqual(result.model_action, "")
+
+    def test_rewrite_and_unchecked_ignore_the_model(self) -> None:
+        rewrite = self.add_group("Gate", ["Bad", "Worse"])
+        for variant in rewrite:
+            self.make_verdict(variant["units"][0], JudgeVerdict.Severity.MAJOR)
+        unchecked = self.add_group("Gate", ["One", "Two"])
+        self.make_verdict(unchecked[0]["units"][0])
+        for variants, bucket in ((rewrite, REWRITE), (unchecked, UNCHECKED)):
+            with self.subTest(bucket=bucket):
+                result = self.judge_with(
+                    variants,
+                    self.recommendation("use_existing", [variants[0]["target"][0]]),
+                )
+                self.assertEqual(result.bucket, bucket)
+                self.assertEqual(result.model_action, "")
+
+    def test_plural_use_existing_keeps_the_full_target(self) -> None:
+        variants = self.passed_group([("One", "Many"), ("Other", "Others")])
+
+        result = self.judge_with(
+            variants, self.recommendation("use_existing", ["Other", "Others"])
+        )
+
+        self.assertEqual(result.bucket, READY)
+        self.assertEqual(result.recommended, ("Other", "Others"))
+
+
 class RepeatComparisonTriggerTest(RepeatJudgeFixtures):
-    """A completed queue judge run compares the variants it left to choose."""
+    """A completed queue judge run compares its ready and choose groups."""
 
     def setUp(self) -> None:
         super().setUp()
@@ -436,12 +573,14 @@ class RepeatComparisonTriggerTest(RepeatJudgeFixtures):
             for group in attempt.request_snapshot["groups"]
         }
 
-    def test_completed_queue_run_compares_choose_groups_without_results(self) -> None:
+    def test_completed_queue_run_compares_ready_and_choose_without_results(
+        self,
+    ) -> None:
         none = JudgeVerdict.Severity.NONE
         major = JudgeVerdict.Severity.MAJOR
         choose = self.add_judged_group("Choose", [none, none])
         decided = self.add_judged_group("Decided", [none, none])
-        self.add_judged_group("Ready", [none, major])
+        ready = self.add_judged_group("Ready", [none, major])
         self.add_judged_group("Rewrite", [major, major])
         self.add_judged_group("Unchecked", [none, ""])
         units = list(self.translation.unit_set.filter(source="Decided").order_by("pk"))
@@ -469,13 +608,13 @@ class RepeatComparisonTriggerTest(RepeatJudgeFixtures):
         queue = self.finish(run)
 
         self.assertEqual(RepeatRecommendationRun.objects.count(), 2)
-        self.assertEqual(self.sent_groups(), {choose.pk})
+        self.assertEqual(self.sent_groups(), {choose.pk, ready.pk})
         self.assertEqual(queue.call_count, 1)
         comparison = RepeatRecommendationRun.objects.exclude(pk=earlier.pk).get()
         self.assertEqual(comparison.actor, self.user)
         self.assertEqual(
             run.summary["repeat_comparison"],
-            {"status": "started", "run": comparison.pk, "groups": 1},
+            {"status": "started", "run": comparison.pk, "groups": 2},
         )
         # A redelivered completion or a second finalization starts nothing.
         self.assertIsNone(compare_after_judge(run.pk))
@@ -506,10 +645,10 @@ class RepeatComparisonTriggerTest(RepeatJudgeFixtures):
         self.assertNotEqual(partial.status, ProducerRun.Status.COMPLETED)
         self.assertFalse(RepeatRecommendationRun.objects.exists())
 
-    def test_no_choose_group_records_none(self) -> None:
-        self.add_judged_group(
-            "Ready", [JudgeVerdict.Severity.NONE, JudgeVerdict.Severity.MAJOR]
-        )
+    def test_no_ready_or_choose_group_records_none(self) -> None:
+        major = JudgeVerdict.Severity.MAJOR
+        self.add_judged_group("Rewrite", [major, major])
+        self.add_judged_group("Unchecked", [JudgeVerdict.Severity.NONE, ""])
         run = self.make_run()
 
         self.finish(run)

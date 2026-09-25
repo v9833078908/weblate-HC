@@ -141,7 +141,7 @@ def execute_repeat_recommendation_attempt(attempt_id: int) -> None:
 
 @app.task(trail=False, acks_late=True, reject_on_worker_lost=True)
 def compare_repeat_variants(run_id: str) -> None:
-    """Compare the variants a completed repeat queue check left to choose."""
+    """Compare repeat variants after a completed repeat queue check."""
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.repeat_judge import compare_after_judge
 

@@ -35,6 +35,8 @@ from weblate.utils.state import STATE_APPROVED, STATE_TRANSLATED
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from weblate.trans.models import RepeatRecommendationResult
+
 LOGGER = logging.getLogger(__name__)
 READY, CHOOSE, REWRITE, UNCHECKED = "ready", "choose", "rewrite", "unchecked"
 REPEAT_JUDGE_QUERY = "check:repeat-drift"
@@ -129,7 +131,7 @@ def schedule_repeat_comparison(run: ProducerRun) -> None:
 
 
 def compare_after_judge(run_id) -> dict[str, object] | None:
-    """Compare the variants a completed queue check left to choose, at most once."""
+    """Compare the variants of ready and choose groups after a queue check, once."""
     with transaction.atomic():
         run = ProducerRun.objects.select_for_update().filter(pk=run_id).first()
         if (
@@ -167,7 +169,7 @@ def _start_comparison(run: ProducerRun, policy: RepeatPolicy) -> dict[str, objec
     group_ids = sorted(
         group_id
         for group_id, judgement in judgements.items()
-        if judgement.bucket == CHOOSE
+        if judgement.bucket in {READY, CHOOSE}
     )
     if not group_ids:
         return {"status": "none", "groups": 0}
@@ -221,10 +223,15 @@ class GroupJudgement:
     variants: dict[tuple[str, ...], VariantJudgement]
     # (unit id, verdict pk, target hash) for every judged place, sorted.
     evidence: tuple[tuple[int, int, str], ...]
+    # "use_existing" when the model backs the recommended variant,
+    # "keep_independent" when it advises not to link the places, else "".
+    model_action: str = ""
 
 
 def judge_group(
-    variants: list[dict], verdicts: dict[int, JudgeVerdict | None]
+    variants: list[dict],
+    verdicts: dict[int, JudgeVerdict | None],
+    recommendation: RepeatRecommendationResult | None = None,
 ) -> GroupJudgement:
     """Classify one repeat group using current, collegium-reduced verdicts."""
     judgements: dict[tuple[str, ...], VariantJudgement] = {}
@@ -284,16 +291,46 @@ def judge_group(
         bucket = REWRITE
     else:
         bucket = UNCHECKED
+    recommended = passed_targets[0] if bucket == READY else None
+
+    model_action = ""
+    if recommendation is not None and bucket in {READY, CHOOSE}:
+        # The model compared every variant of the group (D15).
+        target = tuple(recommendation.target)
+        picked = judgements.get(target)
+        agrees = (
+            recommendation.action == "use_existing"
+            and picked is not None
+            and picked.mark == "passed"
+        )
+        if bucket == READY:
+            if agrees and target == recommended:
+                model_action = recommendation.action
+            else:
+                # A disagreement leaves the decision to the producer.
+                bucket = CHOOSE
+                recommended = None
+        elif agrees and not approved:
+            # An approved place stays a human decision (D4).
+            bucket = READY
+            recommended = target
+            model_action = recommendation.action
+        elif recommendation.action == "keep_independent":
+            model_action = recommendation.action
 
     return GroupJudgement(
         bucket=bucket,
-        recommended=passed_targets[0] if bucket == READY else None,
+        recommended=recommended,
         variants=judgements,
         evidence=tuple(sorted(evidence)),
+        model_action=model_action,
     )
 
 
-def judge_groups(groups: Iterable[tuple[int, list[dict]]]) -> dict[int, GroupJudgement]:
+def judge_groups(
+    groups: Iterable[tuple[int, list[dict]]],
+    recommendations: dict[int, RepeatRecommendationResult] | None = None,
+) -> dict[int, GroupJudgement]:
     """Judge many groups with one active-verdict query for all their places."""
     grouped = list(groups)
     units = [
@@ -303,4 +340,8 @@ def judge_groups(groups: Iterable[tuple[int, list[dict]]]) -> dict[int, GroupJud
         for unit in variant["units"]
     ]
     verdicts = active_verdicts(units)
-    return {group_id: judge_group(variants, verdicts) for group_id, variants in grouped}
+    recommendations = recommendations or {}
+    return {
+        group_id: judge_group(variants, verdicts, recommendations.get(group_id))
+        for group_id, variants in grouped
+    }
