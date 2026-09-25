@@ -32,7 +32,7 @@ from django.db.models import (
 from django.db.models.functions import MD5
 from django.utils import timezone
 from django.utils.html import escape
-from django.utils.translation import gettext, gettext_lazy
+from django.utils.translation import gettext, gettext_lazy, pgettext_lazy
 
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models.unit import Unit
@@ -54,6 +54,21 @@ JUDGE_REPAIR_REQUIREMENT = (
     "Fix all listed errors while preserving the remaining meaning, placeholders, and "
     "markup."
 )
+
+# The judge prompt's fixed error vocabulary (weblate/trans/judge.py
+# CATEGORIES), shown capitalized in the run report and repeat queue.
+JUDGE_CATEGORY_LABELS = {
+    "terminology": gettext_lazy("Terminology"),
+    "mistranslation": gettext_lazy("Mistranslation"),
+    "omission": gettext_lazy("Omission"),
+    "addition": gettext_lazy("Addition"),
+    "fluency": gettext_lazy("Fluency"),
+    "punctuation": gettext_lazy("Punctuation"),
+    "markup": gettext_lazy("Markup"),
+    # A plain "Register" already means the sign-up verb elsewhere in this
+    # project's translations; this is the linguistic register/tone sense.
+    "register": pgettext_lazy("Judge error category", "Register"),
+}
 
 # These are deliberately limited to request-shape and resolved-profile data.
 # In particular, do not add request text, response text, credentials, or full

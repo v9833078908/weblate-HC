@@ -42,6 +42,7 @@ from weblate.trans.models import (
     Translation,
 )
 from weblate.trans.models.judge import (
+    JUDGE_CATEGORY_LABELS,
     RUN_KIND_LABELS,
     SEVERITY_RANK,
     JudgeVerdict,
@@ -113,21 +114,6 @@ _OUTCOME_LABELS = {
     "matched": gettext_lazy("Matched"),
     "checked": gettext_lazy("Checked"),
     "cached": gettext_lazy("Cached"),
-}
-
-# The judge prompt's fixed error vocabulary (weblate/trans/judge.py
-# CATEGORIES), shown capitalized on the Pareto table.
-_CATEGORY_LABELS = {
-    "terminology": gettext_lazy("Terminology"),
-    "mistranslation": gettext_lazy("Mistranslation"),
-    "omission": gettext_lazy("Omission"),
-    "addition": gettext_lazy("Addition"),
-    "fluency": gettext_lazy("Fluency"),
-    "punctuation": gettext_lazy("Punctuation"),
-    "markup": gettext_lazy("Markup"),
-    # A plain "Register" already means the sign-up verb elsewhere in this
-    # project's translations; this is the linguistic register/tone sense.
-    "register": pgettext_lazy("Judge error category", "Register"),
 }
 
 _SEVERITY_LABELS = {
@@ -224,7 +210,7 @@ def _category_rows(rows: QuerySet) -> list[dict]:
         if primary is None:
             primary = errors[0]
         category = primary.get("category")
-        if category not in _CATEGORY_LABELS:
+        if category not in JUDGE_CATEGORY_LABELS:
             continue
         entry = per_category.setdefault(
             category, {"category": category, "count": 0, "worst": ""}
@@ -236,7 +222,7 @@ def _category_rows(rows: QuerySet) -> list[dict]:
             entry["worst"] = str(outcome)
     result = sorted(per_category.values(), key=lambda entry: -entry["count"])
     for entry in result:
-        entry["label"] = _CATEGORY_LABELS[entry["category"]]
+        entry["label"] = JUDGE_CATEGORY_LABELS[entry["category"]]
         entry["worst_label"] = _SEVERITY_LABELS.get(entry["worst"], "")
         entry["query"] = _SEVERITY_QUERY.get(entry["worst"], "")
     return result
@@ -303,7 +289,7 @@ def _annotate_row(row: JudgeRunUnit) -> None:
             "This string had no translation to judge."
         )
     elif primary is not None:
-        label = _CATEGORY_LABELS.get(
+        label = JUDGE_CATEGORY_LABELS.get(
             primary.get("category"), primary.get("category", "")
         )
         row.problem = f"{label}: {primary.get('description', '')}"  # type: ignore[attr-defined]
