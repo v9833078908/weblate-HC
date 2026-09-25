@@ -32987,6 +32987,14 @@ msgstr[0] "Проверено %(checked)s из %(total)s места"
 msgstr[1] "Проверено %(checked)s из %(total)s мест"
 msgstr[2] "Проверено %(checked)s из %(total)s мест"
 
+#: weblate/templates/repeat_queue.html
+#, python-format
+msgid "Comparing variants: %(counter)s group"
+msgid_plural "Comparing variants: %(counter)s groups"
+msgstr[0] "Сравнение вариантов: %(counter)s группа"
+msgstr[1] "Сравнение вариантов: %(counter)s группы"
+msgstr[2] "Сравнение вариантов: %(counter)s групп"
+
 #: weblate/templates/repeat_queue.html:139
 msgid "View judge run"
 msgstr "Открыть прогон судьи"
@@ -33115,6 +33123,10 @@ msgstr "При проверке судьёй нельзя перезаписыв
 #: weblate/templates/snippets/autoform.html
 msgid "The judge checks the matching strings and records verdicts. String states are not changed and no replacement translations are generated."
 msgstr "Судья проверяет строки по фильтру и записывает вердикты. Состояния строк не меняются, новые варианты перевода не создаются."
+
+#: weblate/templates/snippets/autoform.html
+msgid "After the check, the model compares the variants of repeat groups where the judge accepts at least one variant. This comparison is also paid and starts automatically when the check completes."
+msgstr "После проверки модель сравнивает варианты в группах повторов, где судья принял хотя бы один вариант. Это сравнение тоже платное и запускается автоматически, когда проверка завершится."
 
 #: weblate/templates/snippets/autoform.html
 msgid "A judge check plans up to %(requests)s LLM requests (batches × judges × rounds); a refused batch is retried once."

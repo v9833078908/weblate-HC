@@ -809,3 +809,8 @@ msgstr "Оценка стоимости начальной проверки су
 #: weblate/static/loader-bootstrap.js:1563
 msgid "Estimated judge cost for the initial check is unavailable."
 msgstr "Оценка стоимости начальной проверки судьёй недоступна."
+
+#: weblate/static/loader-bootstrap.js
+#, javascript-format
+msgid "Then the model compares variants: up to %(groups)s groups, about %(requests)s LLM requests."
+msgstr "Затем модель сравнит варианты: до %(groups)s групп, около %(requests)s запросов к LLM."
