@@ -36,12 +36,15 @@ from weblate.trans.models.judge import (
     JudgeCandidateMetadata,
     JudgeResolutionError,
     JudgeVerdict,
+    active_verdict,
+    active_verdicts,
     compute_context_hash,
     compute_decision_revision,
     compute_target_hash,
     compute_target_storage_hash,
     current_round,
     current_verdict,
+    judge_status_annotations,
     resolve_verdict,
     state_for_verdict,
     verdict_for_severity,
@@ -143,6 +146,124 @@ class JudgeSeverityGateTest(SimpleTestCase):
                 JudgeVerdict.Verdict.UNPARSED, enable_review=True, may_approve=True
             )
         )
+
+
+class ActiveVerdictsTest(ViewTestCase):
+    def make_verdict(self, unit: Unit, **kwargs) -> JudgeVerdict:
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", "c")
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        kwargs.setdefault("unparsed", False)
+        kwargs.setdefault("max_severity", JudgeVerdict.Severity.NONE)
+        return JudgeVerdict.objects.create(unit=unit, **kwargs)
+
+    def assert_batch_matches_single_and_annotation(self, units: list[Unit]) -> None:
+        for consensus in (True, False):
+            with (
+                self.subTest(consensus=consensus),
+                override_settings(JUDGE_CONSENSUS_REJECT=consensus),
+            ):
+                with self.assertNumQueries(1):
+                    batched = active_verdicts(units)
+                self.assertEqual(set(batched), {unit.pk for unit in units})
+                annotated = {
+                    unit.pk: unit.judge_active_severity
+                    for unit in Unit.objects.filter(
+                        pk__in=[unit.pk for unit in units]
+                    ).annotate(**judge_status_annotations())
+                }
+                for unit in units:
+                    single = active_verdict(unit)
+                    batch = batched[unit.pk]
+                    self.assertEqual(
+                        getattr(batch, "pk", None), getattr(single, "pk", None)
+                    )
+                    self.assertEqual(
+                        getattr(batch, "verdict", None),
+                        getattr(single, "verdict", None),
+                    )
+                    self.assertEqual(
+                        getattr(batch, "effective_severity", None),
+                        annotated[unit.pk],
+                    )
+                    if batch is not None:
+                        with self.assertNumQueries(0):
+                            _ = (
+                                batch.errors,
+                                batch.back_translation,
+                                batch.primary_error,
+                            )
+
+    def test_matches_active_verdict_per_unit_in_one_query(self) -> None:
+        Unit.objects.create(
+            translation=self.get_translation(),
+            id_hash=5000,
+            source="batch candidate source",
+            target="batch candidate target",
+            state=STATE_TRANSLATED,
+            position=5000,
+        )
+        units = list(
+            self.get_translation()
+            .unit_set.select_related("translation__component", "translation__plural")
+            .order_by("pk")[:5]
+        )
+        self.assertEqual(len(units), 5)
+        passed, flagged, one_seat, stale, candidate_only = units
+        passed.target = "batch passed target"
+        passed.save(update_fields=["target"])
+        stale.target = "batch stale target"
+        stale.save(update_fields=["target"])
+
+        self.make_verdict(passed, seat=1, back_translation="passed evidence")
+        self.make_verdict(passed, seat=2, max_severity="minor")
+        major = self.make_verdict(
+            flagged,
+            seat=1,
+            max_severity="major",
+            errors=[{"severity": "major", "description": "Wrong meaning"}],
+        )
+        self.make_verdict(flagged, seat=1, unparsed=True)
+        self.make_verdict(one_seat, seat=1)
+        self.make_verdict(one_seat, seat=2, unparsed=True)
+        # This hash is current for another unit, but stale for this unit.
+        self.make_verdict(
+            stale,
+            target_hash=compute_target_hash(passed.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(passed.target),
+        )
+        self.make_verdict(candidate_only, subject=JudgeVerdict.Subject.CANDIDATE)
+
+        self.assert_batch_matches_single_and_annotation(units)
+        self.assertEqual(active_verdicts(units)[flagged.pk].pk, major.pk)
+        self.assertIsNone(active_verdicts(units)[stale.pk])
+        self.assertIsNone(active_verdicts(units)[candidate_only.pk])
+
+    def test_disputed_critical_follows_consensus_setting(self) -> None:
+        unit = (
+            self.get_translation()
+            .unit_set.select_related("translation__component", "translation__plural")
+            .order_by("pk")
+            .first()
+        )
+        self.assertIsNotNone(unit)
+        critical = self.make_verdict(unit, seat=1, max_severity="critical")
+        self.make_verdict(unit, seat=2, max_severity="minor")
+
+        self.assert_batch_matches_single_and_annotation([unit])
+        for consensus, expected_severity, expected_verdict in (
+            (True, "major", JudgeVerdict.Verdict.FLAG),
+            (False, "critical", JudgeVerdict.Verdict.REJECT),
+        ):
+            with override_settings(JUDGE_CONSENSUS_REJECT=consensus):
+                batch = active_verdicts([unit])[unit.pk]
+                self.assertEqual(batch.pk, critical.pk)
+                self.assertEqual(batch.effective_severity, expected_severity)
+                self.assertEqual(batch.verdict, expected_verdict)
 
 
 class ProducerRunIdempotencyTest(ViewTestCase):
