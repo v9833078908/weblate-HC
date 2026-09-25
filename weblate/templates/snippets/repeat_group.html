@@ -8,6 +8,7 @@
             aria-controls="group-{{ item.group.pk }}">
       <span class="rq-source">{{ item.group.source_forms.0 }}</span>
       <span class="rq-group-summary">{% blocktranslate count counter=item.units|length %}{{ counter }} place{% plural %}{{ counter }} places{% endblocktranslate %} · {% blocktranslate count counter=item.variants|length %}{{ counter }} translation{% plural %}{{ counter }} translations{% endblocktranslate %}</span>
+      {% comment %}One badge: the toggle grid holds a single badge column.{% endcomment %}
       {% if item.status == 'approved-conflict' %}
         <span class="badge text-bg-warning">{% translate "Approved conflict" %}</span>
       {% elif item.status == 'rule-conflict' %}
@@ -16,14 +17,10 @@
         <span class="badge text-bg-success">{% translate "Resolved" %}</span>
       {% elif item.status == 'consistent' %}
         <span class="badge text-bg-light">{% translate "Same translation" %}</span>
+      {% elif item.preselect %}
+        <span class="badge text-bg-success">{% blocktranslate with target=item.judge.recommended.0 %}Recommended: {{ target }}{% endblocktranslate %}</span>
       {% else %}
         <span class="badge text-bg-secondary">{% translate "Different translations" %}</span>
-      {% endif %}
-      {% if item.preselect %}
-        <span class="badge text-bg-success">{% blocktranslate with target=item.judge.recommended.0 %}Recommended: {{ target }}{% endblocktranslate %}</span>
-      {% endif %}
-      {% if item.status == 'open' and item.judge.bucket == 'choose' and item.several_passed %}
-        <span class="badge text-bg-secondary">{% translate "The judge accepted several variants" %}</span>
       {% endif %}
     </button>
   </h2>
@@ -36,9 +33,6 @@
       <p>{% translate "The translation is already the same everywhere, so nothing needs fixing. Make it shared: a later edit then updates every place, and new strings with this text reuse it instead of being translated again." %}</p>
     {% elif item.status == 'open' or item.approved_conflict %}
       <p>{% blocktranslate count counter=item.variants|length %}This text is translated in {{ counter }} way. Choose one translation for every place.{% plural %}This text is translated in {{ counter }} different ways. Choose one translation for every place.{% endblocktranslate %}</p>
-    {% endif %}
-    {% if item.judge.bucket == 'ready' %}
-      <p class="text-muted">{% translate "The judge checked this translation in one of its places. Look through the preview before confirming." %}</p>
     {% endif %}
     {% if item.approved_conflict %}
       <p class="alert alert-warning">{% translate "Approved translations differ. They remain unchanged; you can still write a selected translation to eligible non-approved occurrences." %}</p>
@@ -75,21 +69,17 @@
                      data-choice="variant"
                      {% if item.preselect and variant.target == item.judge.recommended %}checked{% endif %} />
               <span class="form-check-label"><code>{{ variant.target.0 }}</code> — {% blocktranslate count counter=variant.units|length %}used in {{ counter }} place{% plural %}used in {{ counter }} places{% endblocktranslate %}
-                {% if variant.judge.mark == 'passed' %}
-                  {% if item.preselect and variant.target == item.judge.recommended %}
-                    <span class="badge text-bg-success">{% translate "Recommended: checked by the judge" %}</span>
-                  {% else %}
-                    <span class="badge text-bg-success">{% translate "Checked by the judge" %}</span>
-                  {% endif %}
+                {% if item.preselect and variant.target == item.judge.recommended %}
+                  <span class="badge text-bg-success">{% translate "Recommended" %}</span>
                 {% elif variant.judge.mark == 'flagged' %}
                   <span class="badge text-bg-warning">{% translate "The judge found an error" %}</span>
-                {% endif %}
-                {% if variant.model_pick %}
+                {% elif variant.model_pick %}
                   <span class="badge text-bg-info">{% translate "Model recommendation" %}</span>
                 {% endif %}
               </span>
               {% if variant.model_pick and item.recommendation.rationale %}<span class="d-block text-muted">{% blocktranslate with reason=item.recommendation.rationale %}Model rationale: {{ reason }}{% endblocktranslate %}</span>{% endif %}
-              {% if variant.judge.back_translation %}<span class="d-block text-muted">{% blocktranslate with translation=variant.judge.back_translation %}Back-translation: {{ translation }}{% endblocktranslate %}</span>{% endif %}
+              {% comment %}A back-translation that only echoes the target adds nothing.{% endcomment %}
+              {% if variant.judge.back_translation and variant.judge.back_translation != variant.target.0 %}<span class="d-block text-muted">{% blocktranslate with translation=variant.judge.back_translation %}Back-translation: {{ translation }}{% endblocktranslate %}</span>{% endif %}
               {% if variant.judge.reason %}<span class="d-block text-muted">{% blocktranslate with reason=variant.judge.reason %}Judge's reason: {{ reason }}{% endblocktranslate %}</span>{% endif %}
             </label>
           {% endfor %}

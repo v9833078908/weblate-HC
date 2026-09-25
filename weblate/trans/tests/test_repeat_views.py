@@ -1601,7 +1601,7 @@ class RepeatBulkViewsTest(ViewTestCase):
             self.make_judge_verdict(
                 unit,
                 back_translation=(
-                    "<b>x</b><script>y</script>" if unit == passed[0] else ""
+                    "<b>x</b><script>y</script>" if unit == passed[0] else "Pass two"
                 ),
             )
         self.make_recommendation(
@@ -1620,17 +1620,19 @@ class RepeatBulkViewsTest(ViewTestCase):
 
         response = self.client.get(self.queue_url)
 
-        self.assertContains(response, "Recommended: checked by the judge")
         self.assertContains(
-            response,
-            "The judge checked this translation in one of its places. Look through the preview before confirming.",
+            response, '<span class="badge text-bg-success">Recommended</span>'
         )
         self.assertContains(response, "The checked translation")
         self.assertContains(
             response,
             "Back-translation: &lt;b&gt;x&lt;/b&gt;&lt;script&gt;y&lt;/script&gt;",
         )
-        self.assertContains(response, "Checked by the judge")
+        # A passed variant carries no badge of its own; only the
+        # recommendation and a found error are marked.
+        self.assertNotContains(response, "Checked by the judge")
+        # A back-translation that only echoes its variant is not shown.
+        self.assertNotContains(response, "Back-translation: Pass two")
         self.assertContains(response, "The judge found an error")
         self.assertContains(response, "&lt;color=#FF0000&gt;")
         self.assertNotContains(response, "<script>y</script>")
@@ -2174,7 +2176,9 @@ class RepeatBulkViewsTest(ViewTestCase):
             picked_card,
             r'name="target"\s+value="Model picked 1"\s+data-choice="variant"\s+checked',
         )
-        self.assertIn("Model recommendation", picked_card)
+        # A preselected pick carries one badge; the rationale explains it.
+        self.assertNotIn("Model recommendation", picked_card)
+        self.assertIn(">Recommended</span>", picked_card)
         self.assertIn("Model rationale: Picked why", picked_card)
         # The model's pick is its own variant row, not a second radio.
         self.assertEqual(picked_card.count('value="Model picked 1"'), 1)
@@ -2188,12 +2192,16 @@ class RepeatBulkViewsTest(ViewTestCase):
                 self.assertNotRegex(card, r"(?s)<input[^>]*\schecked")
                 self.assertIn(f"Model rationale: {rationale}", card)
                 self.assertNotIn("Recommended: ", card)
-        self.assertIn("Model recommendation", self.card(response, disagree))
-        several = "The judge accepted several variants"
-        for group in (keep, human):
-            self.assertIn(several, self.card(response, group))
-        for group in (picked, disagree):
-            self.assertNotIn(several, self.card(response, group))
+        # A model pick of a flagged variant shows the judge's error once and
+        # the model's rationale beside it.
+        disagree_card = self.card(response, disagree)
+        self.assertIn("The judge found an error", disagree_card)
+        self.assertNotIn("Model recommendation", disagree_card)
+        for group in (picked, keep, human, disagree):
+            with self.subTest(header=group.source_forms[0]):
+                header = self.card(response, group).split("</button>", 1)[0]
+                # The toggle grid holds one badge column.
+                self.assertEqual(header.count('class="badge'), 1)
 
     def test_queue_plural_model_results_preselect_nothing(self) -> None:
         source = join_plural(["Gate", "Gates"])

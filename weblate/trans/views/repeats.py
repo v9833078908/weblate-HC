@@ -211,9 +211,6 @@ def _judge_panel(request, obj, target_language, groups, policy, current):
         item["model_on_variant"] = any(
             variant["model_pick"] for variant in item["variants"]
         )
-        item["several_passed"] = (
-            sum(variant["judge"].mark == "passed" for variant in item["variants"]) > 1
-        )
         recommended = item["judge"].recommended
         single_form = len(item["variants"][0]["target"]) == 1
         item["preselect"] = (

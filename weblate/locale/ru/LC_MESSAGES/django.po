@@ -33179,3 +33179,7 @@ msgstr[2] "групп, которые судья не смог проверит�
 #: weblate/templates/snippets/repeat_group.html
 msgid "The judge accepted several variants"
 msgstr "Судья одобрил несколько вариантов"
+
+#: weblate/templates/snippets/repeat_group.html
+msgid "Recommended"
+msgstr "Рекомендуем"
