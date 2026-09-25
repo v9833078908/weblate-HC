@@ -33156,11 +33156,11 @@ msgid "Review and apply at once"
 msgstr "Проверить и применить разом"
 
 #: weblate/templates/repeat_queue.html
-msgid "group: several variants passed, your choice"
-msgid_plural "groups: several variants passed, your choice"
-msgstr[0] "группа: судья одобрил несколько вариантов, выбор за вами"
-msgstr[1] "группы: судья одобрил несколько вариантов, выбор за вами"
-msgstr[2] "групп: судья одобрил несколько вариантов, выбор за вами"
+msgid "group: no single safe variant, your choice"
+msgid_plural "groups: no single safe variant, your choice"
+msgstr[0] "группа: нет одного надёжного варианта, выбор за вами"
+msgstr[1] "группы: нет одного надёжного варианта, выбор за вами"
+msgstr[2] "групп: нет одного надёжного варианта, выбор за вами"
 
 #: weblate/templates/repeat_queue.html
 msgid "group: errors in every variant, a new translation is needed"

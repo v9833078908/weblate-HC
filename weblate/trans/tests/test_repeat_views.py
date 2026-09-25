@@ -1987,7 +1987,7 @@ class RepeatBulkViewsTest(ViewTestCase):
             content,
             r'(?s)judge=choose"\s+aria-current="page">'
             r'<span class="d-block fs-3 fw-semibold">1</span>'
-            r"\s*group: several variants passed, your choice</a>",
+            r"\s*group: no single safe variant, your choice</a>",
         )
         self.assertContains(
             response, "groups: errors in every variant, a new translation is needed"

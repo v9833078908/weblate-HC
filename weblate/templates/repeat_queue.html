@@ -186,7 +186,7 @@
                   <div class="card-body">
                     <a href="?status=open&amp;judge=choose"
                        {% if judge_filter == 'choose' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.choose }}</span>
-                      {% blocktranslate count counter=judge_panel.buckets.choose %}group: several variants passed, your choice{% plural %}groups: several variants passed, your choice{% endblocktranslate %}</a>
+                      {% blocktranslate count counter=judge_panel.buckets.choose %}group: no single safe variant, your choice{% plural %}groups: no single safe variant, your choice{% endblocktranslate %}</a>
                   </div>
                 </div>
               </li>
