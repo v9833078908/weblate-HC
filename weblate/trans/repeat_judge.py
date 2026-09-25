@@ -99,15 +99,17 @@ def judge_group(
                 passed.append((unit.pk, verdict))
 
         mark = "flagged" if flagged else "passed" if passed else "unchecked"
-        back_translation = (
-            min(passed, key=itemgetter(0))[1].back_translation if passed else ""
-        )
-        reason = ""
+        back_translation = reason = ""
+        if passed:
+            back_translation = min(passed, key=itemgetter(0))[1].back_translation
         if flagged:
+            # A flagged variant shows what its strictest seat read, so a
+            # producer can see when the rejected text is only a synonym.
             _, strictest = max(
                 flagged,
                 key=lambda item: (SEVERITY_RANK[item[1].effective_severity], -item[0]),
             )
+            back_translation = strictest.back_translation
             primary = strictest.primary_error
             if primary is not None:
                 category = primary.get("category", "")

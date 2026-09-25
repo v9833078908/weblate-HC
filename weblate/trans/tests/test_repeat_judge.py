@@ -235,12 +235,16 @@ class RepeatJudgeTest(ViewTestCase):
             more[0]["units"][0], back_translation="Second back translation"
         )
         self.make_verdict(
-            flagged_low, JudgeVerdict.Severity.MAJOR, description="Major error"
+            flagged_low,
+            JudgeVerdict.Severity.MAJOR,
+            description="Major error",
+            back_translation="Major back translation",
         )
         self.make_verdict(
             more[1]["units"][0],
             JudgeVerdict.Severity.CRITICAL,
             description="Critical error",
+            back_translation="Critical back translation",
         )
 
         result = self.judge(variants)
@@ -250,6 +254,11 @@ class RepeatJudgeTest(ViewTestCase):
         )
         self.assertEqual(
             result.variants["Flag",].reason, "Mistranslation: Critical error"
+        )
+        # The flagged variant shows what the strictest seat read, so a
+        # producer can see the rejected text is often an acceptable synonym.
+        self.assertEqual(
+            result.variants["Flag",].back_translation, "Critical back translation"
         )
 
     def test_equal_severity_reasons_use_lowest_unit_id(self) -> None:
