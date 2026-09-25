@@ -68,7 +68,7 @@ such groups are applied in bulk after one review table.
 | D8 | The queue gets a panel with three states (start / running / ready) and four bucket counters that filter the queue. | Replaces the toolbar button; buckets are `ready`, `choose`, `rewrite`, `unchecked`. |
 | D9 | Every variant of a group must be checked before the group can be `ready` (review Q1, answer A). | One passed variant next to an unchecked one is `unchecked`, not `ready`: an unchecked variant could also pass, which would make the group "choose yourself". |
 | D10 | The queue's judge run records verdicts only (review Q2, answer A). | A proposal-only launch stores `judge_candidate_severities=[]` and skips the machine-translation preparation: no repair candidate is paid for, since this flow never shows one and bulk apply overwrites flagged places. |
-| D11 | A place counts as passed only when every configured judge seat returned a parsed verdict for its current text (review Q3, answer A). | Matches the rule for judge approval (`weblate/trans/autotranslate.py:1403-1407`, `has_complete_current_evidence`). A place with one seat's pass is `unchecked`; one seat's `flag`/`reject` is already `flagged`. |
+| D11 | A place's verdict is the existing collegium rule, unchanged (review Q3, answer B; the owner revised an earlier answer A on 2026-09-25). | `active_verdict` / `collegium_verdict` (`weblate/trans/models/judge.py:1336-1364`): when both seats answered, the strictest wins; when one seat failed in transport, the other seat's parsed verdict stands. No seat-count requirement. The queue must show the same verdict as the editor card; a disagreement between seats is already safe because the strictest wins; the only difference from requiring both seats is a one-seat transport failure, and the phase 1 paid run with its 25-group check shows whether that matters. Tighten later if it does. |
 | D12 | Two phases (review Q4, answer A). | Phase 1 = Tasks 1-7: judgements, panel, card, and a gated paid run with a precision check of at least 25 ready groups. Phase 2 = Tasks 8-10 (bulk apply) starts only if at most one in five is wrong and the owner approves phase 2. |
 
 ## Evidence the design rests on
@@ -132,8 +132,7 @@ and re-checked by the engineering review on 2026-09-25.
   (`weblate/trans/models/judge.py:1456-1542`, matching on
   `target_storage_hash`). A reason text is built as
   `f"{label}: {description}"` from `primary_error` and `_CATEGORY_LABELS`
-  (`weblate/trans/views/judge.py:120-131`, `298-309`). The configured seats
-  are `JUDGE_SEATS` (`weblate/trans/judge.py:46`).
+  (`weblate/trans/views/judge.py:120-131`, `298-309`).
 - **Progress.** `ProducerRun.get_coverage()`
   (`weblate/trans/models/judge.py:460-551`) returns `total`, `recorded`,
   `pending` and more. `recorded` includes the `PENDING` rows a run reserves up
@@ -173,16 +172,15 @@ and re-checked by the engineering review on 2026-09-25.
 
 ## Judgement rule
 
-Evaluated per group whose queue status is `open`. `seats` is `JUDGE_SEATS`.
+Evaluated per group whose queue status is `open`.
 
-1. For each place, take its active round: per seat, the newest parsed live row
-   for its current text (`active_round` semantics).
+1. For each place, take its active verdict (`active_verdict` semantics, D11):
+   per seat the newest parsed live row for its current text, reduced by the
+   collegium rule; a seat without a parsed row does not block the other.
 2. A **place** is
-   - `flagged` when the round's collegium verdict is `flag` or `reject`, even
-     if only one seat answered;
-   - `passed` when the collegium verdict is `pass` and the round has a parsed
-     row from every seat in `seats` (D11);
-   - otherwise `unchecked`.
+   - `flagged` when that verdict is `flag` or `reject`;
+   - `passed` when that verdict is `pass`;
+   - otherwise (no parsed verdict for the current text) `unchecked`.
 3. A **variant** is `flagged` when any of its places is flagged; `passed` when
    at least one place passed and none is flagged; otherwise `unchecked`.
 4. The **group bucket**, first match wins:
@@ -225,11 +223,11 @@ hand.
 
 ## Phase 1: judgements, panel and card
 
-### Task 1: batched active rounds
+### Task 1: batched active verdicts
 
 **Files:**
 
-- Modify: `weblate/trans/models/judge.py` (next to `active_round`, line 1293)
+- Modify: `weblate/trans/models/judge.py` (next to `active_verdict`, line 1362)
 - Test: `weblate/trans/tests/test_judge.py`
 
 **Step 1: Write the failing test**
@@ -241,7 +239,7 @@ Add a test class that reuses the verdict factory shape from
 `get_target_plurals()` does not query inside the assertion:
 
 ```python
-class ActiveRoundsTest(ViewTestCase):
+class ActiveVerdictsTest(ViewTestCase):
     def make_verdict(self, unit, **kwargs) -> JudgeVerdict:
         kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
         kwargs.setdefault(
@@ -254,18 +252,21 @@ class ActiveRoundsTest(ViewTestCase):
         kwargs.setdefault("max_severity", JudgeVerdict.Severity.NONE)
         return JudgeVerdict.objects.create(unit=unit, **kwargs)
 
-    def test_matches_active_round_per_unit_in_one_query(self) -> None:
+    def test_matches_active_verdict_per_unit_in_one_query(self) -> None:
         units = list(
             self.get_translation()
             .unit_set.select_related("translation__component", "translation__plural")
-            .order_by("pk")[:4]
+            .order_by("pk")[:5]
         )
-        passed, flagged, stale, empty = units
+        passed, flagged, one_seat, stale, empty = units
         self.make_verdict(passed, seat=1)
         self.make_verdict(passed, seat=2, max_severity="minor")
         self.make_verdict(flagged, seat=1, max_severity="major")
         # A newer unparsed row never hides an older parsed opinion.
         self.make_verdict(flagged, seat=1, unparsed=True)
+        # Seat 2 failed in transport: seat 1's parsed pass stands.
+        self.make_verdict(one_seat, seat=1)
+        self.make_verdict(one_seat, seat=2, unparsed=True)
         self.make_verdict(stale, target_hash="not-the-current-text")
         # A candidate row is not an opinion about the live text.
         self.make_verdict(empty, subject=JudgeVerdict.Subject.CANDIDATE)
@@ -276,7 +277,7 @@ class ActiveRoundsTest(ViewTestCase):
                 override_settings(JUDGE_CONSENSUS_REJECT=consensus),
             ):
                 with self.assertNumQueries(1):
-                    batched = active_rounds(units)
+                    batched = active_verdicts(units)
                 annotated = {
                     unit.pk: unit.judge_active_severity
                     for unit in Unit.objects.filter(
@@ -284,19 +285,16 @@ class ActiveRoundsTest(ViewTestCase):
                     ).annotate(**judge_status_annotations())
                 }
                 for unit in units:
-                    self.assertEqual(
-                        [row.pk for row in batched[unit.pk]],
-                        [row.pk for row in active_round(unit)],
-                    )
-                    verdict = collegium_verdict(batched[unit.pk])
                     single = active_verdict(unit)
                     self.assertEqual(
-                        getattr(verdict, "pk", None), getattr(single, "pk", None)
+                        getattr(batched[unit.pk], "pk", None),
+                        getattr(single, "pk", None),
                     )
                     if single is not None:
-                        self.assertEqual(verdict.verdict, single.verdict)
+                        self.assertEqual(batched[unit.pk].verdict, single.verdict)
                     self.assertEqual(
-                        getattr(verdict, "effective_severity", None), annotated[unit.pk]
+                        getattr(batched[unit.pk], "effective_severity", None),
+                        annotated[unit.pk],
                     )
 ```
 
@@ -307,16 +305,16 @@ setting.
 
 **Step 2: Run it and see it fail**
 
-`uv run pytest weblate/trans/tests/test_judge.py -k ActiveRoundsTest -n 0`
-Expected: `ImportError`/`NameError` for `active_rounds`.
+`uv run pytest weblate/trans/tests/test_judge.py -k ActiveVerdictsTest -n 0`
+Expected: `ImportError`/`NameError` for `active_verdicts`.
 
 **Step 3: Implement**
 
 ```python
-def active_rounds(units: Sequence[Unit]) -> dict[int, list[JudgeVerdict]]:
-    """Return ``active_round`` for many units with one query."""
-    # The same rule lives in active_round() and, as SQL, in
-    # judge_status_annotations(); ActiveRoundsTest pins all three together.
+def active_verdicts(units: Sequence[Unit]) -> dict[int, JudgeVerdict | None]:
+    """Return ``active_verdict`` for many units with one query."""
+    # The same rule lives in active_verdict() and, as SQL, in
+    # judge_status_annotations(); ActiveVerdictsTest pins all three together.
     target_hashes = {
         unit.pk: compute_target_hash(unit.get_target_plurals()) for unit in units
     }
@@ -345,20 +343,23 @@ def active_rounds(units: Sequence[Unit]) -> dict[int, list[JudgeVerdict]]:
         # The same text in two units shares a hash; keep only the unit's own.
         if row.target_hash == target_hashes[row.unit_id]:
             newest.setdefault((row.unit_id, row.seat), row)
-    rounds: dict[int, list[JudgeVerdict]] = {unit_id: [] for unit_id in target_hashes}
+    rounds: dict[int, list[JudgeVerdict]] = defaultdict(list)
     for (unit_id, _seat), row in sorted(newest.items()):
         rounds[unit_id].append(row)
-    return rounds
+    return {
+        unit_id: collegium_verdict(rounds.get(unit_id, [])) for unit_id in target_hashes
+    }
 ```
 
-This mirrors `_seat_round_rows(..., context_hash=None, prefer_parsed=True)`:
-per seat the newest parsed live row for the current text. Callers reduce a
-round with `collegium_verdict` and read seat completeness from its rows.
+This mirrors `_seat_round_rows(..., context_hash=None, prefer_parsed=True)`
+reduced by `collegium_verdict`: per seat the newest parsed live row for the
+current text, strictest seat wins, a seat without a parsed row does not block
+the other (D11).
 
 **Step 4: Run it and see it pass**, then run the whole
 `weblate/trans/tests/test_judge.py`.
 
-**Step 5: Commit** `feat(judge): read active rounds for many units at once`.
+**Step 5: Commit** `feat(judge): read active verdicts for many units at once`.
 
 ### Task 2: group judgements
 
@@ -382,9 +383,12 @@ stated. One test per rule row:
 - one passed + one unchecked variant: `unchecked`, `recommended` is `None`
   (D9);
 - one passed + one flagged + one unchecked: `unchecked`;
-- a place with a pass from seat 1 only: the place and its variant are
-  `unchecked`, so the group is not `ready` (D11);
+- a place whose seat 1 passed while seat 2 has only an unparsed row: the place
+  and its variant are `passed`, so one such variant next to a flagged one is
+  `ready` (D11);
 - a place with a `major` from seat 1 only: its variant is `flagged`;
+- a place with seat 1 `none` and seat 2 `major`: `flagged` (the strictest seat
+  wins);
 - two passed: `choose`, `recommended` is `None`; two passed + one unchecked:
   still `choose`;
 - one passed + one flagged while a place is `STATE_APPROVED`: `choose`;
@@ -419,29 +423,24 @@ class GroupJudgement:
     bucket: str
     recommended: tuple[str, ...] | None
     variants: dict[tuple[str, ...], VariantJudgement]
-    # (unit id, verdict pk, target hash) for every active-round row, sorted.
+    # (unit id, verdict pk, target hash) for every judged place, sorted.
     evidence: tuple[tuple[int, int, str], ...]
 
 
 def judge_group(
-    variants: list[dict],
-    rounds: dict[int, list[JudgeVerdict]],
-    *,
-    seats: Sequence[int] = JUDGE_SEATS,
+    variants: list[dict], verdicts: dict[int, JudgeVerdict | None]
 ) -> GroupJudgement: ...
 
 
-def judge_groups(
-    groups: Iterable[tuple[int, list[dict]]], *, seats: Sequence[int] = JUDGE_SEATS
-) -> dict[int, GroupJudgement]:
+def judge_groups(groups: Iterable[tuple[int, list[dict]]]) -> dict[int, GroupJudgement]:
     """Judge many groups with one verdict query; ``groups`` yields (group id, variants)."""
     ...
 ```
 
 `variants` is the queue's shape: `[{"target": tuple, "units": [Unit, ...]}]`
 (`weblate/trans/views/repeats.py:149-165`). The place, variant and bucket rules
-are the "Judgement rule" section, in that order. `JUDGE_SEATS` comes from
-`weblate/trans/judge.py:46`. The reason text reuses `_CATEGORY_LABELS` from
+are the "Judgement rule" section, in that order; `judge_groups` reads all
+places through one `active_verdicts` call. The reason text reuses `_CATEGORY_LABELS` from
 `weblate/trans/views/judge.py:120`; move that mapping to
 `weblate/trans/models/judge.py` if importing a view module from a service
 module would create a cycle, and import it back in the view.
@@ -696,8 +695,8 @@ Plural entries use `{% blocktranslate count %}` / `ngettext` with all three
 Russian forms.
 
 `PRODUCT.md`: "the UI preselects nothing" becomes "the UI preselects nothing
-except a single-form repeat variant the LLM judge passed, with both seats, as
-the only variant without errors for its exact current text; a preselected
+except a single-form repeat variant the LLM judge passed as the only
+variant without errors for its exact current text; a preselected
 choice still goes through preview and confirmation". The paid-trigger truth
 states that the repeat queue links to the standard judge launch in a
 verdict-only mode (no repair candidates, no pre-translation) and starts
@@ -948,8 +947,8 @@ Phase 1:
 
 | Check | Result |
 | --- | --- |
-| `active_rounds` equals `active_round`, `active_verdict` and `judge_status_annotations`, one query | Pending |
-| Judgement rule cases (ready / choose / rewrite / unchecked, unchecked variant, one seat, approved, stale) | Pending |
+| `active_verdicts` equals `active_verdict` and `judge_status_annotations`, one query | Pending |
+| Judgement rule cases (ready / choose / rewrite / unchecked, unchecked variant, one parsed seat, strictest seat, approved, stale) | Pending |
 | Verdict-only launch: no state change, no candidates, no preparation, returns to the queue | Pending |
 | Queue panel states, progress without reserved rows, stopped run, relaunch scope, bucket filter; no paid recommend link | Pending |
 | Card preselection (single-form only), evidence, escaping | Pending |
@@ -973,7 +972,7 @@ Phase 2:
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | - | - |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | - | - |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 27 findings (2 P1, 12 P2, 13 P3): 4 owner decisions resolved on 2026-09-25 (Q1-Q4, all answer A, recorded as D9-D12); 23 fixes folded into Tasks 1-10; 18 test gaps added to the tasks; 0 open |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 27 findings (2 P1, 12 P2, 13 P3): 4 owner decisions resolved on 2026-09-25 (Q1 A, Q2 A, Q3 B after revision, Q4 A; recorded as D9-D12); 23 fixes folded into Tasks 1-10; 18 test gaps added to the tasks; 0 open |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | - | - |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | - | - |
 
