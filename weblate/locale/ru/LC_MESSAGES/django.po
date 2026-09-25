@@ -33135,3 +33135,47 @@ msgstr "Проверка судьёй предполагает до %(requests)s
 #: weblate/templates/snippets/autoform.html
 msgid "Run judge check"
 msgstr "Запустить проверку судьёй"
+
+#: weblate/templates/repeat_queue.html
+msgid "Judge check progress"
+msgstr "Ход проверки судьёй"
+
+#: weblate/templates/repeat_queue.html
+msgid "You can leave this page: the check runs in the background and results appear here."
+msgstr "Можно уйти со страницы: проверка идёт в фоне, результаты появятся здесь."
+
+#: weblate/templates/repeat_queue.html
+msgid "group: a recommended variant is ready"
+msgid_plural "groups: a recommended variant is ready"
+msgstr[0] "группа: рекомендованный вариант готов"
+msgstr[1] "группы: рекомендованный вариант готов"
+msgstr[2] "групп: рекомендованный вариант готов"
+
+#: weblate/templates/repeat_queue.html
+msgid "Review and apply at once"
+msgstr "Проверить и применить разом"
+
+#: weblate/templates/repeat_queue.html
+msgid "group: several variants passed, your choice"
+msgid_plural "groups: several variants passed, your choice"
+msgstr[0] "группа: судья одобрил несколько вариантов, выбор за вами"
+msgstr[1] "группы: судья одобрил несколько вариантов, выбор за вами"
+msgstr[2] "групп: судья одобрил несколько вариантов, выбор за вами"
+
+#: weblate/templates/repeat_queue.html
+msgid "group: errors in every variant, a new translation is needed"
+msgid_plural "groups: errors in every variant, a new translation is needed"
+msgstr[0] "группа: ошибки во всех вариантах, нужен новый перевод"
+msgstr[1] "группы: ошибки во всех вариантах, нужен новый перевод"
+msgstr[2] "групп: ошибки во всех вариантах, нужен новый перевод"
+
+#: weblate/templates/repeat_queue.html
+msgid "group the judge could not check"
+msgid_plural "groups the judge could not check"
+msgstr[0] "группа, которую судья не смог проверить"
+msgstr[1] "группы, которые судья не смог проверить"
+msgstr[2] "групп, которые судья не смог проверить"
+
+#: weblate/templates/snippets/repeat_group.html
+msgid "The judge accepted several variants"
+msgstr "Судья одобрил несколько вариантов"

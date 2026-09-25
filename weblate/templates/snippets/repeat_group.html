@@ -22,6 +22,9 @@
       {% if item.preselect %}
         <span class="badge text-bg-success">{% blocktranslate with target=item.judge.recommended.0 %}Recommended: {{ target }}{% endblocktranslate %}</span>
       {% endif %}
+      {% if item.status == 'open' and item.judge.bucket == 'choose' and item.several_passed %}
+        <span class="badge text-bg-secondary">{% translate "The judge accepted several variants" %}</span>
+      {% endif %}
     </button>
   </h2>
   <section id="group-{{ item.group.pk }}"

@@ -1780,6 +1780,16 @@ class RepeatBulkViewsTest(ViewTestCase):
 
         self.assertEqual(response.context["judge_panel"]["state"], "running")
         self.assertContains(response, "Checked 420 of 1022 places")
+        self.assertContains(response, 'aria-valuenow="420"')
+        self.assertContains(response, 'aria-valuemin="0"')
+        self.assertContains(response, 'aria-valuemax="1022"')
+        self.assertContains(response, 'aria-label="Judge check progress"')
+        self.assertContains(response, "width: 41%")
+        self.assertContains(
+            response,
+            "You can leave this page: the check runs in the background "
+            "and results appear here.",
+        )
         self.assertTrue(response.context["judge_panel"]["can_view_run"])
         self.assertContains(response, run.get_absolute_url())
 
@@ -1940,6 +1950,77 @@ class RepeatBulkViewsTest(ViewTestCase):
             response.context["groups"][0]["group"].source_forms, ["Ready bucket"]
         )
 
+    def test_queue_ready_state_shows_tiles_instead_of_launch(self) -> None:
+        _, ready = self.make_group("Tile ready", ["R1", "R2"], start=26410)
+        _, choose = self.make_group("Tile choose", ["C1", "C2"], start=26510)
+        self.make_judge_verdict(ready[0])
+        self.make_judge_verdict(ready[1], JudgeVerdict.Severity.MAJOR)
+        for unit in choose:
+            self.make_judge_verdict(unit)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch(
+                "weblate.trans.views.repeats.judge_configuration_ready",
+                return_value=True,
+            ),
+        ):
+            response = self.client.get(self.queue_url + "?status=open&judge=choose")
+
+        panel = response.context["judge_panel"]
+        self.assertEqual(panel["state"], "ready")
+        self.assertTrue(panel["can_launch"])
+        content = response.content.decode()
+        self.assertRegex(
+            content,
+            r'(?s)judge=ready"\s*>\s*<span class="d-block fs-3 fw-semibold">1</span>'
+            r"\s*group: a recommended variant is ready</a>",
+        )
+        self.assertRegex(
+            content,
+            r'(?s)judge=choose"\s+aria-current="page">'
+            r'<span class="d-block fs-3 fw-semibold">1</span>'
+            r"\s*group: several variants passed, your choice</a>",
+        )
+        self.assertContains(
+            response, "groups: errors in every variant, a new translation is needed"
+        )
+        self.assertContains(response, "groups the judge could not check")
+        self.assertNotContains(response, "Check variants with the judge</a>")
+        self.assertNotContains(response, "The repeat check covers")
+        self.assertNotContains(response, "the cost estimate appears")
+        self.assertNotContains(response, "Review and apply at once")
+
+    def test_queue_ready_tile_offers_bulk_review(self) -> None:
+        group, units = self.make_group("Tile review", ["R1", "R2"], start=26420)
+        self.make_judge_verdict(units[0])
+        self.make_judge_verdict(units[1], JudgeVerdict.Severity.MAJOR)
+        self.make_recommendation(
+            self.make_recommendation_run(),
+            group,
+            units,
+            action="use_existing",
+            target=["R1"],
+        )
+
+        response = self.client.get(self.queue_url)
+
+        self.assertEqual(response.context["bulk_ready"], 1)
+        self.assertContains(
+            response,
+            f'<a class="btn btn-primary btn-sm d-block mt-2" '
+            f'href="{response.context["bulk_review_url"]}">'
+            "Review and apply at once</a>",
+            html=True,
+        )
+
     def test_queue_unchecked_places_inside_check_offer_relaunch(self) -> None:
         _, units = self.make_group("Remaining places", ["One", "Two"], start=26800)
         _, ready_units = self.make_group("Ready places", ["Yes", "No"], start=26850)
@@ -1975,7 +2056,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertEqual(panel["relaunch_places"], 1)
         self.assertEqual(panel["outside_places"], 0)
         self.assertContains(response, "Check the remaining places")
-        self.assertContains(response, escape(panel["launch_url"]), count=2)
+        self.assertContains(response, escape(panel["launch_url"]), count=1)
 
     def test_queue_ignored_place_is_outside_check_and_counts_differ(self) -> None:
         _, units = self.make_group(
@@ -2108,6 +2189,11 @@ class RepeatBulkViewsTest(ViewTestCase):
                 self.assertIn(f"Model rationale: {rationale}", card)
                 self.assertNotIn("Recommended: ", card)
         self.assertIn("Model recommendation", self.card(response, disagree))
+        several = "The judge accepted several variants"
+        for group in (keep, human):
+            self.assertIn(several, self.card(response, group))
+        for group in (picked, disagree):
+            self.assertNotIn(several, self.card(response, group))
 
     def test_queue_plural_model_results_preselect_nothing(self) -> None:
         source = join_plural(["Gate", "Gates"])

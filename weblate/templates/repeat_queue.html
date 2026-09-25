@@ -134,7 +134,16 @@
       <section class="alert alert-info" aria-label="{% translate 'Judge check for repeats' %}">
         {% if judge_panel.state == 'running' %}
           <h2 class="h5">{% translate "The judge is checking variants" %}</h2>
-          <p>{% blocktranslate with checked=judge_panel.checked count total=judge_panel.total %}Checked {{ checked }} of {{ total }} place{% plural %}Checked {{ checked }} of {{ total }} places{% endblocktranslate %}.</p>
+          <div class="progress"
+               role="progressbar"
+               aria-label="{% translate 'Judge check progress' %}"
+               aria-valuenow="{{ judge_panel.checked }}"
+               aria-valuemin="0"
+               aria-valuemax="{{ judge_panel.total }}">
+            <div class="progress-bar"
+                 style="width: {% widthratio judge_panel.checked judge_panel.total 100 %}%"></div>
+          </div>
+          <p class="mt-2">{% blocktranslate with checked=judge_panel.checked count total=judge_panel.total %}Checked {{ checked }} of {{ total }} place{% plural %}Checked {{ checked }} of {{ total }} places{% endblocktranslate %}. {% translate "You can leave this page: the check runs in the background and results appear here." %}</p>
           {% if judge_panel.can_view_run %}
             <a href="{{ judge_panel.run.get_absolute_url }}">{% translate "View judge run" %}</a>
           {% endif %}
@@ -143,30 +152,65 @@
             <h2 class="h5">{% translate "Judge check results" %}</h2>
           {% else %}
             <h2 class="h5">{% translate "Check variants with the judge" %}</h2>
-          {% endif %}
-          <p>{% blocktranslate count counter=judge_panel.places %}The repeat check covers {{ counter }} place.{% plural %}The repeat check covers {{ counter }} places.{% endblocktranslate %}
-            {% if judge_panel.places != judge_panel.queue_places %}
-              {% blocktranslate count counter=judge_panel.queue_places %}The open queue contains {{ counter }} place.{% plural %}The open queue contains {{ counter }} places.{% endblocktranslate %}
+            <p>{% blocktranslate count counter=judge_panel.places %}The repeat check covers {{ counter }} place.{% plural %}The repeat check covers {{ counter }} places.{% endblocktranslate %}
+              {% if judge_panel.places != judge_panel.queue_places %}
+                {% blocktranslate count counter=judge_panel.queue_places %}The open queue contains {{ counter }} place.{% plural %}The open queue contains {{ counter }} places.{% endblocktranslate %}
+              {% endif %}
+            </p>
+            {% if judge_panel.can_launch %}
+              <a class="btn btn-primary" href="{{ judge_panel.launch_url }}">{% translate "Check variants with the judge" %}</a>
+              <p class="small text-muted">{% translate "When enough priced history exists, the cost estimate appears before you launch. Actual spend appears in the run report." %}</p>
             {% endif %}
-          </p>
-          {% if judge_panel.can_launch %}
-            <a class="btn btn-primary" href="{{ judge_panel.launch_url }}">{% translate "Check variants with the judge" %}</a>
-            <p class="small text-muted">{% translate "When enough priced history exists, the cost estimate appears before you launch. Actual spend appears in the run report." %}</p>
           {% endif %}
         {% endif %}
         {% if judge_panel.stopped %}
           <p>{% translate "The last check stopped before it finished." %}</p>
         {% endif %}
-        <nav aria-label="{% translate 'Judge result filters' %}">
-          <a href="?status=open&amp;judge=ready"
-             {% if judge_filter == 'ready' %} aria-current="page"{% endif %}>{% translate "Ready" %} {{ judge_panel.buckets.ready }}</a>
-          <a href="?status=open&amp;judge=choose"
-             {% if judge_filter == 'choose' %} aria-current="page"{% endif %}>{% translate "Choose yourself" %} {{ judge_panel.buckets.choose }}</a>
-          <a href="?status=open&amp;judge=rewrite"
-             {% if judge_filter == 'rewrite' %} aria-current="page"{% endif %}>{% translate "Rewrite" %} {{ judge_panel.buckets.rewrite }}</a>
-          <a href="?status=open&amp;judge=unchecked"
-             {% if judge_filter == 'unchecked' %} aria-current="page"{% endif %}>{% translate "Unchecked" %} {{ judge_panel.buckets.unchecked }}</a>
-        </nav>
+        {% if judge_panel.state == 'ready' %}
+          <nav aria-label="{% translate 'Judge result filters' %}">
+            <ul class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-2 list-unstyled mb-3">
+              <li class="col">
+                <div class="card h-100 border-primary border-2">
+                  <div class="card-body">
+                    <a href="?status=open&amp;judge=ready"
+                       {% if judge_filter == 'ready' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.ready }}</span>
+                      {% blocktranslate count counter=judge_panel.buckets.ready %}group: a recommended variant is ready{% plural %}groups: a recommended variant is ready{% endblocktranslate %}</a>
+                    {% if bulk_ready %}
+                      <a class="btn btn-primary btn-sm d-block mt-2" href="{{ bulk_review_url }}">{% translate "Review and apply at once" %}</a>
+                    {% endif %}
+                  </div>
+                </div>
+              </li>
+              <li class="col">
+                <div class="card h-100">
+                  <div class="card-body">
+                    <a href="?status=open&amp;judge=choose"
+                       {% if judge_filter == 'choose' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.choose }}</span>
+                      {% blocktranslate count counter=judge_panel.buckets.choose %}group: several variants passed, your choice{% plural %}groups: several variants passed, your choice{% endblocktranslate %}</a>
+                  </div>
+                </div>
+              </li>
+              <li class="col">
+                <div class="card h-100">
+                  <div class="card-body">
+                    <a href="?status=open&amp;judge=rewrite"
+                       {% if judge_filter == 'rewrite' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.rewrite }}</span>
+                      {% blocktranslate count counter=judge_panel.buckets.rewrite %}group: errors in every variant, a new translation is needed{% plural %}groups: errors in every variant, a new translation is needed{% endblocktranslate %}</a>
+                  </div>
+                </div>
+              </li>
+              <li class="col">
+                <div class="card h-100">
+                  <div class="card-body">
+                    <a href="?status=open&amp;judge=unchecked"
+                       {% if judge_filter == 'unchecked' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.unchecked }}</span>
+                      {% blocktranslate count counter=judge_panel.buckets.unchecked %}group the judge could not check{% plural %}groups the judge could not check{% endblocktranslate %}</a>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </nav>
+        {% endif %}
         {% if judge_panel.comparing %}
           <p role="status">{% blocktranslate count counter=judge_panel.comparing %}Comparing variants: {{ counter }} group{% plural %}Comparing variants: {{ counter }} groups{% endblocktranslate %}</p>
         {% endif %}
