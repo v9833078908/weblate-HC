@@ -1542,19 +1542,34 @@ class RepeatBulkViewsTest(ViewTestCase):
     def test_queue_judge_launch_url_and_no_paid_recommendation_link(self) -> None:
         self.make_group("Judge start", ["One", "Two"], start=26000)
         project_language = self.project.project_languages[self.translation.language]
-        response = self.client.get(self.queue_url)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch(
+                "weblate.trans.views.repeats.judge_configuration_ready",
+                return_value=True,
+            ),
+        ):
+            response = self.client.get(self.queue_url)
 
         self.assertEqual(response.context["judge_panel"]["state"], "start")
+        self.assertTrue(response.context["judge_panel"]["can_launch"])
         self.assertEqual(
             response.context["judge_panel"]["launch_url"],
             f"{project_language.get_absolute_url()}?mode=judge&q=check%3Arepeat-drift"
             "&judge_proposal_only=1&overwrite_existing="
             f"&next=%2Frepeats%2F{self.project.slug}%2Fcs%2F#auto",
         )
-        if response.context["judge_panel"]["can_launch"]:
-            self.assertContains(
-                response, escape(response.context["judge_panel"]["launch_url"])
-            )
+        self.assertContains(
+            response, escape(response.context["judge_panel"]["launch_url"])
+        )
         self.assertNotContains(
             response,
             reverse(
@@ -1608,6 +1623,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         run = self.make_judge_run(status=ProducerRun.Status.FAILED)
         response = self.client.get(self.queue_url)
         self.assertEqual(response.context["judge_panel"]["run"], run)
+        self.assertEqual(response.context["judge_panel"]["state"], "start")
         self.assertContains(response, "The last check stopped before it finished.")
 
     def test_queue_stopped_run_with_verdicts_is_ready(self) -> None:
@@ -1674,17 +1690,40 @@ class RepeatBulkViewsTest(ViewTestCase):
 
     def test_queue_unchecked_places_inside_check_offer_relaunch(self) -> None:
         _, units = self.make_group("Remaining places", ["One", "Two"], start=26800)
+        _, ready_units = self.make_group("Ready places", ["Yes", "No"], start=26850)
         self.project.check_flags = "repeat-drift"
         self.project.save(update_fields=["check_flags"])
         CHECKS["repeat-drift"].perform_batch(self.component)
         self.make_judge_verdict(units[0])
+        self.make_judge_verdict(ready_units[0])
+        self.make_judge_verdict(ready_units[1], JudgeVerdict.Severity.MAJOR)
 
-        response = self.client.get(self.queue_url)
+        user_class = type(self.user)
+        original_has_perm = user_class.has_perm
+
+        def has_perm(user, perm, obj=None):
+            return perm in {"translation.auto", "unit.review"} or original_has_perm(
+                user, perm, obj
+            )
+
+        with (
+            patch.object(user_class, "has_perm", autospec=True, side_effect=has_perm),
+            patch(
+                "weblate.trans.views.repeats.judge_configuration_ready",
+                return_value=True,
+            ),
+        ):
+            response = self.client.get(self.queue_url)
+
         panel = response.context["judge_panel"]
+        self.assertEqual(panel["state"], "ready")
+        self.assertTrue(panel["can_launch"])
+        self.assertEqual(panel["buckets"]["ready"], 1)
+        self.assertEqual(panel["buckets"]["unchecked"], 1)
         self.assertEqual(panel["relaunch_places"], 1)
         self.assertEqual(panel["outside_places"], 0)
-        if panel["can_launch"]:
-            self.assertContains(response, "Check the remaining places")
+        self.assertContains(response, "Check the remaining places")
+        self.assertContains(response, escape(panel["launch_url"]), count=2)
 
     def test_queue_ignored_place_is_outside_check_and_counts_differ(self) -> None:
         _, units = self.make_group(
