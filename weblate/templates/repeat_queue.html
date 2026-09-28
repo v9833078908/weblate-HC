@@ -22,8 +22,6 @@
         <h1>{% translate "Repeat queue" %}: {{ language }}</h1>
         <p class="text-muted">{% translate "The same source text should read the same everywhere in the game. Choose one translation per group; nothing is written until you confirm the preview." %}</p>
       </div>
-      <a class="btn btn-outline-secondary"
-         href="{% url 'repeat-rule' project=project.slug language=language.code %}">{% translate "Where to look for repeats" %}</a>
     </div>
 
     {% if decision %}
