@@ -33152,8 +33152,8 @@ msgstr[1] "группы: рекомендованный вариант гото�
 msgstr[2] "групп: рекомендованный вариант готов"
 
 #: weblate/templates/repeat_queue.html
-msgid "Review and apply at once"
-msgstr "Проверить и применить разом"
+msgid "Make a bulk edit"
+msgstr "Сделать массовую правку"
 
 #: weblate/templates/repeat_queue.html
 msgid "group: no single safe variant, your choice"

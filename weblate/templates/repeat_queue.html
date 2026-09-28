@@ -176,7 +176,7 @@
                        {% if judge_filter == 'ready' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.ready }}</span>
                       {% blocktranslate count counter=judge_panel.buckets.ready %}group: a recommended variant is ready{% plural %}groups: a recommended variant is ready{% endblocktranslate %}</a>
                     {% if bulk_ready %}
-                      <a class="btn btn-primary btn-sm d-block mt-2" href="{{ bulk_review_url }}">{% translate "Review and apply at once" %}</a>
+                      <a class="btn btn-primary btn-sm d-block mt-2" href="{{ bulk_review_url }}">{% translate "Make a bulk edit" %}</a>
                     {% endif %}
                   </div>
                 </div>

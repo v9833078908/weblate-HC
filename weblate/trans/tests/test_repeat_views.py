@@ -2127,7 +2127,7 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertNotContains(response, "Check variants with the judge</a>")
         self.assertNotContains(response, "The repeat check covers")
         self.assertNotContains(response, "the cost estimate appears")
-        self.assertNotContains(response, "Review and apply at once")
+        self.assertNotContains(response, "Make a bulk edit")
 
     def test_queue_ready_tile_offers_bulk_review(self) -> None:
         group, units = self.make_group("Tile review", ["R1", "R2"], start=26420)
@@ -2148,7 +2148,7 @@ class RepeatBulkViewsTest(ViewTestCase):
             response,
             f'<a class="btn btn-primary btn-sm d-block mt-2" '
             f'href="{response.context["bulk_review_url"]}">'
-            "Review and apply at once</a>",
+            "Make a bulk edit</a>",
             html=True,
         )
 
