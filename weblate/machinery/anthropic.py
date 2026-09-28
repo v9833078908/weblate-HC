@@ -83,7 +83,7 @@ class AnthropicTranslation(BaseLLMTranslation):
     ) -> dict:
         return {
             "model": model,
-            "max_tokens": self.settings.get("max_tokens", 4096),
+            "max_tokens": self.settings.get("max_tokens", 16000),
             "system": prompt,
             "messages": [
                 {"role": "user", "content": previous_content},

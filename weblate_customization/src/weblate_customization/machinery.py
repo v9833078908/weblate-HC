@@ -153,6 +153,14 @@ class RoutedLLMTranslation(OpenAITranslation):
     def get_runtime_base_url(self) -> str:
         return self.settings.get("base_url") or DEFAULT_BASE_URL
 
+    def _get_prompt(self, target_language: str) -> str:
+        # The reply schema wraps the array the base prompt describes.
+        return (
+            super()._get_prompt(target_language)
+            + '\nWhen a response schema is supplied, return {"translations": [...]}:'
+            " the array described above, wrapped in that one key.\n"
+        )
+
     def get_headers(self) -> dict[str, str]:
         """Identify this service to OpenRouter without affecting other proxies."""
         headers = super().get_headers()

@@ -797,7 +797,7 @@ class AnthropicMachineryForm(KeyMachineryForm, LLMBasicMachineryForm):
             "Max tokens",
         ),
         help_text=gettext_lazy("Maximum number of tokens to generate in the response."),
-        initial=4096,
+        initial=16000,
         min_value=1,
         max_value=64000,
     )
