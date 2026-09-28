@@ -357,9 +357,9 @@ the Sphinx build - `myst_parser` is not enabled.
 ## Development environment
 
 The dev instance runs in Docker (`dev-docker/`), started via `./rundev.sh` from
-the repo root. `rundev.sh` defaults `WEBLATE_PORT=8080`, but the currently running
-container publishes **3001** (`WEBLATE_PORT=3001 ./rundev.sh`) - that is what the
-MCP server and any API scripts expect. Login `admin`/`admin`. Mail goes to maildev
+the repo root. `rundev.sh` defaults `WEBLATE_PORT=8080`; start it as
+`WEBLATE_PORT=3001 ./rundev.sh`, because the MCP server and API scripts expect
+port **3001**. Login `admin`/`admin`. Mail goes to maildev
 on <http://localhost:1081/> — this stack publishes `1081` (override with
 `MAILDEV_PORT`) because another project on this workstation owns the upstream
 default `1080`.
@@ -517,13 +517,13 @@ the container's `sys.path` via `/app/data/python`. After editing
 cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 ```
 
-`GameMarkupCheck`, `GameLineBreakCheck`, `CyrillicLeakCheck`,
-`GameNumberCheck` and `GameTokenCheck` are registered through
-`WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck,weblate_customization.checks.GameNumberCheck,weblate_customization.checks.GameTokenCheck`,
-and `LineSeparatorSpacing` through
-`WEBLATE_ADD_AUTOFIX: weblate_customization.autofixes.LineSeparatorSpacing`,
-both in the `weblate` service environment in `dev-docker/docker-compose.yml`
-and (as `WEBLATE_ADD_CHECK=` / `WEBLATE_ADD_AUTOFIX=`) in
+Every check class in `checks.py` is registered through `WEBLATE_ADD_CHECK`
+and every autofix class in `autofixes.py` through `WEBLATE_ADD_AUTOFIX`;
+`WEBLATE_REMOVE_CHECK` drops the upstream `MaxLengthCheck` and
+`SourceMaxLengthCheck` (replaced by `GameMaxLengthCheck` and
+`GameSourceMaxLengthCheck`) and `TranslatedCheck`. All three variables are set
+in the `weblate` service environment in `dev-docker/docker-compose.yml`
+and (as `WEBLATE_ADD_CHECK=` / `WEBLATE_REMOVE_CHECK=` / `WEBLATE_ADD_AUTOFIX=`) in
 `deploy/environment.example`; `settings_docker.py` folds `WEBLATE_ADD_CHECK` /
 `WEBLATE_REMOVE_CHECK` into `CHECK_LIST`, and `WEBLATE_ADD_AUTOFIX` /
 `WEBLATE_REMOVE_AUTOFIX` into `AUTOFIX_LIST`, through `modify_env_list`

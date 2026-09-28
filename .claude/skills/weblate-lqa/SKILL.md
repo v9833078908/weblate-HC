@@ -150,13 +150,10 @@ Always structure the LQA report using this format:
 
 ## Known Pitfalls (from dogfooding this skill)
 
-- **Denominator mismatch.** A 2026-08-22 self-audit of `victory-banner/common` (DE)
-  found `total_words` was computed over the *full* component while defects were only
-  searched for in a ~28%-of-units manual sample — inflating the score (96.67 instead
-  of the honest 94.82 sample-scoped figure) by silently assuming the unreviewed 72%
-  was defect-free. `review_scope` exists specifically to make this mistake
-  impossible to reproduce silently — always let the tool compute the denominator
-  from the declared scope, never pass a raw word count by hand.
+- **Denominator.** Let the tool compute the MQM denominator from the declared
+  `review_scope`; never pass a raw word count. A component-wide denominator over
+  a partial review counts every unreviewed unit as defect-free and inflates the
+  score.
 - **Style vs grammar_syntax.** A grammatically correct string that merely differs in
   pattern from its siblings is `style` (Neutral), not `grammar_syntax` (Minor). See
   `references/mqm-game-profile.md` §1.3.

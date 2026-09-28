@@ -21,15 +21,15 @@ Prose that contradicts the code is stale prose. Say so and cite the file:line.
 This repo is HCGameLoc, an independent Weblate-derived repo, not a tracking
 fork. Upstream docs do NOT cover:
 
-- `weblate_customization/` - `GameMarkupCheck`, `RoutedLLMTranslation`
-  (service slug `openrouter`, display name `OpenRouter`)
+- `weblate_customization/` - custom checks (`GameMarkupCheck` and others),
+  autofixes, and the routed machinery `RoutedLLMTranslation` (`openrouter`) and
+  `RoutedLiteLLMTranslation` (`litellm`)
 - `loc_kit_ingest/` and `weblate/utils/views.py:create_component_from_kit`
-- `WEBLATE_ADD_CHECK` / `WEBLATE_ADD_MACHINERY` env registration
-  (`weblate/utils/environment.py`, folded into `CHECK_LIST` by
-  `settings_docker.py`) instead of editing settings lists
-- `docs/product/`, `docs/operations/` (Russian fork docs; former
-  `docs/product/` and `docs/product/guides/` are merged into `docs/product/`;
-  layout rule in `AGENTS.md`, "Documentation layout")
+- `WEBLATE_ADD_CHECK` / `WEBLATE_ADD_AUTOFIX` / `WEBLATE_ADD_MACHINERY` env
+  registration (`weblate/utils/environment.py:modify_env_list`, folded into the
+  settings lists by `settings_docker.py`) instead of editing settings lists
+- `docs/product/`, `docs/operations/` (Russian fork docs; layout rule in
+  `AGENTS.md`, "Documentation layout")
 
 Any question touching these: read local files, not upstream.
 
@@ -52,7 +52,7 @@ a markdown twin plus an index. Fetch the index once per session and cache it:
 curl -s https://docs.weblate.org/en/latest/llms.txt > /tmp/weblate-llms.txt
 ```
 
-212 pages, each line `- [Title](URL.md): first sentence`. Route by grepping the
+Each line is `- [Title](URL.md): first sentence`. Route by grepping the
 index rather than guessing:
 
 ```sh
@@ -86,13 +86,11 @@ Hot paths, already verified:
 
 ## Version check
 
-`llms.txt` line 3 states the documented version. It must match
-`weblate/utils/version.py` (`VERSION`). Mismatch -> the answer may describe a
-different release; pin the version explicitly:
-
-```text
-https://docs.weblate.org/en/weblate-5.9/admin/machine.md
-```
+`llms.txt` line 3 states the documented upstream version. The fork's own
+`VERSION` in `weblate/utils/version.py` is a separate calendar version and never
+matches it, so upstream `latest` can describe behavior this repo never received
+or has changed. Treat an upstream answer as provisional until the implementing
+module under `weblate/` confirms it (Precedence 1).
 
 ## Cross-references
 
