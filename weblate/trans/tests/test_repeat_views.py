@@ -974,7 +974,10 @@ class RepeatBulkViewsTest(ViewTestCase):
         self.assertTemplateUsed(full, "base.html")
         self.assertEqual(
             [member["key"] for member in full.context["members"]],
-            [unit.context for unit in (units[1], units[2], units[3], units[0], units[4])],
+            [
+                unit.context
+                for unit in (units[1], units[2], units[3], units[0], units[4])
+            ],
         )
         self.assertContains(full, "Will change", count=3)
         self.assertContains(full, "Already translated this way")

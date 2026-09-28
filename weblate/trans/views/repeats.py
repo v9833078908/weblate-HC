@@ -1064,9 +1064,7 @@ def repeat_bulk_places(request, project: str, language: str, result_id: int):
                 "show_component": show_component,
                 "remaining": max(len(changing) - INLINE_PLACES, 0),
                 "places_url": request.path,
-                "matching": unchanged.pop(
-                    _member_reason_label("already-matches"), 0
-                ),
+                "matching": unchanged.pop(_member_reason_label("already-matches"), 0),
                 "blocked": list(unchanged.items()),
             },
         )
