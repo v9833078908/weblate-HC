@@ -4022,6 +4022,40 @@ class ProjectAPITest(APIBaseTest):
         project = Project.objects.get(slug="api-project")
         self.assertFalse(project.inherit_license)
 
+    def test_create_uses_translation_review_default(self) -> None:
+        # The field default is read from settings at import time, so the
+        # Docker default is applied to the field itself.
+        # ruff: ignore[private-member-access]
+        field = Project._meta.get_field("translation_review")
+        with patch.object(field, "get_default", return_value=True):
+            self.do_request(
+                "api:project-list",
+                method="post",
+                code=201,
+                superuser=True,
+                format="json",
+                request={
+                    "name": "Review default",
+                    "slug": "review-default",
+                    "web": "https://weblate.org/",
+                },
+            )
+            self.do_request(
+                "api:project-list",
+                method="post",
+                code=201,
+                superuser=True,
+                format="json",
+                request={
+                    "name": "Review off",
+                    "slug": "review-off",
+                    "web": "https://weblate.org/",
+                    "translation_review": False,
+                },
+            )
+        self.assertTrue(Project.objects.get(slug="review-default").translation_review)
+        self.assertFalse(Project.objects.get(slug="review-off").translation_review)
+
     def test_create_with_workspace_inherits_settings(self) -> None:
         workspace = Workspace.objects.create(name="API workspace", license="MIT")
         self.do_request(

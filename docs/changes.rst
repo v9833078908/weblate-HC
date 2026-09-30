@@ -140,6 +140,8 @@ Weblate 2026.8.1
 
 .. rubric:: Compatibility
 
+* The Docker container now turns on :ref:`project-translation_review` for new projects by default; existing projects are unchanged, and :envvar:`WEBLATE_DEFAULT_TRANSLATION_REVIEW` set to ``0`` restores the previous default.
+
 .. rubric:: Upgrading
 
 Please follow :ref:`generic-upgrade-instructions` in order to perform update.

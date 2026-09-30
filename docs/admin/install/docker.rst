@@ -1048,7 +1048,12 @@ Generic settings
 
    .. versionadded:: 5.16
 
-   Configures the default value for :ref:`project-translation_review`, turned off by default.
+   .. versionchanged:: 2026.8.1
+
+      Turned on by default.
+
+   Configures the default value for :ref:`project-translation_review` of new
+   projects, turned on by default. Existing projects keep their setting.
 
 .. envvar:: WEBLATE_DEFAULT_SOURCE_REVIEW
 

@@ -1515,9 +1515,8 @@ DEFAULT_ACCESS_CONTROL = get_env_int(
     "WEBLATE_DEFAULT_ACCESS_CONTROL", trans_defaults.DEFAULT_ACCESS_CONTROL
 )
 
-DEFAULT_TRANSLATION_REVIEW = get_env_bool(
-    "WEBLATE_DEFAULT_TRANSLATION_REVIEW", trans_defaults.DEFAULT_TRANSLATION_REVIEW
-)
+# New projects start with reviews turned on; existing projects keep their value.
+DEFAULT_TRANSLATION_REVIEW = get_env_bool("WEBLATE_DEFAULT_TRANSLATION_REVIEW", True)
 DEFAULT_SOURCE_REVIEW = get_env_bool(
     "WEBLATE_DEFAULT_SOURCE_REVIEW", trans_defaults.DEFAULT_SOURCE_REVIEW
 )

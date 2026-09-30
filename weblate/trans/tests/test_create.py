@@ -4,12 +4,16 @@
 
 """Test for creating projects and models."""
 
+import os
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
+import sys
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
+from django.test import SimpleTestCase
 from django.test.utils import CaptureQueriesContext, modify_settings, override_settings
 from django.urls import reverse
 from translation_finder import DiscoveryResult
@@ -139,6 +143,19 @@ class CreateTest(ViewTestCase):
         self.assertEqual(
             Project.objects.get(slug="create-project").check_flags, "repeat-drift"
         )
+
+    def test_create_project_uses_translation_review_default(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+
+        # The field default is read from settings at import time, so the
+        # Docker default is applied to the field itself.
+        # ruff: ignore[private-member-access]
+        field = Project._meta.get_field("translation_review")
+        with patch.object(field, "get_default", return_value=True):
+            self.client_create_project(True)
+
+        self.assertTrue(Project.objects.get(slug="create-project").translation_review)
 
     @modify_settings(INSTALLED_APPS={"remove": "weblate.billing"})
     def test_create_project_asks_for_license(self) -> None:
@@ -1621,3 +1638,42 @@ class CreateTest(ViewTestCase):
         change = component.change_set.get(action=ActionEvents.CREATE_COMPONENT)
         self.assertEqual(change.details["origin"], "scratch")
         self.assertIn("scratch", change.get_details_display())
+
+
+class DockerProjectDefaultsTest(SimpleTestCase):
+    def get_docker_translation_review(self, **env: str) -> str:
+        code = """
+from pathlib import Path
+
+# settings_docker reads the secret from a container path this test host does
+# not have. Only that one read is intercepted; every other read is real.
+_read_text = Path.read_text
+Path.read_text = lambda self, *args, **kwargs: (
+    "test-secret" if self.name == "secret" else _read_text(self, *args, **kwargs)
+)
+from weblate import settings_docker
+print(settings_docker.DEFAULT_TRANSLATION_REVIEW)
+"""
+        environ = {
+            key: value
+            for key, value in os.environ.items()
+            if key != "WEBLATE_DEFAULT_TRANSLATION_REVIEW"
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            check=False,
+            env=environ
+            | {"WEBLATE_DATABASES": "0", "WEBLATE_SITE_DOMAIN": "example.com"}
+            | env,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.strip()
+
+    def test_translation_review_on_unless_overridden(self) -> None:
+        self.assertEqual(self.get_docker_translation_review(), "True")
+        self.assertEqual(
+            self.get_docker_translation_review(WEBLATE_DEFAULT_TRANSLATION_REVIEW="0"),
+            "False",
+        )
