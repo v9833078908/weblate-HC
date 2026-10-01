@@ -1,0 +1,18 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Optional backend-only access to the BDHC read-only facade.
+# Supply the host secret path through an ignored local environment file.
+services:
+  weblate:
+    environment:
+      BDHC_API_BASE_URL: ${BDHC_API_BASE_URL:-http://192.168.0.180:19101}
+      BDHC_API_TOKEN_FILE: /run/secrets/bdhc_readonly_token
+    volumes:
+    - type: bind
+      source: ${BDHC_API_TOKEN_HOST_FILE:?Set the host path to the raw BDHC token file}
+      target: /run/secrets/bdhc_readonly_token
+      read_only: true
+      bind:
+        create_host_path: false
