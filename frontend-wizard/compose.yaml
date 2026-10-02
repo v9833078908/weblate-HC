@@ -1,0 +1,8 @@
+name: hc-frontend-wizard
+
+services:
+  wizard:
+    build: .
+    ports:
+      - "127.0.0.1:3002:3000"
+    restart: unless-stopped
