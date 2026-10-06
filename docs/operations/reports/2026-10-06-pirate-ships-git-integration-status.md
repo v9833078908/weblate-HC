@@ -1,5 +1,10 @@
 # Pirate Ships: Weblate как источник правды - состояние на 2026-10-06
 
+> **Заменён** планом
+> `docs/operations/plans/2026-10-06-pirate-ships-weblate-branch-workflow.md`:
+> Weblate сведён с `master`, а схема с переносом из `localization` отклонена
+> командой 2026-10-06.
+
 Документ для сверки с командой игры. Заменяет версию от 2026-09-24
 (`docs/operations/plans/2026-08-15-pirate-ships-production-cleanup-json-migration.md`,
 раздел «Сверка с игровыми ветками и согласованная схема»). Все проверки
