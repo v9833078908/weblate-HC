@@ -45,6 +45,7 @@ from weblate.trans.models.multilingual_spreadsheet import (
     ComponentSpreadsheetImportDraft,
 )
 from weblate.trans.models.pending import PendingUnitChange
+from weblate.trans.models.producer_mt import ProducerMTOperation, ProducerMTUnitAttempt
 from weblate.trans.models.project import CommitPolicyChoices, Project
 from weblate.trans.models.repeat import (
     RepeatBulkItem,
@@ -93,6 +94,8 @@ __all__ = [
     "Label",
     "LocKitImportDraft",
     "PendingUnitChange",
+    "ProducerMTOperation",
+    "ProducerMTUnitAttempt",
     "ProducerRun",
     "Project",
     "RepeatBulkItem",

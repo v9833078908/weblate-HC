@@ -107,6 +107,7 @@ class ProducerMe(APIView):
             "full_name": user.full_name,
             "is_superuser": user.is_superuser,
             "capabilities": {
+                "mt_async_batches": 1,
                 "judge": judge_configuration_ready(),
                 "glossary_profile_analysis": (
                     settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED

@@ -7,6 +7,8 @@ Weblate 2026.8.1
 
 .. rubric:: New features
 
+* Added :ref:`durable empty-string MT batches <api-producer-mt-batches>` with actor-bound idempotent acceptance, background execution, saved answers and explicit unknown-provider outcomes; client timeouts no longer own the translation operation.
+
 * Project administrators can rename a key or move a source string in flat JSON components without recreating its translations or metadata; both operations are previewed, audited, and write the resulting source order to the component files.
 
 * Added an optional :ref:`LLM judge <llm-judge>` automatic translation mode, where two independently configured language models review each string in a filter and record a per-string verdict; a rejected string is held in the existing :guilabel:`Needs editing` queue for a human decision instead of shipping automatically.

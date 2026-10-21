@@ -288,6 +288,15 @@ def perform_component_commit(
             component.create_translations(force=True)
 
 
+@app.task(trail=False, acks_late=True, reject_on_worker_lost=True, queue="translate")
+def producer_mt_batch(*, run_id: str) -> dict:
+    """Distinct identity: old rollback workers cannot execute this as legacy MT."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.mt_operations import process_mt_operation
+
+    return process_mt_operation(run_id)
+
+
 @app.task(
     trail=False,
     autoretry_for=(WeblateLockTimeoutError,),
@@ -1983,14 +1992,24 @@ def publish_producer_run_dispatch(*, run_id, skip_locked: bool = False) -> bool:
         if not (is_valid_queued or is_valid_running) or run.actor_id is None:
             return False
         task_id = run.dispatch_task_id
-        kwargs = _producer_run_dispatch_kwargs(run)
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.producer_mt import ProducerMTOperation
+
+        is_durable_mt = ProducerMTOperation.objects.filter(run_id=run_id).exists()
+        kwargs = (
+            {"run_id": str(run_id)}
+            if is_durable_mt
+            else _producer_run_dispatch_kwargs(run)
+        )
         if kwargs is None:
             return False
 
     register_task_liveness(str(task_id))
     try:
-        auto_translate.apply_async(
-            kwargs=kwargs,
+        # Keep new paid intents unexecutable by an older auto_translate worker.
+        task = producer_mt_batch if is_durable_mt else auto_translate
+        task.apply_async(
+            kwargs={"run_id": str(run_id)} if is_durable_mt else kwargs,
             task_id=str(task_id),
             priority=INTERACTIVE_TASK_PRIORITY,
         )
@@ -2953,6 +2972,10 @@ def drain_loc_kit_dispatches() -> None:
 @app.task(trail=False)
 def drain_producer_run_dispatches() -> None:
     """Re-publish every committed producer-run intent missing its broker mark."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.mt_operations import recover_expired_mt_operations
+
+    recover_expired_mt_operations()
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models.judge import ProducerRun
 

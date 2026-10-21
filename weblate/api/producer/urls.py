@@ -6,6 +6,7 @@
 
 from django.urls import path
 
+from weblate.api.producer.mt import ProducerMTBatch, ProducerMTBatchDetail
 from weblate.api.producer.views import (
     ProducerJudgeApplicationUndo,
     ProducerMe,
@@ -21,6 +22,8 @@ from weblate.api.producer.views import (
 )
 
 urlpatterns = [
+    path("projects/<slug:slug>/mt/batches/", ProducerMTBatch.as_view(), name="producer-mt-batch"),
+    path("projects/<slug:slug>/mt/batches/<uuid:key>/", ProducerMTBatchDetail.as_view(), name="producer-mt-batch-detail"),
     path("me/", ProducerMe.as_view(), name="producer-me"),
     path("projects/", ProducerProjects.as_view(), name="producer-projects"),
     path("runs/<uuid:pk>/", ProducerRunDetail.as_view(), name="producer-run-detail"),

@@ -37,6 +37,24 @@ datastore, local filesystem repositories, and external code-hosting systems.
 Scope and intended use
 ----------------------
 
+The producer MT batch API (:ref:`api-producer-mt-batches`) is an authenticated,
+permission-scoped outbound translation surface. A UUID key is actor/project
+bound and payload bound; a separate unique unit/revision reservation prevents a
+new key from bypassing an unresolved paid intent. Request fields cannot choose
+an endpoint, credential or arbitrary model, or enable overwriting. The existing
+project machinery configuration remains the outbound authority. Admission uses
+the producer rate limit; receipt reads keep the ordinary authenticated API rate
+limit without consuming the paid-admission budget. Workers recheck permissions and
+empty-target revisions before a normal audited write without propagation.
+Provider answers are stored privately in the database before application and
+are not returned by receipt reads. Account deletion preserves unresolved unit
+intents, but removes actor access. Backups must treat these stored answers as
+translation content. Unknown provider outcomes fail closed: this protects
+against blind client or Celery retries, not against provider-internal retries,
+billing duplication, or an independently authorized legacy MT request. Keep
+receipts and unit intents during code rollback; erasing them removes this safety
+boundary. *(documented)* (source: :doc:`/api`)
+
 .. list-table::
    :header-rows: 1
 

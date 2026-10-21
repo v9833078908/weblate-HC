@@ -33,6 +33,7 @@ class ProducerCapabilitiesSerializer(serializers.Serializer):
     would offer an action the server cannot perform.
     """
 
+    mt_async_batches = serializers.IntegerField(min_value=1, max_value=1)
     judge = serializers.BooleanField(
         help_text="Whether the LLM judge is configured and usable."
     )

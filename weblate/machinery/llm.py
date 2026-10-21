@@ -384,6 +384,8 @@ class LLMStringPayload(LLMStringContext):
 
 
 class BaseLLMTranslation(BatchMachineTranslation):
+    # Opt-in for a caller with its own durable per-unit outbound journal.
+    durable_single_attempt = False
     settings_form: type[LLMBasicMachineryForm]
     max_score = 90
     request_timeout = 120
@@ -2857,6 +2859,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
             # Splitting a refused batch only sends more refused requests.
             raise
         except PartialLLMReplyError as error:
+            if self.durable_single_attempt:
+                return {
+                    text: error.translations.get(text, []) for text, _unit in sources
+                }
             if rescue_budget < 1:
                 tail = None
             else:
@@ -2882,6 +2888,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
             # Splitting a refused batch only sends more refused requests.
             raise
         except MachineTranslationError as error:
+            if self.durable_single_attempt:
+                raise
             halves = self._split_sources(sources, source_occurrences)
             if halves is None:
                 raise

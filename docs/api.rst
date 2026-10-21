@@ -3602,6 +3602,61 @@ restore an ``Approved`` state, review permission
 ``423`` (:http:statuscode:`423`), the same code the rest of the API uses
 for a lock conflict, never a bare permission error.
 
+.. _api-producer-mt-batches:
+
+Durable empty-string MT batches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Servers with ``mt_async_batches: 1`` in :http:get:`/api/producer/me/`
+support the following separate MT workflow. It does not change the existing
+``autotranslate`` endpoint or judge revision format.
+
+.. http:post:: /api/producer/projects/(string:slug)/mt/batches/
+
+    Requires authentication, project access and ``translation.auto`` on the
+    selected translation. Send a UUID ``Idempotency-Key`` header and an object
+    with ``component``, ``language``, the project's configured routed ``engine``
+    (``openrouter`` or ``litellm``), integer ``threshold`` (0–100), and ``units``:
+    1–20 unique objects with ``unit_id`` and ``revision``. Unknown top-level
+    fields, including overwrite options, are rejected. Plural source units
+    are currently refused instead of silently truncating their forms.
+
+    An MT revision is SHA-256 of UTF-8 JSON of ``id``, ``source`` (plural array),
+    ``context``, ``target`` (plural array), and integer ``state``, with sorted
+    keys, no ASCII escaping and separators ``,`` and ``:`` without whitespace.
+    It is not the judge decision revision described below.
+
+    Only empty, writable, current revisions are admitted. Acceptance atomically
+    stores a receipt, per-unit reservations and a background run before returning
+    ``202``; no provider is called by this HTTP request. Repeating the same
+    actor/project/key and payload returns the same run; a different payload or
+    an already reserved unit revision returns ``409``. Never generate a new key
+    merely because an HTTP response was lost.
+
+.. http:get:: /api/producer/projects/(string:slug)/mt/batches/(uuid:key)/
+
+    Returns only the requesting actor's receipt, subject to current project and
+    translation permissions. Fields are ``key``, ``run_id``, ``state``, ``total``,
+    ``applied`` and ``units`` with ``unit_id``, ``revision``, ``state`` and
+    ``after_revision``. Prompts, credentials and stored provider answers are
+    private. Receipt states are ``accepted``, ``running``, ``completed``,
+    ``partial``, ``failed`` and ``provider_unknown``.
+
+    Worker redelivery reuses a stored answer or the normal machinery cache.
+    An unresolved outbound intent without an answer becomes ``provider_unknown``;
+    neither polling nor another request key authorizes another paid attempt for
+    that revision. This is not an exactly-once billing promise from the provider.
+    The worker rechecks permissions, revision and empty target under a row lock
+    before saving through the normal audited translation path, without propagation.
+
+    Clients should persist keys and progress before POST, respect ``Retry-After``
+    on ``429``, poll the same receipt after transport failures, and verify current
+    unit revisions against ``after_revision`` before declaring completion.
+
+    Back up the database and translation files before rollout. Code rollback
+    must preserve receipts, per-unit intents and newly saved translations; do not
+    drop these tables or restore an older production database just to roll back code.
+
 .. _api-producer-revision:
 
 Revision, ``estimate_id``, and ``scope_hash``
