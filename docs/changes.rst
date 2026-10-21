@@ -113,6 +113,7 @@ Weblate 2026.8.1
 
 .. rubric:: Bug fixes
 
+* An advisory glossary check result, which only asks to verify a term the comparison could not confirm, no longer reaches the LLM judge as a proven defect, so the judge keeps evaluating that term; a hard glossary failure is still passed on.
 * Russian glossary terms with a fleeting vowel, such as ``Стрелок`` or ``Боец``, now match their other case forms (``Стрелков``, ``Бойцами``), so machine translation, the glossary check and the LLM judge no longer lose the term outside the nominative.
 * Automatic translation now rejects a machine-translation request without a selected engine and reports when none of the selected engines is configured for a run.
 * The LLM judge now skips strings that remain untranslated after pretranslation, records the reason in the producer report, and avoids a misleading automatic-translation history entry.
