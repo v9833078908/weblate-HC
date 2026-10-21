@@ -509,3 +509,26 @@ class GlossaryMorphologyEvaluatorTest(SimpleTestCase):
         )
         self.assertEqual(hard, set())
         self.assertEqual(advisory, set())
+
+    def test_occurrence_count_sees_fleeting_vowel_source(self) -> None:
+        """Both fleeting-vowel forms count, so one "Shooters" covers only one."""
+        source = "Выбери Стрелка. Стрелков лучше прятать."
+        unit = self.build(
+            target_code="en",
+            term_source="Стрелок",
+            term_target="Shooter",
+            source_text=source,
+            target_text="Pick from the Shooters. Hide Riflemen.",
+            source_language_code="ru",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, source, "Pick from the Shooters. Hide Riflemen."
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, {"Стрелок"})
+
+        hard, advisory = evaluate_glossary_terms(
+            unit, source, "Pick from the Shooters. Hide Shooters."
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, set())

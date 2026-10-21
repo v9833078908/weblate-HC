@@ -1504,6 +1504,32 @@ class GlossaryStemMatcherTest(ViewTestCase):
         self.assertEqual(self.matched_sources("пищеконцентрат прибыл"), set())
         self.assertEqual(self.matched_sources("началась блокировка"), set())
 
+    def test_stem_fallback_recovers_fleeting_vowel(self) -> None:
+        """
+        A Russian noun drops its fleeting vowel in every case but one.
+
+        Snowball strips endings only, so "Стрелок" stems to "стрелок" while
+        "Стрелков" stems to "стрелк": on Pirate Ships the term reached neither
+        the MT prompt nor the check, and the model wrote "Riflemen".
+        """
+        for term in ("Стрелок", "Боец", "Уровень", "Замок"):
+            self.add_ru_term(term)
+        cases = {
+            "Стрелков лучше прятать": "Стрелок",
+            "за более сильными Бойцами": "Боец",
+            "до 5 уровня": "Уровень",
+            "у ворот замка": "Замок",
+        }
+        for probe_source, canonical in cases.items():
+            with self.subTest(probe_source=probe_source):
+                self.assertEqual(self.matched_sources(probe_source), {canonical})
+
+    def test_stem_fallback_fleeting_vowel_skips_short_stems(self) -> None:
+        """A fleeting-vowel stem under four letters names unrelated words."""
+        self.add_ru_term("Игорь")
+        self.add_ru_term("Осень")
+        self.assertEqual(self.matched_sources("новые игры из старых основ"), set())
+
     def test_matcher_fingerprint_changes_with_glossary_and_modes(self) -> None:
         """Задача 5: the fingerprint tracks Snowball, allowlists and content."""
         source_language = self.ru_component.source_language
@@ -1554,6 +1580,7 @@ class GlossaryStemMatcherTest(ViewTestCase):
                 "target_algorithm",
                 "source_stem_allowlist",
                 "target_morphology_allowlist",
+                "fleeting_vowel_min_stem",
                 "exact_only_term_count",
                 "not_applicable_term_count",
                 "glossary_term_count",

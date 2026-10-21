@@ -81,6 +81,34 @@ def stem_word(algorithm: str, word: str) -> str:
     return _STEMMERS[algorithm][1].stemWord(word)
 
 
+# A Russian fleeting vowel stays in the nominative and drops in every other
+# case (стрелок/стрелков, боец/бойцами, уровень/уровня, палец/пальца), and
+# Snowball strips endings only, so the two stems never meet. Measured in
+# docs/product/measurements/2026-10-21-glossary-fleeting-vowel.md.
+_RU_CONSONANTS = "бвгджзйклмнпрстфхцчшщ"
+_RU_FLEETING_RE = re.compile(rf"(.*[{_RU_CONSONANTS}])([оеё])([{_RU_CONSONANTS}])")
+_RU_IOTATED_RE = re.compile(rf"(.*[аеёиоуыэюя])[её]([{_RU_CONSONANTS}])")
+# A shorter alternate names unrelated words: игорь -> игр matches "игры"
+FLEETING_MIN_STEM = 4
+
+
+@lru_cache(maxsize=65536)
+def stem_alternatives(algorithm: str, stem: str) -> frozenset[str]:
+    """Return the stem plus its Russian fleeting-vowel alternates."""
+    if algorithm != "russian":
+        return frozenset((stem,))
+    alternates = set()
+    if match := _RU_FLEETING_RE.fullmatch(stem):
+        alternates.add(match[1] + match[3])
+        if match[2] in "её":
+            alternates.add(match[1] + "ь" + match[3])
+    if match := _RU_IOTATED_RE.fullmatch(stem):
+        alternates.add(match[1] + "й" + match[2])
+    return frozenset(
+        {stem} | {alt for alt in alternates if len(alt) >= FLEETING_MIN_STEM}
+    )
+
+
 def get_text_stems(text: str, language_code: str) -> list[str]:
     """Stem every word of the text; empty when the language is not allowlisted."""
     stemmer = get_stemmer(language_code)
@@ -127,13 +155,19 @@ def count_inflected(term: str, text: str, language_code: str) -> int:
     """
     if is_acronym(term):
         return 0
-    needle = get_text_stems(term, language_code)
+    algorithm = get_algorithm(language_code)
+    if algorithm is None:
+        return 0
+    needle = [
+        stem_alternatives(algorithm, stem)
+        for stem in get_text_stems(term, language_code)
+    ]
     if not needle:
         return 0
     haystack = get_text_stems(text, language_code)
     count = 0
     limit = len(haystack) - len(needle)
     for i in range(limit + 1):
-        if haystack[i : i + len(needle)] == needle:
+        if all(haystack[i + k] in options for k, options in enumerate(needle)):
             count += 1
     return count

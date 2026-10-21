@@ -12,7 +12,7 @@ from bisect import bisect_left
 from collections import OrderedDict, defaultdict
 from copy import copy
 from functools import lru_cache
-from itertools import chain
+from itertools import chain, product
 from threading import Lock
 from typing import TYPE_CHECKING, TypedDict, cast
 
@@ -22,6 +22,7 @@ from django.db.models import Prefetch, Q, Value
 from django.db.models.functions import MD5, Lower
 
 from weblate.checks.morphology import (
+    FLEETING_MIN_STEM,
     MORPHOLOGY_LANGUAGES,
     SOURCE_STEM_LANGUAGES,
     WORD_RE,
@@ -29,6 +30,7 @@ from weblate.checks.morphology import (
     get_snowball_version,
     get_stemmer,
     is_acronym,
+    stem_alternatives,
     stem_word,
 )
 from weblate.trans.models.unit import Unit
@@ -239,8 +241,13 @@ def get_glossary_stem_automaton(
                 ]
                 if not stems or any(not stem for stem in stems):
                     continue
-                pattern = STEM_SEPARATOR + STEM_SEPARATOR.join(stems) + STEM_SEPARATOR
-                patterns.setdefault(pattern, set()).add(source.lower())
+                for variant in product(
+                    *(stem_alternatives(algorithm, stem) for stem in stems)
+                ):
+                    pattern = (
+                        STEM_SEPARATOR + STEM_SEPARATOR.join(variant) + STEM_SEPARATOR
+                    )
+                    patterns.setdefault(pattern, set()).add(source.lower())
 
         if patterns:
             automaton: ahocorasick_rs.AhoCorasick | None = ahocorasick_rs.AhoCorasick(
@@ -755,6 +762,7 @@ def glossary_matcher_fingerprint(
         "target_algorithm": get_algorithm(language.code),
         "source_stem_allowlist": sorted(SOURCE_STEM_LANGUAGES),
         "target_morphology_allowlist": sorted(MORPHOLOGY_LANGUAGES),
+        "fleeting_vowel_min_stem": FLEETING_MIN_STEM,
         "exact_only_term_count": exact_only_count,
         "not_applicable_term_count": not_applicable_count,
         "glossary_term_count": len(units),
