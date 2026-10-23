@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "observed_at": "2026-10-23T14:24:04.905519+00:00",
+  "readiness": "NO-GO",
+  "production_updated": false,
+  "services_restarted": false,
+  "old_job_resumed": false,
+  "production_source": "e7520b439f69294923f86895a3a63b5bc8d386d3",
+  "production_image": "sha256:4af5111b69abe2a0c5d6c6a4b562b78586d92c366817314498e834a528d10e70",
+  "prepared_source": "2b8e7483275e59e5364521b31fbeaafdc3559dcb",
+  "prepared_image": "sha256:8a2119cd8fd4cc49ba40a879947f579094e9520fe8f061cb944bf56882227675",
+  "weblate_free_bytes": 3797737472,
+  "required_import_free_bytes_minimum": 8589934592,
+  "wizard_free_bytes": 18534486016,
+  "protected_de_filled": 1310,
+  "protected_total": 1662,
+  "mt_receipts": 39,
+  "unknown_receipts": 1,
+  "old_job_payload_sha256": "f536c0bc0d1e8d07fe9a4da8aa8e09e0868e5978a2e8272c21cd930ad4e804a7",
+  "old_job_status": "unknown",
+  "latest_wizard_backup_integrity": "ok",
+  "local_backup_files_verified": 7,
+  "local_backup_total_bytes": 2009389936,
+  "current_environment_matches_saved_backup": false,
+  "current_image_archive_verified": false,
+  "final_consistent_predeploy_backup": false,
+  "blockers": [
+    "Production advanced to e7520b4; integrate and retest locally, rebuild image before transfer.",
+    "Weblate storage and tmp share one filesystem with 3.54 GiB free; minimum 8 GiB not met.",
+    "Saved environment differs, current 4af5111 image archive and coordinated predeploy backups are not verified."
+  ],
+  "limits": [
+    "No backup export or new snapshot was created.",
+    "No deletion, import, deployment, restart, model request or old run resume.",
+    "No full Celery active-task/queue audit; global MT receipts have no active lease.",
+    "Metadata only for native Weblate nightly files; their restore was not re-tested."
+  ],
+  "protected_translation_digest_groups_match": 18
+}
