@@ -2,12 +2,19 @@
   "component": "weblate",
   "snapshot_date": "2026-10-23",
   "host": "hc-srv15-localizer",
-  "source_commit": "1a852b65ed4e6f5065a8caee403a9f3da5f8d459",
-  "image_id": "sha256:3f0cf69e97d160d2ce7aef3cbb2238bf6380b69dac568721b6530b78a3f0a692",
-  "runtime_source_files_match": 1490,
-  "runtime_extra_compiled_catalogs": 264,
+  "source_commit": "f55405f2276731ee2980a90e84fe028a247b1e6b",
+  "image_id": "sha256:5a2102af8a4dd938bf346c3d7a22b6100ab91d80eb3952eb1b31cd51be04a299",
   "secrets_included": false,
-  "source_archive_sha256": "22a1fc2e92e102e7ac741d58b4241ae99ff3f34f65f4e9549a127e09ec90c439",
+  "container_started": "2026-10-23T07:39:32.919684996Z",
+  "previous_snapshot_commit": "4c54e0171f0230a86d684bd0b5a93270e7e08a5b",
+  "previous_source_archive_sha256": "22a1fc2e92e102e7ac741d58b4241ae99ff3f34f65f4e9549a127e09ec90c439",
+  "source_capture_sha256": "25d588c9d61e260f5d481c3add1cbd4fa28d154ca5632ae770e595cc021f7a43",
+  "snapshot_method": "verified complete previous tree plus exact binary production delta",
+  "runtime_checked_hashes": {
+    "weblate/trans/judge_loop.py": "7bba59b15cfae0fd8dbebb658a52cb5d8d0fa8bd859df83fa1e7d0f1a5fa0fe6",
+    "weblate/trans/models/judge.py": "d7fddcc413389767b8f12897efceda4b34754595c93fc07e1d9eee6e0d399b64",
+    "weblate/trans/migrations/0147_judge_application_change_restrict.py": "1869c2dd64aa517ddf31a82abc5f1c165b171f902717f91fed352ee976ea82dd"
+  },
   "files": [
     {
       "path": ".claude/skills/weblate-docs/SKILL.md",
@@ -5807,14 +5814,14 @@
     },
     {
       "path": "docs/api.rst",
-      "size": 150466,
-      "sha256": "b08669157bcf38f1111fe00f88d9d5fdd5d843a4806c3dec3ca3a7beee8ef113",
+      "size": 150683,
+      "sha256": "e73c2227daa5716f10e0812f1673557e89ac1252eaa9dd57e6ed8eefdbb8c5ac",
       "mode": 420
     },
     {
       "path": "docs/changes.rst",
-      "size": 69428,
-      "sha256": "5db51da5dd6286eccd177defad36558619a0cd8b029fe397beab5066b8656f1e",
+      "size": 69669,
+      "sha256": "8ffee8f6cffe5a120bef18fb701f628ea37296b5a25790e73fc765967a140bf6",
       "mode": 420
     },
     {
@@ -13183,8 +13190,8 @@
     },
     {
       "path": "weblate/api/tests.py",
-      "size": 692123,
-      "sha256": "930f3a99a4359a033d80bfd34c077fa2ecd488985fdeda0947907fb01d9e8ac3",
+      "size": 693930,
+      "sha256": "754fd0327262b9971fcf90b466c3895e23586a1df45853b3fbcf693568ac8237",
       "mode": 420
     },
     {
@@ -20959,8 +20966,8 @@
     },
     {
       "path": "weblate/trans/judge_loop.py",
-      "size": 100616,
-      "sha256": "612d699ce54de76b4d3266560ce5b6573323f0d2165e35e374f99bdb336d3641",
+      "size": 101173,
+      "sha256": "7bba59b15cfae0fd8dbebb658a52cb5d8d0fa8bd859df83fa1e7d0f1a5fa0fe6",
       "mode": 420
     },
     {
@@ -21948,6 +21955,12 @@
       "mode": 420
     },
     {
+      "path": "weblate/trans/migrations/0147_judge_application_change_restrict.py",
+      "size": 619,
+      "sha256": "1869c2dd64aa517ddf31a82abc5f1c165b171f902717f91fed352ee976ea82dd",
+      "mode": 420
+    },
+    {
       "path": "weblate/trans/migrations/__init__.py",
       "size": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -22027,8 +22040,8 @@
     },
     {
       "path": "weblate/trans/models/judge.py",
-      "size": 72044,
-      "sha256": "77c9b85d70ee3326cdb76dcfabe941af61f65035d05b52f0fc843560ddb33e68",
+      "size": 72166,
+      "sha256": "d7fddcc413389767b8f12897efceda4b34754595c93fc07e1d9eee6e0d399b64",
       "mode": 420
     },
     {
@@ -23209,8 +23222,8 @@
     },
     {
       "path": "weblate/trans/tests/test_judge_loop.py",
-      "size": 100860,
-      "sha256": "32d5a85532a0e19f91ef2d2c8e36eb1426e3c4577178b2b788dbee9df79283f7",
+      "size": 102607,
+      "sha256": "80168531f044939ed3ef96b0a1ed32e4bcb8e75b63bf27590c8743d34c6344b8",
       "mode": 420
     },
     {

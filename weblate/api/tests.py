@@ -26,6 +26,7 @@ from django.core.files import File
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
 from django.db.models import Q
+from django.db.models.deletion import RestrictedError
 from django.templatetags.static import static
 from django.test.utils import modify_settings, override_settings
 from django.urls import reverse
@@ -13046,6 +13047,52 @@ class UnitAPITest(APIBaseTest):
         component = Component.objects.get(pk=component.pk)
         self.assertNotEqual(revision, component.repository.last_revision)
         self.assertEqual(component.stats.all, 12)
+
+    def test_delete_unit_with_applied_judge_repair(self) -> None:
+        component = self._create_component(
+            "po-mono",
+            "po-mono/*.po",
+            "po-mono/en.po",
+            project=self.component.project,
+            name="mono",
+        )
+        unit = component.translation_set.get(language_code="cs").unit_set.get(
+            source="Hello, world!\n"
+        )
+        source_id = unit.source_unit_id
+        unit_ids = list(
+            Unit.objects.filter(source_unit_id=source_id).values_list("pk", flat=True)
+        )
+        change = unit.translation.change_set.create(
+            unit=unit, action=ActionEvents.ACCEPT, user=self.user
+        )
+        application = JudgeApplication.objects.create(
+            unit=unit,
+            change=change,
+            candidate_target_hash=compute_target_hash(unit.get_target_plurals()),
+            applied_revision=compute_decision_revision(unit),
+        )
+
+        with self.assertRaises(RestrictedError):
+            change.delete()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.do_request(
+                "api:unit-detail",
+                kwargs={"pk": source_id},
+                method="delete",
+                code=204,
+                superuser=True,
+            )
+
+        self.assertFalse(Unit.objects.filter(pk__in=[source_id, *unit_ids]).exists())
+        self.assertFalse(JudgeApplication.objects.filter(pk=application.pk).exists())
+        self.assertFalse(Change.objects.filter(pk=change.pk).exists())
+        translation = component.source_translation
+        translation.drop_store_cache()
+        self.assertNotIn(
+            "Hello, world!\n", [stored.source for stored in translation.store.all_units]
+        )
 
     def test_delete_unit_locked(self) -> None:
         component = self._create_component(
