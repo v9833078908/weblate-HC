@@ -1,0 +1,51 @@
+{
+  "kind": "intermediate-e752-integration",
+  "production_updated": false,
+  "services_stopped_or_restarted": false,
+  "old_job_resumed": false,
+  "paid_requests": 0,
+  "production_source": "5e27fccd9b95f187fa7716c747e65d7a84d2d535",
+  "production_image": "sha256:5ee8e0b49f9751afaf88fee9c49824e5bb99e18049038b17dc66620924c6c028",
+  "integrated_source": "e7520b439f69294923f86895a3a63b5bc8d386d3",
+  "snapshot_commit": "df144f9d16a6176a87663f742db8edcd9c20b734",
+  "new_commits_not_integrated": [
+    "2abd6e62259951b1f56a4cabb748ca23765f3041",
+    "5e27fccd9b95f187fa7716c747e65d7a84d2d535"
+  ],
+  "tests": {
+    "recovery_quality": 425,
+    "api_native": 271,
+    "subtests": 75,
+    "operator": 25,
+    "final_targeted_regression": 1,
+    "ruff_changed_python_files": 2,
+    "full_upstream_suite": false
+  },
+  "fresh_review": {
+    "critical": 0,
+    "important": 0,
+    "minor": 0
+  },
+  "protected_translation_groups_unchanged": 18,
+  "protected_filled_de": 1310,
+  "protected_receipts": 39,
+  "old_job_status": "unknown",
+  "old_job_payload_sha256": "f536c0bc0d1e8d07fe9a4da8aa8e09e0868e5978a2e8272c21cd930ad4e804a7",
+  "free_after_export_cancel_bytes": 3105427456,
+  "image_archive_complete": false,
+  "image_export_cancelled_for_disk_reserve": true,
+  "new_build_completed": false,
+  "online_database_backup": {
+    "bytes": 147338533,
+    "sha256": "17ee41fe46b206f19f25b7e8c03e887c401579a83d3e06e9cfa219509ae12c97",
+    "verified_hash": true,
+    "restored": false,
+    "quiesced": false
+  },
+  "followup": {
+    "automation": "production",
+    "once_at_moscow": "2026-10-23 19:55",
+    "scope": "read-only baseline check; no automatic integration/deployment"
+  },
+  "state": "waiting_at_user_request"
+}
