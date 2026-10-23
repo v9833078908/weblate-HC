@@ -14,6 +14,8 @@ The existing REST API, project routing, credentials, judge repair application
 policy, source and target storage remain unchanged. No provider fallback or
 automatic retry is introduced. The user separately approved at most two more
 live requests, total additional cost at most $0.10, without storing translations.
+After those probes exposed a placement refusal, the user approved a second pair
+under the same $0.10 ceiling, still without storing translations.
 
 ## Internal model contract
 
@@ -51,6 +53,11 @@ For a source with N placeholder parts:
 - Decoder failures record the existing refused usage outcome, reason, and
   original response exactly once before raising `MachineTranslationError`.
   Malformed objects never enter the base parser's JSON-repair path.
+- Where immutable markup alternates with N+1 nonempty source text segments,
+  require nonempty output text slots (`minLength: 1`) and the corresponding
+  fixed occurrence positions (`enum`). This expresses the existing segment
+  boundary check before generation; grammar, syntax and empty edge slots retain
+  their existing flexible representation.
 
 Use standard closed-object/required/enum/string/array/integer bounds only; no
 `contains`, `prefixItems`, `allOf`, or model-specific schema keywords. Provider
@@ -113,4 +120,10 @@ unit target/state. No mass translation run or historical queued-run restart.
   `ebd75d2bddb0adeaddc155a0dda7bcc9cd0e4d599cb3273c662b5ea93c0efce9`.
 - Scoped pre-commit checks passed, with the previously established baseline
   global REUSE failure excluded. Code review found no actionable defects.
-- Production rollout and the two authorized final live probes are pending.
+- `fad32b18` was deployed and independently verified in the running image.
+  Gemini passed exact markup preservation; DeepSeek returned the required slot
+  but put all text before it, correctly refused by the unchanged validator.
+  These two probes cost $0.00953011, without storing translations.
+- Placement refinement: three failing-before schema subtests; all 25 protected
+  slot regressions pass after requiring interior text and fixed markup positions.
+  Follow-up rollout and the separately authorized second pair are pending.

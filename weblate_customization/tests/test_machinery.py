@@ -304,6 +304,34 @@ class RoutedProtectedSlotsTest(SimpleTestCase):
             ):
                 validate(reply, self.prepare(litellm=litellm)[4])
 
+    def test_interior_markup_schema_requires_text_on_both_sides(self) -> None:
+        prepared = self.prepare('Armor <sprite name="fire"> weapons')
+        for text, position in (
+            (["방어력 무기", ""], 1),
+            (["", "방어력 무기"], 0),
+            (["방어력 ", "무기"], 0),
+        ):
+            reply = {
+                "translations": {
+                    "s0": {"text": text, "placeholders": {"p0": {"position": position}}}
+                }
+            }
+            with (
+                self.subTest(text=text, position=position),
+                self.assertRaises(JSONSchemaValidationError),
+            ):
+                validate(reply, prepared[4])
+        valid = {
+            "translations": {
+                "s0": {
+                    "text": ["방어력 ", "무기"],
+                    "placeholders": {"p0": {"position": 1}},
+                }
+            }
+        }
+        validate(valid, prepared[4])
+        self.assertEqual(self.parse(valid, prepared), '방어력 <sprite name="fire">무기')
+
     def test_sprite_is_restored_from_source_without_model_owned_metadata(self) -> None:
         reply = {
             "translations": {

@@ -335,6 +335,20 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
             placeholders = [
                 part for part in item["parts"] if part["type"] == "placeholder"
             ]
+            # The validator already requires nonempty text on either side of
+            # interior markup. Express that boundary in the provider schema too.
+            fixed_boundaries = (
+                bool(placeholders)
+                and len(item["parts"]) == 2 * len(placeholders) + 1
+                and all(
+                    part["kind"] == "markup" and not part["translatable"]
+                    for part in placeholders
+                )
+                and all(
+                    part["type"] == "text" and part["text"].strip()
+                    for part in item["parts"][::2]
+                )
+            )
             occurrences = {}
             for index, part in enumerate(placeholders):
                 fields = {
@@ -344,6 +358,8 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
                         "maximum": len(placeholders),
                     }
                 }
+                if fixed_boundaries:
+                    fields["position"] = {"type": "integer", "enum": [index + 1]}
                 if part["translatable"]:
                     fields["text"] = {"type": "string"}
                 occurrences[f"p{index}"] = cls._closed_schema(fields)
@@ -351,7 +367,11 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
                 {
                     "text": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "items": (
+                            {"type": "string", "minLength": 1}
+                            if fixed_boundaries
+                            else {"type": "string"}
+                        ),
                         "minItems": len(placeholders) + 1,
                         "maxItems": len(placeholders) + 1,
                     },
