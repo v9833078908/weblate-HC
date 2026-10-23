@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 from django.conf import settings
@@ -24,22 +24,40 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from weblate.api.pagination import StandardPagination
+from weblate.api.producer.operations import idempotency_parameter, quality_idempotent
+from weblate.api.producer.quality import (
+    collect_quality_snapshot,
+    project_judge_decision,
+    project_quality_issues,
+    quality_recheck_snapshot,
+    quality_repeat_groups,
+)
 from weblate.api.producer.serializers import (
     ProducerApplyCandidateRequestSerializer,
     ProducerBulkApplyRequestSerializer,
     ProducerBulkApplyResultSerializer,
     ProducerClarificationRequestSerializer,
     ProducerClarificationSerializer,
+    ProducerDecisionListRequestSerializer,
     ProducerDecisionSerializer,
+    ProducerJudgeDecisionSerializer,
     ProducerJudgeEstimateRequestSerializer,
     ProducerJudgeEstimateSerializer,
     ProducerMeSerializer,
     ProducerProjectSummarySerializer,
+    ProducerQualityIssueFilterSerializer,
+    ProducerQualityIssueListSerializer,
+    ProducerQualityOperationSerializer,
+    ProducerQualityRecheckRequestSerializer,
+    ProducerQualityRecheckResultSerializer,
+    ProducerQualitySnapshotRequestSerializer,
+    ProducerQualitySnapshotSerializer,
     ProducerRunResumeRequestSerializer,
     ProducerRunSerializer,
     ProducerRunStartRequestSerializer,
@@ -53,7 +71,11 @@ from weblate.api.throttling import (
 from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD
 from weblate.trans.autotranslate import BatchAutoTranslate, PreparationScope
 from weblate.trans.forms import configured_routed_engine
-from weblate.trans.judge import judge_configuration_ready, judge_configuration_snapshot
+from weblate.trans.judge import (
+    JUDGE_SEATS,
+    judge_configuration_ready,
+    judge_configuration_snapshot,
+)
 from weblate.trans.judge_loop import (
     DEFAULT_CANDIDATE_SEVERITIES,
     accept_judge_candidate,
@@ -64,14 +86,20 @@ from weblate.trans.models.judge import (
     JudgeApplication,
     JudgeApplicationUndoError,
     JudgeCandidateError,
-    JudgeCandidateMetadata,
-    JudgeVerdict,
+    JudgeRunUnit,
     ProducerRun,
     UnitClarification,
     compute_decision_revision,
 )
+from weblate.trans.models.producer_quality import ProducerQualityOperation
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
+from weblate.trans.quality_execution import (
+    QualityExecutionPolicy,
+    project_digest,
+    protected_scope,
+    reject_verification_mutation,
+)
 from weblate.trans.tasks import publish_producer_run_dispatch
 from weblate.trans.views.judge import _get_scope, user_can_view_producer_run
 from weblate.utils.state import STATE_APPROVED
@@ -81,6 +109,7 @@ if TYPE_CHECKING:
     from rest_framework.request import Request
 
     from weblate.auth.models import User
+    from weblate.trans.autotranslate import JudgeScopePreview
 
     class AuthenticatedRequest(Request):
         """DRF request after Weblate's authentication middleware."""
@@ -107,7 +136,19 @@ class ProducerMe(APIView):
             "full_name": user.full_name,
             "is_superuser": user.is_superuser,
             "capabilities": {
-                "judge": judge_configuration_ready(),
+                "mt_async_batches": 1,
+                "mt_reconciliation": 1,
+                "quality_execution_policy": 1,
+                "verify_only_immutable": 1,
+                "judge": (judge_ready := judge_configuration_ready()),
+                "judge_seats": len(JUDGE_SEATS) if judge_ready else 0,
+                "quality_api_version": 2,
+                "candidate_quality_gate": True,
+                "glossary_direct_scan": True,
+                "quality_group_recheck": True,
+                "quality_repeat_plan": True,
+                "quality_final_snapshot": True,
+                "quality_idempotency": True,
                 "glossary_profile_analysis": (
                     settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED
                 ),
@@ -139,9 +180,14 @@ class ProducerProjects(ListAPIView):
 
 
 def _preparation_estimate_payload(
-    project: Project, user: User, scope: dict
+    project: Project, user: User, scope: dict, execution_mode: str = "repair"
 ) -> tuple[
-    BatchAutoTranslate, object, list[Unit], dict, list[int], PreparationScope | None
+    BatchAutoTranslate,
+    JudgeScopePreview,
+    list[Unit],
+    dict,
+    list[str],
+    PreparationScope | None,
 ]:
     """
     Build the shared estimate/start view of the run's two volumes (Task 3).
@@ -163,6 +209,24 @@ def _preparation_estimate_payload(
         judge_mutating_repairs=False,
     )
     preview, units = batch.preview_judge_scope_snapshot()
+    if execution_mode == "verify_only":
+        missing = sum(not unit.target for unit in units)
+        return (
+            batch,
+            preview,
+            units,
+            {
+                "missing": missing,
+                "per_language": {},
+                "engine": None,
+                "blockers": ["Verification requires filled translations."]
+                if missing
+                else [],
+                "mt_cost_known": True,
+            },
+            (["Verification requires filled translations."] if missing else []),
+            None,
+        )
     try:
         preparation = batch.build_preparation_scope()
     except PermissionDenied as error:
@@ -192,6 +256,7 @@ def _scope_hash_for(
     units: list[Unit],
     preparation: dict,
     execution_version: int = 1,
+    execution_mode: str = "repair",
 ) -> str:
     """Bind the estimate to its exact selection, MT volume and execution version."""
     return hashlib.sha256(
@@ -202,6 +267,13 @@ def _scope_hash_for(
                 "scope": scope,
                 "unit_ids": [unit.pk for unit in units],
                 "preparation": preparation,
+                "execution_mode": execution_mode,
+                "protected_scope": protected_scope(units)
+                if execution_mode == "verify_only"
+                else {},
+                "protected_project": project_digest(project)
+                if execution_mode == "verify_only"
+                else "",
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -234,11 +306,29 @@ class ProducerProjectJudgeEstimate(APIView):
                 status=409,
             )
         scope = serializer.validated_data.get("scope", {})
-        _batch, preview, units, preparation, _blockers, _scope = (
-            _preparation_estimate_payload(project, self.request.user, scope)
+        policy = QualityExecutionPolicy.from_mode(
+            serializer.validated_data["execution_mode"]
         )
+        _batch, preview, units, preparation, _blockers, _scope = (
+            _preparation_estimate_payload(
+                project, self.request.user, scope, policy.mode
+            )
+        )
+        if policy.verify_only and (preparation["missing"] or not units):
+            return Response(
+                {
+                    "detail": "Verification requires filled translations.",
+                    "code": "empty-scope",
+                },
+                status=409,
+            )
         scope_hash = _scope_hash_for(
-            project, scope, units, preparation, execution_version=1
+            project,
+            scope,
+            units,
+            preparation,
+            execution_version=1,
+            execution_mode=policy.mode,
         )
         estimate = ProducerRun.objects.create(
             actor=self.request.user,
@@ -254,9 +344,11 @@ class ProducerProjectJudgeEstimate(APIView):
             scope_hash=scope_hash,
             scope_snapshot=[unit.pk for unit in units],
             configuration_snapshot=judge_configuration_snapshot(),
+            execution_options=policy.options(),
         )
         payload = {
             "estimate_id": str(estimate.pk),
+            "execution_mode": policy.mode,
             "scope_hash": scope_hash,
             "strings": preview.processed,
             "selected": preview.matched,
@@ -281,12 +373,14 @@ class ProducerProjectRunStart(APIView):
 
     @extend_schema(
         request=ProducerRunStartRequestSerializer,
+        parameters=[idempotency_parameter()],
         responses={
             200: ProducerRunSerializer,
             201: ProducerRunSerializer,
             409: ProducerConflictSerializer,
         },
     )
+    @quality_idempotent("judge-start")
     def post(self, request: Request, slug: str) -> Response:
         serializer = ProducerRunStartRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -308,6 +402,17 @@ class ProducerProjectRunStart(APIView):
                 status=409,
             )
         scope = serializer.validated_data.get("scope", {})
+        policy = QualityExecutionPolicy.from_mode(
+            serializer.validated_data["execution_mode"]
+        )
+        if policy.mode != QualityExecutionPolicy.for_run(estimate).mode:
+            return Response(
+                {
+                    "detail": "Execution mode changed since estimate.",
+                    "code": "estimate-drift",
+                },
+                status=409,
+            )
         if scope.get("query", "") != estimate.requested_query:
             return Response(
                 {
@@ -330,10 +435,17 @@ class ProducerProjectRunStart(APIView):
                 status=409,
             )
         _batch, _preview, units, preparation, blockers, preparation_scope = (
-            _preparation_estimate_payload(project, self.request.user, scope)
+            _preparation_estimate_payload(
+                project, self.request.user, scope, policy.mode
+            )
         )
         scope_hash = _scope_hash_for(
-            project, scope, units, preparation, execution_version=1
+            project,
+            scope,
+            units,
+            preparation,
+            execution_version=1,
+            execution_mode=policy.mode,
         )
         if scope_hash != estimate.scope_hash:
             return Response(
@@ -365,7 +477,13 @@ class ProducerProjectRunStart(APIView):
             "judge_mutating_repairs": False,
             "judge_candidate_severities": list(DEFAULT_CANDIDATE_SEVERITIES),
             "overwrite_existing": False,
+            **policy.options(),
         }
+        if policy.verify_only:
+            execution_options.update(
+                protected_scope=protected_scope(units),
+                protected_project=project_digest(project),
+            )
         idempotency_key = str(estimate.pk)
         try:
             with transaction.atomic():
@@ -435,6 +553,191 @@ class ProducerRunDetail(APIView):
     @extend_schema(responses=ProducerRunSerializer)
     def get(self, request: Request, pk) -> Response:
         return Response(ProducerRunSerializer(self._get_run(pk)).data)
+
+
+class ProducerProjectDecisions(GenericAPIView):
+    """List one project's text-free, run-scoped judge decisions."""
+
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ProducerJudgeDecisionSerializer
+    pagination_class = StandardPagination
+    request: AuthenticatedRequest  # type: ignore[assignment]
+
+    @extend_schema(
+        parameters=[ProducerDecisionListRequestSerializer],
+        responses=ProducerJudgeDecisionSerializer(many=True),
+    )
+    def get(self, request: Request, slug: str) -> Response:
+        filters = ProducerDecisionListRequestSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        project = get_object_or_404(self.request.user.allowed_projects, slug=slug)
+        run = get_object_or_404(
+            ProducerRun,
+            pk=filters.validated_data["run"],
+            requested_mode=filters.validated_data["kind"],
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(project.pk),
+        )
+        if not user_can_view_producer_run(self.request.user, project, run):
+            raise Http404
+        queryset = (
+            JudgeRunUnit.objects.filter(run=run, project_id=project.pk)
+            .select_related("unit", "unit__translation", "verdict")
+            .order_by("pk")
+        )
+        page = cast("list[JudgeRunUnit]", self.paginate_queryset(queryset))
+        rows = [project_judge_decision(item, self.request.user) for item in page]
+        serializer = self.get_serializer(rows, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+class ProducerProjectQualityIssues(APIView):
+    """Read active repeat and glossary issues as stable structured groups."""
+
+    permission_classes = (IsAuthenticated,)
+    request: AuthenticatedRequest  # type: ignore[assignment]
+
+    @extend_schema(
+        parameters=[ProducerQualityIssueFilterSerializer],
+        responses=ProducerQualityIssueListSerializer,
+    )
+    def get(self, request: Request, slug: str) -> Response:
+        filters = ProducerQualityIssueFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        project = get_object_or_404(self.request.user.allowed_projects, slug=slug)
+        payload = project_quality_issues(
+            project=project,
+            language=filters.validated_data["language"],
+            kinds=filters.validated_data["kind"],
+            user=self.request.user,
+        )
+        return Response(ProducerQualityIssueListSerializer(payload).data)
+
+
+class ProducerProjectQualitySnapshot(APIView):
+    """Read-only full quality scan over an explicit, permission-closed scope."""
+
+    permission_classes = (IsAuthenticated,)
+    request: AuthenticatedRequest  # type: ignore[assignment]
+
+    @extend_schema(
+        request=ProducerQualitySnapshotRequestSerializer,
+        responses=ProducerQualitySnapshotSerializer,
+    )
+    def post(self, request: Request, slug: str) -> Response:
+        project = get_object_or_404(self.request.user.allowed_projects, slug=slug)
+        serializer = ProducerQualitySnapshotRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        payload = collect_quality_snapshot(
+            project=project,
+            language=data["language"],
+            unit_ids=data["scope"]["unit_ids"],
+            user=request.user,
+        )
+        return Response(ProducerQualitySnapshotSerializer(payload).data)
+
+
+class ProducerProjectQualityRecheck(APIView):
+    """Recompute checks for a closed unit list without changing translations."""
+
+    permission_classes = (IsAuthenticated,)
+    request: AuthenticatedRequest  # type: ignore[assignment]
+
+    @extend_schema(
+        request=ProducerQualityRecheckRequestSerializer,
+        parameters=[idempotency_parameter()],
+        responses=ProducerQualityRecheckResultSerializer,
+    )
+    @quality_idempotent("quality-recheck")
+    def post(self, request: Request, slug: str) -> Response:
+        serializer = ProducerQualityRecheckRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        project = get_object_or_404(self.request.user.allowed_projects, slug=slug)
+        requested = serializer.validated_data["items"]
+        units = {
+            unit.pk: unit
+            for unit in Unit.objects.filter_access(self.request.user)
+            .filter(
+                pk__in=[item["unit_id"] for item in requested],
+                translation__component__project=project,
+            )
+            .select_related("translation", "translation__component")
+        }
+        results = []
+        for item in requested:
+            unit = units.get(item["unit_id"])
+            if unit is None:
+                results.append(
+                    {
+                        "unit_id": item["unit_id"],
+                        "outcome": "missing",
+                        "revision": "",
+                        "checks": [],
+                    }
+                )
+                continue
+            revision = compute_decision_revision(unit)
+            if revision != item["revision"]:
+                results.append(
+                    {
+                        "unit_id": unit.pk,
+                        "outcome": "stale",
+                        "revision": revision,
+                        "checks": unit.failing_check_names,
+                    }
+                )
+                continue
+            permission = (
+                "glossary.edit"
+                if unit.translation.component.is_glossary
+                else "unit.edit"
+            )
+            if not self.request.user.has_perm(permission, unit):
+                results.append(
+                    {
+                        "unit_id": unit.pk,
+                        "outcome": "forbidden",
+                        "revision": revision,
+                        "checks": unit.failing_check_names,
+                    }
+                )
+                continue
+            unit.run_checks()
+            unit.refresh_from_db()
+            results.append(
+                {
+                    "unit_id": unit.pk,
+                    "outcome": "rechecked",
+                    "revision": compute_decision_revision(unit),
+                    "checks": unit.failing_check_names,
+                }
+            )
+        payload = {
+            "snapshot_hash": quality_recheck_snapshot(results),
+            "items": results,
+        }
+        affected_ids = {unit.pk for unit in units.values()}
+        affected_groups = set()
+        for language in {unit.translation.language.code for unit in units.values()}:
+            language_ids = [
+                unit.pk
+                for unit in units.values()
+                if unit.translation.language.code == language
+            ]
+            groups = quality_repeat_groups(
+                project=project,
+                language=language,
+                user=request.user,
+                unit_ids=language_ids,
+            )
+            affected_groups.update(groups)
+            affected_ids.update(
+                unit.pk for members in groups.values() for unit in members
+            )
+        payload["affected_unit_ids"] = sorted(affected_ids)
+        payload["affected_repeat_group_ids"] = sorted(affected_groups)
+        return Response(ProducerQualityRecheckResultSerializer(payload).data)
 
 
 class ProducerRunCancel(ProducerRunDetail):
@@ -599,6 +902,7 @@ class ProducerUnitApplyCandidate(APIView):
         serializer = ProducerApplyCandidateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         unit = get_object_or_404(Unit.objects.filter_access(self.request.user), pk=pk)
+        reject_verification_mutation(request, unit.translation.component.project)
         if not self.request.user.has_perm(
             "unit.review", unit
         ) or not self.request.user.has_perm("translation.auto", unit.translation):
@@ -643,10 +947,13 @@ class ProducerProjectDecisionsApply(APIView):
 
     @extend_schema(
         request=ProducerBulkApplyRequestSerializer,
+        parameters=[idempotency_parameter()],
         responses=ProducerBulkApplyResultSerializer(many=True),
     )
+    @quality_idempotent("candidate-apply")
     def post(self, request: Request, slug: str) -> Response:
         project = get_object_or_404(self.request.user.allowed_projects, slug=slug)
+        reject_verification_mutation(request, project)
         serializer = ProducerBulkApplyRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         results = [
@@ -662,11 +969,11 @@ class ProducerProjectDecisionsApply(APIView):
                 pk=unit_id, translation__component__project=project
             )
         except Unit.DoesNotExist:
-            return {"unit": unit_id, "outcome": "forbidden"}
+            return self._bulk_result(unit_id, "forbidden")
         if not self.request.user.has_perm(
             "unit.review", unit
         ) or not self.request.user.has_perm("translation.auto", unit.translation):
-            return {"unit": unit_id, "outcome": "forbidden"}
+            return self._bulk_result(unit_id, "forbidden")
         # Candidate existence is checked before revision staleness: a
         # completed apply always advances the revision too, so a retry
         # (or a losing side of a concurrent apply race) must report the
@@ -675,35 +982,70 @@ class ProducerProjectDecisionsApply(APIView):
             pk=item["candidate_id"], unit=unit
         ).first()
         if candidate is None:
-            return {"unit": unit_id, "outcome": "already_applied"}
+            return self._bulk_result(unit_id, "already_applied", unit)
         if compute_decision_revision(unit) != item["revision"]:
-            return {"unit": unit_id, "outcome": "stale"}
+            return self._bulk_result(unit_id, "stale", unit)
         if self._needs_individual_confirmation(unit, candidate):
-            return {"unit": unit_id, "outcome": "needs_individual_confirmation"}
+            return self._bulk_result(unit_id, "needs_individual_confirmation", unit)
         try:
-            accept_judge_candidate(candidate, self.request)
+            application = accept_judge_candidate(
+                candidate,
+                self.request,
+                automatic=True,
+                expected_revision=item["revision"],
+            )
         except JudgeCandidateError:
+            unit.refresh_from_db()
             if not Suggestion.objects.filter(pk=candidate.pk).exists():
                 # Lost a race to a concurrent apply of the same candidate,
                 # not a validation failure.
-                return {"unit": unit_id, "outcome": "already_applied"}
-            return {"unit": unit_id, "outcome": "not_verified"}
-        return {"unit": unit_id, "outcome": "applied"}
+                return self._bulk_result(unit_id, "already_applied", unit)
+            if compute_decision_revision(unit) != item["revision"]:
+                return self._bulk_result(unit_id, "stale", unit)
+            return self._bulk_result(unit_id, "not_verified", unit)
+        unit.refresh_from_db()
+        return self._bulk_result(unit_id, "applied", unit, application.pk)
 
     @staticmethod
-    def _needs_individual_confirmation(unit: Unit, candidate: Suggestion) -> bool:
-        if unit.state == STATE_APPROVED:
-            return True
-        metadata = JudgeCandidateMetadata.parse(candidate.userdetails)
-        if metadata is None:
-            return False
-        verdict = JudgeVerdict.objects.filter(pk=metadata.verdict_id).first()
-        if verdict is None:
-            return False
-        return any(
-            isinstance(error, dict) and error.get("category") == "terminology"
-            for error in verdict.errors
+    def _bulk_result(
+        unit_id: int,
+        outcome: str,
+        unit: Unit | None = None,
+        application_id: int | None = None,
+    ) -> dict:
+        return {
+            "unit": unit_id,
+            "outcome": outcome,
+            "revision": compute_decision_revision(unit) if unit is not None else "",
+            "application_id": application_id,
+        }
+
+    @staticmethod
+    def _needs_individual_confirmation(unit: Unit, _candidate: Suggestion) -> bool:
+        # Automatic acceptance independently checks the candidate's glossary;
+        # a terminology error on the OLD target must not veto a verified fix.
+        return unit.state == STATE_APPROVED
+
+
+class ProducerQualityOperationDetail(APIView):
+    """Observe a keyed write after an uncertain HTTP response, without replay."""
+
+    permission_classes = (IsAuthenticated,)
+    request: AuthenticatedRequest  # type: ignore[assignment]
+
+    @extend_schema(responses=ProducerQualityOperationSerializer)
+    def get(self, request: Request, slug: str, operation_id) -> Response:
+        project = get_object_or_404(self.request.user.allowed_projects, slug=slug)
+        operation = get_object_or_404(
+            ProducerQualityOperation,
+            project=project,
+            actor=request.user,
+            key=operation_id,
         )
+        data = {"state": operation.state}
+        if operation.state == "confirmed":
+            data["result"] = operation.result
+        return Response(data)
 
 
 class ProducerUnitClarification(APIView):

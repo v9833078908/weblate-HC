@@ -37,6 +37,24 @@ datastore, local filesystem repositories, and external code-hosting systems.
 Scope and intended use
 ----------------------
 
+The producer MT batch API (:ref:`api-producer-mt-batches`) is an authenticated,
+permission-scoped outbound translation surface. A UUID key is actor/project
+bound and payload bound; a separate unique unit/revision reservation prevents a
+new key from bypassing an unresolved paid intent. Request fields cannot choose
+an endpoint, credential or arbitrary model, or enable overwriting. The existing
+project machinery configuration remains the outbound authority. Admission uses
+the producer rate limit; receipt reads keep the ordinary authenticated API rate
+limit without consuming the paid-admission budget. Workers recheck permissions and
+empty-target revisions before a normal audited write without propagation.
+Provider answers are stored privately in the database before application and
+are not returned by receipt reads. Account deletion preserves unresolved unit
+intents, but removes actor access. Backups must treat these stored answers as
+translation content. Unknown provider outcomes fail closed: this protects
+against blind client or Celery retries, not against provider-internal retries,
+billing duplication, or an independently authorized legacy MT request. Keep
+receipts and unit intents during code rollback; erasing them removes this safety
+boundary. *(documented)* (source: :doc:`/api`)
+
 .. list-table::
    :header-rows: 1
 
@@ -440,7 +458,58 @@ Reachability preconditions:
   per-user API rate limit, so a compromised or over-eager token cannot
   multiply provider spend past a second, independent ceiling.
   *(documented)* (source: :ref:`api-producer`, :doc:`/admin/config`)
-* Judge verdicts, producer runs (including cost estimates and applied
+  Its project decision and quality-list endpoints return identifiers,
+  hashes, classifications, and applicability only: source, target,
+  candidate, prompt, and judge-evidence text stay in Weblate. The bounded
+  quality recheck endpoint accepts only accessible units in the named
+  project and refuses a stale revision before recomputing checks. Applying
+  a result remains a separate operation protected by both
+  ``translation.auto`` and ``unit.review`` and by the candidate verification,
+  approval, terminology, and revision guards described above. An external
+  orchestrator therefore cannot turn a read-only quality report into an
+  unrestricted unit-write primitive. *(documented)* (source:
+  :ref:`api-producer`)
+  Version 2 adds a bounded explicit-scope snapshot, direct glossary and
+  exact-repeat scans, and actor/project-bound repeat plan and run resources.
+  Disabled component propagation is reported as a mandatory repeat-coverage
+  issue, never as proof of consistent translations; the read-only scan does
+  not change that administrator policy.
+  The automatic candidate path requires a current collegial PASS from both
+  parsed seats plus technical and mandatory glossary checks under the unit
+  lock. Unlike manual acknowledgement, this can repair an old terminology
+  failure only if the candidate itself passes the mandatory checks.
+  Automatic repeat writes reuse native signed manifests, revision checks,
+  protection rules and audit events; recipients outside the submitted scope
+  cannot be written. Written recipients remain held until a fresh dual PASS
+  and mandatory checks approve that exact revision. Repeat recommendation
+  preparation may reach the existing configured judge provider and shares
+  the independent producer rate limit with judge estimate/start/resume; polling,
+  snapshot scanning, and applying stored plans do not submit a new provider
+  request. UUID idempotency keys bind accepted local writes to the actor,
+  project and request; receipts contain text-free results, while server-only
+  manifest data is never serialized. This does not promise exactly-once
+  outbound billing or an atomic file download: clients must compare the
+  complete scope revision on both sides of export. *(documented)*
+  (source: :ref:`api-producer-quality-v2`)
+* Durable producer MT and judge dispatches reserve semantic work before outbound
+  I/O and store complete responses before parsing. The private
+  ``DATA_DIR/private-llm-delivery`` files contain translation text and provider
+  output, require the same protection and private backup handling as project
+  content, and are never serialized by producer endpoints. Each body is capped
+  at 16 MiB and checked by SHA-256 before reuse. Missing or corrupt data retains
+  the permanent spend fence and cannot authorize paid replay. Resolved bodies
+  are pruned 30 days after successful terminal processing; unresolved bodies
+  remain available for reconciliation. Provider result lookup and billing
+  idempotency are not claimed for unverified routes. *(maintainer)*
+* Immutable producer verification binds its mode to actor, project, estimate,
+  run and explicit scope. It suppresses translation preparation, candidates,
+  repair and hold changes; scoped model-write barriers reject accidental
+  protected-content changes and execution-context apply endpoints refuse
+  mutations. Concurrent independent edits invalidate the audit-aware baseline
+  without being rolled back. This is not a database-wide write freeze, a
+  restriction on administrators, or a sandbox against arbitrary SQL executed
+  by trusted application code. *(maintainer)*
+* Producer quality operation receipts, judge verdicts, producer runs (including cost estimates and applied
   candidate receipts), and the durable per-application undo record are
   retained without an automatic expiry; only high-volume transport
   diagnostics - raw provider request/response records and closed retry

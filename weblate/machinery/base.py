@@ -515,6 +515,14 @@ class BatchMachineTranslation(DocVersionsMixin):
                 if not self.should_retry_exception(error, attempt):
                     raise
             else:
+                if getattr(self, "durable_single_attempt", False):
+                    # Capture the body before check_failure can reject/parse it.
+                    from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+                        capture_transport_response,
+                        encode_http_response,
+                    )
+
+                    capture_transport_response(encode_http_response(response))
                 if self._accept_or_retry(response, attempt):
                     return response
                 delayed_by = response

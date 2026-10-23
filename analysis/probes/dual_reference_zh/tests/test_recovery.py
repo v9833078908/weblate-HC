@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-import subprocess  # ruff: ignore[suspicious-subprocess-import]
+import subprocess
 import sys
 from pathlib import Path
 
@@ -25,7 +25,6 @@ def test_terminal_failure_is_serializable() -> None:
     with pytest.raises(runner.RequestError) as raised:
         runner.run_with_retry(request, label={"arm": "A"})
     result = json.loads(json.dumps(raised.value.as_result()))
-    # ruff: ignore[assert]
     assert len(result["attempts"]) == 1
 
 
@@ -48,9 +47,7 @@ def test_recoverable_failure_retries(monkeypatch, failure) -> None:
         return {"items": {}}, {"status": 200}
 
     _, _, attempts = runner.run_with_retry(request, label={"arm": "A"})
-    # ruff: ignore[assert]
     assert len(calls) == len(attempts) == 2
-    # ruff: ignore[assert]
     assert "secret" not in json.dumps(attempts)
 
 
@@ -64,9 +61,7 @@ def test_completed_batch_survives_later_interruption(tmp_path) -> None:
     )
     # A new reader can recover the completed batch before a final artifact exists.
     events = [json.loads(line) for line in journal.path.read_text().splitlines()]
-    # ruff: ignore[assert]
     assert events[0]["result"]["items"]["one"]["translation"] == "一"
-    # ruff: ignore[assert]
     assert events[0]["group"] == "generate"
 
 
@@ -89,9 +84,7 @@ def test_journal_survives_process_exit(tmp_path) -> None:
         ],
         check=False,
     )
-    # ruff: ignore[assert]
     assert result.returncode == 17
-    # ruff: ignore[assert]
     assert json.loads(path.read_text())["result"]["translation"] == "saved"
 
 
@@ -100,7 +93,6 @@ def test_final_artifact_is_readable_and_not_overwritten(tmp_path) -> None:
     runner.save_result(path, {"value": "original"})
     with pytest.raises(FileExistsError):
         runner.save_result(path, {"value": "replacement"})
-    # ruff: ignore[assert]
     assert json.loads(path.read_text()) == {"value": "original"}
 
 

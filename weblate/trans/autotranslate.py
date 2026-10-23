@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
-from typing import TYPE_CHECKING, Any, Literal, TypeGuard
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard
 from uuid import uuid4
 
 from celery import current_task
@@ -59,6 +59,11 @@ from weblate.trans.models.judge import (
     state_for_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.quality_execution import (
+    QualityExecutionPolicy,
+    VerificationChangedError,
+    verification_context,
+)
 from weblate.trans.util import is_plural, split_plural
 from weblate.utils.celery import touch_task_liveness
 from weblate.utils.state import (
@@ -83,6 +88,10 @@ if TYPE_CHECKING:
 # A refusal that outlived the request retries stops the service for everyone, so
 # batches of a run started meanwhile are skipped. Wait for a short stop to pass
 # rather than dropping their strings, but never hold a run for a long one.
+
+
+class _JudgeRunKwargs(TypedDict, total=False):
+    run: ProducerRun
 
 
 def _valid_preparation_ids(value: object) -> TypeGuard[list[int]]:
@@ -541,6 +550,14 @@ class AutoTranslate(BaseAutoTranslate):
         self.judge_mutating_repairs = judge_mutating_repairs
         self.judge_candidate_severities = judge_candidate_severities
         self.judge_proposal_only = judge_proposal_only
+
+        self.quality_execution_policy = QualityExecutionPolicy.for_run(producer_run)
+        if self.quality_execution_policy.verify_only:
+            self.judge_pretranslate = False
+            self.judge_mutating_repairs = False
+            self.judge_proposal_only = True
+            self.judge_candidate_severities = ()
+            self.overwrite_existing = False
         self.judge_units_matched = 0
         self.judge_units_processed = 0
         self.judge_units_remaining = 0
@@ -577,12 +594,14 @@ class AutoTranslate(BaseAutoTranslate):
             target = [target]
         max_length = unit.get_max_length()
         max_length_check = CHECKS.get("max-length")
-        replace = (
+        replace_for_length = (
             max_length_check.get_replacement_function(unit)
             if max_length_check is not None
             else lambda text: text
         )
-        over_max_length = any(len(replace(item)) > max_length for item in target)
+        over_max_length = any(
+            len(replace_for_length(item)) > max_length for item in target
+        )
         if self.mode == "suggest" or (over_max_length and self.mode != "judge"):
             _, result = Suggestion.objects.add(
                 unit,
@@ -1363,7 +1382,9 @@ class AutoTranslate(BaseAutoTranslate):
             return False
 
         try:
-            run_kwargs = {} if self.producer_run is None else {"run": self.producer_run}
+            run_kwargs: _JudgeRunKwargs = (
+                {} if self.producer_run is None else {"run": self.producer_run}
+            )
             verdicts = run_judge_batch(
                 units,
                 writable_ids=writable_ids,
@@ -1435,6 +1456,19 @@ class AutoTranslate(BaseAutoTranslate):
                     stale_conflicts.add(unit.id)
                     continue
                 if self.judge_proposal_only:
+                    # ruff: ignore[import-outside-top-level]
+                    from weblate.trans.judge_quality import (
+                        may_release_automatic_repeat_hold,
+                    )
+
+                    if (
+                        not self.quality_execution_policy.verify_only
+                        and self.user is not None
+                        and may_release_automatic_repeat_hold(locked, self.user)
+                    ):
+                        self.update(
+                            locked, STATE_TRANSLATED, locked.get_target_plurals()
+                        )
                     projections.add(unit.id)
                     continue
                 if verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
@@ -1652,6 +1686,15 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.enforce_permissions = enforce_permissions
         self.overwrite_existing = overwrite_existing
         self.producer_run_id = producer_run_id
+        self.quality_execution_policy = QualityExecutionPolicy.for_run(
+            ProducerRun.objects.get(pk=producer_run_id) if producer_run_id else None
+        )
+        if self.quality_execution_policy.verify_only:
+            judge_pretranslate = False
+            judge_mutating_repairs = False
+            judge_candidate_severities = ()
+            judge_proposal_only = True
+            self.overwrite_existing = False
         self.judge_pretranslate = judge_pretranslate
         self.judge_mutating_repairs = judge_mutating_repairs
         self.judge_candidate_severities = judge_candidate_severities
@@ -2227,14 +2270,23 @@ class BatchAutoTranslate(BaseAutoTranslate):
             matches = claimed is not None and self._producer_run_request_matches(
                 claimed
             )
-            if matches and claimed.status in {
-                ProducerRun.Status.COMPLETED,
-                ProducerRun.Status.FAILED,
-                ProducerRun.Status.CANCELLED,
-                ProducerRun.Status.PARTIAL,
-            }:
+            if (
+                matches
+                and claimed is not None
+                and claimed.status
+                in {
+                    ProducerRun.Status.COMPLETED,
+                    ProducerRun.Status.FAILED,
+                    ProducerRun.Status.CANCELLED,
+                    ProducerRun.Status.PARTIAL,
+                }
+            ):
                 return claimed
-            if matches and claimed.status == ProducerRun.Status.CANCEL_REQUESTED:
+            if (
+                matches
+                and claimed is not None
+                and claimed.status == ProducerRun.Status.CANCEL_REQUESTED
+            ):
                 claimed.status = ProducerRun.Status.CANCELLED
                 claimed.finished = timezone.now()
                 claimed.save(update_fields=["status", "finished"])
@@ -2680,10 +2732,16 @@ class BatchAutoTranslate(BaseAutoTranslate):
         run.summary = summary
         run.warnings = self.get_warnings()
         run.save(update_fields=["status", "finished", "failure", "summary", "warnings"])
+        from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+            resolve_run_deliveries,
+        )
+
+        resolve_run_deliveries(run)
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.repeat_judge import schedule_repeat_comparison
 
-        schedule_repeat_comparison(run)
+        if not QualityExecutionPolicy.for_run(run).verify_only:
+            schedule_repeat_comparison(run)
 
     def _can_process_translation(self, translation: Translation) -> bool:
         return not self.enforce_permissions or bool(
@@ -2718,13 +2776,25 @@ class BatchAutoTranslate(BaseAutoTranslate):
     ) -> str:
         self.active_producer_run = None
         try:
-            message = self._perform(
-                auto_source=auto_source,
-                engines=engines,
-                threshold=threshold,
-                source_component_ids=source_component_ids,
+            run = (
+                ProducerRun.objects.get(pk=self.producer_run_id)
+                if self.producer_run_id
+                else None
             )
+            with verification_context(run):
+                message = self._perform(
+                    auto_source=auto_source,
+                    engines=engines,
+                    threshold=threshold,
+                    source_component_ids=source_component_ids,
+                )
         except Exception as error:
+            if isinstance(error, VerificationChangedError) and self.producer_run_id:
+                ProducerRun.objects.filter(pk=self.producer_run_id).update(
+                    status=ProducerRun.Status.PARTIAL,
+                    failure="Verification snapshot changed; results are stale",
+                    finished=timezone.now(),
+                )
             if (
                 self.active_producer_run is not None
                 and self.active_producer_run.execution_version == 0
@@ -2735,7 +2805,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 )
                 and isinstance(
                     error,
-                    (DatabaseError, MemoryError, SystemExit, KeyboardInterrupt),
+                    (
+                        DatabaseError,
+                        MemoryError,
+                        SystemExit,
+                        KeyboardInterrupt,
+                        VerificationChangedError,
+                    ),
                 )
             ):
                 self._finish_producer_run(
@@ -2920,6 +2996,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         # project-wide preparation (C3).
         purpose_judges_stored_text = producer_run is not None and (
             producer_run.requested_mode in {"recheck", "drain"}
+            or self.quality_execution_policy.verify_only
         )
         preparation_requested = (
             auto_source == "mt"

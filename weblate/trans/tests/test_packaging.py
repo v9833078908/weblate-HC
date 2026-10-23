@@ -103,6 +103,32 @@ class ResourceDataPackagingTest(SimpleTestCase):
                     (REPO_ROOT / path).is_file(), f"{path} is read but does not exist"
                 )
 
+    def test_discovery_excludes_standalone_customization(self) -> None:
+        """The separately built customization must not become a namespace package."""
+        config = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+        patterns = config["tool"]["setuptools"]["packages"]["find"]["include"]
+        for package in ("weblate", "weblate.trans"):
+            self.assertTrue(
+                any(fnmatch.fnmatchcase(package, item) for item in patterns)
+            )
+        for package in (
+            "weblate_customization",
+            "weblate_customization.src.weblate_customization",
+            "weblate_customization.tests",
+        ):
+            with self.subTest(package=package):
+                self.assertFalse(
+                    any(fnmatch.fnmatchcase(package, item) for item in patterns)
+                )
+
+    def test_sdist_declares_standalone_customization_sources(self) -> None:
+        """A clean sdist keeps standalone sources without relying on egg-info."""
+        manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+        self.assertIn(
+            "recursive-include weblate_customization *.py *.toml",
+            manifest.splitlines(),
+        )
+
     def test_declared_as_package_data(self) -> None:
         """Every runtime data file is named by a package-data glob."""
         globs = package_data_globs()
@@ -143,6 +169,9 @@ class ResourceDataPackagingTest(SimpleTestCase):
             self.assertEqual(len(wheels), 1, f"expected one wheel, got {wheels}")
             with zipfile.ZipFile(wheels[0]) as archive:
                 shipped = set(archive.namelist())
+        self.assertFalse(
+            any(path.startswith("weblate_customization/") for path in shipped)
+        )
         for path in sorted(self.expected):
             with self.subTest(path=path):
                 self.assertIn(path.as_posix(), shipped)

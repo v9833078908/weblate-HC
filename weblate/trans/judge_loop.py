@@ -26,10 +26,11 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, connections, transaction
 from django.db.models import Max, Q
 from django.utils import timezone
@@ -53,6 +54,12 @@ from weblate.trans.judge import (
     request_verdicts,
     resolve_judge_seat_profile,
     validate_judge_configuration,
+)
+from weblate.trans.judge_quality import (
+    automatic_candidate_allowed,
+    automatic_repeat_change,
+    candidate_quality,
+    evaluate_target_quality,
 )
 from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models.change import Change
@@ -80,17 +87,27 @@ from weblate.trans.models.judge import (
     state_for_verdict,
     unit_clarification_answer,
 )
+from weblate.trans.models.unit import Unit
+from weblate.trans.quality_execution import (
+    QualityExecutionPolicy,
+    annotate_verification_origin,
+    assert_verification_admissible,
+    require_mutation_allowed,
+    verification_evidence_allowed,
+    verification_session,
+)
 from weblate.trans.util import join_plural
 from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
+    from weblate.api.producer.views import AuthenticatedRequest
     from weblate.auth.models import AuthenticatedHttpRequest, User
     from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
+    from weblate.trans.judge import JudgeSeatProfile
     from weblate.trans.models.project import Project
     from weblate.trans.models.suggestion import Suggestion
-    from weblate.trans.models.unit import Unit
 
 # Verdicts whose round produces a stored producer candidate instead of a
 # mutating repair. minor maps to PASS and never has a candidate.
@@ -183,7 +200,7 @@ def _machinery_candidates(
 
 
 def repair_targets(
-    units: list[Unit], user: User | None, *, run_id: str | None = None
+    units: list[Unit], user: User | None, *, run_id: str | uuid.UUID | None = None
 ) -> dict[int, list[str]]:
     """
     Return usable repair targets keyed by unit id, writing nothing.
@@ -195,6 +212,8 @@ def repair_targets(
     """
     if not units:
         return {}
+
+    require_mutation_allowed()
     translation = units[0].translation
     settings_map = translation.component.project.get_machinery_settings()
     engine_id = configured_routed_engine(settings_map)
@@ -202,7 +221,11 @@ def repair_targets(
         return {}
     setting = settings_map[engine_id]
     engine = MACHINERY[engine_id](setting)
-    engine.usage_run_id = run_id
+    engine.usage_run_id = str(run_id) if run_id is not None else None
+    if run_id is not None:
+        engine.durable_single_attempt = True
+        engine.retry_attempts = 0
+        engine.delivery_purpose = "repair"
     if engine.batch_size == 1:
         return _repair_targets_per_unit(engine, units, user)
     try:
@@ -447,7 +470,7 @@ def _request_identity(
 def _cached_verdict(
     unit: Unit,
     request: JudgeRequest,
-    profiles: dict[int, object],
+    profiles: Mapping[int, JudgeSeatProfile],
     project_context: str,
     *,
     subject: str = JudgeVerdict.Subject.LIVE,
@@ -460,16 +483,27 @@ def _cached_verdict(
     rows = []
     for seat, identity in identities.items():
         row = (
-            unit.judge_verdicts.filter(
-                request_identity=identity,
-                seat=seat,
-                subject=subject,
+            annotate_verification_origin(
+                unit.judge_verdicts.filter(
+                    request_identity=identity,
+                    seat=seat,
+                    subject=subject,
+                )
             )
             .order_by("-timestamp", "-pk")
             .first()
         )
-        if row is None or row.unparsed or row.judge_model != profiles[seat].model:
+        if (
+            row is None
+            or row.unparsed
+            or row.judge_model != profiles[seat].model
+            or not verification_evidence_allowed(row)
+        ):
             return None
+        if subject == JudgeVerdict.Subject.LIVE:
+            applied = automatic_repeat_change(unit)
+            if applied is not None and row.timestamp <= applied[0].timestamp:
+                return None
         rows.append(row)
     return collegium_verdict(rows)
 
@@ -1098,6 +1132,7 @@ def _persist_verdict_batches(
     on_batch: OnBatch | None,
     attempt_started_at: datetime | None = None,
     subject: str = JudgeVerdict.Subject.LIVE,
+    producer_run: ProducerRun | None = None,
 ) -> OnBatch:
     cursor = 0
 
@@ -1114,6 +1149,20 @@ def _persist_verdict_batches(
                 ),
             )
         with transaction.atomic():
+            if QualityExecutionPolicy.for_run(producer_run).verify_only:
+                locked_run = ProducerRun.objects.select_for_update().get(
+                    pk=producer_run.pk
+                )
+                target_ids = [unit.pk for unit in batch_units]
+                source_ids = Unit.objects.filter(pk__in=target_ids).values_list(
+                    "source_unit_id", flat=True
+                )
+                list(
+                    Unit.objects.filter(pk__in=set(target_ids) | set(source_ids))
+                    .order_by("pk")
+                    .select_for_update()
+                )
+                assert_verification_admissible(locked_run, unit_ids=target_ids)
             for unit, request, result in zip(
                 batch_units,
                 batch_requests,
@@ -1247,8 +1296,8 @@ def _run_seats(  # ruff: ignore[complex-structure]
             if all(
                 index == event.seat_index
                 or index in completed
-                or coverage[index] >= event.end_offset
-                for index in coverage
+                or covered >= event.end_offset
+                for index, covered in coverage.items()
             ):
                 pending.remove(event)
                 release([event])
@@ -1323,6 +1372,7 @@ class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builti
         self.unsupported_repair_languages: set[str] = set()
 
 
+@verification_session
 def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-many-locals, too-many-statements]
     units: list[Unit],
     *,
@@ -1353,6 +1403,17 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
     producer candidate; a producer one-unit re-check narrows it to critical
     and turns ``mutating_repairs`` off, which makes the run evidence-only.
     """
+    if QualityExecutionPolicy.for_run(run).verify_only:
+        if evidence_run_id is not None and evidence_run_id != run.pk:
+            msg = "Verification evidence identity cannot be changed"
+            raise PermissionDenied(msg)
+        if not {unit.pk for unit in units} <= set(run.scope_snapshot):
+            msg = "Verification scope cannot be widened"
+            raise PermissionDenied(msg)
+        candidate_severities = ()
+        mutating_repairs = False
+        writable_ids = set()
+        candidate_targets = None
     candidate_verdicts = frozenset(
         _CANDIDATE_VERDICT_BY_SEVERITY[severity]
         for severity in candidate_severities
@@ -1396,6 +1457,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
                 project_context=project_context,
                 on_batch=on_batch,
                 attempt_started_at=started_at,
+                producer_run=run,
                 subject=(
                     JudgeVerdict.Subject.CANDIDATE
                     if candidate_targets is not None
@@ -1893,7 +1955,7 @@ def _finalize_drain_run(
 
 def _select_drain_requests(
     token: str,
-    profiles: dict[int, object],
+    profiles: Mapping[int, JudgeSeatProfile],
     deferrals: list[JudgeDeferral],
 ) -> tuple[list[Unit], dict[int, list[Unit]]]:
     """
@@ -1951,7 +2013,7 @@ def _select_drain_requests(
 
 def _drain_seat(
     run: ProducerRun,
-    profiles: dict[int, object],
+    profiles: Mapping[int, JudgeSeatProfile],
     claimed: list[JudgeDeferral],
     started: float,
     seat: int,
@@ -2003,7 +2065,7 @@ def _drain_seat(
 
 
 def _run_drain_translation(
-    profiles: dict[int, object],
+    profiles: Mapping[int, JudgeSeatProfile],
     claimed: list[JudgeDeferral],
     started: float,
     units: list[Unit],
@@ -2043,10 +2105,9 @@ def _run_drain_translation(
             finished=timezone.now(),
         )
         raise
-    else:
-        ProducerRun.objects.filter(pk=run.pk).update(
-            status=ProducerRun.Status.COMPLETED, finished=timezone.now()
-        )
+    ProducerRun.objects.filter(pk=run.pk).update(
+        status=ProducerRun.Status.COMPLETED, finished=timezone.now()
+    )
     return processed
 
 
@@ -2224,9 +2285,11 @@ def queue_judge_recheck(unit: Unit, actor: User) -> tuple[ProducerRun, bool]:
 
 def accept_judge_candidate(
     candidate: Suggestion,
-    request: AuthenticatedHttpRequest,
+    request: AuthenticatedHttpRequest | AuthenticatedRequest,
     *,
     acknowledge: Mapping[str, bool] | None = None,
+    automatic: bool = False,
+    expected_revision: str | None = None,
 ) -> JudgeApplication:
     """
     Accept a stored judge repair candidate under every acceptance guard.
@@ -2335,6 +2398,17 @@ def accept_judge_candidate(
             raise JudgeCandidateError(
                 gettext("This candidate has not been fully verified.")
             )
+        if automatic and (
+            expected_revision is None
+            or compute_decision_revision(locked_unit) != expected_revision
+            or not automatic_candidate_allowed(locked_unit, user)
+            or not candidate_quality(
+                locked_unit, locked_candidate.target_list, evidence=candidate_evidence
+            ).acceptable
+        ):
+            raise JudgeCandidateError(
+                gettext("This candidate is not safe for automatic application.")
+            )
         if locked_unit.state == STATE_APPROVED and not acked.get("approval_loss"):
             raise JudgeCandidateError(
                 gettext(
@@ -2342,10 +2416,14 @@ def accept_judge_candidate(
                     "acknowledge to continue."
                 )
             )
-        if any(
-            isinstance(error, dict) and error.get("category") == "terminology"
-            for error in verdict.errors
-        ) and not acked.get("terminology_conflict"):
+        if (
+            any(
+                isinstance(error, dict) and error.get("category") == "terminology"
+                for error in verdict.errors
+            )
+            and not automatic
+            and not acked.get("terminology_conflict")
+        ):
             raise JudgeCandidateError(
                 gettext(
                     "This candidate touches a possible terminology mismatch; "
@@ -2363,6 +2441,15 @@ def accept_judge_candidate(
                 "judge_run_id": str(verdict.run_id),
             },
         )
+        if (
+            automatic
+            and not evaluate_target_quality(
+                locked_unit, locked_unit.get_target_plurals()
+            ).clean
+        ):
+            raise JudgeCandidateError(
+                gettext("The applied candidate did not pass the required checks.")
+            )
         apply_change = (
             Change.objects.filter(unit=locked_unit, action=ActionEvents.ACCEPT)
             .order_by("-pk")
@@ -2370,7 +2457,8 @@ def accept_judge_candidate(
         )
         application = JudgeApplication.objects.create(
             unit=locked_unit,
-            change=apply_change,
+            # translate() above creates this audited ACCEPT change atomically.
+            change=cast("Change", apply_change),
             run=ProducerRun.objects.filter(pk=verdict.run_id).first(),
             run_unit=JudgeRunUnit.objects.filter(
                 run_id=verdict.run_id, unit_id_snapshot=locked_unit.pk
@@ -2394,7 +2482,8 @@ def accept_judge_candidate(
 
 
 def undo_judge_application(
-    application: JudgeApplication, request: AuthenticatedHttpRequest
+    application: JudgeApplication,
+    request: AuthenticatedHttpRequest | AuthenticatedRequest,
 ) -> JudgeApplication:
     """
     Undo one previously applied judge repair candidate (Task 8).

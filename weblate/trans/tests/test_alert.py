@@ -41,12 +41,13 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.alert import Alert
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.tests import http_mock
 from weblate.vcs.base import RepositoryError, RepositoryInternalError
 from weblate.vcs.models import VCS_REGISTRY
 from weblate.workspaces.models import Workspace
 
 
-class WebsiteAlertSettingTest(ViewTestCase):
+class WebsiteAlertSettingTest(http_mock.MockDNSMixin, ViewTestCase):
     """Test WEBSITE_ALERTS_ENABLED setting."""
 
     def create_component(self):

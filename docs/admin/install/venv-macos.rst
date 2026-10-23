@@ -7,7 +7,8 @@ Installing on macOS
 
 .. code-block:: sh
 
-   brew install python libyaml pkgconf zstd lz4 xxhash libxmlsec1 uv
+   brew install python@3.14 libyaml pkgconf zstd lz4 xxhash libxmlsec1 uv
+   export UV_PYTHON="$(brew --prefix python@3.14)/bin/python3.14"
 
 .. include:: steps/install-system-server.rst
 

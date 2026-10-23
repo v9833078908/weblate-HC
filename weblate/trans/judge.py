@@ -17,12 +17,12 @@ import re
 import threading
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from decimal import Decimal
 from importlib import resources
 from itertools import starmap
 from secrets import randbelow, token_hex
-from typing import TYPE_CHECKING, NoReturn, cast
+from typing import TYPE_CHECKING, Any, NoReturn, TypeGuard, cast
 from urllib.parse import urlsplit
 
 import httpx2
@@ -39,6 +39,7 @@ from weblate.utils.requests import stream_validated_url
 
 if TYPE_CHECKING:
     from weblate.glossary.models import GlossaryPromptEntry
+    from weblate.trans.models.judge import ProducerRun
 
 _OPENROUTER_HOST = "openrouter.ai"
 _LITELLM_HOST = "hcbifrost.herocraft.com"
@@ -357,11 +358,9 @@ def _fetch_litellm_alias(
     if body is None or response.status_code != 200:
         return None
     payload = json.loads(body)
-    entries = (
-        payload.get("data")
-        if isinstance(payload, dict) and isinstance(payload.get("data"), list)
-        else []
-    )
+    entries = payload.get("data", []) if isinstance(payload, dict) else []
+    if not isinstance(entries, list):
+        entries = []
     entry = next(
         (
             item
@@ -428,7 +427,7 @@ def _profile_value(name: str, seat: int, global_value: object) -> object:
     return global_value if value == "inherit" else value
 
 
-def _positive_int(value: object) -> bool:
+def _positive_int(value: object) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
@@ -1053,6 +1052,7 @@ class _BatchResponse:
     retry_after: float | None = None
     transport_succeeded: bool = False
     provider_cost: Decimal | None = None
+    delivery_id: str = ""
 
 
 def _retry_after(headers: object) -> float | None:
@@ -1323,6 +1323,14 @@ def _decode_non_stream(
     )
     if raw is None:
         return None, failure, "", byte_count, first_byte, exception_class
+    from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+        capture_transport_response,
+        encode_http_response,
+    )
+
+    capture_transport_response(
+        encode_http_response(response, body=raw.decode("utf-8", errors="replace"))
+    )
     if not raw:
         return None, "empty-response", "", byte_count, first_byte, ""
     try:
@@ -1433,7 +1441,7 @@ def _failure_for_http(status: int | None) -> str:
     return ""
 
 
-def _usage_values(payload: dict | None) -> dict[str, object]:
+def _usage_values(payload: dict | None) -> dict[str, Any]:
     return (
         payload.get("usage", {})
         if isinstance(payload, dict) and isinstance(payload.get("usage"), dict)
@@ -1540,7 +1548,7 @@ def _batch_digest(batch: Sequence[JudgeRequest]) -> str:
 def _persist_attempt(
     *,
     enabled: bool,
-    run: object | None,
+    run: ProducerRun | None,
     profile: JudgeSeatProfile,
     batch: Sequence[JudgeRequest],
     ordinal: int,
@@ -1680,9 +1688,13 @@ def post_chat_completion(
 
 
 def _payload(
-    batch: Sequence[JudgeRequest], profile: JudgeSeatProfile, project_context: str
+    batch: Sequence[JudgeRequest],
+    profile: JudgeSeatProfile,
+    project_context: str,
+    *,
+    boundary: str | None = None,
 ) -> dict:
-    boundary = f"untrusted_translation_data_{token_hex(16)}"
+    boundary = boundary or f"untrusted_translation_data_{token_hex(16)}"
     segments = list(starmap(_segment, enumerate(batch)))
     response_format: dict[str, object] = {"type": profile.response_format}
     if profile.response_format == "json_schema":
@@ -1792,25 +1804,143 @@ def _update_adaptive(profile: JudgeSeatProfile, enabled: bool, failure: str) -> 
         LOGGER.exception("Failed to update judge adaptive state")
 
 
-def _run_batch(  # ruff: ignore[complex-structure]
+def _durable_judge_response(batch, payload, profile, project_context, run):
+    from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+        DeliveryUnresolved,
+        captured_response,
+        dispatch_exchange,
+        exchange_for_work,
+    )
+    from weblate.trans.models import Unit  # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+        compute_decision_revision,
+    )
+
+    identities = []
+    for request in batch:
+        content = hashlib.sha256(
+            json.dumps(
+                {
+                    "source": request.source,
+                    "target": request.target,
+                    "note": request.note,
+                    "explanation": request.explanation,
+                    "glossary": request.glossary_terms,
+                    "context": project_context,
+                    "clarification": request.clarification,
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+            ).encode()
+        ).hexdigest()
+        revision = (
+            compute_decision_revision(Unit.objects.get(pk=request.unit_id))
+            if request.unit_id
+            else request.unit_key
+        )
+        identities.append(
+            f"judge:{request.unit_id or request.unit_key}:{revision}:{request.target_language}:{profile.seat}:{content}"
+        )
+    digest = hashlib.sha256(
+        json.dumps(
+            {
+                "payload": payload,
+                "endpoint": profile.endpoint_fingerprint,
+                "profile": profile.profile_fingerprint,
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+        ).encode()
+    ).hexdigest()
+
+    def send():
+        response = _post_batch(payload, profile)
+        raw = captured_response()
+        return raw if raw is not None else json.dumps(asdict(response), default=str)
+
+    try:  # ruff: ignore[too-many-statements-in-try-clause]
+        saved = json.loads(dispatch_exchange(identities, digest, send, run_id=run.pk))
+        if "body" in saved:
+            response = httpx2.Response(
+                saved["status"],
+                content=saved["body"].encode(),
+                headers=saved["headers"],
+            )
+            body, failure, finish, size, first, exception = _decode_non_stream(
+                response, started=time.monotonic()
+            )
+            result = _BatchResponse(
+                saved["status"],
+                body,
+                failure,
+                exception,
+                finish,
+                size,
+                first,
+                retry_after=_retry_after(response.headers),
+                transport_succeeded=200 <= saved["status"] < 300,
+                provider_cost=_response_cost(response.headers),
+            )
+        else:
+            if saved.get("provider_cost") is not None:
+                saved["provider_cost"] = Decimal(saved["provider_cost"])
+            result = _BatchResponse(**saved)
+        return replace(result, delivery_id=str(exchange_for_work(identities)))
+    except DeliveryUnresolved:
+        return _BatchResponse(None, None, "unknown")
+
+
+def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements]
     batch: Sequence[JudgeRequest],
     *,
     profile: JudgeSeatProfile,
     project_slug: str,
     project_context: str,
     persistence: bool,
-    run: object | None,
+    run: ProducerRun | None,
     retry_budget: RetryBudget,
     adaptive: bool,
     isolate: bool,
     ordinal: int,
     retry_deadline: float | None = None,
 ) -> list[JudgeResult]:
-    payload = _payload(batch, profile, project_context)
+    durable = run is not None
+    if durable:
+        # Durable full JSON bodies can be saved before schema decoding; a
+        # streamed partial body must not trigger an automatically paid fallback.
+        profile = replace(profile, stream=False)
+        isolate = False
+    if durable:
+        identity = json.dumps(
+            {
+                "batch": [asdict(item) for item in batch],
+                "profile": profile.profile_fingerprint,
+                "context": project_context,
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+        )
+        nonce = hmac.new(
+            settings.SECRET_KEY.encode(), identity.encode(), hashlib.sha256
+        ).hexdigest()[:32]
+        payload = _payload(
+            batch,
+            profile,
+            project_context,
+            boundary=f"untrusted_translation_data_{nonce}",
+        )
+    else:
+        payload = _payload(batch, profile, project_context)
     fallback_profile = resolve_judge_fallback_seat_profile(profile.seat, profile)
     transport_left = _setting_retries("JUDGE_TRANSPORT_RETRIES", 1)
     transient_left = _setting_retries("JUDGE_TRANSIENT_HTTP_RETRIES", 1)
     protocol_left = _setting_retries("JUDGE_PROTOCOL_RETRIES", 1)
+    if durable:
+        transport_left = transient_left = protocol_left = 0
+        fallback_profile = None
     last_failure, last_attempt, last_profile = "unknown", None, profile
     retries_used = 0
 
@@ -1818,7 +1948,12 @@ def _run_batch(  # ruff: ignore[complex-structure]
         target_profile: JudgeSeatProfile, target_payload: dict, target_ordinal: int
     ) -> tuple[_BatchResponse, str, _ParseOutcome, object | None, bool]:
         """POST once, persist the attempt and usage, and classify the outcome."""
-        response = _post_batch(target_payload, target_profile)
+        if durable:
+            response = _durable_judge_response(
+                batch, target_payload, target_profile, project_context, run
+            )
+        else:
+            response = _post_batch(target_payload, target_profile)
         failure = _failure_for_http(response.status_code) or response.failure_kind
         outcome = _ParseOutcome(None, failure)
         if not failure and response.payload is not None:
@@ -1843,15 +1978,34 @@ def _run_batch(  # ruff: ignore[complex-structure]
             ),
         )
         if persistence:
-            _record_usage(
-                response.payload,
-                target_profile.provider,
-                target_profile.model,
-                project_slug,
-                batch,
-                cast("JudgeRequestAttempt | None", attempt),
-                response.provider_cost,
-            )
+
+            def write_usage():
+                _write_llm_usage(
+                    response.payload,
+                    target_profile.provider,
+                    target_profile.model,
+                    project_slug,
+                    batch,
+                    cast("JudgeRequestAttempt | None", attempt),
+                    response.provider_cost,
+                )
+
+            if response.delivery_id:
+                from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+                    record_usage_once,
+                )
+
+                record_usage_once(response.delivery_id, write_usage)
+            else:
+                _record_usage(
+                    response.payload,
+                    target_profile.provider,
+                    target_profile.model,
+                    project_slug,
+                    batch,
+                    cast("JudgeRequestAttempt | None", attempt),
+                    response.provider_cost,
+                )
         _log_attempt(
             response,
             profile=target_profile,
@@ -2075,7 +2229,7 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
     project_context: str = "",
     on_batch: OnBatch | None = None,
     seat: int | None = None,
-    run: object | None = None,
+    run: ProducerRun | None = None,
     persist_attempts: bool = False,
     retry_budget: RetryBudget | None = None,
     adaptive: bool = False,

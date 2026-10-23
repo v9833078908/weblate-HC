@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET  # ruff: ignore[suspicious-xml-etree-import]
 from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO, StringIO
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, NoReturn, cast
 from zipfile import BadZipFile, ZipFile
 
 from django.conf import settings
@@ -58,7 +58,9 @@ class SpreadsheetPreview:
     changes: tuple[SpreadsheetRow, ...]
 
 
-def _error(message: str, *, row: int | None = None, column: str | None = None) -> None:
+def _error(
+    message: str, *, row: int | None = None, column: str | None = None
+) -> NoReturn:
     if row is not None and column is not None:
         message = f"Row {row}, column {column}: {message}"
     raise ValidationError(message)
@@ -79,7 +81,8 @@ def _component_units(
     if plural is not None:
         _error("Plural units cannot be exchanged in a multilingual spreadsheet.")
     return source_units, {
-        (unit.source_unit_id, unit.translation.language.code): unit for unit in units
+        (cast("int", unit.source_unit_id), unit.translation.language.code): unit
+        for unit in units
     }
 
 
@@ -114,7 +117,7 @@ def _validate_identities(
 
 
 def _csv_value(value: str) -> str:
-    return CSVExporter.string_filter(None, value)
+    return CSVExporter.string_filter(value)
 
 
 def _serialize_csv(rows: list[tuple[str, ...]]) -> bytes:
@@ -193,6 +196,9 @@ def _parse_xlsx(component: Component, content: bytes) -> list[list[str]]:
     from openpyxl import load_workbook
 
     # ruff: ignore[import-outside-top-level]
+    from openpyxl.utils.cell import get_column_letter
+
+    # ruff: ignore[import-outside-top-level]
     from openpyxl.utils.exceptions import InvalidFileException
 
     with ZipFile(BytesIO(content)) as archive:
@@ -225,12 +231,12 @@ def _parse_xlsx(component: Component, content: bytes) -> list[list[str]]:
     rows: list[list[str]] = []
     for row_number, row in enumerate(worksheet.iter_rows(), start=1):
         values: list[str] = []
-        for cell in row:
+        for column_number, cell in enumerate(row, start=1):
             if cell.data_type == "f":
                 _error(
                     "Formula cells are not supported.",
                     row=row_number,
-                    column=cell.column_letter,
+                    column=get_column_letter(column_number),
                 )
             values.append("" if cell.value is None else str(cell.value))
         if any(values):
@@ -276,7 +282,7 @@ def parse_upload(component: Component, uploaded: UploadedFile) -> ParsedSpreadsh
     validate_translation_upload_size(uploaded)
     uploaded.seek(0)
     content = uploaded.read()
-    name = uploaded.name.lower()
+    name = (uploaded.name or "").lower()
     if name.endswith(".csv"):
         rows = _parse_csv(content)
     elif name.endswith(".xlsx"):

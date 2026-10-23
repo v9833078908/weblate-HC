@@ -41,6 +41,7 @@ from weblate.utils.render import (
     validate_render_commit,
     validate_render_component,
 )
+from weblate.utils.tests import http_mock
 from weblate.utils.views import get_form_data
 from weblate.vcs.base import RepositoryLock
 from weblate.vcs.github import GitHubInstallation
@@ -48,7 +49,7 @@ from weblate.vcs.models import VCS_REGISTRY
 from weblate.workspaces.models import Workspace
 
 
-class SettingsTest(ViewTestCase):
+class SettingsTest(http_mock.MockDNSMixin, ViewTestCase):
     @modify_settings(INSTALLED_APPS={"remove": "weblate.billing"})
     def test_restricted_component_permission_denial(self) -> None:
         self.project.add_user(self.user, "Administration")

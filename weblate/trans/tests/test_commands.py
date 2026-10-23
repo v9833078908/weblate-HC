@@ -68,6 +68,7 @@ from weblate.trans.tests.utils import (
     require_github,
 )
 from weblate.utils.state import STATE_NEEDS_CHECKING, STATE_READONLY, STATE_TRANSLATED
+from weblate.vcs.base import RepositoryError
 from weblate.vcs.mercurial import HgRepository
 
 # The test settings use the default AUTOFIX_LIST, which has none of the custom
@@ -1890,7 +1891,11 @@ class ReapplyAutofixesTest(ViewTestCase):
 
     def test_vcs_commit_failure_keeps_own_pending_changes(self) -> None:
         with (
-            patch.object(Component, "commit_files", return_value=False) as commit,
+            patch.object(
+                type(self.component.repository),
+                "commit",
+                side_effect=RepositoryError(1, "VCS commit failed"),
+            ) as commit,
             self.assertRaises(CommandError),
         ):
             self.run_command("--apply")

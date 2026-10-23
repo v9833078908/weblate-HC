@@ -1201,7 +1201,7 @@ needs a live instance database.
 .. weblate-admin-option:: --baseline PATH
 
     Reads accepted findings from :file:`PATH`, one key per line, with ``#``
-    starting a comment. Each finding line starts with ``! `` (or two spaces
+    starting a comment. Each finding line starts with ``!`` and a space (or two spaces
     when accepted), followed by four tab-separated key fields and a detail
     field. Copy only the four key fields into the baseline. A deliberate
     homonym belongs here; every other finding keeps the run failing.

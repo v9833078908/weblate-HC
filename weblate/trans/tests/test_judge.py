@@ -13,7 +13,7 @@ from unittest.mock import patch
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, connection
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
-from django.utils import translation
+from django.utils import translation as django_translation
 from django.utils.translation import gettext
 
 from weblate.auth.models import Group, Permission, Role, User, setup_project_groups
@@ -1283,7 +1283,7 @@ class JudgeResolutionRealConcurrencyTest(RepoTestMixin, TransactionTestCase):
 
 class JudgeResolutionLocalizationTest(SimpleTestCase):
     def test_action_and_form_copy_renders_in_russian(self) -> None:
-        with translation.override("ru"):
+        with django_translation.override("ru"):
             self.assertEqual(
                 str(ActionEvents.JUDGE_RESOLUTION.label),
                 "Решение по вердикту судьи",
@@ -1308,7 +1308,7 @@ class JudgeResolutionLocalizationTest(SimpleTestCase):
             )
 
     def test_domain_helper_errors_render_in_russian(self) -> None:
-        with translation.override("ru"):
+        with django_translation.override("ru"):
             self.assertEqual(
                 str(
                     JudgeResolutionError(

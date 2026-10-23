@@ -54,8 +54,8 @@ PROBE_PATH = (
 )
 _spec = importlib.util.spec_from_file_location("judge_cost_latency_ab", PROBE_PATH)
 if _spec is None or _spec.loader is None:
-    msg = "cannot load the measurement runner probe"
-    raise RuntimeError(msg)
+    _IMPORT_ERROR = "cannot load the measurement runner probe"
+    raise RuntimeError(_IMPORT_ERROR)
 probe = importlib.util.module_from_spec(_spec)
 # Dataclass processing resolves the module's namespace through sys.modules.
 sys.modules[_spec.name] = probe
@@ -103,7 +103,8 @@ BUDGET = {
 class TempDirMixin:
     def temp_dir(self) -> pathlib.Path:
         # Python 3.14 TemporaryDirectory.__enter__ returns the path string.
-        context = self.enterContext(tempfile.TemporaryDirectory())
+        # unittest owns and closes this context at test cleanup.
+        context = self.enterContext(tempfile.TemporaryDirectory())  # pylint: disable=consider-using-with
         return pathlib.Path(context if isinstance(context, str) else context.name)
 
 
@@ -424,7 +425,9 @@ class RunnerManifestTest(TempDirMixin, SimpleTestCase):
     JUDGE_REQUEST_SLEEP=0,
     JUDGE_DEFERRAL_ENABLED=False,
 )
-class RunnerEndToEndTest(TempDirMixin, RepoTestMixin, TransactionTestCase):
+class RunnerEndToEndTest(
+    http_mock.MockDNSMixin, TempDirMixin, RepoTestMixin, TransactionTestCase
+):
     """Fake-provider runs of the real run_judge_batch through the runner."""
 
     def setUp(self) -> None:

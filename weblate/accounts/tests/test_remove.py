@@ -4,12 +4,14 @@
 
 """Test for account removal."""
 
+from django.test import override_settings
 from django.urls import reverse
 
 from weblate.auth.models import User
 from weblate.trans.tests.test_views import RegistrationTestMixin, ViewTestCase
 
 
+@override_settings(SITE_TITLE="Weblate", EMAIL_SUBJECT_PREFIX="[Weblate] ")
 class AccountRemovalTest(ViewTestCase, RegistrationTestMixin):
     def test_page(self) -> None:
         response = self.client.get(reverse("remove"))

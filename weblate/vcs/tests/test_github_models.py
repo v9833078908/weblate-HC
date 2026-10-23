@@ -81,8 +81,9 @@ def _assert_github_app_auth_environment(
     )
 
 
-class TestGitHubInstallationManager(TestCase):
+class TestGitHubInstallationManager(http_mock.MockDNSMixin, TestCase):
     def setUp(self):
+        super().setUp()
         self.installation = _make_installation(
             repositories=[{"full_name": "test-org/repo1"}]
         )

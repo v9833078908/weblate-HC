@@ -1041,7 +1041,7 @@ class BaseFormatTest(FormatTestCase, ABC):
             finally:
                 self.FILE_FORMAT_PARAMS.pop(key, None)
 
-    def parse_file(self, filename: str | IO[bytes], template: str | None = None):
+    def parse_file(self, filename: str | Path | IO[bytes], template: str | None = None):
         if self.MONOLINGUAL:
             return self.format_class(
                 filename,

@@ -1,0 +1,11 @@
+{
+  "component": "weblate",
+  "source_release": "9d985aafc02d",
+  "production_source_commit": "1a852b65ed4e6f5065a8caee403a9f3da5f8d459",
+  "prepared_weblate_source": "84955a0ef9360128dd1b06003910217635a2f296",
+  "merge_base": "de468d90f63bf1cb86bc1f94542be3619fa37e63",
+  "production_glossary_fix_preserved": true,
+  "changelog_resolution": "Keep both production glossary fix and prepared download-revision fix",
+  "installed": false,
+  "requires_new_production_approval": true
+}

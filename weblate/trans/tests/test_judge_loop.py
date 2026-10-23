@@ -512,10 +512,9 @@ class JudgeLoopTest(ViewTestCase):
         original_write = _write_verdict
 
         def write_verdict(*args, **kwargs):
-            verdict = original_write(*args, **kwargs)
+            original_write(*args, **kwargs)
             if kwargs["seat"] == 2:
                 seat_two_persisted.set()
-            return verdict
 
         def request(requests, *, on_batch, seat, **kwargs):
             if seat == 1:
@@ -572,10 +571,9 @@ class JudgeLoopTest(ViewTestCase):
         original_write = _write_verdict
 
         def write_verdict(*args, **kwargs):
-            verdict = original_write(*args, **kwargs)
+            original_write(*args, **kwargs)
             if kwargs["seat"] == 1:
                 first_persisted.set()
-            return verdict
 
         def request(requests, *, on_batch, seat, **kwargs):
             try:
@@ -2335,7 +2333,7 @@ CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
     JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
     JUDGE_DEFERRAL_ENABLED=True,
 )
-class JudgeRefusedSeatTest(RepoTestMixin, TransactionTestCase):
+class JudgeRefusedSeatTest(http_mock.MockDNSMixin, RepoTestMixin, TransactionTestCase):
     """
     A seat refusal must abort the run with no verdict and no deferral.
 
@@ -2464,7 +2462,9 @@ _FAILOVER_LITELLM_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/complet
     JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1="json_schema",
     JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2="json_schema",
 )
-class JudgeFailoverSeatIsolationTest(RepoTestMixin, TransactionTestCase):
+class JudgeFailoverSeatIsolationTest(
+    http_mock.MockDNSMixin, RepoTestMixin, TransactionTestCase
+):
     """Seat 1 failing over must not change which endpoint serves seat 2."""
 
     def setUp(self) -> None:

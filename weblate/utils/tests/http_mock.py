@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import json as json_module
 import re
+import socket
 from dataclasses import dataclass, field
 from functools import wraps
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx2
+from django.test import SimpleTestCase
 
 from weblate.utils.requests import (
     ORIGINAL_URL_REQUEST_EXTENSION,
@@ -36,6 +39,42 @@ class _Unset:
 
 
 _UNSET = _Unset()
+
+
+class MockDNSMixin(SimpleTestCase):
+    """
+    Pair mocked HTTP with offline public DNS, leaving validators intact.
+
+    Method-level DNS patches can still model private answers and rebinding.
+    Only test cases opting into this fixture use it; security tests continue
+    to control their own resolver and production code has no test bypass.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        original_getaddrinfo = socket.getaddrinfo
+
+        def getaddrinfo(host, port, *args, **kwargs):
+            # Outbound validation resolves with port=None. Preserve service
+            # resolution, notably psycopg's own fresh database connections.
+            if port is not None:
+                return original_getaddrinfo(host, port, *args, **kwargs)
+            return [
+                (
+                    socket.AF_INET,
+                    socket.SOCK_STREAM,
+                    socket.IPPROTO_TCP,
+                    "",
+                    ("93.184.216.34", 0),
+                )
+            ]
+
+        self.enterContext(
+            patch(
+                "weblate.utils.outbound.socket.getaddrinfo",
+                new=getaddrinfo,
+            )
+        )
 
 
 @dataclass

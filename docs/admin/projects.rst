@@ -103,7 +103,7 @@ As a last step, you review the translation component info and fill in optional d
 .. _loc-kit-tables:
 
 Translation tables from CSV, TSV, and XLSX
-++++++++++++++++++++++++++++++++++++++++
+++++++++++++++++++++++++++++++++++++++++++
 
 The :guilabel:`Upload translations files` flow also accepts a single CSV, TSV,
 or XLSX spreadsheet as a loc-kit. It is converted into one monolingual PO file
@@ -133,7 +133,7 @@ import report lists the skipped rows.
 .. _uploading-glossary-tables:
 
 Glossary tables from CSV, TSV, and XLSX
-++++++++++++++++++++++++++++++++++++++
+++++++++++++++++++++++++++++++++++++++++
 
 A spreadsheet can instead become a bilingual TBX glossary component. This is
 the only path that may consult an external provider, and it starts only when

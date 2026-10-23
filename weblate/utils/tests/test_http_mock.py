@@ -2,11 +2,63 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import socket
+from unittest.mock import patch
+
 import httpx2
+from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
-from weblate.utils.requests import fetch_url
+from weblate.utils.requests import (
+    async_fetch_validated_url,
+    fetch_url,
+    fetch_validated_url,
+)
 from weblate.utils.tests import http_mock
+
+
+class MockDNSFixtureTest(http_mock.MockDNSMixin, SimpleTestCase):
+    def test_service_resolution_is_not_replaced(self) -> None:
+        addresses = socket.getaddrinfo("localhost", 5432, type=socket.SOCK_STREAM)
+
+        self.assertTrue(addresses)
+        self.assertTrue(all(item[4][0] in {"127.0.0.1", "::1"} for item in addresses))
+        self.assertTrue(all(item[4][1] == 5432 for item in addresses))
+
+    @http_mock.activate
+    def test_validated_http_uses_pinned_fixture_address(self) -> None:
+        http_mock.register("GET", "https://offline.example/test", text="offline")
+
+        response = fetch_validated_url("get", "https://offline.example/test")
+
+        self.assertEqual(response.text, "offline")
+        self.assertEqual(
+            str(http_mock.get_transport_url(http_mock.calls[0].request)),
+            "https://93.184.216.34/test",
+        )
+
+    @http_mock.activate
+    async def test_async_validated_http_uses_fixture_dns(self) -> None:
+        http_mock.register("GET", "https://offline.example/async", text="offline")
+
+        response = await async_fetch_validated_url(
+            "get", "https://offline.example/async"
+        )
+
+        self.assertEqual(response.text, "offline")
+
+    @http_mock.activate
+    def test_method_dns_override_still_blocks_private_answers(self) -> None:
+        http_mock.register("GET", "https://offline.example/private", text="unsafe")
+        with (
+            patch(
+                "weblate.utils.outbound.socket.getaddrinfo",
+                return_value=[(0, 0, 0, "", ("127.0.0.1", 0))],
+            ),
+            self.assertRaises(ValidationError),
+        ):
+            fetch_validated_url("get", "https://offline.example/private")
+        self.assertEqual(http_mock.calls, [])
 
 
 class HTTPMockTest(SimpleTestCase):

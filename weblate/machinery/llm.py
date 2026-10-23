@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import re
 import string
@@ -17,6 +19,7 @@ from secrets import token_hex
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, TypeGuard, cast
 
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.db.models import OuterRef, Subquery
 from django.utils.html import strip_tags
 from django.utils.translation import override, pgettext
@@ -70,6 +73,12 @@ llm_batch_unit_count: ContextVar[int] = ContextVar("llm_batch_unit_count", defau
 #: the reply could be used is only known after validation; this carries the
 #: first to the second so both live on one row.
 llm_usage_record: ContextVar[int | None] = ContextVar("llm_usage_record", default=None)
+llm_delivery_work: ContextVar[tuple[str, ...]] = ContextVar(
+    "llm_delivery_work", default=()
+)
+llm_delivery_usage: ContextVar[object | None] = ContextVar(
+    "llm_delivery_usage", default=None
+)
 
 #: How a measured request was resolved, mirroring ``LLMUsageLog.Outcome``.
 #: Spelled out here because importing the model at module level would close
@@ -384,6 +393,8 @@ class LLMStringPayload(LLMStringContext):
 
 
 class BaseLLMTranslation(BatchMachineTranslation):
+    # Opt-in for a caller with its own durable per-unit outbound journal.
+    durable_single_attempt = False
     settings_form: type[LLMBasicMachineryForm]
     max_score = 90
     request_timeout = 120
@@ -2857,6 +2868,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
             # Splitting a refused batch only sends more refused requests.
             raise
         except PartialLLMReplyError as error:
+            if self.durable_single_attempt:
+                return {
+                    text: error.translations.get(text, []) for text, _unit in sources
+                }
             if rescue_budget < 1:
                 tail = None
             else:
@@ -2882,6 +2897,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
             # Splitting a refused batch only sends more refused requests.
             raise
         except MachineTranslationError as error:
+            if self.durable_single_attempt:
+                raise
             halves = self._split_sources(sources, source_occurrences)
             if halves is None:
                 raise
@@ -2958,7 +2975,29 @@ class BaseLLMTranslation(BatchMachineTranslation):
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
     ) -> DownloadMultipleTranslations:
-        string_ids = self._build_string_ids(len(sources))
+        if self.durable_single_attempt:
+            from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+                compute_decision_revision,
+            )
+
+            if any(unit is None for _text, unit in sources):
+                msg = "Durable MT requires a unit-bound scope"
+                raise MachineTranslationError(msg)
+            purpose = getattr(self, "delivery_purpose", "mt")
+            identity = tuple(
+                f"{purpose}:{unit.pk}:{unit.translation.language.code}:{compute_decision_revision(unit if purpose == 'repair' else unit.source_unit)}"
+                for _text, unit in sources
+            )
+            string_ids = [
+                "s"
+                + hmac.new(
+                    settings.SECRET_KEY.encode(), item.encode(), hashlib.sha256
+                ).hexdigest()[:16]
+                for item in identity
+            ]
+        else:
+            identity = ()
+            string_ids = self._build_string_ids(len(sources))
         prompt, content, previous_content, previous_response = (
             self._prepare_llm_translation(
                 source_language,
@@ -2985,6 +3024,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
         # attempt's row, and a reply billed without usable usage leaves the
         # variable at None so nothing is marked at all.
         usage_token = llm_usage_record.set(None)
+        delivery_token = None
+        usage_delivery_token = llm_delivery_usage.set(None)
+        if identity:
+            delivery_token = llm_delivery_work.set(identity)
         try:
             try:
                 translations_string = self.fetch_llm_translations(
@@ -3000,6 +3043,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 translations_string, sources, source_occurrences, string_ids=string_ids
             )
         finally:
+            if delivery_token is not None:
+                llm_delivery_work.reset(delivery_token)
+            llm_delivery_usage.reset(usage_delivery_token)
             llm_batch_unit_count.reset(unit_count_token)
             llm_usage_record.reset(usage_token)
 
@@ -3037,6 +3083,18 @@ class BaseLLMTranslation(BatchMachineTranslation):
         source_occurrences: list[int] | None = None,
         rescue_budget: int = LLM_PREFIX_RESCUE_LIMIT,
     ) -> DownloadMultipleTranslations:
+        if self.durable_single_attempt:
+            return await sync_to_async(
+                self._download_multiple_translations_with_context_cache
+            )(
+                source_language,
+                target_language,
+                sources,
+                user,
+                threshold,
+                source_occurrences=source_occurrences,
+                rescue_budget=rescue_budget,
+            )
         try:
             return await self._afetch_llm_batch(
                 source_language, target_language, sources, source_occurrences

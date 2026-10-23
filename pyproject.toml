@@ -307,6 +307,7 @@ ignore = [
   ".claude/*",
   ".claude/*/*",
   ".claude/*/*/*",
+  ".claude/*/*/*/*",
   ".clusterfuzzlite/*",
   ".dclintrc",
   ".dockerignore",
@@ -315,6 +316,8 @@ ignore = [
   ".imgbotconfig",
   ".omp/*",
   ".omp/*/*",
+  ".omp/*/*/*",
+  ".omp/*/*/*/*",
   ".reuse/dep5",
   ".weblate",
   ".well-known/*",
@@ -330,16 +333,19 @@ ignore = [
   "client/*/*",
   "deploy/*",
   "deploy/*/*",
+  "DESIGN.md",
   "dev-docker/*",
   "dev-docker/*/*",
   "docs/*",
   "docs/*/*",
   "docs/*/*/*",
   "docs/*/*/*/*",
+  "frontend-wizard/**",
   "fuzzing/*",
   "fuzzing/*/*",
   "fuzzing/*/*/*",
   "LICENSES/*",
+  "PRODUCT.md",
   "rundev.sh",
   "scripts/*",
   "scripts/*/*",
@@ -817,7 +823,7 @@ exclude = [
   "weblate.tests",
   "weblate.tests.*"
 ]
-include = ["weblate*"]
+include = ["weblate", "weblate.*"]
 namespaces = true
 
 [tool.tomlsort]

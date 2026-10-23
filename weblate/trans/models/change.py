@@ -593,7 +593,7 @@ class Change(models.Model, UserDisplayMixin):
     workspace = models.ForeignKey(
         "workspaces.Workspace",
         null=True,
-        on_delete=models.deletion.CASCADE,
+        on_delete=models.deletion.SET_NULL,
         db_index=False,
     )
     category = models.ForeignKey(
@@ -949,7 +949,7 @@ class Change(models.Model, UserDisplayMixin):
         change_action: ActionEvents = ActionEvents.USER_REVERT,
         author: User | None = None,
         request=None,
-        change_details: dict[str, str] | None = None,
+        change_details: dict[str, int | str] | None = None,
     ) -> bool:
         if self.unit is None or self.action not in ACTIONS_REVERTABLE:
             return False
@@ -980,7 +980,7 @@ class Change(models.Model, UserDisplayMixin):
         change_action: ActionEvents = ActionEvents.REVERT,
         author: User | None = None,
         request=None,
-        change_details: dict[str, str] | None = None,
+        change_details: dict[str, int | str] | None = None,
         propagate: bool = True,
     ) -> bool:
         """

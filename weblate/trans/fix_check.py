@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     from django_stubs_ext import StrOrPromise
 
     from weblate.auth.models import User
-    from weblate.checks.base import BaseCheck, FixupType
+    from weblate.checks.base import BaseCheck, FixupType, TargetCheck
     from weblate.checks.chars import TerminalEdit
     from weblate.trans.models import Project
     from weblate.trans.models.unit import UnitQuerySet
@@ -646,7 +646,7 @@ def _terminal_policy_edit(unit: Unit) -> tuple[str, TerminalEdit] | None:
     removal, the mark the target itself carries).
     """
     for check_id in TERMINAL_SOURCE_POLICY_CHECK_IDS:
-        edit = terminal_source_edit(CHECKS[check_id], unit)
+        edit = terminal_source_edit(cast("TargetCheck", CHECKS[check_id]), unit)
         if edit is not None:
             return check_id, edit
     return None

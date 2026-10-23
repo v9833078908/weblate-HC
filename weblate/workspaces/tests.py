@@ -350,6 +350,25 @@ class WorkspaceViewTest(BaseTestCase):
         self.assertEqual(moved_project_change.project_id, moved_project.pk)
         self.assertFalse(Change.objects.filter(pk=workspace_change.pk).exists())
 
+    def test_queryset_removal_preserves_moved_project_history(self) -> None:
+        workspace = Workspace.objects.create(name="Historical workspace")
+        project = self.create_project(workspace, name="Moved", slug="moved-history")
+        history = Change.objects.create(
+            project=project, action=ActionEvents.CREATE_PROJECT
+        )
+        workspace_only = Change.objects.create(
+            workspace=workspace, action=ActionEvents.WORKSPACE_SETTING_CHANGE
+        )
+        project.workspace = None
+        project.save(update_fields=["workspace"])
+
+        Workspace.objects.filter(pk=workspace.pk).delete()
+
+        history.refresh_from_db()
+        self.assertEqual(history.project_id, project.pk)
+        self.assertIsNone(history.workspace_id)
+        self.assertFalse(Change.objects.filter(pk=workspace_only.pk).exists())
+
     def test_workspace_removal_requires_matching_name(self) -> None:
         user = create_test_user()
         workspace = Workspace.objects.create(name="Confirmation workspace")

@@ -129,7 +129,7 @@ def _request_segments(body: dict) -> list[dict]:
     return json.loads(payload)["segments"]
 
 
-class JudgeSSETest(SimpleTestCase):
+class JudgeSSETest(http_mock.MockDNSMixin, SimpleTestCase):
     def test_invalid_utf8_is_a_typed_protocol_failure(self) -> None:
         response = httpx2.Response(200, content=b"\xff")
 
@@ -171,7 +171,7 @@ class JudgeSSETest(SimpleTestCase):
         self.assertEqual(payload["usage"]["cost"], Decimal("0.123456789123456789"))
 
 
-class SegmentGlossaryTest(SimpleTestCase):
+class SegmentGlossaryTest(http_mock.MockDNSMixin, SimpleTestCase):
     def test_segment_carries_the_complete_glossary_entry(self) -> None:
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.judge import _segment
@@ -251,7 +251,7 @@ class SegmentGlossaryTest(SimpleTestCase):
         self.assertIn("〜してください", prompt)
 
 
-class JudgeClientGateTest(SimpleTestCase):
+class JudgeClientGateTest(http_mock.MockDNSMixin, SimpleTestCase):
     @override_settings(JUDGE_ENABLED=False)
     @http_mock.activate
     def test_disabled_makes_no_network_call(self) -> None:
@@ -423,7 +423,7 @@ class JudgeClientGateTest(SimpleTestCase):
         self.assertEqual(len(http_mock.calls), 0)
 
 
-class JudgeEndpointResolutionTest(SimpleTestCase):
+class JudgeEndpointResolutionTest(http_mock.MockDNSMixin, SimpleTestCase):
     def test_default_base_url_is_openrouter(self) -> None:
         self.assertEqual(get_judge_base_url(), "https://openrouter.ai/api/v1")
 
@@ -441,7 +441,7 @@ class JudgeEndpointResolutionTest(SimpleTestCase):
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
 )
-class JudgeExplicitEndpointTest(SimpleTestCase):
+class JudgeExplicitEndpointTest(http_mock.MockDNSMixin, SimpleTestCase):
     """An endpoint is a value threaded through resolution, not a global read."""
 
     def test_primary_endpoint_is_an_explicit_value(self) -> None:
@@ -498,7 +498,7 @@ class JudgeExplicitEndpointTest(SimpleTestCase):
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
 )
-class JudgeFallbackConfigurationTest(SimpleTestCase):
+class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
     """Eight new settings, all blank by default, validated all-or-nothing."""
 
     def test_unconfigured_fallback_validates_and_is_ready(self) -> None:
@@ -516,7 +516,10 @@ class JudgeFallbackConfigurationTest(SimpleTestCase):
             ),
         )
         request_verdicts([REQ], seat=1)
-        self.assertEqual(len(http_mock.calls), 1)
+        # Capability lookups are not paid judge attempts and may be cached.
+        posts = [call for call in http_mock.calls if call.request.method == "POST"]
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(str(posts[0].request.url), LITELLM_CHAT_URL)
 
     def test_partial_fallback_configuration_raises_before_any_request(self) -> None:
         required = [
@@ -669,7 +672,7 @@ class JudgeFallbackConfigurationTest(SimpleTestCase):
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeServingIdentityTest(TestCase):
+class JudgeServingIdentityTest(http_mock.MockDNSMixin, TestCase):
     """Every result carries the identity of the profile that actually served it."""
 
     @http_mock.activate
@@ -741,7 +744,7 @@ _FALLBACK_PARSED_PAYLOAD = _reply(
     JUDGE_PROTOCOL_RETRIES=0,
     **JUDGE_FALLBACK_SETTINGS,
 )
-class JudgeFailoverTest(TestCase):
+class JudgeFailoverTest(http_mock.MockDNSMixin, TestCase):
     """One fallback attempt per batch per seat, exactly on the permitted kinds."""
 
     def test_failover_and_availability_kinds_differ_exactly_as_specified(
@@ -1159,7 +1162,7 @@ _SLASHED_PRIMARY = "https://openrouter.ai/api/v1/"
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeEndpointCanonicalizationTest(SimpleTestCase):
+class JudgeEndpointCanonicalizationTest(http_mock.MockDNSMixin, SimpleTestCase):
     """
     One destination is one endpoint, whatever way the operator spelled it.
 
@@ -1246,7 +1249,7 @@ class JudgeEndpointCanonicalizationTest(SimpleTestCase):
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeClientTest(SimpleTestCase):
+class JudgeClientTest(http_mock.MockDNSMixin, SimpleTestCase):
     @http_mock.activate
     def test_openrouter_request_has_service_title(self) -> None:
         http_mock.register("POST", CHAT_URL, json=_reply([]))
@@ -1976,7 +1979,7 @@ class JudgeClientTest(SimpleTestCase):
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeRequestLoggingTest(SimpleTestCase):
+class JudgeRequestLoggingTest(http_mock.MockDNSMixin, SimpleTestCase):
     @http_mock.activate
     def test_batch_outcome_is_logged_with_elapsed_time(self) -> None:
         http_mock.register(
@@ -2005,7 +2008,7 @@ class JudgeRequestLoggingTest(SimpleTestCase):
     JUDGE_API_KEY="sk-test",
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeRequestDeadlineTest(TestCase):
+class JudgeRequestDeadlineTest(http_mock.MockDNSMixin, TestCase):
     def _dripping_response(self) -> httpx2.Response:
         body = json.dumps(
             _reply([{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}])
@@ -2180,7 +2183,7 @@ class JudgeRequestDeadlineTest(TestCase):
     JUDGE_API_KEY="sk-test",
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeOnBatchTest(SimpleTestCase):
+class JudgeOnBatchTest(http_mock.MockDNSMixin, SimpleTestCase):
     @override_settings(JUDGE_BATCH_SIZE=1)
     @http_mock.activate
     def test_is_called_once_per_completed_batch_in_input_order(self) -> None:
@@ -2260,7 +2263,7 @@ class JudgeOnBatchTest(SimpleTestCase):
     JUDGE_API_KEY="sk-test",
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeCancellationTest(SimpleTestCase):
+class JudgeCancellationTest(http_mock.MockDNSMixin, SimpleTestCase):
     """G4: a cancellation predicate stops new batches; a sent one still lands."""
 
     @override_settings(JUDGE_BATCH_SIZE=1)
@@ -2321,7 +2324,7 @@ class JudgeCancellationTest(SimpleTestCase):
         self.assertEqual(results, [])
 
 
-class JudgeUsageLogTest(TestCase):
+class JudgeUsageLogTest(http_mock.MockDNSMixin, TestCase):
     @override_settings(
         JUDGE_ENABLED=True,
         JUDGE_API_KEY="sk-test",
@@ -2733,7 +2736,7 @@ class JudgeUsageLogTest(TestCase):
         self.assertEqual(LLMUsageLog.objects.count(), 0)
 
 
-class JudgeReasoningBudgetTest(TestCase):
+class JudgeReasoningBudgetTest(http_mock.MockDNSMixin, TestCase):
     """Reasoning tokens were 84% of the first dev run's cost."""
 
     @override_settings(
@@ -2780,7 +2783,7 @@ class JudgeReasoningBudgetTest(TestCase):
         self.assertEqual(body["reasoning"], {"effort": "low", "exclude": True})
 
 
-class JudgePromptContextTest(TestCase):
+class JudgePromptContextTest(http_mock.MockDNSMixin, TestCase):
     """The prompt must carry the project's setting, never a hardcoded one."""
 
     @override_settings(
@@ -2846,7 +2849,7 @@ LITELLM_CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeLiteLLMPayloadTest(TestCase):
+class JudgeLiteLLMPayloadTest(http_mock.MockDNSMixin, TestCase):
     def setUp(self) -> None:
         super().setUp()
         # Alias resolution is exercised separately; these payload tests
@@ -3406,7 +3409,7 @@ class JudgeLiteLLMPayloadTest(TestCase):
         self.assertNotIn("thinking", body)
 
 
-class JudgeHttpFailureMappingTest(SimpleTestCase):
+class JudgeHttpFailureMappingTest(http_mock.MockDNSMixin, SimpleTestCase):
     """The whole safety argument for refusals lives in this table."""
 
     REQUEST_INVALID: ClassVar[set[int]] = {400, 404, 405, 406, 415, 422}
@@ -3455,7 +3458,7 @@ class JudgeHttpFailureMappingTest(SimpleTestCase):
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeRefusedRequestTest(TestCase):
+class JudgeRefusedRequestTest(http_mock.MockDNSMixin, TestCase):
     """A refused request must never become a verdict or a paid retry."""
 
     @http_mock.activate
