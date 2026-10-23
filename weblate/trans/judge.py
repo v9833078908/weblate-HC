@@ -51,18 +51,17 @@ PROMPT_SCHEMA_REVISION = "judge-verdict-v3"
 # LiteLLM aliases declare the exact reasoning control they support, so the
 # accepted values are a closed set rather than a free-form effort level.
 # `""` sends no field and leaves the alias on its own default.
-# `extra_body.enable_thinking=false` is the only shape measured to reach the
-# AtlasCloud passthrough behind `hcbifrost`: a bare `enable_thinking` is
-# rejected with HTTP 500, and a bare `thinking` is accepted and then silently
-# dropped, which is why two seats configured "off" kept reporting ~90%
-# reasoning tokens. See
-# docs/product/measurements/2026-09-03-judge-thinking-passthrough.md.
+# LiteLLM must forward each model's own control inside `extra_body`: DeepSeek
+# uses `thinking.type=disabled`, while Qwen uses `enable_thinking=false`.
+# A top-level `thinking` can be accepted and silently dropped by the proxy.
+# See docs/product/measurements/2026-09-03-judge-thinking-passthrough.md.
 _LITELLM_REASONING_VALUES = frozenset(
     {
         "",
         "thinking.disabled",
         "enable_thinking=false",
         "extra_body.enable_thinking=false",
+        "extra_body.thinking.disabled",
     }
 )
 
@@ -1665,6 +1664,8 @@ def _reasoning_payload(profile: JudgeSeatProfile) -> dict:
             # The proxy forwards `extra_body` to the upstream deployment
             # verbatim; a top-level field is either rejected or eaten.
             return {"extra_body": {"enable_thinking": False}}
+        if profile.reasoning == "extra_body.thinking.disabled":
+            return {"extra_body": {"thinking": {"type": "disabled"}}}
         return {}
     if profile.reasoning:
         return {"reasoning": {"effort": profile.reasoning, "exclude": True}}

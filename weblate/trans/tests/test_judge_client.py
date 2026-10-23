@@ -3328,6 +3328,33 @@ class JudgeLiteLLMPayloadTest(http_mock.MockDNSMixin, TestCase):
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
         JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
         JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_1="extra_body.thinking.disabled",
+        JUDGE_REASONING_EFFORT_SEAT_2="extra_body.enable_thinking=false",
+    )
+    def test_native_deepseek_thinking_is_nested_without_changing_qwen(self) -> None:
+        first = resolve_judge_seat_profile(1)
+        second = resolve_judge_seat_profile(2)
+
+        body = _payload([REQ], first, "")
+        self.assertEqual(body["extra_body"], {"thinking": {"type": "disabled"}})
+        self.assertNotIn("thinking", body)
+        self.assertNotIn("reasoning", body)
+        self.assertNotIn("enable_thinking", body)
+        qwen_body = _payload([REQ], second, "")
+        self.assertEqual(qwen_body["extra_body"], {"enable_thinking": False})
+
+        with (
+            override_settings(
+                JUDGE_REASONING_EFFORT_SEAT_1="extra_body.thinking.disable"
+            ),
+            self.assertRaises(JudgeError),
+        ):
+            resolve_judge_seat_profile(1)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
         JUDGE_REASONING_EFFORT="enable_thinking=false",
         JUDGE_RESPONSE_FORMAT="json_object",
         JUDGE_STREAM=True,

@@ -2105,13 +2105,19 @@ closed set naming the exact request field to send:
 ``extra_body.enable_thinking=false``
     Sends ``enable_thinking: false`` nested under ``extra_body``, which a
     proxy forwards to the upstream deployment verbatim.
+``extra_body.thinking.disabled``
+    Sends ``thinking: {"type": "disabled"}`` nested under ``extra_body``.
+    Use this for DeepSeek V4 Pro on the corporate AtlasCloud-backed proxy;
+    its thinking toggle differs from Qwen's ``enable_thinking: false``.
 
-Any other value raises before a request is sent. Which of the three a given
-alias honours is a property of that alias and has to be measured: a top-level
-field may be rejected outright, or accepted and then dropped, in which case
-reasoning stays on while the setting reads as if it were off. Verify with the
-``reasoning_tokens`` recorded on the judge's request attempts rather than from
-the setting alone.
+Any other value raises before a request is sent. Which control a given alias
+honours is a property of that alias and has to be measured: a top-level field
+may be rejected outright, or accepted and then dropped, in which case
+reasoning stays on while the setting reads as if it were off. A control
+supported by one model can also be ignored by another model on the same proxy.
+Verify with the response's ``reasoning_tokens`` and streamed reasoning, not the
+setting alone. A null reasoning count in a request attempt means no positive
+count was recorded; it does not distinguish a reported zero from missing usage.
 
 .. seealso::
 

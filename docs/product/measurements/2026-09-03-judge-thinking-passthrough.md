@@ -3,6 +3,35 @@
 **Date:** 2026-09-03. **Status:** measured; seat 2 changed, seat 1 deliberately
 not. **Probes:** `dev-docker/data/thinking_probe*.py` (throwaway, not tracked).
 
+> **DeepSeek correction, 2026-10-23.** The claim below that the Qwen
+> `enable_thinking` control disables DeepSeek does not hold on the current
+> AtlasCloud-backed alias. An approved, interleaved synthetic probe used the
+> live `deepseek-v4-pro` alias, streaming strict JSON Schema, a 1,200-token
+> output cap and no retries. It stopped at the first HTTP failure:
+>
+> | Raw request control | HTTP | Wall time | Reasoning tokens | Streamed reasoning characters |
+> |---|---:|---:|---:|---:|
+> | `extra_body: {enable_thinking: false}` | 200 | 6.684 s | 232 | 574 |
+> | `extra_body: {thinking: {type: disabled}}` | 200 | 2.494 s | 0 | 0 |
+> | `thinking: {type: disabled}` | 200 | 9.042 s | 458 | 970 |
+> | Top-level `thinking` plus `allowed_openai_params: [thinking]` | 500 | 4.821 s | not reported | not reported |
+>
+> All three completed responses returned the correct synthetic answer.
+> Successful responses reported $0.00283098 combined; the failed response
+> reported no cost. This establishes a working DeepSeek toggle, not a judge
+> quality comparison or a workload-wide speed claim: there is one observation
+> per control, and no request was retried. Use
+> `JUDGE_REASONING_EFFORT_SEAT_1=extra_body.thinking.disabled`; retain
+> `extra_body.enable_thinking=false` for Qwen. The
+> [DeepSeek contract](https://api-docs.deepseek.com/guides/thinking_mode/)
+> names `thinking.type` as the toggle. The nested request is necessary on this
+> proxy; do not confuse the OpenAI SDK's `extra_body` argument with a raw API
+> field on other endpoints. Historical measurements below remain unchanged.
+>
+> The 2026-10-22 Pirate Ships launch already recorded thinking-off in its
+> profile snapshot, yet 5 of 20 DeepSeek requests reported 6,870 reasoning
+> tokens in total. A configured toggle is not evidence that it was honoured.
+
 A producer reported that the judge run on `need-for-greed/orders/ru` was very
 slow and asked for the highest-leverage safe speed-up. It is one setting on one
 seat: `atlas/qwen3.8-max` was spending 92% of its output tokens on reasoning
