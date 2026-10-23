@@ -1,0 +1,2702 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+from __future__ import annotations
+
+import contextlib
+import json
+import time
+from decimal import Decimal
+from math import ceil
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, TypedDict, cast
+from uuid import uuid4
+
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.contrib.messages import get_messages
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
+from django.db.models import Case, IntegerField, Q, Value, When
+from django.db.models.functions import MD5, Lower
+from django.http import (
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseRedirect,
+    JsonResponse,
+)
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import format_html
+from django.utils.text import normalize_newlines
+from django.utils.translation import gettext, gettext_lazy, ngettext
+from django.views.decorators.http import require_GET, require_POST
+
+from weblate.auth.results import PermissionResult
+from weblate.checks.models import CHECKS, get_display_checks
+from weblate.glossary.forms import TermForm
+from weblate.glossary.models import (
+    fetch_glossary_terms,
+    get_glossary_terms,
+    get_matched_glossary_prompt_entries,
+)
+from weblate.logger import LOGGER
+from weblate.machinery.models import MACHINERY
+from weblate.screenshots.forms import ScreenshotForm
+from weblate.trans.actions import ActionEvents
+from weblate.trans.autotranslate import BatchAutoTranslate
+from weblate.trans.exceptions import (
+    FileParseError,
+    SuggestionSimilarToTranslationError,
+    SuggestionTooLongError,
+)
+from weblate.trans.forms import (
+    AutoForm,
+    ChecksumForm,
+    CommentForm,
+    ContextForm,
+    JudgeResolutionForm,
+    MergeForm,
+    PositionSearchForm,
+    RevertForm,
+    TranslationForm,
+    ZenTranslationForm,
+    get_new_unit_form,
+)
+from weblate.trans.judge import (
+    JudgeError,
+    judge_configuration_ready,
+    judge_configuration_snapshot,
+    judge_seat_profiles,
+    validate_judge_configuration,
+)
+from weblate.trans.judge_loop import (
+    DEFAULT_CANDIDATE_SEVERITIES,
+    active_judge_candidate,
+    active_recheck_run,
+    generation_pending,
+    queue_judge_recheck,
+)
+from weblate.trans.models import (
+    Category,
+    Comment,
+    Component,
+    JudgeVerdict,
+    Project,
+    Suggestion,
+    SuggestionAddResult,
+    Translation,
+    Unit,
+    Vote,
+)
+from weblate.trans.models.judge import (
+    ALLOWED_RESOLUTION_TRANSITIONS,
+    JudgeCandidateError,
+    JudgeResolutionError,
+    ProducerRun,
+    active_round,
+    active_verdict,
+    compute_context_hash,
+    current_round,
+    current_verdict,
+    latest_round,
+    repair_evidence,
+    resolve_verdict,
+    unit_clarification_answer,
+)
+from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
+from weblate.trans.models.unit import fill_in_source_translation
+from weblate.trans.repeat_judge import REPEAT_JUDGE_QUERY, comparison_upper_bound
+from weblate.trans.tasks import (
+    auto_translate,
+    generate_judge_candidate,
+    publish_producer_run_dispatch,
+)
+from weblate.trans.templatetags.translations import (
+    try_linkify_filename,
+    unit_state_class,
+    unit_state_title,
+)
+from weblate.trans.util import redirect_next, render
+from weblate.trans.validators import SUGGESTION_REJECTION_REASON_LENGTH
+from weblate.utils import messages
+from weblate.utils.antispam import is_spam
+from weblate.utils.celery import (
+    INTERACTIVE_TASK_PRIORITY,
+    add_user_task,
+    delete_task_liveness,
+    delete_task_metadata,
+    get_queue_length,
+    register_task_liveness,
+    store_task_metadata,
+)
+from weblate.utils.hash import hash_to_checksum
+from weblate.utils.html import format_html_join_comma, list_to_tuples
+from weblate.utils.lock import WeblateLockTimeoutError
+from weblate.utils.messages import get_message_kind
+from weblate.utils.ratelimit import revert_rate_limit, session_ratelimit_post
+from weblate.utils.state import (
+    STATE_APPROVED,
+    STATE_TRANSLATED,
+)
+from weblate.utils.stats import CategoryLanguage, ProjectLanguage
+from weblate.utils.tracing import start_span
+from weblate.utils.views import parse_path, parse_path_units, show_form_errors
+from weblate.workspaces.models import Workspace
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from weblate.auth.models import AuthenticatedHttpRequest
+    from weblate.trans.models.unit import UnitQuerySet
+
+SESSION_SEARCH_CACHE_TTL = 1800
+ZEN_PAGE_SIZE = 20
+DELETE_UNIT_LOCKED_MESSAGE = gettext_lazy(
+    "Could not remove the string because another background operation is in progress. Please try again later."
+)
+
+
+class SearchResult(TypedDict, total=False):
+    form: PositionSearchForm
+    offset: int
+    query: str
+    url: str
+    items: Any
+    key: str
+    name: str
+    ids: list[int]
+    total: int | None
+    ttl: int
+    last_viewed_unit_id: int | None
+    last_section: bool
+
+
+class _SearchBase(Protocol):
+    @property
+    def cache_key(self) -> str: ...
+
+    def get_absolute_url(self) -> str: ...
+
+
+class TranslateUnitResult(NamedTuple):
+    search_result: SearchResult
+    num_results: int
+    offset: int
+    unit: Unit
+
+
+class SearchSnapshot(NamedTuple):
+    ids: list[int]
+    offset: int
+    total: int | None
+    last_section: bool
+
+
+class CachedSearchSnapshot(NamedTuple):
+    key: str
+    session_data: SearchResult
+    unit_ids: list[int]
+    ttl: int
+
+
+def display_fixups(request: AuthenticatedHttpRequest, fixups: list[str]) -> None:
+    messages.info(
+        request,
+        format_html(
+            "{} {}",
+            ngettext(
+                "The following fix-up was applied to the translation:",
+                "The following fix-ups were applied to the translation:",
+                len(fixups),
+            ),
+            format_html_join_comma("{}", list_to_tuples(fixups)),
+        ),
+    )
+
+
+def show_unit_edit_denied(
+    request: AuthenticatedHttpRequest, permission: bool | PermissionResult
+) -> None:
+    reason = permission.reason if isinstance(permission, PermissionResult) else ""
+    messages.error(
+        request,
+        reason or gettext("You do not have permission to save translations."),
+    )
+
+
+def format_newly_failing_checks_message(check_names: set[str]) -> str:
+    ordered_checks = [CHECKS[check].name for check in sorted(check_names)]
+    return ngettext(
+        "The translation has been saved, however there is a newly failing check: {checks}",
+        "The translation has been saved, however there are some newly failing checks: {checks}",
+        len(ordered_checks),
+    ).format(checks=format_html_join_comma("{}", list_to_tuples(ordered_checks)))
+
+
+def get_other_units(unit):
+    """Return other units to show while translating."""
+    with start_span(op="unit.others", name=f"{unit.pk}"):
+        result: dict[str, Any] = {
+            "total": 0,
+            "skipped": False,
+            "same": [],
+            "matching": [],
+            "context": [],
+            "source": [],
+            "other": [],
+        }
+
+        allow_merge = False
+        untranslated = False
+        translation = unit.translation
+        component = translation.component
+        propagation = component.allow_translation_propagation
+        same = None
+        any_propagated = False
+
+        query_match_source = Q(source__lower__md5=MD5(Lower(Value(unit.source))))
+        query_match_context = Q(context__lower__md5=MD5(Lower(Value(unit.context))))
+
+        if unit.source and unit.context:
+            match = Q(source=unit.source) & Q(context=unit.context)
+            if component.has_template():
+                query = query_match_source | query_match_context
+            else:
+                query = query_match_source
+        elif unit.source:
+            match = Q(source=unit.source) & Q(context="")
+            query = query_match_source
+        elif unit.context:
+            match = Q(context=unit.context)
+            query = query_match_context
+        else:
+            return result
+
+        matches = query
+        if unit.target:
+            target_matches = Q(target__lower__md5=MD5(Lower(Value(unit.target)))) & Q(
+                state__gte=STATE_TRANSLATED
+            )
+            matches = query | target_matches
+
+        units = (
+            Unit.objects.filter(
+                translation__component__project=component.project,
+                translation__language=translation.language,
+            )
+            .filter(matches)
+            .alias(
+                matches_current=Case(
+                    When(match, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            )
+            .prefetch()
+            .prefetch_source()
+            .order_by("-matches_current")
+        )
+
+        # Use memory_db for the query in case it exists. This is supposed
+        # to be a read-only replica for offloading expensive translation
+        # queries.
+        if "memory_db" in settings.DATABASES:
+            units = units.using("memory_db")
+
+        max_units = 20
+        units_limited = units[:max_units].fill_in_source_translation()
+        units_count = len(units_limited)
+
+        # Is it only this unit?
+        if units_count == 1:
+            return result
+
+        if units_count == max_units:
+            # Get the real units count from the database
+            units_count = units.count()
+
+        result["skipped"] = units_count > max_units
+
+        for item in units_limited:
+            item.allow_merge = item.differently_translated = (
+                item.translated and item.target != unit.target
+            )
+            item.is_propagated = (
+                propagation
+                and item.translation.component.allow_translation_propagation
+                and item.translation.plural_id == translation.plural_id
+                and item.source == unit.source
+                and item.context == unit.context
+            )
+            if item.pk != unit.pk:
+                any_propagated |= item.is_propagated
+            untranslated |= not item.translated
+            allow_merge |= item.allow_merge
+            if item.pk == unit.pk:
+                same = item
+                result["same"].append(item)
+            elif item.source == unit.source and item.context == unit.context:
+                result["matching"].append(item)
+            elif item.source == unit.source:
+                result["source"].append(item)
+            elif item.context == unit.context:
+                result["context"].append(item)
+            else:
+                result["other"].append(item)
+
+        # Slightly different logic to allow applying current translation to
+        # the propagated strings
+        if same is not None and any_propagated:
+            same.allow_merge = (
+                (untranslated or allow_merge) and same.translated and propagation
+            )
+            allow_merge |= same.allow_merge
+
+        result["total"] = sum(
+            len(result[x]) for x in ("matching", "source", "context", "other")
+        )
+        result["allow_merge"] = allow_merge
+
+        return result
+
+
+def cleanup_session(session, delete_all: bool = False) -> None:
+    """Delete old search results from session storage."""
+    now = int(time.time())
+    keys = list(session.keys())
+    for key in keys:
+        if not key.startswith("search_"):
+            continue
+        value = session[key]
+        ttl = value.get("ttl") if isinstance(value, dict) else None
+        if delete_all or not isinstance(ttl, int) or ttl < now:
+            del session[key]
+
+
+class SearchNavigation:
+    """Resolve stable translation navigation from a session search snapshot."""
+
+    MUTABLE_SORTS = frozenset({"last_updated", "num_failing_checks", "target"})
+
+    @staticmethod
+    def get_ttl() -> int:
+        """Return expiration timestamp for cached search state."""
+        return int(time.time()) + SESSION_SEARCH_CACHE_TTL
+
+    @staticmethod
+    def get_session_key(base: _SearchBase, search_url: str) -> str:
+        """Return the session key for cached search state."""
+        return f"search_{base.cache_key}_{search_url}"
+
+    @staticmethod
+    def get_session_data(session, session_key: str) -> SearchResult | None:
+        """Return typed search session data if the stored value is usable."""
+        session_data = session.get(session_key)
+        if not isinstance(session_data, dict):
+            return None
+        return cast("SearchResult", session_data)
+
+    @classmethod
+    def refresh_session(cls, session, session_key: str, session_data: SearchResult):
+        """Refresh a search session entry TTL."""
+        ttl = cls.get_ttl()
+        session_data["ttl"] = ttl
+        session[session_key] = session_data
+        return ttl
+
+    @staticmethod
+    def _get_unit_ids(session_data: SearchResult) -> list[int] | None:
+        """Return a valid list of unit IDs from search session data."""
+        unit_ids = session_data.get("ids")
+        if not isinstance(unit_ids, list) or not all(
+            isinstance(pk, int) for pk in unit_ids
+        ):
+            return None
+        return unit_ids
+
+    @staticmethod
+    def _get_ids_snapshot(
+        unit_ids: list[int], offset: int, page_size: int
+    ) -> SearchSnapshot | None:
+        """Return a stable page from a full ordered unit ID list."""
+        if offset < 1:
+            offset = max(len(unit_ids) - page_size + 1, 1)
+        page_offset = offset - 1
+        page_ids = unit_ids[page_offset : page_offset + page_size + 1]
+        if not page_ids:
+            return None
+        return SearchSnapshot(
+            ids=page_ids,
+            offset=offset,
+            total=len(unit_ids),
+            last_section=len(page_ids) <= page_size,
+        )
+
+    @staticmethod
+    def get_order_insensitive_items(
+        items: object,
+    ) -> tuple[tuple[str, str], ...] | None:
+        """Return search parameters without the current ordering."""
+        if not isinstance(items, (list, tuple)):
+            return None
+        result = []
+        for item in items:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                return None
+            name, value = item
+            if not isinstance(name, str) or not isinstance(value, str):
+                return None
+            if name != "sort_by":
+                result.append((name, value))
+        return tuple(result)
+
+    @staticmethod
+    def get_last_viewed_unit_id(session_data: SearchResult | None) -> int | None:
+        """Return a valid last viewed unit ID from search session data."""
+        if session_data is None:
+            return None
+        last_viewed_unit_id = session_data.get("last_viewed_unit_id")
+        if isinstance(last_viewed_unit_id, int):
+            return last_viewed_unit_id
+        return None
+
+    def __init__(
+        self,
+        base: _SearchBase,
+        project: Project,
+        unit_set: UnitQuerySet,
+        request: AuthenticatedHttpRequest,
+        *,
+        blank: bool = False,
+        use_cache: bool = True,
+    ) -> None:
+        self.base = base
+        self.project = project
+        self.unit_set = unit_set
+        self.request = request
+        self.blank = blank
+        self.use_cache = use_cache
+
+        self.form = PositionSearchForm(
+            request=request, data=request.GET, show_builder=False, obj=base
+        )
+        self.form_valid = self.form.is_valid()
+        if self.form_valid:
+            self.cleaned_data = self.form.cleaned_data
+            self.search_url = self.form.urlencode()
+            self.search_query = self.form.cleaned_data["q"]
+            self.search_name = str(self.form.get_name())
+            self.search_items = self.form.items()
+        else:
+            self.cleaned_data = {}
+            show_form_errors(request, self.form)
+            self.search_url = ""
+            self.search_query = ""
+            self.search_name = ""
+            self.search_items = ()
+        self.order_insensitive_search_items = self.get_order_insensitive_items(
+            self.search_items
+        )
+        self.offset = self.cleaned_data.get("offset", 1)
+        self.session_key = self.get_session_key(base, self.search_url)
+
+    @property
+    def query_string(self) -> str:
+        return self.cleaned_data.get("q", "")
+
+    @property
+    def can_use_session_snapshot(self) -> bool:
+        return self.use_cache and "offset" in self.request.GET
+
+    @property
+    def can_use_bounded_page_lookup(self) -> bool:
+        return not self.query_string and not self.has_mutable_sort
+
+    @property
+    def has_mutable_sort(self) -> bool:
+        sort_by = self.cleaned_data.get("sort_by", "")
+        return any(
+            choice.lstrip("-") in self.MUTABLE_SORTS
+            for choice in sort_by.split(",")
+            if choice
+        )
+
+    def get_ordered_units(self):
+        """Perform the ordered search."""
+        return self.unit_set.search(
+            self.query_string, project=self.project
+        ).order_by_request(self.cleaned_data, self.base)
+
+    def get_ordered_unit_ids(self) -> list[int]:
+        """Perform the ordered search and return the full unit ID snapshot."""
+        return list(self.get_ordered_units().values_list("id", flat=True))
+
+    def get_matching_full_snapshots(self) -> Iterator[CachedSearchSnapshot]:
+        """Yield cached full snapshots for the same search ignoring ordering."""
+        if not self.can_use_session_snapshot:
+            return
+
+        prefix = f"search_{self.base.cache_key}_"
+        session_keys = list(self.request.session.keys())
+        for key in session_keys:
+            if not key.startswith(prefix):
+                continue
+            session_data = self.get_session_data(self.request.session, key)
+            if session_data is None or session_data.get("query") != self.search_query:
+                continue
+            if (
+                self.get_order_insensitive_items(session_data.get("items"))
+                != self.order_insensitive_search_items
+            ):
+                continue
+            unit_ids = self._get_unit_ids(session_data)
+            ttl = session_data.get("ttl")
+            if unit_ids is not None and isinstance(ttl, int):
+                yield CachedSearchSnapshot(key, session_data, unit_ids, ttl)
+
+    def get_cached_snapshot_sort_key(
+        self, snapshot: CachedSearchSnapshot
+    ) -> tuple[int, bool]:
+        """Sort cached snapshots by freshness, preferring current key on ties."""
+        return snapshot.ttl, snapshot.key == self.session_key
+
+    def get_latest_cached_full_snapshot(self) -> CachedSearchSnapshot | None:
+        """Return the newest full snapshot for the same search."""
+        return max(
+            self.get_matching_full_snapshots(),
+            key=self.get_cached_snapshot_sort_key,
+            default=None,
+        )
+
+    def get_reordered_cached_session_data(
+        self, source: CachedSearchSnapshot, *, reset_offset_to_last_viewed: bool
+    ) -> SearchResult | None:
+        """Reuse a cached ID list when only ordering changed."""
+        unit_ids = list(
+            self.unit_set.filter(pk__in=source.unit_ids)
+            .order_by_request(self.cleaned_data, self.base)
+            .values_list("id", flat=True)
+        )
+        if not unit_ids:
+            return None
+
+        last_viewed_unit_id = self.get_last_viewed_unit_id(source.session_data)
+        if reset_offset_to_last_viewed and last_viewed_unit_id is not None:
+            with contextlib.suppress(ValueError):
+                self.offset = unit_ids.index(last_viewed_unit_id) + 1
+
+        session_data = self.make_session_data(
+            unit_ids,
+            self.get_ttl(),
+            last_viewed_unit_id,
+        )
+        if self.use_cache:
+            self.request.session[self.session_key] = session_data
+        return session_data
+
+    def make_session_metadata(
+        self, ttl: int, last_viewed_unit_id: int | None = None
+    ) -> SearchResult:
+        """Build shared search session metadata."""
+        return {
+            "query": self.search_query,
+            "url": self.search_url,
+            "items": self.search_items,
+            "key": self.session_key,
+            "name": self.search_name,
+            "ttl": ttl,
+            "last_viewed_unit_id": last_viewed_unit_id,
+        }
+
+    def make_lightweight_session_data(
+        self,
+        session_data: SearchResult | None,
+        ttl: int,
+    ) -> SearchResult:
+        """Store search metadata without materializing all unit IDs."""
+        return self.make_session_metadata(
+            ttl, self.get_last_viewed_unit_id(session_data)
+        )
+
+    def make_session_data(
+        self, unit_ids: list[int], ttl: int, last_viewed_unit_id: int | None = None
+    ) -> SearchResult:
+        session_data = self.make_session_metadata(ttl, last_viewed_unit_id)
+        session_data["ids"] = unit_ids
+        return session_data
+
+    def load_data(
+        self, *, reset_offset_to_last_viewed: bool = False
+    ) -> HttpResponse | SearchResult:
+        """Load a cached full snapshot or perform and store a new search."""
+        cleanup_session(self.request.session)
+
+        cached = self.get_latest_cached_full_snapshot()
+        if cached is not None:
+            if cached.key == self.session_key:
+                self.refresh_session(
+                    self.request.session, self.session_key, cached.session_data
+                )
+                return cached.session_data
+            session_data = self.get_reordered_cached_session_data(
+                cached,
+                reset_offset_to_last_viewed=reset_offset_to_last_viewed,
+            )
+            if session_data is not None:
+                return session_data
+
+        unit_ids = self.get_ordered_unit_ids()
+        if not unit_ids and not self.blank:
+            messages.warning(self.request, gettext("No strings found!"))
+            return redirect(
+                f"{self.base.get_absolute_url()}?q={self.query_string}#search"
+            )
+
+        ttl = self.get_ttl()
+        session_data = self.make_session_data(unit_ids, ttl)
+        if self.use_cache:
+            self.request.session[self.session_key] = session_data
+        return session_data
+
+    def limited_page(
+        self, *, include_count: bool, page_size: int
+    ) -> HttpResponse | SearchResult:
+        """Return one page without materializing the full result ID list."""
+        cleanup_session(self.request.session)
+        session_data = self.get_session_data(self.request.session, self.session_key)
+        ordered_units = self.get_ordered_units()
+
+        total = None
+        if include_count or self.offset < 1:
+            total = ordered_units.count()
+            if not total and not self.blank:
+                messages.warning(self.request, gettext("No strings found!"))
+                return redirect(
+                    f"{self.base.get_absolute_url()}?q={self.query_string}#search"
+                )
+            if self.offset < 1:
+                self.offset = max(total - page_size + 1, 1)
+
+        offset = self.offset - 1
+        unit_ids = list(
+            ordered_units.values_list("id", flat=True)[offset : offset + page_size + 1]
+        )
+        if not unit_ids and self.offset <= 1 and not self.blank:
+            messages.warning(self.request, gettext("No strings found!"))
+            return redirect(
+                f"{self.base.get_absolute_url()}?q={self.query_string}#search"
+            )
+
+        ttl = self.get_ttl()
+        session_data = self.make_lightweight_session_data(session_data, ttl)
+        if self.use_cache:
+            self.request.session[self.session_key] = session_data
+        return self.make_result(
+            session_data,
+            ids=unit_ids[:page_size],
+            include_total=include_count,
+            total=total,
+            last_section=len(unit_ids) <= page_size,
+        )
+
+    def make_result(
+        self,
+        session_data: SearchResult,
+        *,
+        ids: list[int] | None = None,
+        offset: int | None = None,
+        total: int | None = None,
+        include_total: bool = False,
+        last_section: bool | None = None,
+    ) -> SearchResult:
+        """Build the search result context shared by translate and zen views."""
+        result: SearchResult = {
+            "form": self.form,
+            "offset": self.offset if offset is None else offset,
+            "query": session_data.get("query", self.search_query),
+            "url": session_data.get("url", self.search_url),
+            "items": session_data.get("items", self.search_items),
+            "key": self.session_key,
+            "name": session_data.get("name", self.search_name),
+            "ids": (self._get_unit_ids(session_data) or []) if ids is None else ids,
+            "ttl": session_data["ttl"],
+            "last_viewed_unit_id": session_data.get("last_viewed_unit_id"),
+        }
+        if include_total:
+            result["total"] = total
+        if last_section is not None:
+            result["last_section"] = last_section
+        return result
+
+    def search(self) -> HttpResponse | SearchResult:
+        """Perform search or return cached full search results."""
+        with start_span(op="unit.search", name=self.search_url):
+            data = self.load_data()
+            if isinstance(data, HttpResponse):
+                return data
+            return self.make_result(data)
+
+    def page(
+        self, *, include_count: bool = False, page_size: int = ZEN_PAGE_SIZE
+    ) -> HttpResponse | SearchResult:
+        """Return one stable page of unit IDs from the cached full snapshot."""
+        with start_span(op="unit.search", name=self.search_url):
+            if page_size == 1 and self.can_use_bounded_page_lookup:
+                return self.limited_page(
+                    include_count=include_count, page_size=page_size
+                )
+            data = self.load_data(reset_offset_to_last_viewed=page_size == 1)
+            if isinstance(data, HttpResponse):
+                return data
+            unit_ids = self._get_unit_ids(data)
+            if unit_ids is None:
+                return self.make_result(
+                    data,
+                    ids=[],
+                    include_total=include_count,
+                    total=0 if include_count else None,
+                    last_section=True,
+                )
+            snapshot = self._get_ids_snapshot(unit_ids, self.offset, page_size)
+            if snapshot is None:
+                return self.make_result(
+                    data,
+                    ids=[],
+                    include_total=include_count,
+                    total=len(unit_ids) if include_count else None,
+                    last_section=True,
+                )
+            return self.make_result(
+                data,
+                ids=snapshot.ids[:page_size],
+                offset=snapshot.offset,
+                include_total=include_count,
+                total=snapshot.total if include_count else None,
+                last_section=snapshot.last_section,
+            )
+
+    def post_unit(self, unit: Unit) -> tuple[SearchResult, int] | None:
+        """Resolve POST search context using the submitted offset."""
+        if not self.form_valid or self.offset < 1:
+            return None
+        with start_span(op="unit.search", name=self.search_url):
+            if self.can_use_bounded_page_lookup:
+                return self.limited_post_unit(unit)
+            data = self.load_data()
+            if isinstance(data, HttpResponse):
+                return None
+            unit_ids = self._get_unit_ids(data)
+            if unit_ids is None:
+                return None
+            snapshot = self._get_ids_snapshot(unit_ids, self.offset, 1)
+            if snapshot is None or snapshot.ids[0] != unit.id:
+                return None
+            return (
+                self.make_result(
+                    data,
+                    ids=snapshot.ids[:1],
+                    offset=snapshot.offset,
+                    include_total=True,
+                    total=snapshot.total,
+                    last_section=snapshot.last_section,
+                ),
+                snapshot.total or 0,
+            )
+
+    def limited_post_unit(self, unit: Unit) -> tuple[SearchResult, int] | None:
+        """Resolve POST context without materializing all result IDs."""
+        cleanup_session(self.request.session)
+        session_data = self.get_session_data(self.request.session, self.session_key)
+        ordered_units = self.get_ordered_units()
+        unit_ids = list(
+            ordered_units.values_list("id", flat=True)[
+                self.offset - 1 : self.offset + 1
+            ]
+        )
+        if not unit_ids or unit_ids[0] != unit.id:
+            return None
+
+        total = ordered_units.count()
+        ttl = self.get_ttl()
+        session_data = self.make_lightweight_session_data(session_data, ttl)
+        if self.use_cache:
+            self.request.session[self.session_key] = session_data
+        return (
+            self.make_result(
+                session_data,
+                ids=unit_ids[:1],
+                include_total=True,
+                total=total,
+                last_section=len(unit_ids) <= 1,
+            ),
+            total,
+        )
+
+
+def get_checksum_unit_set(unit_set: UnitQuerySet) -> UnitQuerySet:
+    """Load relations needed by translation POST handling."""
+    return unit_set.select_related(
+        "translation",
+        "translation__language",
+        "translation__plural",
+        "translation__component",
+        "translation__component__project",
+        "translation__component__source_language",
+        "source_unit",
+        "source_unit__translation",
+        "source_unit__translation__language",
+        "source_unit__translation__plural",
+        "source_unit__translation__component",
+        "source_unit__translation__component__project",
+        "source_unit__translation__component__source_language",
+    )
+
+
+def perform_suggestion(unit, form, request: AuthenticatedHttpRequest):
+    """Handle suggestion saving."""
+    if not form.cleaned_data["target"][0]:
+        messages.error(request, gettext("Your suggestion is empty!"))
+        # Stay on same entry
+        return False
+    suggestion_permission = request.user.has_perm("suggestion.add", unit)
+    if not suggestion_permission:
+        # Need privilege to add
+        messages.error(
+            request,
+            getattr(suggestion_permission, "reason", "")
+            or gettext("You do not have permission to add suggestions."),
+        )
+        # Stay on same entry
+        return False
+    # Spam check for unauthenticated users
+    if not request.user.is_authenticated and is_spam(
+        request, form.cleaned_data["target"]
+    ):
+        messages.error(request, gettext("Your suggestion has been identified as spam!"))
+        return False
+
+    # Create the suggestion
+    try:
+        suggestion, result = Suggestion.objects.add(
+            unit,
+            form.cleaned_data["target"],
+            request,
+            request.user.has_perm("suggestion.vote", unit),
+            raise_exception=True,
+        )
+    except SuggestionSimilarToTranslationError:
+        messages.error(
+            request, gettext("Your suggestion is similar to the current translation!")
+        )
+        return False
+    except SuggestionTooLongError:
+        messages.error(request, gettext("Translation text too long!"))
+        return False
+    if result == SuggestionAddResult.DUPLICATE:
+        messages.error(request, gettext("Your suggestion already exists!"))
+    elif result == SuggestionAddResult.CREATED and suggestion and suggestion.fixups:
+        display_fixups(request, suggestion.fixups)
+    return result == SuggestionAddResult.CREATED
+
+
+def _queue_manual_save_recheck(request: AuthenticatedHttpRequest, unit: Unit) -> None:
+    """Queue the judge re-check of a manual fix, or explain why it will not run."""
+    user = request.user
+    if not user.has_perm("unit.review", unit) or not user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        messages.info(
+            request,
+            gettext(
+                "The changed text awaits a judge re-check by a user who may run it."
+            ),
+        )
+        return
+    try:
+        validate_judge_configuration()
+    except JudgeError as error:
+        messages.error(request, str(error))
+        return
+    queue_judge_recheck(unit, user)
+    messages.info(
+        request, gettext("The changed text has been queued for a judge re-check.")
+    )
+
+
+def perform_translation(unit, form, request: AuthenticatedHttpRequest) -> bool:
+    """Handle translation and stores it to a backend."""
+    user = request.user
+    profile = user.profile
+    component = unit.translation.component
+    project = component.project
+    # Alternative translations handling
+    add_alternative = "add_alternative" in request.POST
+
+    # A judged string takes its release state from the judge, not from a
+    # human radio choice: changed text is always stored as translated (an
+    # approved string is demoted, a held one is lifted) and the queued
+    # re-check decides from there. A save that changes nothing keeps the
+    # state the judge left behind. The stored target is normalized the same
+    # way the posted one is, so a stray CRLF is not mistaken for an edit.
+    judged = bool(latest_round(unit))
+    target_changed = form.cleaned_data["target"] != [
+        normalize_newlines(text) for text in unit.get_target_plurals()
+    ]
+    state = form.cleaned_data["state"]
+    if judged and target_changed and not unit.readonly:
+        state = STATE_TRANSLATED
+
+    # Update explanation for glossary
+    change_explanation = (
+        component.is_glossary and unit.explanation != form.cleaned_data["explanation"]
+    )
+    # Save
+    saved = unit.translate(
+        user,
+        form.cleaned_data["target"],
+        state,
+        request=request,
+        add_alternative=add_alternative,
+    )
+    # Make sure explanation is saved
+    if change_explanation:
+        saved |= unit.update_explanation(form.cleaned_data["explanation"], user)
+
+    # Warn about applied fixups
+    if unit.fixups:
+        display_fixups(request, unit.fixups)
+
+    # No change edit - should we skip to next entry
+    if not saved:
+        revert_rate_limit("translate", request)
+        return True
+
+    # A manual fix of a judged string belongs to the judge to release:
+    # queue the re-check right after the save lands.
+    if judged and target_changed:
+        _queue_manual_save_recheck(request, unit)
+
+    # Auto subscribe user
+    if not profile.all_languages:
+        language = unit.translation.language
+        profile.languages.add(language)
+        messages.info(
+            request,
+            gettext(
+                "Added %(language)s to your translated languages. "
+                "You can adjust them in the settings."
+            )
+            % {"language": language},
+        )
+    if profile.watch_on_contribution(project):
+        messages.info(
+            request,
+            gettext(
+                "Added %(project)s to your watched projects. "
+                "You can adjust this behavior in the settings."
+            )
+            % {"project": project},
+        )
+
+    # Get new set of checks
+    oldchecks = unit.updated_old_checks_names
+    if oldchecks is None:
+        oldchecks = unit.all_checks_names
+    newchecks = unit.all_checks_names
+
+    # Did we introduce any new failures?
+    if (
+        saved
+        and form.cleaned_data["state"] >= STATE_TRANSLATED
+        and (
+            # Any new checks?
+            newchecks > oldchecks
+            or
+            # Any enforced check?
+            (component.enforced_checks and newchecks & set(component.enforced_checks))
+        )
+    ):
+        # Show message to user
+        messages.error(
+            request,
+            format_newly_failing_checks_message(newchecks),
+        )
+        # Stay on same entry
+        return False
+
+    return not add_alternative
+
+
+@session_ratelimit_post("translate", logout_user=False)
+def handle_translate(
+    request: AuthenticatedHttpRequest, unit, this_unit_url, next_unit_url
+):
+    """Save translation or suggestion to database and backend."""
+    form = TranslationForm(request.user, unit, request.POST)
+    if not form.is_valid():
+        show_form_errors(request, form)
+        return None
+
+    go_next = True
+
+    if "suggest" in request.POST:
+        go_next = perform_suggestion(unit, form, request)
+    elif not (edit_permission := request.user.has_perm("unit.edit", unit)):
+        if request.user.has_perm("meta:unit.flag", unit):
+            unit.update_explanation(form.cleaned_data["explanation"], request.user)
+        else:
+            show_unit_edit_denied(request, edit_permission)
+    else:
+        # A shared target may only change through the repeat preview flow.
+        # The one exception is an explicit choice to sever this occurrence
+        # before storing the ordinary editor change.
+        if form.cleaned_data["target"] != unit.get_target_plurals():
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.repeats import (
+                current_shared_membership,
+                make_membership_independent,
+            )
+
+            membership = current_shared_membership(unit)
+            if membership is not None:
+                decision = form.cleaned_data.get("repeat_decision")
+                if decision == "shared":
+                    messages.info(
+                        request,
+                        gettext(
+                            "Choose the shared translation from the repeat queue preview."
+                        ),
+                    )
+                    return HttpResponseRedirect(
+                        reverse(
+                            "repeat-queue",
+                            kwargs={
+                                "project": unit.translation.component.project.slug,
+                                "language": unit.translation.language.code,
+                            },
+                        )
+                    )
+                if decision != "independent":
+                    messages.error(
+                        request,
+                        gettext(
+                            "Choose whether to update the shared repeat in its queue or keep this occurrence independent."
+                        ),
+                    )
+                    return HttpResponseRedirect(this_unit_url)
+                make_membership_independent(unit=unit, reason="editor")
+        go_next = perform_translation(unit, form, request)
+
+    # Redirect to next entry
+    if "save-stay" not in request.POST and go_next:
+        return HttpResponseRedirect(next_unit_url)
+    return HttpResponseRedirect(this_unit_url)
+
+
+def handle_merge(unit, request: AuthenticatedHttpRequest, next_unit_url):
+    """Handle unit merging."""
+    mergeform = MergeForm(unit, request.POST)
+    if not mergeform.is_valid():
+        show_form_errors(request, mergeform)
+        return None
+
+    merged = mergeform.cleaned_data["merge_unit"]
+
+    edit_permission = request.user.has_perm("unit.edit", unit)
+    if not edit_permission:
+        show_unit_edit_denied(request, edit_permission)
+        return None
+
+    # Store unit
+    unit.translate(request.user, merged.get_target_plurals(), merged.state)
+    # Redirect to next entry
+    return HttpResponseRedirect(next_unit_url)
+
+
+def handle_revert(unit, request: AuthenticatedHttpRequest, next_unit_url):
+    revertform = RevertForm(unit, request.GET)
+    if not revertform.is_valid():
+        show_form_errors(request, revertform)
+        return None
+
+    change = revertform.cleaned_data["revert_change"]
+
+    edit_permission = request.user.has_perm("unit.edit", unit)
+    if not edit_permission:
+        show_unit_edit_denied(request, edit_permission)
+        return None
+
+    if not change.revert(
+        request.user, change_action=ActionEvents.REVERT, request=request
+    ):
+        messages.error(request, gettext("Could not revert the selected change."))
+        return None
+    # Redirect to next entry
+    return HttpResponseRedirect(next_unit_url)
+
+
+def check_suggest_permissions(
+    request: AuthenticatedHttpRequest, mode, unit, suggestion
+) -> bool:
+    """Check permission for suggestion handling."""
+    user = request.user
+    if mode in {"accept", "accept_edit", "accept_approve"}:
+        accept_permission = user.has_perm("suggestion.accept", unit)
+        if not accept_permission:
+            messages.error(
+                request,
+                getattr(accept_permission, "reason", "")
+                or gettext("You do not have permission to accept suggestions."),
+            )
+            return False
+        if mode == "accept_approve" and not (
+            review_permission := user.has_perm("unit.review", unit)
+        ):
+            messages.error(
+                request,
+                getattr(review_permission, "reason", "")
+                or gettext("You do not have permission to approve translations."),
+            )
+            return False
+    elif mode in {"delete", "spam"}:
+        if not user.has_perm("suggestion.delete", suggestion):
+            messages.error(
+                request, gettext("You do not have privilege to delete suggestions!")
+            )
+            return False
+    elif mode in {"upvote", "downvote"} and not (
+        vote_permission := user.has_perm("suggestion.vote", unit)
+    ):
+        reason = (
+            vote_permission.reason
+            if isinstance(vote_permission, PermissionResult)
+            else ""
+        )
+        messages.error(
+            request,
+            reason or gettext("You do not have permission to vote for suggestions."),
+        )
+        return False
+    return True
+
+
+def handle_suggestions(
+    request: AuthenticatedHttpRequest, unit, this_unit_url, next_unit_url
+):
+    """Handle suggestion deleting/accepting."""
+    sugid = ""
+    params = (
+        "accept",
+        "accept_edit",
+        "accept_approve",
+        "delete",
+        "spam",
+        "upvote",
+        "downvote",
+    )
+    redirect_url = this_unit_url
+    mode = None
+
+    # Parse suggestion ID
+    for param in params:
+        if param in request.POST:
+            sugid = request.POST[param]
+            mode = param
+            break
+
+    # Fetch suggestion
+    try:
+        suggestion = Suggestion.objects.get(pk=int(sugid), unit=unit)
+    except (Suggestion.DoesNotExist, ValueError):
+        messages.error(request, gettext("Invalid suggestion!"))
+        return HttpResponseRedirect(this_unit_url)
+
+    # Permissions check
+    if not check_suggest_permissions(request, mode, unit, suggestion):
+        return HttpResponseRedirect(this_unit_url)
+
+    # Perform operation
+    if (
+        "accept" in request.POST
+        or "accept_edit" in request.POST
+        or "accept_approve" in request.POST
+    ):
+        try:
+            suggestion.accept(
+                request,
+                state=STATE_APPROVED
+                if "accept_approve" in request.POST
+                else STATE_TRANSLATED,
+            )
+        except JudgeCandidateError as error:
+            messages.error(request, str(error))
+        else:
+            if "accept_edit" not in request.POST:
+                redirect_url = next_unit_url
+    elif "delete" in request.POST or "spam" in request.POST:
+        rejection_reason = request.POST.get("rejection", "")
+        if len(rejection_reason) > SUGGESTION_REJECTION_REASON_LENGTH:
+            messages.error(request, gettext("Rejection reason is too long!"))
+        else:
+            suggestion.delete_log(
+                request.user,
+                is_spam="spam" in request.POST,
+                rejection_reason=rejection_reason,
+                old=unit.target,
+            )
+    elif "upvote" in request.POST:
+        suggestion.add_vote(request, Vote.POSITIVE)
+        redirect_url = next_unit_url
+    elif "downvote" in request.POST:
+        suggestion.add_vote(request, Vote.NEGATIVE)
+
+    return HttpResponseRedirect(redirect_url)
+
+
+def handle_component_shift_notice(
+    request: AuthenticatedHttpRequest, unit_set, search_result, unit
+) -> None:
+    """Show a warning when sequential navigation moves to another component."""
+    last_viewed_unit_id = search_result.get("last_viewed_unit_id")
+    if last_viewed_unit_id:
+        try:
+            previous_unit = unit_set.get(pk=last_viewed_unit_id)
+        except Unit.DoesNotExist:
+            previous_unit = None
+        if (
+            previous_unit is not None
+            and unit.translation.component != previous_unit.translation.component
+        ):
+            messages.warning(
+                request,
+                gettext("You have shifted from %(previous)s to %(current)s.")
+                % {
+                    "previous": previous_unit.translation.full_slug,
+                    "current": unit.translation.full_slug,
+                },
+            )
+
+    search_result["last_viewed_unit_id"] = unit.id
+    session_key = search_result.get("key")
+    if not session_key:
+        return
+    session_result = SearchNavigation.get_session_data(request.session, session_key)
+    if session_result is None:
+        session_result = cast("SearchResult", {})
+    session_result["last_viewed_unit_id"] = unit.id
+    SearchNavigation.refresh_session(request.session, session_key, session_result)
+
+
+def get_addable_glossaries(unit, user):
+    """Return visible and addable glossaries for the unit."""
+    if unit.translation.component.hide_glossary_matches:
+        return [], []
+
+    glossaries = list(unit.translation.get_glossaries())
+    if not user.has_perm("glossary.add", unit.translation.component.project):
+        return glossaries, []
+
+    addable_ids = [
+        glossary.pk
+        for glossary in glossaries
+        if glossary.component.manage_units and user.has_perm("unit.add", glossary)
+    ]
+    return glossaries, addable_ids
+
+
+def get_addterm_glossaries(addable_ids):
+    """Return glossary queryset for the add-term form."""
+    return (
+        Translation.objects.filter(pk__in=addable_ids, component__manage_units=True)
+        .prefetch()
+        .order()
+    )
+
+
+def prepare_glossary_terms(
+    units: list[Unit], project: Project, *, full: bool = False
+) -> None:
+    """Prepare glossary terms for units if glossary matching is useful."""
+    if (
+        units
+        and project.glossaries
+        and any(not unit.translation.component.hide_glossary_matches for unit in units)
+    ):
+        fetch_glossary_terms(units, full=full)
+    else:
+        for unit in units:
+            unit.glossary_terms = []
+
+
+def get_translate_unit(
+    request: AuthenticatedHttpRequest,
+    obj: _SearchBase,
+    project: Project,
+    unit_set: UnitQuerySet,
+) -> HttpResponse | TranslateUnitResult:
+    """Resolve search results and current unit for the translate view."""
+    if (
+        request.method == "POST"
+        and request.POST.get("checksum")
+        and request.GET.get("offset")
+    ):
+        checksum_form = ChecksumForm(get_checksum_unit_set(unit_set), request.POST)
+        if checksum_form.is_valid():
+            unit = checksum_form.cleaned_data["unit"]
+            search_data = SearchNavigation(obj, project, unit_set, request).post_unit(
+                unit
+            )
+            if search_data is not None:
+                search_result, num_results = search_data
+                return TranslateUnitResult(
+                    search_result, num_results, search_result["offset"], unit
+                )
+
+    use_fast_search = (
+        request.method == "GET"
+        and not request.GET.get("checksum")
+        and "revert" not in request.GET
+    )
+    if use_fast_search:
+        search_result = SearchNavigation(obj, project, unit_set, request).page(
+            include_count=True, page_size=1
+        )
+    else:
+        search_result = SearchNavigation(obj, project, unit_set, request).search()
+
+    # Handle redirects
+    if isinstance(search_result, HttpResponse):
+        return search_result
+
+    # Get number of results
+    num_results = (
+        search_result["total"] if use_fast_search else len(search_result["ids"])
+    )
+
+    # Search offset
+    offset = search_result["offset"]
+
+    # Checksum unit access
+    payload = request.GET or request.POST
+    if payload.get("checksum"):
+        checksum_form = ChecksumForm(get_checksum_unit_set(unit_set), payload)
+        if checksum_form.is_valid():
+            unit = checksum_form.cleaned_data["unit"]
+            try:
+                offset = search_result["ids"].index(unit.id) + 1
+            except ValueError:
+                offset = None
+        else:
+            offset = None
+        if offset is None:
+            messages.warning(request, gettext("No strings found!"))
+            return redirect(obj)
+    else:
+        # Check boundaries
+        if not 0 < offset <= num_results:
+            messages.info(request, gettext("The translation has come to an end."))
+            # Delete search
+            if search_result["key"] in request.session:
+                del request.session[search_result["key"]]
+            return redirect(obj)
+
+        # Grab actual unit
+        try:
+            unit_id = search_result["ids"][0 if use_fast_search else offset - 1]
+            unit = unit_set.get(pk=unit_id)
+        except Unit.DoesNotExist:
+            # Can happen when using SID for other translation
+            messages.error(request, gettext("Invalid search string!"))
+            return redirect(obj)
+
+    return TranslateUnitResult(search_result, num_results, offset, unit)
+
+
+def _judge_view_context(
+    request: AuthenticatedHttpRequest, unit: Unit
+) -> dict[str, Any]:
+    """Judge-verdict context for the unit page: round, verdict, staleness."""
+    judge_round = latest_round(unit)
+    judge_current_round = current_round(unit)
+    judge_current_verdict = current_verdict(unit)
+    judge_unparsed = bool(judge_current_round) and all(
+        row.unparsed for row in judge_current_round
+    )
+    active = active_verdict(unit)
+    judge_verdict = active if judge_unparsed else judge_current_verdict or active
+    judge_stale = (
+        bool(judge_round)
+        and judge_verdict is None
+        and judge_round[0].is_stale(unit.get_target_plurals())
+    )
+    judge_context_changed = judge_verdict is not None and (
+        judge_verdict.context_hash
+        != compute_context_hash(
+            source=unit.source,
+            note=unit.source_unit.note,
+            explanation=unit.source_unit.explanation,
+            glossary_terms=get_matched_glossary_prompt_entries(unit),
+            clarification=unit_clarification_answer(unit),
+        )
+    )
+    judge_resolution_choices: set[str] = set()
+    if judge_current_verdict is not None:
+        judge_resolution_choices = {
+            resolution
+            for verdict, old_resolution, resolution in ALLOWED_RESOLUTION_TRANSITIONS
+            if verdict == judge_current_verdict.verdict
+            and old_resolution == judge_current_verdict.resolution
+        }
+    judge_can_resolve = bool(judge_resolution_choices) and request.user.has_perm(
+        "unit.review", unit
+    )
+    judge_resolution_form = None
+    if judge_can_resolve:
+        judge_resolution_form = JudgeResolutionForm()
+        judge_resolution_form.fields["resolution"].choices = [
+            choice
+            for choice in judge_resolution_form.fields["resolution"].choices
+            if choice[0] in judge_resolution_choices
+        ]
+    # Generate, regenerate, accept, and re-check all require both
+    # permissions (invariant 5) - stronger than plain unit.review, which
+    # only gates the resolution form above.
+    judge_can_triage = request.user.has_perm(
+        "unit.review", unit
+    ) and request.user.has_perm("translation.auto", unit.translation)
+    # A fresh, unresolved REJECT/FLAG for the current text is the only
+    # state that owns candidate/generate controls; minor/pass never has
+    # one and a resolved verdict already shows its own badge above.
+    judge_active_verdict = judge_current_verdict is not None and (
+        not judge_current_verdict.resolution
+        and judge_current_verdict.verdict
+        in {JudgeVerdict.Verdict.REJECT, JudgeVerdict.Verdict.FLAG}
+    )
+    # While max-length is active the unit is still on the deterministic
+    # mutating-repair path (invariant 9): no candidate is ever stored for
+    # it, and Generate must not offer one either.
+    judge_active_max_length = any(
+        check.name == "max-length" for check in unit.active_checks
+    )
+    return {
+        "judge_round": judge_round,
+        "judge_verdict": judge_verdict,
+        "judge_seats": (
+            active_round(unit)
+            if judge_unparsed
+            else judge_current_round
+            if judge_current_verdict is not None
+            else active_round(unit)
+            if judge_verdict is not None
+            else []
+        ),
+        "judge_stale": judge_stale,
+        "judge_unparsed": judge_unparsed,
+        "judge_context_changed": judge_context_changed,
+        "judge_current_verdict": judge_current_verdict,
+        "judge_can_resolve": judge_can_resolve,
+        "judge_resolution_choices": judge_resolution_choices,
+        "judge_resolution_form": judge_resolution_form,
+        "judge_repair_evidence": repair_evidence(unit, active=judge_verdict),
+        "judge_candidate": active_judge_candidate(unit, judge_current_verdict),
+        "judge_recheck_pending": active_recheck_run(unit),
+        "judge_generation_pending": (
+            judge_current_verdict is not None
+            and generation_pending(unit.pk, judge_current_verdict.pk)
+        ),
+        "judge_generation_outcome": (
+            judge_current_verdict.generation_outcome
+            if judge_current_verdict is not None
+            else ""
+        ),
+        "judge_can_triage": judge_can_triage,
+        "judge_active_verdict": judge_active_verdict,
+        "judge_active_max_length": judge_active_max_length,
+    }
+
+
+@transaction.atomic
+def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpResponse:
+    """Translate, suggest and search view."""
+    obj, unit_set, context = parse_path_units(
+        request, path, (Translation, ProjectLanguage, CategoryLanguage)
+    )
+
+    project = context["project"]
+    user = request.user
+
+    search_data = get_translate_unit(request, obj, project, unit_set)
+    if isinstance(search_data, HttpResponse):
+        return search_data
+    search_result = search_data.search_result
+    num_results = search_data.num_results
+    offset = search_data.offset
+    unit = search_data.unit
+
+    handle_component_shift_notice(request, unit_set, search_result, unit)
+
+    # Some URLs we will most likely use
+    base_unit_url = f"{obj.get_translate_url()}?{search_result['url']}&offset="
+    this_unit_url = base_unit_url + str(offset)
+    next_unit_url = base_unit_url + str(offset + 1)
+
+    response = None
+
+    if request.method == "POST" and "merge" not in request.POST:
+        if (
+            "accept" in request.POST
+            or "accept_edit" in request.POST
+            or "accept_approve" in request.POST
+            or "delete" in request.POST
+            or "spam" in request.POST
+            or "upvote" in request.POST
+            or "downvote" in request.POST
+        ):
+            # Handle accepting/deleting suggestions
+            response = handle_suggestions(request, unit, this_unit_url, next_unit_url)
+        else:
+            # Handle translation
+            response = handle_translate(request, unit, this_unit_url, next_unit_url)
+
+    # Handle translation merging
+    elif "merge" in request.POST:
+        response = handle_merge(unit, request, next_unit_url)
+
+    # Handle reverting
+    elif "revert" in request.GET:
+        response = handle_revert(unit, request, this_unit_url)
+
+    # Pass possible redirect further
+    if response is not None:
+        return response
+
+    # Show secondary languages for signed in users
+    secondary = unit.get_secondary_units(user) if user.is_authenticated else None
+
+    screenshot_form = None
+    if user.has_perm("screenshot.add", unit.translation):
+        screenshot_form = ScreenshotForm(
+            unit.translation.component, initial={"translation": unit.translation}
+        )
+
+    glossaries, addable_glossary_ids = get_addable_glossaries(unit, user)
+    addterm_form = None
+    if addable_glossary_ids:
+        addterm_form = TermForm(
+            unit,
+            user,
+            glossaries=get_addterm_glossaries(addable_glossary_ids),
+            filter_permissions=False,
+        )
+    other_languages_count = max(unit.source_unit.unit_set.count() - 1, 0)
+    prepare_glossary_terms([unit], project, full=True)
+    judge_context = _judge_view_context(request, unit)
+    form = TranslationForm(user, unit, judged=bool(judge_context["judge_round"]))
+
+    return render(
+        request,
+        "translate.html",
+        {
+            "path_object": obj,
+            "this_unit_url": this_unit_url,
+            "first_unit_url": f"{base_unit_url}1",
+            "last_unit_url": base_unit_url + str(num_results),
+            "next_section_url": base_unit_url
+            + str(offset + user.profile.nearby_strings),
+            "prev_section_url": base_unit_url
+            + str(max(1, offset - user.profile.nearby_strings)),
+            "next_unit_url": next_unit_url,
+            "prev_unit_url": base_unit_url + str(offset - 1),
+            "object": obj,
+            "project": project,
+            "component": obj.component if isinstance(obj, Translation) else None,
+            "unit": unit,
+            "nearby": unit.nearby(user.profile.nearby_strings),
+            "nearby_keys": unit.nearby_keys(user.profile.nearby_strings),
+            "can_go_next_section": offset + user.profile.nearby_strings <= num_results,
+            "others": get_other_units(unit) if user.is_authenticated else {"total": 0},
+            "search_url": search_result["url"],
+            "search_items": search_result["items"],
+            "search_query": search_result["query"],
+            "offset": offset,
+            "filter_count": num_results,
+            "filter_pos": offset,
+            "form": form,
+            "comment_form": CommentForm(
+                unit.translation,
+                initial={"scope": "global" if unit.is_source else "translation"},
+            ),
+            "context_form": ContextForm(instance=unit.source_unit, user=user),
+            "search_form": search_result["form"].reset_offset(),
+            "secondary": secondary,
+            "locked": unit.translation.component.locked,
+            "glossary": get_glossary_terms(unit, full=True),
+            "glossaries": glossaries,
+            "addterm_form": addterm_form,
+            "last_changes": unit.change_set.prefetch().recent(skip_preload="unit"),
+            **judge_context,
+            "other_languages_count": other_languages_count,
+            "screenshots": (unit.source_unit.screenshots.all() | unit.screenshots.all())
+            .distinct()
+            .order(),
+            "display_checks": list(get_display_checks(unit)),
+            "comments_to_check": unit.unresolved_comments,
+            "machinery_services": json.dumps(
+                list(project.get_machinery_settings().keys())
+            ),
+            "new_unit_form": get_new_unit_form(
+                unit.translation, user, initial={"variant": unit.pk}
+            ),
+            "screenshot_form": screenshot_form,
+            "translation_file_link": lambda: try_linkify_filename(
+                unit.translation.filename,
+                unit.translation.filename,
+                # '1' as a placeholder, because `get_repoweb_link` can't currently
+                # generate links without line specified. Although it's ok to use
+                # '' or '0' on GitHub or GitLab, let's play it safe for now.
+                "1",
+                unit,
+                user,
+            ),
+        },
+    )
+
+
+@require_GET
+@login_required
+def auto_translation_preview(request: AuthenticatedHttpRequest, path):
+    obj = parse_path(
+        request,
+        path,
+        (Translation, Component, Category, Project, ProjectLanguage, Workspace),
+    )
+    if not request.user.has_perm("translation.auto", obj):
+        raise PermissionDenied
+    form_obj = (
+        obj.component
+        if isinstance(obj, Translation)
+        else obj.project
+        if isinstance(obj, (Category, ProjectLanguage))
+        else obj
+    )
+    autoform = AutoForm(form_obj, request.user, request.GET)
+    if not autoform.is_valid():
+        return JsonResponse({"errors": autoform.errors}, status=400)
+    mode = autoform.cleaned_data["mode"]
+    if mode == "judge" and not request.user.has_perm("unit.review", form_obj):
+        raise PermissionDenied
+    batch = BatchAutoTranslate(
+        obj,
+        user=request.user,
+        q=autoform.cleaned_data["q"],
+        mode=mode,
+        component_wide=isinstance(obj, Component),
+        overwrite_existing=autoform.cleaned_data["overwrite_existing"],
+    )
+    judge_preview = batch.preview_judge_scope() if mode == "judge" else None
+    mt_preview = batch.preview_mt_scope() if mode != "judge" else None
+    preparation = (
+        _judge_preparation_preview(batch)
+        if judge_preview and not autoform.cleaned_data["judge_proposal_only"]
+        else None
+    )
+    preview = judge_preview or mt_preview
+    judge_cost: dict[str, str | bool] = {"available": False}
+    if judge_preview is not None:
+        project_ids = {
+            translation.component.project_id for translation in batch.translations
+        }
+        if len(project_ids) == 1:
+            ranges = [
+                recent_cost_range(
+                    project_ids.copy().pop(),
+                    profile.provider,
+                    profile.model,
+                    LLMUsageLog.Operation.JUDGE,
+                )
+                for profile in judge_seat_profiles()
+            ]
+            if all(cost_range is not None for cost_range in ranges):
+                low = sum(cost_range[0] for cost_range in ranges if cost_range)
+                high = sum(cost_range[1] for cost_range in ranges if cost_range)
+                judge_cost = {
+                    "available": True,
+                    "min": format((low * judge_preview.processed).normalize(), "f"),
+                    "max": format(
+                        (
+                            high
+                            * judge_preview.processed
+                            * (
+                                1
+                                if autoform.cleaned_data["judge_proposal_only"]
+                                else settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1
+                            )
+                        ).normalize(),
+                        "f",
+                    ),
+                }
+    pretranslation_cost: dict[str, str | bool] = {"available": False}
+    engine_ids = autoform.cleaned_data["engines"]
+    if mode != "judge" and autoform.cleaned_data["auto_source"] == "mt" and engine_ids:
+        # Every selected engine is asked for every unit, so one string in one
+        # language costs the sum over the engines; the interval bounds are the
+        # cheapest and the dearest such sum across the languages of the scope.
+        bounds_by_language: list[tuple[Decimal, Decimal]] = []
+        complete = bool(mt_preview and mt_preview.per_translation)
+        for translation, _writable in mt_preview.per_translation if mt_preview else []:
+            configurations = translation.component.project.get_machinery_settings()
+            low = high = Decimal(0)
+            for engine_id in engine_ids:
+                configuration = configurations.get(engine_id)
+                if configuration is None or engine_id not in MACHINERY:
+                    complete = False
+                    break
+                machine = MACHINERY[engine_id](configuration)
+                model = getattr(machine, "resolve_model", lambda _code: None)(
+                    translation.language.code
+                )
+                cost_range = (
+                    recent_cost_range(
+                        translation.component.project_id,
+                        machine.get_identifier(),
+                        model,
+                        LLMUsageLog.Operation.TRANSLATION,
+                    )
+                    if isinstance(model, str)
+                    else None
+                )
+                if cost_range is None:
+                    complete = False
+                    break
+                low += cost_range[0]
+                high += cost_range[1]
+            if not complete:
+                break
+            bounds_by_language.append((low, high))
+        if complete and bounds_by_language and mt_preview:
+            pretranslation_cost = {
+                "available": True,
+                "min": format(
+                    min(low for low, _high in bounds_by_language) * mt_preview.writable,
+                    "f",
+                ),
+                "max": format(
+                    max(high for _low, high in bounds_by_language)
+                    * mt_preview.writable,
+                    "f",
+                ),
+            }
+    return JsonResponse(
+        {
+            "matched": preview.matched,
+            "processed": judge_preview.processed if judge_preview else 0,
+            "remaining": judge_preview.remaining if judge_preview else 0,
+            "writable": preview.writable,
+            "judge_calls_initial": judge_preview.initial_calls if judge_preview else 0,
+            "judge_calls_worst_case": judge_preview.worst_case_calls
+            if judge_preview
+            else 0,
+            "judge_cost": judge_cost,
+            "pretranslation_cost": pretranslation_cost,
+            "preparation": preparation,
+            "repeat_comparison": (
+                comparison_upper_bound(obj, request.user)
+                if judge_preview is not None
+                and isinstance(obj, ProjectLanguage)
+                and autoform.cleaned_data["judge_proposal_only"]
+                and autoform.cleaned_data["q"].startswith(REPEAT_JUDGE_QUERY)
+                else None
+            ),
+        }
+    )
+
+
+def _judge_preparation_preview(batch: BatchAutoTranslate) -> dict[str, object]:
+    """Return the mandatory pre-judge machine translation volume and blockers."""
+    # C6/Task 3: the mandatory pre-judge MT volume is priced before the
+    # operator consents. A permission failure is a blocker, not a crash:
+    # the preview says the judge cannot start and why, and never pays a
+    # provider probe to find out.
+    try:
+        prep_scope = batch.build_preparation_scope()
+    except PermissionDenied as error:
+        return {
+            "missing": 0,
+            "per_language": {},
+            "engine": None,
+            "blockers": [str(error)],
+        }
+    return {
+        "missing": len(prep_scope.missing_ids),
+        "per_language": dict(sorted(prep_scope.per_language_missing.items())),
+        "engine": prep_scope.mt_engine,
+        "blockers": list(batch.preparation_blockers),
+    }
+
+
+_AutoTarget = Translation | Component | Category | Project | ProjectLanguage | Workspace
+
+
+def _start_judge_producer_run(  # ruff: ignore[complex-structure]
+    request: AuthenticatedHttpRequest, obj: _AutoTarget, autoform: AutoForm
+) -> HttpResponseRedirect:
+    form_obj = (
+        obj.component
+        if isinstance(obj, Translation)
+        else obj.project
+        if isinstance(obj, (Category, ProjectLanguage))
+        else obj
+    )
+    if not request.user.has_perm("unit.review", form_obj):
+        raise PermissionDenied
+    if not judge_configuration_ready():
+        messages.error(request, gettext("The LLM judge is not configured."))
+        return redirect(obj)
+    batch = BatchAutoTranslate(
+        obj,
+        user=request.user,
+        q=autoform.cleaned_data["q"],
+        mode="judge",
+        component_wide=isinstance(obj, Component),
+        overwrite_existing=autoform.cleaned_data.get("overwrite_existing", False),
+    )
+    _preview, units = batch.preview_judge_scope_snapshot(execution_version=1)
+    proposal_only = autoform.cleaned_data.get("judge_proposal_only", False)
+    preparation_requested = (
+        autoform.cleaned_data.get("auto_source") == "mt"
+        and not autoform.cleaned_data.get("overwrite_existing", False)
+        and not proposal_only
+    )
+    if preparation_requested:
+        try:
+            preparation_scope = batch.build_preparation_scope()
+        except PermissionDenied as error:
+            messages.error(request, str(error))
+            return redirect(obj)
+        blockers = list(batch.preparation_blockers)
+        if blockers:
+            messages.error(request, " ".join(blockers))
+            return redirect(obj)
+    else:
+        preparation_scope = None
+    match obj:
+        case Translation():
+            scope_type = ProducerRun.ScopeType.TRANSLATION
+            scope_id = str(obj.pk)
+        case Component():
+            scope_type = ProducerRun.ScopeType.COMPONENT
+            scope_id = str(obj.pk)
+        case Project():
+            scope_type = ProducerRun.ScopeType.PROJECT
+            scope_id = str(obj.pk)
+        case Workspace():
+            scope_type = ProducerRun.ScopeType.WORKSPACE
+            scope_id = str(obj.pk)
+        case Category():
+            scope_type = ProducerRun.ScopeType.PROJECT
+            scope_id = str(obj.project.pk)
+        case ProjectLanguage():
+            scope_type = ProducerRun.ScopeType.PROJECT
+            scope_id = str(obj.project.pk)
+        case _:
+            scope_type = ProducerRun.ScopeType.PROJECT
+            scope_id = str(getattr(obj, "pk", 0))
+
+    execution_options = {
+        "mode": "judge",
+        "q": autoform.cleaned_data["q"],
+        "auto_source": autoform.cleaned_data["auto_source"],
+        "engines": autoform.cleaned_data["engines"],
+        "threshold": autoform.cleaned_data["threshold"],
+        "judge_proposal_only": proposal_only,
+        "judge_pretranslate": False,
+        "judge_mutating_repairs": False,
+        "judge_candidate_severities": (
+            [] if proposal_only else list(DEFAULT_CANDIDATE_SEVERITIES)
+        ),
+        "overwrite_existing": autoform.cleaned_data.get("overwrite_existing", False),
+    }
+    if proposal_only:
+        execution_options["judge_skip_preparation"] = True
+    dispatch_task_id = uuid4()
+    run = ProducerRun.objects.create(
+        actor=request.user,
+        dispatch_task_id=dispatch_task_id,
+        dispatch_phase=f"judge-{scope_type}",
+        dispatch_requested_at=timezone.now(),
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_label=str(obj),
+        scope_path=obj.get_absolute_url(),
+        requested_query=autoform.cleaned_data["q"],
+        requested_mode="judge",
+        cap=len(units),
+        execution_version=1,
+        scope_cursor=0,
+        execution_options=execution_options,
+        scope_snapshot=[unit.pk for unit in units],
+        configuration_snapshot=judge_configuration_snapshot(),
+        preparation_snapshot=(preparation_scope.to_json() if preparation_scope else {}),
+        preparation_phase="pending" if preparation_scope else "",
+    )
+    if not units and not (preparation_scope and preparation_scope.missing_ids):
+        run.status = ProducerRun.Status.COMPLETED
+        run.finished = timezone.now()
+        run.summary = {"completed": True, "units": 0}
+        run.save(update_fields=["status", "finished", "summary"])
+        messages.info(
+            request,
+            gettext("There are no strings matching the criteria to judge."),
+        )
+        return redirect_next(request.POST.get("next"), obj)
+
+    if settings.CELERY_TASK_ALWAYS_EAGER:
+        publish_producer_run_dispatch(run_id=run.pk)
+        messages.success(
+            request,
+            gettext("Automatic translation completed."),
+            f"task:{dispatch_task_id}",
+        )
+    else:
+        transaction.on_commit(lambda: publish_producer_run_dispatch(run_id=run.pk))
+        try:
+            queued_ahead = get_queue_length("translate")
+        except Exception:
+            LOGGER.exception("could not read the translate queue length")
+            queued_ahead = 0
+        if queued_ahead > 1:
+            message = ngettext(
+                "Automatic translation queued: %d run is ahead of it. "
+                "You can close this page.",
+                "Automatic translation queued: %d runs are ahead of it. "
+                "You can close this page.",
+                queued_ahead - 1,
+            ) % (queued_ahead - 1)
+        else:
+            message = gettext("Automatic translation queued. You can close this page.")
+        add_user_task(
+            request.user.id,
+            str(dispatch_task_id),
+            text=message,
+            label=str(obj),
+            url=run.get_absolute_url(),
+        )
+    return redirect_next(request.POST.get("next"), obj)
+
+
+def _resolve_auto_target(
+    obj: _AutoTarget, request: AuthenticatedHttpRequest
+) -> tuple[AutoForm, bool, dict[str, Any]]:
+    target_kwargs: dict[str, Any] = {
+        "translation_id": None,
+        "component_id": None,
+        "category_id": None,
+        "project_id": None,
+        "language_id": None,
+        "workspace_id": None,
+    }
+    match obj:
+        case Translation():
+            autoform = AutoForm(obj.component, request.user, request.POST)
+            update_locked = obj.component.locked
+            target_kwargs["translation_id"] = obj.id
+        case Component():
+            autoform = AutoForm(obj, request.user, request.POST)
+            update_locked = obj.locked
+            target_kwargs["component_id"] = obj.id
+        case Category():
+            autoform = AutoForm(obj.project, request.user, request.POST)
+            update_locked = obj.component_set.filter(locked=True).exists()
+            target_kwargs["category_id"] = obj.id
+        case Project():
+            autoform = AutoForm(obj, request.user, request.POST)
+            update_locked = obj.locked
+            target_kwargs["project_id"] = obj.id
+        case ProjectLanguage():
+            autoform = AutoForm(obj.project, request.user, request.POST)
+            update_locked = obj.project.locked
+            target_kwargs["project_id"] = obj.project.id
+            target_kwargs["language_id"] = obj.language.id
+        case Workspace():
+            autoform = AutoForm(obj, request.user, request.POST)
+            update_locked = not (
+                Translation.objects.filter_access(request.user)
+                .filter(component__project__workspace=obj, component__locked=False)
+                .exclude_source()
+                .exists()
+            )
+            target_kwargs["workspace_id"] = str(obj.pk)
+        case _:  # pragma: no cover
+            msg = "Unsupported object for auto translation"
+            raise PermissionDenied(msg)
+    return autoform, update_locked, target_kwargs
+
+
+@require_POST
+@login_required
+def auto_translation(request: AuthenticatedHttpRequest, path):
+    obj: _AutoTarget = parse_path(
+        request,
+        path,
+        (Translation, Component, Category, Project, ProjectLanguage, Workspace),
+    )
+    autoform, update_locked, target_kwargs = _resolve_auto_target(obj, request)
+    permission = request.user.has_perm("translation.auto", obj)
+    if not permission:
+        reason = getattr(permission, "reason", "")
+        if update_locked and reason:
+            messages.error(request, reason)
+            return redirect(obj)
+        raise PermissionDenied
+
+    if update_locked:
+        messages.error(
+            request,
+            gettext(
+                "Automatic translation cannot be started because the target is locked."
+            ),
+        )
+        return redirect(obj)
+    if not autoform.is_valid():
+        show_form_errors(request, autoform)
+        return redirect(obj)
+
+    if autoform.cleaned_data["mode"] == "judge":
+        return _start_judge_producer_run(request, obj, autoform)
+    _run_non_judge_auto_translate(request, obj, autoform, target_kwargs)
+    return redirect_next(request.POST.get("next"), obj)
+
+
+def _run_non_judge_auto_translate(
+    request: AuthenticatedHttpRequest,
+    obj: _AutoTarget,
+    autoform: AutoForm,
+    target_kwargs: dict[str, Any],
+) -> None:
+    if settings.CELERY_TASK_ALWAYS_EAGER:
+        result = auto_translate(
+            **target_kwargs,
+            user_id=request.user.id,
+            mode=autoform.cleaned_data["mode"],
+            q=autoform.cleaned_data["q"],
+            auto_source=autoform.cleaned_data["auto_source"],
+            source_component_id=autoform.cleaned_data["component"],
+            engines=autoform.cleaned_data["engines"],
+            threshold=autoform.cleaned_data["threshold"],
+            overwrite_existing=autoform.cleaned_data.get("overwrite_existing", False),
+        )
+        messages.success(request, result["message"])
+        for warning in result.get("warnings", []):
+            messages.warning(request, warning)
+    else:
+        task_id = str(uuid4())
+        store_task_metadata(
+            task_id,
+            component_id=target_kwargs["component_id"],
+            translation_id=target_kwargs["translation_id"],
+            user_id=request.user.id,
+        )
+        register_task_liveness(task_id)
+        try:
+            task = auto_translate.apply_async(
+                kwargs={
+                    **target_kwargs,
+                    "user_id": request.user.id,
+                    "mode": autoform.cleaned_data["mode"],
+                    "q": autoform.cleaned_data["q"],
+                    "auto_source": autoform.cleaned_data["auto_source"],
+                    "source_component_id": autoform.cleaned_data["component"],
+                    "engines": autoform.cleaned_data["engines"],
+                    "threshold": autoform.cleaned_data["threshold"],
+                    "overwrite_existing": autoform.cleaned_data.get(
+                        "overwrite_existing", False
+                    ),
+                },
+                task_id=task_id,
+                priority=INTERACTIVE_TASK_PRIORITY,
+            )
+        except Exception:
+            delete_task_metadata(task_id)
+            delete_task_liveness(task_id)
+            raise
+        try:
+            queued_ahead = get_queue_length("translate")
+        except Exception:
+            LOGGER.exception("could not read the translate queue length")
+            queued_ahead = 0
+        if queued_ahead > 1:
+            message = ngettext(
+                "Automatic translation queued: %d run is ahead of it. "
+                "You can close this page.",
+                "Automatic translation queued: %d runs are ahead of it. "
+                "You can close this page.",
+                queued_ahead - 1,
+            ) % (queued_ahead - 1)
+        else:
+            message = gettext("Automatic translation queued. You can close this page.")
+        add_user_task(
+            request.user.id,
+            task.id,
+            text=message,
+            label=str(obj),
+            url=obj.get_absolute_url(),
+        )
+        messages.success(request, message, f"task:{task.id}")
+
+
+@login_required
+@transaction.atomic
+@session_ratelimit_post("comment", logout_user=False)
+def comment(request: AuthenticatedHttpRequest, pk):
+    """Add new comment."""
+    unit = get_object_or_404(Unit.objects.filter_access(request.user), pk=pk)
+
+    if not request.user.has_perm("comment.add", unit.translation):
+        raise PermissionDenied
+
+    form = CommentForm(unit.translation, request.POST)
+
+    if form.is_valid():
+        text = form.cleaned_data["comment"]
+        scope = form.cleaned_data["scope"]
+        Comment.objects.add(request, unit, text, scope)
+        messages.success(request, gettext("Posted new comment"))
+    else:
+        show_form_errors(request, form)
+        messages.error(request, gettext("Could not add comment!"))
+
+    return redirect_next(request.POST.get("next"), unit)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def delete_comment(request: AuthenticatedHttpRequest, pk):
+    """Delete comment."""
+    comment_obj = get_object_or_404(
+        Comment.objects.filter(unit__in=Unit.objects.filter_access(request.user)),
+        pk=pk,
+    )
+
+    if not request.user.has_perm("comment.delete", comment_obj):
+        raise PermissionDenied
+
+    fallback_url = comment_obj.unit.get_absolute_url()
+
+    if "spam" in request.POST:
+        comment_obj.report_spam()
+    comment_obj.delete(user=request.user)
+    messages.info(request, gettext("Comment has been deleted."))
+
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def resolve_comment(request: AuthenticatedHttpRequest, pk):
+    """Resolve comment."""
+    comment_obj = get_object_or_404(
+        Comment.objects.filter(unit__in=Unit.objects.filter_access(request.user)),
+        pk=pk,
+    )
+
+    if not request.user.has_perm("comment.resolve", comment_obj):
+        raise PermissionDenied
+
+    fallback_url = comment_obj.unit.get_absolute_url()
+
+    comment_obj.resolve(user=request.user)
+    messages.info(request, gettext("Comment has been resolved."))
+
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def resolve_judge_verdict(request: AuthenticatedHttpRequest, pk):
+    """Record a producer decision on a judge verdict."""
+    verdict_obj = get_object_or_404(
+        JudgeVerdict.objects.filter(
+            unit__in=Unit.objects.filter_access(request.user)
+        ).select_related("unit"),
+        pk=pk,
+    )
+    unit = verdict_obj.unit
+    fallback_url = unit.get_absolute_url()
+    next_url = request.POST.get("next")
+
+    form = JudgeResolutionForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, gettext("Could not record the decision."))
+        return redirect_next(next_url, fallback_url)
+
+    try:
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=pk,
+            actor=request.user,
+            resolution=form.cleaned_data["resolution"],
+            reason=form.cleaned_data["reason"],
+        )
+    except JudgeResolutionError as error:
+        messages.error(request, str(error))
+        return redirect_next(next_url, fallback_url)
+
+    messages.info(request, gettext("The decision has been recorded."))
+    # Auto-advance only on success (Task 8): a resolved verdict is a
+    # completed decision, so the producer moves on to the next string.
+    return redirect_next(request.POST.get("success_next") or next_url, fallback_url)
+
+
+@login_required
+@require_POST
+def judge_recheck(request: AuthenticatedHttpRequest, pk):
+    """Queue a paid one-unit re-check of the current translation."""
+    unit = get_object_or_404(
+        Unit.objects.filter_access(request.user).select_related(
+            "translation", "translation__component", "translation__language"
+        ),
+        pk=pk,
+    )
+    fallback_url = unit.get_absolute_url()
+
+    if not request.user.has_perm("unit.review", unit) or not request.user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        raise PermissionDenied
+
+    try:
+        validate_judge_configuration()
+    except JudgeError as error:
+        messages.error(request, str(error))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    _run, created = queue_judge_recheck(unit, request.user)
+    if created:
+        messages.info(
+            request,
+            gettext("The re-check has been queued; the page updates when it finishes."),
+        )
+    else:
+        messages.info(
+            request, gettext("A re-check for this string is already running.")
+        )
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+def judge_generate_candidate(request: AuthenticatedHttpRequest, pk):
+    """Ask the repair engine for one candidate for a held verdict."""
+    verdict_obj = get_object_or_404(
+        JudgeVerdict.objects.filter(
+            unit__in=Unit.objects.filter_access(request.user)
+        ).select_related("unit", "unit__translation"),
+        pk=pk,
+    )
+    unit = verdict_obj.unit
+    fallback_url = unit.get_absolute_url()
+
+    if not request.user.has_perm("unit.review", unit) or not request.user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        raise PermissionDenied
+
+    if (
+        verdict_obj.verdict
+        not in {
+            JudgeVerdict.Verdict.REJECT,
+            JudgeVerdict.Verdict.FLAG,
+        }
+        or verdict_obj.resolution
+    ):
+        messages.error(request, gettext("This verdict no longer expects a candidate."))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    replace = request.POST.get("replace") == "1"
+    if not replace and generation_pending(unit.pk, verdict_obj.pk):
+        messages.info(request, gettext("A candidate is already being generated."))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    def report(outcome: str) -> None:
+        if outcome == "generated":
+            messages.success(request, gettext("A new candidate has been stored."))
+        elif outcome == "existing":
+            messages.info(request, gettext("This verdict already has a candidate."))
+        elif outcome == "busy":
+            messages.info(request, gettext("A candidate is already being generated."))
+        elif outcome == "denied":
+            messages.error(
+                request,
+                gettext("You no longer have permission to generate a candidate."),
+            )
+        elif outcome in {"stale", "resolved", "invalid-verdict"}:
+            messages.error(
+                request, gettext("The verdict is no longer current for this string.")
+            )
+        else:
+            messages.error(
+                request,
+                gettext("Candidate generation failed; the previous candidate remains."),
+            )
+
+    if settings.CELERY_TASK_ALWAYS_EAGER:
+        report(
+            generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict_obj.pk,
+                user_id=request.user.pk,
+                replace=replace,
+            )
+        )
+    else:
+        generate_judge_candidate.delay(
+            unit_id=unit.pk,
+            verdict_id=verdict_obj.pk,
+            user_id=request.user.pk,
+            replace=replace,
+        )
+        messages.info(request, gettext("Candidate generation has been queued."))
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+def judge_accept_candidate(request: AuthenticatedHttpRequest, pk):
+    """Apply a stored judge repair candidate from the verdict card."""
+    candidate = get_object_or_404(
+        Suggestion.objects.filter(
+            unit__in=Unit.objects.filter_access(request.user)
+        ).select_related("unit", "unit__translation"),
+        pk=pk,
+    )
+    unit = candidate.unit
+    fallback_url = unit.get_absolute_url()
+    next_url = request.POST.get("next")
+
+    if not request.user.has_perm("unit.review", unit) or not request.user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        raise PermissionDenied
+
+    try:
+        candidate.accept(request)
+    except JudgeCandidateError as error:
+        messages.error(request, str(error))
+        return redirect_next(next_url, fallback_url)
+
+    # Task 10: the candidate was already verified by both judge seats
+    # before it was ever stored (Task 3, proposal-only), so this card no
+    # longer queues a second paid re-check of text the judge already
+    # cleared, and no longer promises one that would only confirm what
+    # apply already proved.
+    messages.success(request, gettext("The suggested fix has been applied."))
+    # Auto-advance only on success (Task 8): applying the candidate is a
+    # completed decision, so the producer moves on to the next string.
+    return redirect_next(request.POST.get("success_next") or next_url, fallback_url)
+
+
+def get_zen_unitdata(
+    obj, project, unit_set, request: AuthenticatedHttpRequest, *, include_count=False
+):
+    """Load unit data for zen mode."""
+    # Search results
+    search_result = SearchNavigation(obj, project, unit_set, request).page(
+        include_count=include_count, page_size=ZEN_PAGE_SIZE
+    )
+
+    # Handle redirects
+    if isinstance(search_result, HttpResponse):
+        return search_result, None
+
+    units = unit_set.prefetch_full().get_ordered(search_result["ids"])
+    fill_in_source_translation(units)
+    prepare_glossary_terms(units, project)
+
+    form_actions = {}
+
+    def get_form_action(unit):
+        try:
+            return form_actions[unit.translation_id]
+        except KeyError:
+            form_action = reverse(
+                "save_zen",
+                kwargs={"path": unit.translation.get_url_path()},
+            )
+            form_actions[unit.translation_id] = form_action
+            return form_action
+
+    unitdata = [
+        {
+            "unit": unit,
+            "secondary": (
+                unit.get_secondary_units(request.user)
+                if request.user.is_authenticated
+                and request.user.profile.secondary_in_zen
+                else None
+            ),
+            "form": ZenTranslationForm(
+                request.user,
+                unit,
+                form_action=get_form_action(unit),
+            ),
+            "offset": search_result["offset"] + pos,
+            "glossary": get_glossary_terms(unit),
+        }
+        for pos, unit in enumerate(units)
+    ]
+
+    return search_result, unitdata
+
+
+def zen(request: AuthenticatedHttpRequest, path):
+    """Zen mode view."""
+    obj, unit_set, context = parse_path_units(
+        request, path, (Translation, ProjectLanguage, CategoryLanguage)
+    )
+    project = context["project"]
+
+    search_result, unitdata = get_zen_unitdata(
+        obj, project, unit_set, request, include_count=True
+    )
+
+    # Handle redirects
+    if isinstance(search_result, HttpResponse):
+        return search_result
+
+    return render(
+        request,
+        "zen.html",
+        {
+            "object": obj,
+            "path_object": obj,
+            "project": project,
+            "component": obj.component if isinstance(obj, Translation) else None,
+            "unitdata": unitdata,
+            "search_query": search_result["query"],
+            "filter_count": search_result["total"],
+            "filter_pos": search_result["offset"],
+            "last_section": search_result["last_section"],
+            "search_url": search_result["url"],
+            "offset": search_result["offset"],
+            "search_form": search_result["form"].reset_offset(),
+            "is_zen": True,
+        },
+    )
+
+
+def load_zen(request: AuthenticatedHttpRequest, path):
+    """Load additional units for zen editor."""
+    obj, unit_set, context = parse_path_units(
+        request, path, (Translation, ProjectLanguage, CategoryLanguage)
+    )
+    project = context["project"]
+
+    search_result, unitdata = get_zen_unitdata(obj, project, unit_set, request)
+
+    # Handle redirects
+    if isinstance(search_result, HttpResponse):
+        return search_result
+
+    return render(
+        request,
+        "zen-units.html",
+        {
+            "object": obj,
+            "path_object": obj,
+            "project": project,
+            "component": obj.component if isinstance(obj, Translation) else None,
+            "unitdata": unitdata,
+            "search_query": search_result["query"],
+            "search_url": search_result["url"],
+            "last_section": search_result["last_section"],
+        },
+    )
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def save_zen(request: AuthenticatedHttpRequest, path):
+    """Save handler for zen mode."""
+    _obj, unit_set, _context = parse_path_units(
+        request, path, (Translation, ProjectLanguage, CategoryLanguage)
+    )
+
+    checksum_form = ChecksumForm(unit_set, request.POST)
+    if not checksum_form.is_valid():
+        show_form_errors(request, checksum_form)
+        return HttpResponseBadRequest("Invalid checksum")
+
+    unit = checksum_form.cleaned_data["unit"]
+    translationsum = ""
+    repeat_decision_required = False
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.repeats import current_shared_membership
+
+    shared_membership = current_shared_membership(unit)
+
+    form = TranslationForm(request.user, unit, request.POST)
+    if not form.is_valid():
+        show_form_errors(request, form)
+    elif not (edit_permission := request.user.has_perm("unit.edit", unit)):
+        if request.user.has_perm("meta:unit.flag", unit):
+            unit.update_explanation(form.cleaned_data["explanation"], request.user)
+        else:
+            show_unit_edit_denied(request, edit_permission)
+    else:
+        target_changed = form.cleaned_data["target"] != unit.get_target_plurals()
+        if target_changed and shared_membership is not None:
+            decision = form.cleaned_data.get("repeat_decision")
+            if decision == "shared":
+                repeat_decision_required = True
+                messages.info(
+                    request,
+                    gettext(
+                        "Choose the shared translation from the repeat queue preview."
+                    ),
+                )
+            elif decision == "independent":
+                # ruff: ignore[import-outside-top-level]
+                from weblate.trans.repeats import make_membership_independent
+
+                make_membership_independent(unit=unit, reason="zen")
+                perform_translation(unit, form, request)
+            else:
+                repeat_decision_required = True
+        else:
+            perform_translation(unit, form, request)
+
+        translationsum = hash_to_checksum(unit.get_target_hash())
+
+    response: dict[str, Any] = {
+        "messages": [],
+        "state": "success",
+        "translationsum": translationsum,
+        "unit_state_class": unit_state_class(unit) if unit else "",
+        "unit_state_title": unit_state_title(unit) if unit else "",
+        "repeat_decision_required": repeat_decision_required,
+        "repeat_decision_choices": (
+            ["shared", "independent"] if shared_membership is not None else []
+        ),
+    }
+
+    storage = get_messages(request)
+    if storage:
+        response["messages"] = [
+            {"tags": m.tags, "kind": get_message_kind(m.tags), "text": m.message}
+            for m in storage
+        ]
+        tags = {m.tags for m in storage}
+        if "error" in tags:
+            response["state"] = "danger"
+        elif "warning" in tags:
+            response["state"] = "warning"
+        elif "info" in tags:
+            response["state"] = "info"
+
+    return JsonResponse(data=response)
+
+
+@require_POST
+@login_required
+def new_unit(request: AuthenticatedHttpRequest, path):
+    translation = parse_path(request, path, (Translation,))
+    if not request.user.has_perm("unit.add", translation):
+        raise PermissionDenied
+
+    form = get_new_unit_form(translation, request.user, request.POST)
+    if not form.is_valid():
+        show_form_errors(request, form)
+    else:
+        try:
+            created_unit = translation.add_unit(request, **form.as_kwargs())
+        except WeblateLockTimeoutError:
+            messages.error(
+                request,
+                gettext(
+                    "Could not add the string because another background operation is "
+                    "in progress. Please try again later."
+                ),
+            )
+            return redirect(translation)
+        except ValidationError as error:
+            for message in error.messages:
+                messages.error(request, message)
+            return redirect(translation)
+        messages.success(request, gettext("New string has been added."))
+        return redirect(created_unit)
+
+    return redirect(translation)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def delete_unit(request: AuthenticatedHttpRequest, unit_id):
+    """Delete unit."""
+    unit = get_object_or_404(Unit.objects.filter_access(request.user), pk=unit_id)
+
+    if not request.user.has_perm("unit.delete", unit):
+        raise PermissionDenied
+
+    try:
+        unit.translation.delete_unit(request, unit)
+    except WeblateLockTimeoutError:
+        messages.error(request, DELETE_UNIT_LOCKED_MESSAGE)
+        return redirect(unit)
+    except FileParseError as error:
+        unit.translation.component.update_import_alerts(delete=False)
+        messages.error(request, gettext("Could not remove the string: %s") % error)
+        return redirect(unit)
+    messages.success(request, gettext("String was removed."))
+    # Remove cached search results as we've just removed one of the unit there
+    cleanup_session(request.session, delete_all=True)
+    return redirect_next(request.POST.get("next"), unit.translation)
+
+
+def browse(request: AuthenticatedHttpRequest, path):
+    """Strings browsing."""
+    obj, unit_set, context = parse_path_units(
+        request, path, (Translation, ProjectLanguage, CategoryLanguage)
+    )
+    project = context["project"]
+    search_result = SearchNavigation(
+        obj, project, unit_set, request, blank=True, use_cache=False
+    ).search()
+    offset = search_result["offset"]
+    page = 20
+    units = unit_set.prefetch_full().get_ordered(
+        search_result["ids"][(offset - 1) * page : (offset - 1) * page + page]
+    )
+
+    base_unit_url = f"{reverse('browse', kwargs={'path': obj.get_url_path()})}?{search_result['url']}&offset="
+    num_results = ceil(len(search_result["ids"]) / page)
+
+    return render(
+        request,
+        "browse.html",
+        {
+            "object": obj,
+            "path_object": obj,
+            "project": project,
+            "component": obj.component if isinstance(obj, Translation) else None,
+            "units": units,
+            "search_query": search_result["query"],
+            "search_url": search_result["url"],
+            "search_form": search_result["form"].reset_offset(),
+            "filter_count": num_results,
+            "filter_pos": offset,
+            "first_unit_url": f"{base_unit_url}1",
+            "last_unit_url": base_unit_url + str(num_results),
+            "next_unit_url": base_unit_url + str(offset + 1)
+            if offset < num_results
+            else None,
+            "prev_unit_url": base_unit_url + str(offset - 1) if offset > 1 else None,
+            "is_in_browse": True,
+        },
+    )

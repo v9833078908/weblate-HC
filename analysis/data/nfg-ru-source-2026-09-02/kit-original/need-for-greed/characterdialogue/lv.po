@@ -1,0 +1,120 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Latvian <http://l10n.herocraft.com/projects/need-for-greed/"
+"characterdialogue/lv/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lv\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 0 || n % 100 >= 11 && n % 100 <= "
+"19) ? 0 : ((n % 10 == 1 && n % 100 != 11) ? 1 : 2);\n"
+
+#: 65661046784
+msgid "eggItemReceived"
+msgstr "Ola! Tā ir jāizšķiļas."
+
+#: 12383040049152
+msgid "cursedItemReceived"
+msgstr "Nē, lāsts!"
+
+#: 16277346455552
+msgid "geodeItemReceived"
+msgstr ""
+"Ak, Ģeode!\n"
+"Gatava griešanai."
+
+#: 16667567722496
+msgid "gemItemReceived"
+msgstr "Jā, spīdumi!"
+
+#: 17079226077184
+msgid "goldItemReceived"
+msgstr "ES MĪLU ZELTU!"
+
+#: 17591476424704
+msgid "silverCoinItemReceived"
+msgstr "Mmmmmm, nauda…"
+
+#: 25552772927488
+msgid "wormSpawned"
+msgstr "Sasodīts!"
+
+#: 26219063283712
+msgid "highNoise"
+msgstr "Nu, nāc…"
+
+#: 42988977000448
+msgid "pileLooted"
+msgstr "Miskaste, bet es to varu pārdot."
+
+#: 44098089390080
+msgid "statsEffectAppliedOnDestroy"
+msgstr "Kāpēc tas notiek katru reizi?!"
+
+#: 50940257505280
+msgid "timeIsUp"
+msgstr "Ko, neviena cita, ko traucēt?!"
+
+#: 73606410539008
+msgid "noActions1"
+msgstr "Dū-dū-dū…"
+
+#: 73762149240832
+msgid "noActions2"
+msgstr "Labi, mēs pagaidīsim."
+
+#: 73828930949120
+msgid "noActions3"
+msgstr "Labi, dūmu pauze."
+
+#: 73889177931776
+msgid "noActions4"
+msgstr "Eh… vienalga."
+
+#: 73986347372544
+msgid "noActions5"
+msgstr "Pacietību, pacietību…"
+
+#: 91507905531904
+msgid "richZoneReached1"
+msgstr "Draudoši… tas nozīmē daudz dārgumu!"
+
+#: 91695428669440
+msgid "richZoneReached2"
+msgstr "Jo dziļāk mēs ejam, jo labāks laupījums!"
+
+#: 91772155072512
+msgid "richZoneReached3"
+msgstr "Smaržo pēc dārgumu kalniem!"
+
+#: 42860303913062400
+msgid "coldNight"
+msgstr ""
+"A-a-a-ir\n"
+"a-a-auksti…"
+
+#: 42861209547182080
+msgid "frostible"
+msgstr "J-j-jāuzsilst!"
+
+#: 42861912688693248
+msgid "warmedUp"
+msgstr "Urā, ir silts!"
+
+#: 42862171338838016
+msgid "frozenRockHit"
+msgstr "Jāizkausē ledus!"
+
+#: 42862467540586496
+msgid "frozenItemReceived"
+msgstr "Ledus dārgums!"
+
+#: 49631762726780928
+msgid "SuperRare"
+msgstr "Jā, džekpots!"

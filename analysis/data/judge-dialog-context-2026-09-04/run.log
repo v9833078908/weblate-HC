@@ -1,0 +1,76 @@
+109 units from scenes ('hub1_first_1', 'hub1_ramen_1', 'hub1_teahouse_1'); arms ['H', 'H2']; seats [1, 2]
+seat 2 H r0 b0/109 2s
+seat 2 H2 r0 b0/109 2s
+seat 2 H2 r0 b10/109 28s
+seat 2 H r0 b10/109 30s
+seat 2 H2 r0 b20/109 56s
+seat 2 H r0 b20/109 60s
+seat 1 H2 r0 b0/55 63s
+seat 1 H r0 b0: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 6840, 'seconds': 30.0}
+seat 1 H2 r0 b1: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7596, 'seconds': 30.0}
+seat 2 H r0 b24: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 6719, 'seconds': 30.0}
+seat 2 H2 r0 b25: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7336, 'seconds': 30.0}
+seat 1 H r0 b1: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 6844, 'seconds': 30.0}
+seat 1 H2 r0 b2: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7612, 'seconds': 30.0}
+seat 2 H r0 b25: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 6695, 'seconds': 30.0}
+seat 2 H2 r0 b26: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7347, 'seconds': 30.0}
+seat 1 H r0 b2: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 6841, 'seconds': 36.8}
+seat 1 H2 r0 b3: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7712, 'seconds': 30.0}
+seat 2 H2 r0 b27: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7297, 'seconds': 30.0}
+seat 2 H r0 b26: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 6716, 'seconds': 30.0}
+seat 2 H r0 b30/109 437s
+seat 2 H2 r0 b30/109 455s
+seat 2 H r0 b40/109 462s
+seat 2 H r0 b50/109 500s
+seat 2 H r0 b60/109 541s
+seat 1 H r0 b6: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 6816, 'seconds': 30.9}
+seat 2 H2 r0 b40/109 545s
+seat 2 H r0 b70/109 570s
+seat 2 H2 r0 b50/109 587s
+seat 2 H2 r0 b60/109 610s
+seat 2 H r0 b80/109 626s
+seat 1 H r0 b10/55 647s
+seat 2 H2 r0 b70/109 649s
+seat 2 H2 r0 b80/109 690s
+seat 2 H r0 b90/109 703s
+seat 2 H2 r0 b90/109 717s
+seat 2 H r0 b100/109 729s
+seat 2 H2 r0 b100/109 743s
+seat 2 H r1 b0/109 751s
+seat 2 H2 r1 b0/109 765s
+seat 1 H2 r0 b8: FAILED {'attempts': 3, 'status': 200, 'note': 'transport failure (deadline)', 'input_chars': 7642, 'seconds': 35.0}
+seat 2 H r1 b10/109 792s
+seat 1 H2 r0 b10/55 795s
+seat 2 H2 r1 b10/109 811s
+seat 2 H r1 b20/109 819s
+seat 2 H2 r1 b20/109 836s
+seat 2 H r1 b30/109 846s
+seat 2 H2 r1 b30/109 860s
+seat 2 H r1 b40/109 870s
+seat 2 H2 r1 b40/109 883s
+seat 2 H r1 b50/109 893s
+seat 2 H2 r1 b50/109 907s
+seat 2 H r1 b60/109 916s
+seat 1 H r0 b20/55 923s
+seat 2 H2 r1 b60/109 933s
+seat 2 H r1 b70/109 942s
+seat 2 H2 r1 b70/109 956s
+seat 2 H r1 b80/109 966s
+seat 2 H2 r1 b80/109 981s
+seat 2 H r1 b90/109 994s
+seat 2 H2 r1 b90/109 1010s
+seat 2 H r1 b100/109 1020s
+seat 2 H2 r1 b100/109 1037s
+seat 2 H: wrote /Users/eli/Documents/PythonProjects/gamedev tools/weblate/analysis/data/judge-dialog-context-2026-09-04/seat2-H.json (218 rows)
+seat 2 H2: wrote /Users/eli/Documents/PythonProjects/gamedev tools/weblate/analysis/data/judge-dialog-context-2026-09-04/seat2-H2.json (218 rows)
+seat 1 H2 r0 b20/55 1114s
+seat 1 H r0 b30/55 1131s
+seat 1 H r0 b40/55 1393s
+seat 1 H2 r0 b29: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7671, 'seconds': 30.9}
+seat 1 H2 r0 b30/55 1435s
+seat 1 H r0 b50/55 1565s
+seat 1 H: wrote /Users/eli/Documents/PythonProjects/gamedev tools/weblate/analysis/data/judge-dialog-context-2026-09-04/seat1-H.json (105 rows)
+seat 1 H2 r0 b40/55 1780s
+seat 1 H2 r0 b42: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7618, 'seconds': 30.9}
+seat 1 H2 r0 b50/55 2141s
+seat 1 H2: wrote /Users/eli/Documents/PythonProjects/gamedev tools/weblate/analysis/data/judge-dialog-context-2026-09-04/seat1-H2.json (103 rows)

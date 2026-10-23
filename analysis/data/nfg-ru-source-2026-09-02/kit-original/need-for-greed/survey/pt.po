@@ -1,0 +1,129 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: pt\n"
+
+msgid "survey1Intro"
+msgstr ""
+"Ei! O cavalo quer esclarecer algo.\n"
+"\n"
+"Apenas algumas perguntas rápidas para descobrir com quem ela está lidando.\n"
+"Não levará mais de um minuto."
+
+msgid "survey1Final"
+msgstr ""
+"Parece que… você passou no teste!\n"
+"\n"
+"Ela se lembrou das suas respostas.\n"
+"E aparentemente decidiu não te abandonar."
+
+msgid "survey1AcceptDescription"
+msgstr "Você receberá uma recompensa."
+
+msgid "survey1DeclineDescription"
+msgstr ""
+"Ela vai sobreviver…\n"
+"provavelmente."
+
+msgid "survey1Question1"
+msgstr ""
+"Quantos anos você tem?\n"
+"Não minta. Ela consegue perceber."
+
+msgid "survey1Question1Answer1"
+msgstr "Menos de 15"
+
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+msgid "survey1Question1Answer4"
+msgstr "30 -40"
+
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+msgid "survey1Question2"
+msgstr ""
+"Quem é você?\n"
+"Não precisa de muitos detalhes."
+
+msgid "survey1Question2Answer1"
+msgstr "M"
+
+msgid "survey1Question2Answer2"
+msgstr "F"
+
+msgid "survey1Question2Answer3"
+msgstr "Secreto"
+
+msgid "survey1Question3"
+msgstr "Para que você está aqui?"
+
+msgid "survey1Question3Answer1"
+msgstr "Correr e saquear"
+
+msgid "survey1Question3Answer2"
+msgstr "Criar e vender"
+
+msgid "survey1Question3Answer3"
+msgstr "Melhorias e progressão"
+
+msgid "survey1Question3Answer4"
+msgstr "Apenas por diversão…"
+
+msgid "survey1Question4"
+msgstr "O que falta para você não ir embora?"
+
+msgid "survey1Question4Answer1"
+msgstr "Mais história"
+
+msgid "survey1Question4Answer2"
+msgstr "Novos perigos, rochas e tesouros"
+
+msgid "survey1Question4Answer3"
+msgstr "Novos itens"
+
+msgid "survey1Question4Answer4"
+msgstr "Novos locais"
+
+msgid "survey1Question4Answer5"
+msgstr "Conquistas e recompensas"
+
+msgid "survey1Question5"
+msgstr "O que deve ser corrigido primeiro?"
+
+msgid "survey1Question5Answer1"
+msgstr "Diálogo"
+
+msgid "survey1Question5Answer2"
+msgstr "Recompensas"
+
+msgid "survey1Question5Answer3"
+msgstr "Dificuldade da receita"
+
+msgid "survey1Question5Answer4"
+msgstr "Densidade do mapa"
+
+msgid "survey1Question5Answer5"
+msgstr "Está tudo ótimo"
+
+msgid "surveyDialogTitle"
+msgstr "Pesquisa Rápida"
+
+msgid "startSurvey"
+msgstr "Iniciar"
+
+msgid "claimReward"
+msgstr "Reivindicar recompensa"

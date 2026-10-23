@@ -1,0 +1,1843 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import os.path
+import tempfile
+from difflib import get_close_matches
+from itertools import chain
+from pathlib import Path
+from shutil import copyfile, rmtree
+from unittest.mock import MagicMock, patch
+
+import httpx2
+from asgiref.sync import async_to_sync
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.files import File
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
+from django.test import SimpleTestCase
+from django.test.utils import CaptureQueriesContext, override_settings
+from django.urls import reverse
+from django.utils import timezone
+from lxml import html
+from PIL import Image
+from rest_framework.test import APITestCase
+
+from weblate.auth.models import Group
+from weblate.lang.models import Language
+from weblate.screenshots.models import Screenshot
+from weblate.screenshots.views import (
+    TESSERACT_DOWNLOAD_ATTEMPTS,
+    TESSERACT_DOWNLOAD_TIMEOUT,
+    download_tesseract_data,
+    ensure_tesseract_language,
+    get_tesseract,
+    ocr_get_strings,
+)
+from weblate.trans.actions import ActionEvents
+from weblate.trans.models import Change, Project
+from weblate.trans.tests.test_models import RepoTestCase
+from weblate.trans.tests.test_views import FixtureTestCase
+from weblate.trans.tests.utils import create_test_user, get_test_file
+from weblate.utils.docs import get_doc_url
+from weblate.utils.tests import http_mock
+
+TEST_SCREENSHOT = get_test_file("screenshot.png")
+PUBLIC_TEST_ADDRESS = "93.184.216.34"
+PRIVATE_TEST_ADDRESS = "127.0.0.1"
+PUBLIC_GETADDRINFO = [(0, 0, 0, "", (PUBLIC_TEST_ADDRESS, 443))]
+PRIVATE_GETADDRINFO = [(0, 0, 0, "", (PRIVATE_TEST_ADDRESS, 443))]
+
+
+class ScreenshotImageValidationTest(SimpleTestCase):
+    def test_rejects_invalid_extension(self) -> None:
+        image = SimpleUploadedFile(
+            "screenshot.html",
+            Path(TEST_SCREENSHOT).read_bytes(),
+            content_type="image/png",
+        )
+
+        with self.assertRaises(ValidationError) as error:
+            Screenshot.validate_image_file(image)
+
+        self.assertEqual(error.exception.error_list[0].code, "invalid_extension")
+
+
+class TesseractDataTest(SimpleTestCase):
+    @staticmethod
+    def get_http_error(status_code: int) -> httpx2.HTTPStatusError:
+        request = httpx2.Request("GET", "https://example.com/tesseract")
+        response = httpx2.Response(status_code, request=request)
+        try:
+            response.raise_for_status()
+        except httpx2.HTTPStatusError as error:
+            return error
+        raise AssertionError
+
+    def test_cached_data(self) -> None:
+        with tempfile.TemporaryDirectory() as cache_dir:
+            tessdata = Path(cache_dir) / "tesseract"
+            tessdata.mkdir()
+            (tessdata / "eng.traineddata").write_bytes(b"english")
+            (tessdata / "osd.traineddata").write_bytes(b"orientation")
+
+            with (
+                override_settings(CACHE_DIR=cache_dir),
+                patch("weblate.screenshots.views.WeblateLock"),
+                patch("weblate.screenshots.views.fetch_url") as fetch_url,
+            ):
+                ensure_tesseract_language("eng")
+
+        fetch_url.assert_not_called()
+
+    def test_cache_directory_creation_is_race_safe(self) -> None:
+        with tempfile.TemporaryDirectory() as cache_dir:
+            tessdata = Path(cache_dir) / "tesseract"
+            with (
+                override_settings(CACHE_DIR=cache_dir),
+                patch("weblate.screenshots.views.WeblateLock"),
+                patch("weblate.screenshots.views.os.makedirs") as makedirs,
+                patch("weblate.screenshots.views.download_tesseract_data"),
+            ):
+                ensure_tesseract_language("eng")
+
+        makedirs.assert_called_once_with(str(tessdata), exist_ok=True)
+
+    def test_transient_errors_are_retried(self) -> None:
+        request = httpx2.Request("GET", "https://example.com/eng")
+        response = MagicMock(content=b"trained data")
+        with tempfile.TemporaryDirectory() as cache_dir:
+            target = Path(cache_dir) / "eng.traineddata"
+            with (
+                patch(
+                    "weblate.screenshots.views.fetch_url",
+                    side_effect=[
+                        httpx2.ReadError("connection reset", request=request),
+                        httpx2.RemoteProtocolError(
+                            "server disconnected",
+                            request=request,
+                        ),
+                        response,
+                    ],
+                ) as fetch_url,
+                patch("weblate.screenshots.views.sleep") as sleep,
+            ):
+                download_tesseract_data("https://example.com/eng", str(target))
+
+            self.assertEqual(target.read_bytes(), b"trained data")
+            self.assertEqual(list(Path(cache_dir).iterdir()), [target])
+
+        self.assertEqual(fetch_url.call_count, TESSERACT_DOWNLOAD_ATTEMPTS)
+        fetch_url.assert_called_with(
+            "GET",
+            "https://example.com/eng",
+            follow_redirects=True,
+            timeout=TESSERACT_DOWNLOAD_TIMEOUT,
+        )
+        self.assertEqual([call.args for call in sleep.call_args_list], [(1,), (2,)])
+
+    def test_permanent_error_is_not_retried(self) -> None:
+        with tempfile.TemporaryDirectory() as cache_dir:
+            target = Path(cache_dir) / "eng.traineddata"
+            with (
+                patch(
+                    "weblate.screenshots.views.fetch_url",
+                    side_effect=self.get_http_error(404),
+                ) as fetch_url,
+                self.assertRaises(httpx2.HTTPStatusError),
+            ):
+                download_tesseract_data("https://example.com/eng", str(target))
+
+            self.assertFalse(target.exists())
+
+        fetch_url.assert_called_once()
+
+    def test_exhausted_retries_leave_no_file(self) -> None:
+        with tempfile.TemporaryDirectory() as cache_dir:
+            target = Path(cache_dir) / "eng.traineddata"
+            with (
+                patch(
+                    "weblate.screenshots.views.fetch_url",
+                    side_effect=httpx2.TimeoutException("timed out"),
+                ) as fetch_url,
+                patch("weblate.screenshots.views.sleep"),
+                self.assertRaises(httpx2.TimeoutException),
+            ):
+                download_tesseract_data("https://example.com/eng", str(target))
+
+            self.assertEqual(list(Path(cache_dir).iterdir()), [])
+
+        self.assertEqual(fetch_url.call_count, TESSERACT_DOWNLOAD_ATTEMPTS)
+
+    def test_interrupted_install_removes_temporary_file(self) -> None:
+        response = MagicMock(content=b"trained data")
+        with tempfile.TemporaryDirectory() as cache_dir:
+            target = Path(cache_dir) / "eng.traineddata"
+            with (
+                patch("weblate.screenshots.views.fetch_url", return_value=response),
+                patch(
+                    "weblate.screenshots.views.os.replace",
+                    side_effect=OSError("No space left on device"),
+                ),
+                self.assertRaises(OSError),
+            ):
+                download_tesseract_data("https://example.com/eng", str(target))
+
+            self.assertEqual(list(Path(cache_dir).iterdir()), [])
+
+
+class ViewTest(FixtureTestCase):
+    def test_list_empty(self) -> None:
+        response = self.client.get(reverse("screenshots", kwargs=self.kw_component))
+        self.assertContains(response, "Screenshots")
+        self.assertContains(
+            response, get_doc_url("admin/translating", "screenshots", user=self.user)
+        )
+        self.assertContains(response, 'aria-describedby="screenshots-list-search-help"')
+        self.assertContains(response, 'id="screenshots-list-search-help"')
+        self.assertContains(response, "Search screenshot names.")
+        self.assertContains(
+            response, get_doc_url("user/search", "search-screenshots", user=self.user)
+        )
+
+    def test_list_paste_button(self) -> None:
+        self.make_manager()
+        response = self.client.get(reverse("screenshots", kwargs=self.kw_component))
+        self.assertContains(response, 'id="paste-screenshot-btn"')
+        document = html.fromstring(response.content)
+        container = document.get_element_by_id("screenshot-form-container")
+        form = container.xpath("ancestor::form[1]")[0]
+        self.assertEqual(
+            len(form.xpath('.//input[@name="csrfmiddlewaretoken"]')),
+            1,
+        )
+        button = document.get_element_by_id("paste-screenshot-btn")
+        self.assertEqual(button.get("class"), "btn btn-outline-secondary")
+        parent = button.getparent()
+        assert parent is not None
+        self.assertEqual(parent.get("class"), "input-group")
+        previous = button.getprevious()
+        assert previous is not None
+        self.assertEqual(previous.get("id"), "id_image")
+
+    def do_upload(self, **kwargs):
+        with open(TEST_SCREENSHOT, "rb") as handle:
+            data = {
+                "image": handle,
+                "name": "Obrazek",
+                "translation": self.component.source_translation.pk,
+            }
+            data.update(kwargs)
+            return self.client.post(
+                reverse("screenshots", kwargs=self.kw_component),
+                data,
+                follow=True,
+            )
+
+    def test_upload_denied(self) -> None:
+        response = self.do_upload()
+        self.assertEqual(response.status_code, 403)
+
+    def test_upload(self) -> None:
+        self.make_manager()
+        response = self.do_upload()
+        self.assertContains(response, "Obrazek")
+        self.assertContains(
+            response,
+            "Search for source strings or find strings in the image.",
+        )
+        self.assertEqual(Screenshot.objects.count(), 1)
+        uploaded_changes = Change.objects.filter(
+            action=ActionEvents.SCREENSHOT_UPLOADED,
+            screenshot=Screenshot.objects.get(),
+        )
+        self.assertEqual(uploaded_changes.count(), 1)
+        self.assertEqual(uploaded_changes[0].user, self.user)
+
+    def test_upload_redirect_next(self) -> None:
+        self.make_manager()
+        next_url = "/projects/weblate/weblate/cs/translate/"
+        with open(TEST_SCREENSHOT, "rb") as handle:
+            response = self.client.post(
+                reverse("screenshots", kwargs=self.kw_component),
+                {
+                    "image": handle,
+                    "name": "Obrazek",
+                    "translation": self.component.source_translation.pk,
+                    "next": next_url,
+                },
+            )
+        self.assertRedirects(response, next_url, fetch_redirect_response=False)
+        self.assertEqual(Screenshot.objects.count(), 1)
+
+    def test_upload_redirect_next_invalid(self) -> None:
+        self.make_manager()
+        with open(TEST_SCREENSHOT, "rb") as handle:
+            response = self.client.post(
+                reverse("screenshots", kwargs=self.kw_component),
+                {
+                    "image": handle,
+                    "name": "Obrazek",
+                    "translation": self.component.source_translation.pk,
+                    "next": "https://evil.com/redirect",
+                },
+            )
+        self.assertEqual(Screenshot.objects.count(), 1)
+        screenshot = Screenshot.objects.get()
+        self.assertRedirects(
+            response, screenshot.get_absolute_url(), fetch_redirect_response=False
+        )
+
+    def test_upload_fail(self) -> None:
+        self.make_manager()
+        response = self.do_upload(name="")
+        self.assertContains(response, "Could not upload screenshot")
+        response = self.do_upload(image="")
+        self.assertContains(response, "Could not upload screenshot")
+
+    @override_settings(ALLOWED_ASSET_SIZE=1)
+    def test_upload_too_big(self) -> None:
+        self.make_manager()
+        response = self.do_upload()
+        self.assertContains(response, "Uploaded file is too big.")
+
+    def test_upload_source(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation.unit_set.all()[0]
+        response = self.do_upload(source=source.pk)
+        self.assertContains(response, "Obrazek")
+        self.assertEqual(Screenshot.objects.count(), 1)
+        screenshot = Screenshot.objects.all()[0]
+        self.assertEqual(screenshot.name, "Obrazek")
+        self.assertEqual(screenshot.units.count(), 1)
+        uploaded_changes = Change.objects.filter(
+            action=ActionEvents.SCREENSHOT_UPLOADED,
+            screenshot=screenshot,
+        )
+        self.assertEqual(uploaded_changes.count(), 1)
+        self.assertEqual(uploaded_changes[0].user, self.user)
+        added_changes = Change.objects.filter(
+            action=ActionEvents.SCREENSHOT_ADDED,
+            screenshot=screenshot,
+            unit=source,
+        )
+        self.assertEqual(added_changes.count(), 1)
+        self.assertEqual(added_changes[0].user, self.user)
+
+    def test_upload_source_invalid(self) -> None:
+        self.make_manager()
+        response = self.do_upload(source="wrong")
+        self.assertContains(response, "Obrazek")
+
+    def test_edit(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        response = self.client.post(
+            screenshot.get_absolute_url(), {"name": "Picture"}, follow=True
+        )
+        self.assertContains(response, "Picture")
+        self.assertEqual(Screenshot.objects.all()[0].name, "Picture")
+
+    def test_detail_has_documentation_link(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        response = self.client.get(screenshot.get_absolute_url())
+        self.assertContains(
+            response, get_doc_url("admin/translating", "screenshots", user=self.user)
+        )
+        self.assertContains(response, "Add selected")
+        self.assertContains(response, "Find strings in image")
+        self.assertContains(
+            response,
+            "Suggests source strings by recognizing text in this screenshot.",
+        )
+        self.assertContains(response, 'id="screenshots-search-form"')
+        self.assertContains(
+            response,
+            f'data-href="{reverse("screenshot-js-search", kwargs={"pk": screenshot.pk})}"',
+        )
+        self.assertContains(response, '<textarea class="textarea form-control"')
+        self.assertContains(response, 'name="q"')
+        self.assertContains(response, 'aria-describedby="screenshots-search-help"')
+        self.assertContains(
+            response,
+            "Use query syntax; boolean operators like",
+        )
+        self.assertContains(response, "<code>AND</code>")
+        self.assertContains(
+            response, get_doc_url("user/search", "search-boolean", user=self.user)
+        )
+        self.assertContains(response, 'id="screenshots-toggle-selection"')
+        self.assertContains(response, 'id="paste-screenshot-btn"')
+        form = html.fromstring(response.content).get_element_by_id(
+            "screenshot-form-container"
+        )
+        self.assertEqual(
+            len(form.xpath('.//input[@name="csrfmiddlewaretoken"]')),
+            1,
+        )
+
+    @override_settings(ALLOWED_ASSET_SIZE=1)
+    def test_edit_metadata_with_existing_oversized_image(self) -> None:
+        self.make_manager()
+        with open(TEST_SCREENSHOT, "rb") as handle:
+            screenshot = Screenshot.objects.create(
+                name="Obrazek",
+                translation=self.component.source_translation,
+                user=self.user,
+            )
+            screenshot.image.save("screenshot.png", File(handle))
+
+        response = self.client.post(
+            screenshot.get_absolute_url(), {"name": "Picture"}, follow=True
+        )
+        self.assertContains(response, "Picture")
+        screenshot.refresh_from_db()
+        self.assertEqual(screenshot.name, "Picture")
+
+    def test_view(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        response = self.client.get(screenshot.get_view_url())
+        # Admin can access this
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["content-type"], "image/png")
+
+        # Private admin access
+        self.project.access_control = Project.ACCESS_PRIVATE
+        self.project.save()
+        response = self.client.get(screenshot.get_view_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["content-type"], "image/png")
+
+        # User access
+        self.user.groups.remove(Group.objects.get(name="Managers"))
+        response = self.client.get(screenshot.get_view_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["content-type"], "image/png")
+
+        # Project privileges removed
+        self.project.remove_user(self.user)
+        response = self.client.get(screenshot.get_view_url())
+        self.assertEqual(response.status_code, 404)
+
+        # Anonymous access
+        self.client.logout()
+        response = self.client.get(screenshot.get_view_url())
+        self.assertEqual(response.status_code, 404)
+
+        # Anonymous access to public
+        self.project.access_control = Project.ACCESS_PUBLIC
+        self.project.save()
+        response = self.client.get(screenshot.get_view_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["content-type"], "image/png")
+
+    def test_view_uses_image_content_type(self) -> None:
+        self.make_manager()
+        screenshot = Screenshot.objects.create(
+            name="Polyglot", translation=self.component.source_translation
+        )
+        with open(TEST_SCREENSHOT, "rb") as handle:
+            screenshot.image.save("polyglot.html", File(handle))
+
+        response = self.client.get(screenshot.get_view_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["content-type"], "image/png")
+        response.close()
+
+    def test_private_screenshot_actions_hidden(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.get()
+        source = self.component.source_translation.unit_set.all()[0]
+
+        self.project.access_control = Project.ACCESS_PRIVATE
+        self.project.save()
+        self.user.groups.remove(Group.objects.get(name="Managers"))
+        self.project.remove_user(self.user)
+
+        response = self.client.get(screenshot.get_absolute_url())
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get(screenshot.get_view_url())
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("screenshot-delete", kwargs={"pk": screenshot.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("screenshot-js-search", kwargs={"pk": screenshot.pk}),
+            {"q": "hello"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("screenshot-js-add", kwargs={"pk": screenshot.pk}),
+            {"source": source.pk},
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get(
+            reverse("screenshot-js-get", kwargs={"pk": screenshot.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("screenshot-remove-source", kwargs={"pk": screenshot.pk}),
+            {"source": source.pk},
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("screenshot-js-ocr", kwargs={"pk": screenshot.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        response = self.client.post(
+            reverse("screenshot-delete", kwargs={"pk": screenshot.pk})
+        )
+        self.assertEqual(Screenshot.objects.count(), 0)
+        self.assertRedirects(response, reverse("screenshots", kwargs=self.kw_component))
+
+    def test_delete_redirect_next(self) -> None:
+        self.make_manager()
+        self.do_upload(name="Unassigned")
+        screenshot = Screenshot.objects.get()
+        url = reverse("screenshots", kwargs=self.kw_component)
+        next_url = f"{url}?q=NOT+has%3Astring"
+
+        response = self.client.get(next_url)
+
+        self.assertContains(response, f'value="{next_url}"')
+
+        response = self.client.post(
+            reverse("screenshot-delete", kwargs={"pk": screenshot.pk}),
+            {"next": next_url},
+        )
+
+        self.assertEqual(Screenshot.objects.count(), 0)
+        self.assertRedirects(response, next_url, fetch_redirect_response=False)
+
+    def test_delete_redirect_next_strips_page(self) -> None:
+        self.make_manager()
+        Screenshot.objects.bulk_create(
+            Screenshot(
+                image="screenshots/screenshot.png",
+                name=f"Unassigned {index:02d}",
+                translation=self.component.source_translation,
+                user=self.user,
+            )
+            for index in range(49)
+        )
+        url = reverse("screenshots", kwargs=self.kw_component)
+        next_url = f"{url}?q=NOT+has%3Astring&sort_by=-timestamp&page=2"
+        expected_url = f"{url}?q=NOT+has%3Astring&sort_by=-timestamp"
+
+        response = self.client.get(next_url)
+
+        self.assertContains(response, f'value="{expected_url.replace("&", "&amp;")}"')
+        self.assertEqual(len(response.context["object_list"]), 1)
+        screenshot = response.context["object_list"][0]
+
+        response = self.client.post(
+            reverse("screenshot-delete", kwargs={"pk": screenshot.pk}),
+            {"next": expected_url},
+        )
+
+        self.assertEqual(Screenshot.objects.count(), 48)
+        self.assertRedirects(response, expected_url)
+
+    def test_delete_redirect_next_invalid(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.get()
+        response = self.client.post(
+            reverse("screenshot-delete", kwargs={"pk": screenshot.pk}),
+            {"next": "https://evil.com/redirect"},
+        )
+        self.assertEqual(Screenshot.objects.count(), 0)
+        self.assertRedirects(response, reverse("screenshots", kwargs=self.kw_component))
+
+    def extract_pk(self, data):
+        return int(data.split('data-pk="')[1].split('"')[0])
+
+    def test_async_source_changes_use_screenshot_owner(self) -> None:
+        screenshot = Screenshot.objects.create(
+            name="Owner",
+            translation=self.component.source_translation,
+            user=self.user,
+        )
+        unit = self.component.source_translation.unit_set.first()
+        if unit is None:
+            self.fail("Expected a source unit")
+
+        async def update_sources() -> None:
+            async_screenshot = await Screenshot.objects.aget(pk=screenshot.pk)
+            await async_screenshot.add_units_async([unit])
+            await async_screenshot.aremove_unit(unit)
+
+        async_to_sync(update_sources)()
+
+        changes = Change.objects.filter(screenshot=screenshot).order_by("pk")
+        self.assertEqual(
+            list(changes.values_list("action", "user_id")),
+            [
+                (ActionEvents.SCREENSHOT_ADDED, self.user.pk),
+                (ActionEvents.SCREENSHOT_REMOVED, self.user.pk),
+            ],
+        )
+        self.assertFalse(screenshot.units.filter(pk=unit.pk).exists())
+
+    def test_source_manipulations(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+
+        # Search for string
+        response = self.client.post(
+            reverse("screenshot-js-search", kwargs={"pk": screenshot.pk}),
+            {"q": "hello"},
+        )
+        data = response.json()
+        self.assertEqual(data["responseCode"], 200)
+        self.assertIn('<a class="add-string', data["results"])
+        self.assertIn("screenshot-source-select", data["results"])
+        self.assertIn("screenshots-toggle-selection", data["results"])
+
+        source_pk = self.extract_pk(data["results"])
+
+        self.assertEqual(
+            source_pk,
+            self.component.source_translation.unit_set.search("hello").get().pk,
+        )
+
+        # Add found string
+        self.async_client.force_login(self.user)
+        async_response = async_to_sync(self.async_client.post)(
+            reverse("screenshot-js-add", kwargs={"pk": screenshot.pk}),
+            {"source": source_pk},
+        )
+        data = async_response.json()
+        self.assertEqual(data["responseCode"], 200)
+        self.assertEqual(data["status"], True)
+        self.assertEqual(screenshot.units.count(), 1)
+        added_changes = Change.objects.filter(
+            action=ActionEvents.SCREENSHOT_ADDED,
+            screenshot=screenshot,
+            unit_id=source_pk,
+        )
+        self.assertEqual(added_changes.count(), 1)
+        self.assertEqual(added_changes[0].user, self.user)
+
+        # Updated listing
+        response = self.client.get(
+            reverse("screenshot-js-get", kwargs={"pk": screenshot.pk})
+        )
+        self.assertContains(response, "Hello")
+
+        # Remove added string
+        async_to_sync(self.async_client.post)(
+            reverse("screenshot-remove-source", kwargs={"pk": screenshot.pk}),
+            {"source": source_pk},
+        )
+        self.assertEqual(screenshot.units.count(), 0)
+        removed_changes = Change.objects.filter(
+            action=ActionEvents.SCREENSHOT_REMOVED,
+            screenshot=screenshot,
+            unit_id=source_pk,
+        )
+        self.assertEqual(removed_changes.count(), 1)
+        self.assertEqual(removed_changes[0].user, self.user)
+
+    def test_source_bulk_manipulations(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        source_units = list(
+            self.component.source_translation.unit_set.order_by("pk")[:2]
+        )
+        source_ids = [unit.pk for unit in source_units]
+        screenshot.units.add(source_units[0])
+
+        response = self.client.post(
+            reverse("screenshot-js-add", kwargs={"pk": screenshot.pk}),
+            {
+                "source": [
+                    source_units[0].pk,
+                    source_units[1].pk,
+                    source_units[1].pk,
+                    "invalid",
+                    999999,
+                ]
+            },
+        )
+
+        data = response.json()
+        self.assertEqual(data["responseCode"], 200)
+        self.assertEqual(data["status"], True)
+        self.assertEqual(data["added"], 1)
+        self.assertEqual(data["skipped"], 2)
+        self.assertEqual(data["invalid"], 2)
+        self.assertCountEqual(screenshot.units.values_list("pk", flat=True), source_ids)
+        added_changes = Change.objects.filter(
+            action=ActionEvents.SCREENSHOT_ADDED,
+            screenshot=screenshot,
+            unit=source_units[1],
+        )
+        self.assertEqual(added_changes.count(), 1)
+        self.assertEqual(added_changes[0].user, self.user)
+        self.assertFalse(
+            Change.objects.filter(
+                action=ActionEvents.SCREENSHOT_ADDED,
+                screenshot=screenshot,
+                unit=source_units[0],
+            ).exists()
+        )
+
+    def test_source_bulk_invalid(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+
+        response = self.client.post(
+            reverse("screenshot-js-add", kwargs={"pk": screenshot.pk}),
+            {"source": ["invalid", 999999]},
+        )
+
+        data = response.json()
+        self.assertEqual(data["responseCode"], 200)
+        self.assertEqual(data["status"], False)
+        self.assertEqual(data["added"], 0)
+        self.assertEqual(data["skipped"], 0)
+        self.assertEqual(data["invalid"], 2)
+        self.assertEqual(screenshot.units.count(), 0)
+
+    def test_source_bulk_updates_alerts_once(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        source_units = list(
+            self.component.source_translation.unit_set.order_by("pk")[:2]
+        )
+
+        with patch("weblate.screenshots.models.update_alerts") as update_alerts:
+            response = self.client.post(
+                reverse("screenshot-js-add", kwargs={"pk": screenshot.pk}),
+                {"source": [unit.pk for unit in source_units]},
+            )
+
+        self.assertEqual(response.json()["added"], 2)
+        update_alerts.assert_called_once_with(
+            self.component,
+            alerts={"MissingScreenshots", "UnusedScreenshot"},
+        )
+
+    def test_source_bulk_denied(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        source = self.component.source_translation.unit_set.all()[0]
+        self.user.groups.remove(Group.objects.get(name="Managers"))
+        self.project.remove_user(self.user)
+
+        response = self.client.post(
+            reverse("screenshot-js-add", kwargs={"pk": screenshot.pk}),
+            {"source": [source.pk]},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(screenshot.units.count(), 0)
+
+    def test_list_coverage_summary(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation.unit_set.all()[0]
+        self.do_upload(source=source.pk)
+
+        response = self.client.get(reverse("screenshots", kwargs=self.kw_component))
+
+        self.assertContains(response, "Unassigned screenshots")
+        self.assertContains(response, "Source strings with screenshots")
+        self.assertContains(response, "Source strings without screenshots")
+        self.assertContains(
+            response,
+            f"{reverse('screenshots', kwargs=self.kw_component)}?q=NOT+has%3Astring",
+        )
+        self.assertContains(response, "?q=has%3Astring")
+        self.assertContains(response, "?q=has%3Ascreenshot")
+        self.assertContains(response, "?q=NOT%20has%3Ascreenshot")
+
+    def test_list_unassigned_filter(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation.unit_set.all()[0]
+        self.do_upload(name="Assigned", source=source.pk)
+        self.do_upload(name="Unassigned")
+
+        response = self.client.get(
+            reverse("screenshots", kwargs=self.kw_component), {"assigned": "0"}
+        )
+
+        self.assertContains(response, "Unassigned")
+        self.assertContains(response, "All screenshots")
+        self.assertContains(response, 'value="NOT has:string"')
+        self.assertContains(response, reverse("screenshots", kwargs=self.kw_component))
+        self.assertNotContains(response, "Assigned</a>")
+
+    def test_list_search(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation.unit_set.search("hello").get()
+        self.do_upload(
+            name="Assigned login",
+            source=source.pk,
+            repository_filename="fastlane/login.png",
+        )
+        self.do_upload(name="Unassigned help")
+
+        url = reverse("screenshots", kwargs=self.kw_component)
+
+        response = self.client.get(url, {"q": "login"})
+        self.assertContains(response, "Assigned login")
+        self.assertNotContains(response, "Unassigned help")
+
+        response = self.client.get(url, {"q": "hello"})
+        self.assertNotContains(response, "Assigned login")
+        self.assertNotContains(response, "Unassigned help")
+
+        response = self.client.get(url, {"q": "fastlane"})
+        self.assertNotContains(response, "Assigned login")
+        self.assertNotContains(response, "Unassigned help")
+
+        response = self.client.get(url, {"q": "has:string"})
+        self.assertContains(response, "Assigned login")
+        self.assertNotContains(response, "Unassigned help")
+
+        response = self.client.get(url, {"q": "NOT has:string"})
+        self.assertContains(response, "Unassigned help")
+        self.assertNotContains(response, "Assigned login")
+
+        response = self.client.get(url, {"q": "path:fastlane"})
+        self.assertContains(response, "Assigned login")
+        self.assertNotContains(response, "Unassigned help")
+
+        response = self.client.get(url, {"q": "repository:fastlane"})
+        self.assertContains(response, "Assigned login")
+        self.assertNotContains(response, "Unassigned help")
+
+        response = self.client.get(url, {"q": "string:hello"})
+        self.assertContains(response, "Assigned login")
+        self.assertNotContains(response, "Unassigned help")
+
+        response = self.client.get(url, {"q": "strings:1"})
+        self.assertContains(response, "Assigned login")
+        self.assertNotContains(response, "Unassigned help")
+
+    def test_list_search_invalid(self) -> None:
+        self.make_manager()
+        response = self.client.get(
+            reverse("screenshots", kwargs=self.kw_component),
+            {"q": "state:translated"},
+        )
+
+        self.assertContains(response, "Could not parse query string")
+
+    def test_list_search_invalid_regex_on_non_text_fields(self) -> None:
+        self.make_manager()
+        url = reverse("screenshots", kwargs=self.kw_component)
+
+        for query in ('id:r"foo"', 'strings:r"foo"', 'timestamp:r"foo"'):
+            with self.subTest(query=query):
+                response = self.client.get(url, {"q": query})
+                self.assertContains(response, "Could not parse query string")
+
+    def test_list_search_takes_precedence_over_legacy_unassigned_filter(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation.unit_set.all()[0]
+        self.do_upload(name="Assigned", source=source.pk)
+        self.do_upload(name="Unassigned")
+
+        response = self.client.get(
+            reverse("screenshots", kwargs=self.kw_component),
+            {"assigned": "0", "q": "name:=Assigned"},
+        )
+
+        self.assertContains(response, "Assigned")
+        self.assertNotContains(response, "Unassigned</a>")
+
+    def test_list_queries_do_not_scale_with_screenshots(self) -> None:
+        self.make_manager()
+        source = self.component.source_translation.unit_set.all()[0]
+        url = reverse("screenshots", kwargs=self.kw_component)
+
+        def render_query_count() -> tuple[int, list[str]]:
+            with CaptureQueriesContext(connection) as queries:
+                response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            return len(queries), [query["sql"] for query in queries]
+
+        self.do_upload(name="Screenshot 0", source=source.pk)
+        baseline_count, _baseline_queries = render_query_count()
+
+        for index in range(1, 5):
+            self.do_upload(name=f"Screenshot {index}", source=source.pk)
+
+        query_count, queries = render_query_count()
+
+        self.assertEqual(query_count, baseline_count, queries)
+
+    def test_ocr_backend(self) -> None:
+        # Extract strings
+        with (
+            Image.open(TEST_SCREENSHOT) as image,
+            get_tesseract(Language.objects.get(code="en")) as api,
+        ):
+            result = list(
+                ocr_get_strings(
+                    api, image=image, filename=TEST_SCREENSHOT, resolution=72
+                )
+            )
+
+        # Reverse logic would make sense here, but we want to use same order as in views.py
+        matches = list(
+            chain.from_iterable(
+                get_close_matches(part, ["Hello, world!\n"], cutoff=0.9)
+                for part in result
+            )
+        )
+
+        self.assertTrue(
+            matches, f"Could not find string in tesseract results: {result}"
+        )
+
+    def test_ocr(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+
+        # Search for string
+        response = self.client.post(
+            reverse("screenshot-js-ocr", kwargs={"pk": screenshot.pk})
+        )
+        data = response.json()
+
+        self.assertEqual(data["responseCode"], 200)
+        self.assertGreater(data["count"], 0)
+        self.assertIn("matching source string", data["summary"])
+        # We should find at least one string
+        self.assertIn(
+            '<a class="add-string',
+            data["results"],
+            "OCR recognition not working, no recognized strings found",
+        )
+
+    def test_ocr_truncated_image(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        image = MagicMock()
+        image.__enter__.return_value = image
+
+        def close_and_propagate(*_args) -> bool:
+            image.close()
+            return False
+
+        image.__exit__.side_effect = close_and_propagate
+        image.load.side_effect = OSError(
+            "image file is truncated (5 bytes not processed)"
+        )
+
+        with (
+            patch("weblate.screenshots.views.Image.open", return_value=image),
+            patch("weblate.screenshots.views.get_tesseract") as mocked_tesseract,
+            self.assertLogs("weblate", level="WARNING") as logs,
+        ):
+            response = self.client.post(
+                reverse("screenshot-js-ocr", kwargs={"pk": screenshot.pk})
+            )
+
+        data = response.json()
+        self.assertEqual(data["responseCode"], 200)
+        self.assertEqual(data["count"], 0)
+        self.assertEqual(data["empty"], "No new matching source strings found.")
+        self.assertNotIn('<a class="add-string', data["results"])
+        self.assertIn(
+            "Skipping OCR for unreadable screenshot",
+            "\n".join(logs.output),
+        )
+        self.assertGreaterEqual(image.close.call_count, 1)
+        mocked_tesseract.assert_not_called()
+
+    def test_ocr_tesseract_error_propagates(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        image = MagicMock()
+        image.__enter__.return_value = image
+
+        def close_and_propagate(*_args) -> bool:
+            image.close()
+            return False
+
+        image.__exit__.side_effect = close_and_propagate
+
+        with (
+            patch("weblate.screenshots.views.Image.open", return_value=image),
+            patch(
+                "weblate.screenshots.views.get_tesseract",
+                side_effect=OSError("No space left on device"),
+            ),
+            self.assertRaises(OSError),
+        ):
+            self.client.post(reverse("screenshot-js-ocr", kwargs={"pk": screenshot.pk}))
+
+        self.assertGreaterEqual(image.close.call_count, 1)
+
+    def test_ocr_tesseract_download_error(self) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+
+        with (
+            patch(
+                "weblate.screenshots.views.get_tesseract",
+                side_effect=httpx2.TimeoutException("timed out"),
+            ),
+            self.assertLogs("weblate", level="WARNING") as logs,
+        ):
+            response = self.client.post(
+                reverse("screenshot-js-ocr", kwargs={"pk": screenshot.pk})
+            )
+
+        data = response.json()
+        self.assertEqual(data["responseCode"], 503)
+        self.assertEqual(
+            data["error"],
+            "OCR data could not be downloaded. Please try again later.",
+        )
+        self.assertIn("Could not download Tesseract data", "\n".join(logs.output))
+
+    def test_translation_manipulations(self) -> None:
+        self.make_manager()
+        translation = self.component.translation_set.get(language_code="cs")
+        self.do_upload(translation=translation.pk)
+        screenshot = Screenshot.objects.all()[0]
+
+        # Search for string
+        response = self.client.post(
+            reverse("screenshot-js-search", kwargs={"pk": screenshot.pk}),
+            {"q": "hello"},
+        )
+        data = response.json()
+        self.assertEqual(data["responseCode"], 200)
+        self.assertIn('<a class="add-string', data["results"])
+
+        source_pk = self.extract_pk(data["results"])
+        self.assertEqual(source_pk, translation.unit_set.search("hello").get().pk)
+
+        # Add found string
+        response = self.client.post(
+            reverse("screenshot-js-add", kwargs={"pk": screenshot.pk}),
+            {"source": source_pk},
+        )
+        data = response.json()
+        self.assertEqual(data["responseCode"], 200)
+        self.assertEqual(data["status"], True)
+        self.assertEqual(screenshot.units.count(), 1)
+
+        # Updated listing
+        response = self.client.get(
+            reverse("screenshot-js-get", kwargs={"pk": screenshot.pk})
+        )
+        self.assertContains(response, "Hello")
+
+        # Remove added string
+        self.client.post(
+            reverse("screenshot-remove-source", kwargs={"pk": screenshot.pk}),
+            {"source": source_pk},
+        )
+        self.assertEqual(screenshot.units.count(), 0)
+
+    @http_mock.activate
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_upload_with_image_url(self, _mocked_getaddrinfo, _mocked_get_peer) -> None:
+        data = Path(TEST_SCREENSHOT).read_bytes()
+        image_url = "https://example.com/test-image.png?signature=test#preview"
+        http_mock.register(
+            "GET",
+            "https://example.com/test-image.png?signature=test",
+            headers={"Content-Type": "image/png"},
+            content=data,
+        )
+
+        self.make_manager()
+        response = self.do_upload(image="", image_url=image_url)
+        self.assertContains(response, "Obrazek")
+        self.assertEqual(Screenshot.objects.count(), 1)
+        image_name = Screenshot.objects.get().image.name
+        assert image_name is not None
+        self.assertTrue(image_name.endswith(".png"))
+
+    @http_mock.activate
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_upload_with_image_url_invalid_extension(
+        self, _mocked_getaddrinfo, _mocked_get_peer
+    ) -> None:
+        http_mock.register(
+            "GET",
+            "https://example.com/test-image.html",
+            headers={"Content-Type": "image/png"},
+            content=Path(TEST_SCREENSHOT).read_bytes(),
+        )
+
+        self.make_manager()
+        response = self.do_upload(
+            image="", image_url="https://example.com/test-image.html"
+        )
+
+        self.assertContains(response, "File extension")
+        self.assertEqual(Screenshot.objects.count(), 0)
+
+    @http_mock.activate
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_edit_with_image_url(self, _mocked_getaddrinfo, _mocked_get_peer) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.all()[0]
+        old_name = screenshot.image.name
+        old_filename = screenshot.image.file.name
+
+        data = Path(TEST_SCREENSHOT).read_bytes()
+        http_mock.register(
+            "GET",
+            "https://example.com/test-image.png",
+            headers={"Content-Type": "image/png"},
+            content=data,
+        )
+
+        self.client.post(
+            screenshot.get_absolute_url(),
+            {
+                "image_url": "https://example.com/test-image.png",
+                "name": "Updated screenshot",
+            },
+            follow=True,
+        )
+        screenshot.refresh_from_db()
+        self.assertNotEqual(screenshot.image.name, old_name)
+        self.assertNotEqual(screenshot.image.file.name, old_filename)
+
+    @http_mock.activate
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_image_url_download_failure(
+        self, _mocked_getaddrinfo, _mocked_get_peer
+    ) -> None:
+        """Test handling of image download failures."""
+        self.make_manager()
+        http_mock.register(
+            "GET",
+            "https://example.com/missing-image.png",
+            headers={"Content-Type": "text/html"},
+            status_code=301,
+        )
+        http_mock.register_exception(
+            "GET",
+            "https://example.com/broken-image.png",
+            exception=httpx2.ConnectError(
+                "Network error",
+                request=httpx2.Request("GET", "https://example.com/broken-image.png"),
+            ),
+        )
+        response = self.do_upload(
+            image="", image_url="https://example.com/missing-image.png"
+        )
+        self.assertContains(
+            response,
+            "Unable to download image from the provided URL (HTTP status code: 301).",
+        )
+
+        response = self.do_upload(
+            image="", image_url="https://example.com/broken-image.png"
+        )
+        self.assertContains(response, "Unable to download image from the provided URL.")
+
+    @http_mock.activate
+    def test_no_image_or_url_validation(self) -> None:
+        """Test validation when neither image nor URL is provided."""
+        self.make_manager()
+        response = self.do_upload(image="")
+        self.assertContains(
+            response, "You need to provide either image file or image URL."
+        )
+
+    @http_mock.activate
+    def test_both_image_and_url_provided(self) -> None:
+        """Test that providing both image file and URL prioritizes the file."""
+        self.make_manager()
+        self.do_upload(image_url="https://example.com/should-be-ignored.png")
+        self.assertEqual(Screenshot.objects.count(), 1)
+
+    @http_mock.activate
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_invalid_image_url_content_type(
+        self, _mocked_getaddrinfo, _mocked_get_peer
+    ) -> None:
+        self.make_manager()
+        # Mock a non-image content type
+        http_mock.register(
+            "GET",
+            "https://example.com/not-an-image.png",
+            headers={"Content-Type": "text/html"},
+        )
+        response = self.do_upload(
+            image="", image_url="https://example.com/not-an-image.png"
+        )
+        self.assertContains(response, "Unsupported image type")
+
+    @http_mock.activate
+    @override_settings(ALLOWED_ASSET_SIZE=1)
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_invalid_image_url_size(
+        self, _mocked_getaddrinfo, _mocked_get_peer
+    ) -> None:
+        self.make_manager()
+        # Mock a too big image
+        http_mock.register(
+            "GET",
+            "https://example.com/big-image.png",
+            headers={"Content-Type": "image/png"},
+            content=b"x" * (settings.ALLOWED_ASSET_SIZE + 1),
+        )
+        response = self.do_upload(
+            image="", image_url="https://example.com/big-image.png"
+        )
+        self.assertContains(response, "Image is too big")
+
+    @http_mock.activate
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_invalid_image_url_content(
+        self, _mocked_getaddrinfo, _mocked_get_peer
+    ) -> None:
+        self.make_manager()
+        # Mock a non-image content
+        http_mock.register(
+            "GET",
+            "https://example.com/invalid-image.png",
+            headers={"Content-Type": "image/png"},
+            content=b"x",
+        )
+        response = self.do_upload(
+            image="", image_url="https://example.com/invalid-image.png"
+        )
+        self.assertContains(response, "Upload a valid image.")
+
+    @http_mock.activate
+    @override_settings(ALLOWED_ASSET_DOMAINS=[".allowed.com"])
+    def test_disallowed_image_url_domain(self) -> None:
+        """Test validation when image URL domain is not allowed."""
+        self.make_manager()
+        response = self.do_upload(
+            image="", image_url="https://example.com/not-allowed-image.png"
+        )
+        self.assertContains(response, "URL domain is not allowed.")
+
+    @http_mock.activate
+    @override_settings(ALLOWED_ASSET_DOMAINS=[".allowed.com"])
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_disallowed_image_url_redirect_domain(
+        self, _mocked_getaddrinfo, _mocked_get_peer
+    ) -> None:
+        """Reject redirects leaving the allowed asset domains."""
+        self.make_manager()
+        http_mock.register(
+            "GET",
+            "https://images.allowed.com/redirect-image.png",
+            status_code=302,
+            headers={"Location": "https://proof.example.com/final-image.png"},
+        )
+        http_mock.register(
+            "GET",
+            "https://proof.example.com/final-image.png",
+            headers={"Content-Type": "image/png"},
+            content=Path(TEST_SCREENSHOT).read_bytes(),
+        )
+
+        response = self.do_upload(
+            image="", image_url="https://images.allowed.com/redirect-image.png"
+        )
+
+        self.assertContains(response, "URL domain is not allowed.")
+        self.assertEqual(Screenshot.objects.count(), 0)
+
+    @http_mock.activate
+    @override_settings(ALLOWED_ASSET_DOMAINS=[".allowed.com"])
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_allowed_image_url_redirect_domain(
+        self, _mocked_getaddrinfo, _mocked_get_peer
+    ) -> None:
+        """Allow redirects that stay within the allowed asset domains."""
+        self.make_manager()
+        http_mock.register(
+            "GET",
+            "https://images.allowed.com/redirect-image.png",
+            status_code=302,
+            headers={"Location": "https://cdn.allowed.com/final-image.png"},
+        )
+        http_mock.register(
+            "GET",
+            "https://cdn.allowed.com/final-image.png",
+            headers={"Content-Type": "image/png"},
+            content=Path(TEST_SCREENSHOT).read_bytes(),
+        )
+
+        response = self.do_upload(
+            image="", image_url="https://images.allowed.com/redirect-image.png"
+        )
+
+        screenshot = Screenshot.objects.get()
+        self.assertContains(response, screenshot.name)
+        self.assertEqual(screenshot.image.size, Path(TEST_SCREENSHOT).stat().st_size)
+
+    @http_mock.activate
+    @override_settings(ALLOWED_ASSET_DOMAINS=["*"])
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PRIVATE_GETADDRINFO,
+    )
+    def test_image_url_private_target(self, mocked_getaddrinfo) -> None:
+        self.make_manager()
+        http_mock.register(
+            "GET",
+            "https://private.example.com/test-image.png",
+            headers={"Content-Type": "image/png"},
+            content=Path(TEST_SCREENSHOT).read_bytes(),
+        )
+
+        response = self.do_upload(
+            image="", image_url="https://private.example.com/test-image.png"
+        )
+
+        self.assertContains(response, "internal or non-public address")
+        self.assertEqual(Screenshot.objects.count(), 0)
+        mocked_getaddrinfo.assert_called_once_with("private.example.com", None, type=1)
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @http_mock.activate
+    @override_settings(ALLOWED_ASSET_DOMAINS=["*"])
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PUBLIC_TEST_ADDRESS,
+    )
+    @patch("weblate.utils.outbound.socket.getaddrinfo")
+    def test_image_url_private_redirect(
+        self, mocked_getaddrinfo, mocked_get_peer
+    ) -> None:
+        def getaddrinfo(hostname, *_args, **_kwargs):
+            address = (
+                PRIVATE_TEST_ADDRESS
+                if hostname == "private.example.com"
+                else PUBLIC_TEST_ADDRESS
+            )
+            return [(0, 0, 0, "", (address, 443))]
+
+        mocked_getaddrinfo.side_effect = getaddrinfo
+        self.make_manager()
+        http_mock.register(
+            "GET",
+            "https://public.example.com/redirect-image.png",
+            status_code=302,
+            headers={"Location": "https://private.example.com/final-image.png"},
+        )
+        http_mock.register(
+            "GET",
+            "https://private.example.com/final-image.png",
+            headers={"Content-Type": "image/png"},
+            content=Path(TEST_SCREENSHOT).read_bytes(),
+        )
+
+        response = self.do_upload(
+            image="", image_url="https://public.example.com/redirect-image.png"
+        )
+
+        self.assertContains(response, "internal or non-public address")
+        self.assertEqual(Screenshot.objects.count(), 0)
+        self.assertGreaterEqual(mocked_getaddrinfo.call_count, 2)
+        mocked_get_peer.assert_called_once()
+        self.assertEqual(
+            ["https://public.example.com/redirect-image.png"],
+            [call.request.url for call in http_mock.calls],
+        )
+
+    @http_mock.activate
+    @override_settings(ALLOWED_ASSET_DOMAINS=["*"])
+    @patch(
+        "weblate.utils.requests._get_response_peer_ip",
+        return_value=PRIVATE_TEST_ADDRESS,
+    )
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PUBLIC_GETADDRINFO,
+    )
+    def test_image_url_private_peer(self, mocked_getaddrinfo, mocked_get_peer) -> None:
+        self.make_manager()
+        http_mock.register(
+            "GET",
+            "https://public.example.com/test-image.png",
+            headers={"Content-Type": "image/png"},
+            content=Path(TEST_SCREENSHOT).read_bytes(),
+        )
+
+        response = self.do_upload(
+            image="", image_url="https://public.example.com/test-image.png"
+        )
+
+        self.assertContains(response, "internal or non-public address")
+        self.assertEqual(Screenshot.objects.count(), 0)
+        mocked_getaddrinfo.assert_called_once_with("public.example.com", None, type=1)
+        mocked_get_peer.assert_called_once()
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @http_mock.activate
+    @override_settings(
+        ALLOWED_ASSET_DOMAINS=["*"], ASSET_PRIVATE_ALLOWLIST=["private.example.com"]
+    )
+    @patch("weblate.utils.requests._get_response_peer_ip")
+    @patch("weblate.utils.outbound.socket.getaddrinfo")
+    def test_image_url_allowlisted_private_target(
+        self, mocked_getaddrinfo, mocked_get_peer
+    ) -> None:
+        self.make_manager()
+        http_mock.register(
+            "GET",
+            "https://private.example.com/test-image.png",
+            headers={"Content-Type": "image/png"},
+            content=Path(TEST_SCREENSHOT).read_bytes(),
+        )
+
+        response = self.do_upload(
+            image="", image_url="https://private.example.com/test-image.png"
+        )
+
+        screenshot = Screenshot.objects.get()
+        self.assertContains(response, screenshot.name)
+        mocked_getaddrinfo.assert_not_called()
+        mocked_get_peer.assert_not_called()
+
+    @http_mock.activate
+    @override_settings(ALLOWED_ASSET_DOMAINS=["*"])
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=PRIVATE_GETADDRINFO,
+    )
+    def test_edit_image_url_private_target_keeps_existing_image(
+        self, mocked_getaddrinfo
+    ) -> None:
+        self.make_manager()
+        self.do_upload()
+        screenshot = Screenshot.objects.get()
+        old_name = screenshot.name
+        old_image_name = screenshot.image.name
+        old_filename = screenshot.image.file.name
+        http_mock.register(
+            "GET",
+            "https://private.example.com/test-image.png",
+            headers={"Content-Type": "image/png"},
+            content=Path(TEST_SCREENSHOT).read_bytes(),
+        )
+
+        response = self.client.post(
+            screenshot.get_absolute_url(),
+            {
+                "image_url": "https://private.example.com/test-image.png",
+                "name": "Updated screenshot",
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, "internal or non-public address")
+        screenshot.refresh_from_db()
+        self.assertEqual(screenshot.name, old_name)
+        self.assertEqual(screenshot.image.name, old_image_name)
+        self.assertEqual(screenshot.image.file.name, old_filename)
+        mocked_getaddrinfo.assert_called_once_with("private.example.com", None, type=1)
+        self.assertEqual(len(http_mock.calls), 0)
+
+
+class ScreenshotVCSTest(APITestCase, RepoTestCase):
+    """Test class for syncing vcs screenshots in weblate."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user = create_test_user()
+        self.user.is_superuser = True
+        self.user.save()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.user.auth_token.key}")
+        self.client.login(username="testuser", password="testpassword")
+
+        self.component = self._create_component(
+            "json",
+            "intermediate/*.json",
+            screenshot_filemask="*.png",
+        )
+        self.project = self.component.project
+
+        # Add a screenshot linked to the component
+        shot = Screenshot.objects.create(
+            name="test-update",
+            translation=self.component.source_translation,
+            repository_filename="test-update.png",
+        )
+        data = Path(TEST_SCREENSHOT).read_bytes()
+        half_data_size = len(data) // 2
+        with tempfile.NamedTemporaryFile(suffix="png") as temp_file:
+            temp_file.write(data[:half_data_size])
+            temp_file.flush()
+            temp_file.seek(0)
+            shot.image.save("test-update", File(temp_file))
+
+    def add_symlinked_outside_screenshot(self, filename: str) -> str:
+        outside_dir = tempfile.mkdtemp()
+        self.addCleanup(rmtree, outside_dir)
+        copyfile(TEST_SCREENSHOT, os.path.join(outside_dir, filename))
+
+        link_path = os.path.join(self.component.repository.path, "linked-screenshots")
+        os.symlink(outside_dir, link_path)
+
+        def cleanup_link() -> None:
+            if os.path.lexists(link_path):
+                os.unlink(link_path)
+
+        self.addCleanup(cleanup_link)
+        return f"linked-screenshots/{filename}"
+
+    def add_root_symlinked_screenshot(self, filename: str) -> str:
+        link_path = os.path.join(self.component.repository.path, filename)
+        os.symlink(".", link_path)
+
+        def cleanup_link() -> None:
+            if os.path.lexists(link_path):
+                os.unlink(link_path)
+
+        self.addCleanup(cleanup_link)
+        return filename
+
+    def test_update_screenshots_from_repo(self) -> None:
+        repository = self.component.repository
+        last_revision = repository.last_revision
+        existing_ss_size = Screenshot.objects.filter(
+            translation__component=self.component,
+            repository_filename="test-update.png",
+        )[0].image.size
+
+        copyfile(TEST_SCREENSHOT, os.path.join(repository.path, "test-update.png"))
+        with repository.lock:
+            repository.set_committer("Second Bar", "second@example.net")
+            filenames = ["test-update.png"]
+            repository.commit(
+                "Test commit", "Foo Bar <foo@bar.com>", timezone.now(), filenames
+            )
+            self.component.trigger_post_update(
+                previous_head=last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        # Verify that screenshot has been updated after the signal.
+        self.assertEqual(
+            Screenshot.objects.filter(
+                translation__component=self.component,
+                repository_filename="test-update.png",
+            ).count(),
+            1,
+        )
+        updated_ss_size = Screenshot.objects.filter(
+            translation__component=self.component,
+            repository_filename="test-update.png",
+        )[0].image.size
+        self.assertNotEqual(existing_ss_size, updated_ss_size)
+
+    def test_linked_screenshots_reuse_changed_files(self) -> None:
+        repository = self.component.repository
+        last_revision = repository.last_revision
+        self.create_link_existing()
+
+        with patch.object(
+            repository, "get_changed_files", return_value=["test-update.png"]
+        ) as get_changed_files:
+            self.component.trigger_post_update(
+                previous_head=last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        get_changed_files.assert_called_once_with(compare_to=last_revision)
+
+    def test_update_screenshots_from_repo_rejects_symlinked_directory(self) -> None:
+        repository = self.component.repository
+        filename = self.add_symlinked_outside_screenshot("test-update.png")
+        screenshot = Screenshot.objects.get(repository_filename="test-update.png")
+        screenshot.repository_filename = filename
+        screenshot.save(update_fields=["repository_filename"])
+        existing_ss_size = screenshot.image.size
+
+        with patch.object(repository, "get_changed_files", return_value=[filename]):
+            self.component.trigger_post_update(
+                previous_head=repository.last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        screenshot.refresh_from_db()
+        self.assertEqual(screenshot.image.size, existing_ss_size)
+
+    def test_update_screenshots_from_repo_rejects_root_symlink(self) -> None:
+        repository = self.component.repository
+        filename = self.add_root_symlinked_screenshot("root-linked.png")
+        screenshot = Screenshot.objects.get(repository_filename="test-update.png")
+        screenshot.repository_filename = filename
+        screenshot.save(update_fields=["repository_filename"])
+        existing_ss_size = screenshot.image.size
+
+        with patch.object(repository, "get_changed_files", return_value=[filename]):
+            self.component.trigger_post_update(
+                previous_head=repository.last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        screenshot.refresh_from_db()
+        self.assertEqual(screenshot.image.size, existing_ss_size)
+
+    def test_update_screenshots_from_repo_ignores_open_error(self) -> None:
+        repository = self.component.repository
+        filename = "test-update.png"
+        copyfile(TEST_SCREENSHOT, os.path.join(repository.path, filename))
+        screenshot = Screenshot.objects.get(repository_filename=filename)
+        existing_ss_size = screenshot.image.size
+
+        with (
+            patch.object(repository, "get_changed_files", return_value=[filename]),
+            patch(
+                "weblate.screenshots.models.open",
+                side_effect=FileNotFoundError("deleted"),
+                create=True,
+            ),
+        ):
+            self.component.trigger_post_update(
+                previous_head=repository.last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        screenshot.refresh_from_db()
+        self.assertEqual(screenshot.image.size, existing_ss_size)
+
+    @override_settings(ALLOWED_ASSET_SIZE=1)
+    def test_update_screenshots_from_repo_too_big(self) -> None:
+        repository = self.component.repository
+        last_revision = repository.last_revision
+        existing_ss_size = Screenshot.objects.filter(
+            translation__component=self.component,
+            repository_filename="test-update.png",
+        )[0].image.size
+
+        copyfile(TEST_SCREENSHOT, os.path.join(repository.path, "test-update.png"))
+        with repository.lock:
+            repository.set_committer("Second Bar", "second@example.net")
+            repository.commit(
+                "Test commit",
+                "Foo Bar <foo@bar.com>",
+                timezone.now(),
+                ["test-update.png"],
+            )
+            self.component.trigger_post_update(
+                previous_head=last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        self.assertEqual(
+            Screenshot.objects.filter(
+                translation__component=self.component,
+                repository_filename="test-update.png",
+            )[0].image.size,
+            existing_ss_size,
+        )
+
+    def test_add_screenshots_from_repo(self) -> None:
+        repository = self.component.repository
+        last_revision = repository.last_revision
+
+        copyfile(TEST_SCREENSHOT, os.path.join(repository.path, "test.png"))
+        with repository.lock:
+            repository.set_committer("Second Bar", "second@example.net")
+            filenames = ["test.png"]
+            repository.commit(
+                "Test commit", "Foo Bar <foo@bar.com>", timezone.now(), filenames
+            )
+            self.component.trigger_post_update(
+                previous_head=last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        # Verify that screenshot has been added after the signal.
+        self.assertEqual(
+            Screenshot.objects.filter(
+                translation__component=self.component,
+                repository_filename="test.png",
+            ).count(),
+            1,
+        )
+
+    def test_add_screenshots_from_repo_rejects_symlinked_directory(self) -> None:
+        repository = self.component.repository
+        filename = self.add_symlinked_outside_screenshot("test.png")
+        self.component.screenshot_filemask = "linked-screenshots/*.png"
+
+        with patch.object(repository, "get_changed_files", return_value=[filename]):
+            self.component.trigger_post_update(
+                previous_head=repository.last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        self.assertFalse(
+            Screenshot.objects.filter(repository_filename=filename).exists()
+        )
+
+    def test_add_screenshots_from_repo_rejects_root_symlink(self) -> None:
+        repository = self.component.repository
+        filename = self.add_root_symlinked_screenshot("root-linked.png")
+
+        with patch.object(repository, "get_changed_files", return_value=[filename]):
+            self.component.trigger_post_update(
+                previous_head=repository.last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        self.assertFalse(
+            Screenshot.objects.filter(repository_filename=filename).exists()
+        )
+
+    def test_add_screenshots_from_repo_ignores_open_error(self) -> None:
+        repository = self.component.repository
+        filename = "test-open-error.png"
+        copyfile(TEST_SCREENSHOT, os.path.join(repository.path, filename))
+
+        with (
+            patch.object(repository, "get_changed_files", return_value=[filename]),
+            patch(
+                "weblate.screenshots.models.open",
+                side_effect=FileNotFoundError("deleted"),
+                create=True,
+            ),
+        ):
+            self.component.trigger_post_update(
+                previous_head=repository.last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        self.assertFalse(
+            Screenshot.objects.filter(repository_filename=filename).exists()
+        )
+
+    @override_settings(ALLOWED_ASSET_SIZE=1)
+    def test_add_screenshots_from_repo_too_big(self) -> None:
+        repository = self.component.repository
+        last_revision = repository.last_revision
+
+        copyfile(TEST_SCREENSHOT, os.path.join(repository.path, "test.png"))
+        with repository.lock:
+            repository.set_committer("Second Bar", "second@example.net")
+            repository.commit(
+                "Test commit", "Foo Bar <foo@bar.com>", timezone.now(), ["test.png"]
+            )
+            self.component.trigger_post_update(
+                previous_head=last_revision,
+                skip_push=True,
+                user=None,
+            )
+
+        self.assertEqual(
+            Screenshot.objects.filter(
+                translation__component=self.component,
+                repository_filename="test.png",
+            ).count(),
+            0,
+        )

@@ -1,0 +1,695 @@
+{
+  "project": "need-for-greed",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-03",
+  "components": [
+    "buyers",
+    "characterdialogue",
+    "loot",
+    "orders",
+    "survey",
+    "tutorial",
+    "ui",
+    "glossary"
+  ],
+  "glossary_components": [
+    "glossary"
+  ],
+  "languages": [
+    "bg",
+    "cs",
+    "nl",
+    "en",
+    "fil",
+    "fr",
+    "de",
+    "hu",
+    "id",
+    "it",
+    "lv",
+    "lt",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "es",
+    "tr"
+  ],
+  "units_fetched": 21924,
+  "target_units_compared": 20706,
+  "repeated_source_groups": 5117,
+  "folds": {
+    "strict": {
+      "diverging_groups": 290,
+      "distinct_sources": 114,
+      "per_language": {
+        "es": 72,
+        "pt": 22,
+        "tr": 21,
+        "bg": 17,
+        "id": 17,
+        "nl": 14,
+        "it": 14,
+        "fr": 14,
+        "de": 13,
+        "hu": 13,
+        "pl": 13,
+        "lv": 12,
+        "lt": 12,
+        "cs": 11,
+        "fil": 11,
+        "en": 7,
+        "ro": 7
+      },
+      "scope": {
+        "intra_component": 140,
+        "cross_component_only": 150
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 201,
+        "regular_only": 89
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 222,
+      "distinct_sources": 57,
+      "per_language": {
+        "tr": 20,
+        "es": 19,
+        "bg": 17,
+        "pt": 17,
+        "id": 16,
+        "fr": 14,
+        "de": 13,
+        "it": 13,
+        "pl": 13,
+        "hu": 12,
+        "lv": 12,
+        "lt": 12,
+        "cs": 11,
+        "nl": 10,
+        "fil": 10,
+        "ro": 7,
+        "en": 6
+      },
+      "scope": {
+        "intra_component": 134,
+        "cross_component_only": 88
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 135,
+        "regular_only": 87
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 222,
+      "distinct_sources": 57,
+      "per_language": {
+        "tr": 20,
+        "es": 19,
+        "bg": 17,
+        "pt": 17,
+        "id": 16,
+        "fr": 14,
+        "de": 13,
+        "it": 13,
+        "pl": 13,
+        "hu": 12,
+        "lv": 12,
+        "lt": 12,
+        "cs": 11,
+        "nl": 10,
+        "fil": 10,
+        "ro": 7,
+        "en": 6
+      },
+      "scope": {
+        "intra_component": 134,
+        "cross_component_only": 88
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 135,
+        "regular_only": 87
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 205,
+      "distinct_sources": 56,
+      "per_language": {
+        "tr": 19,
+        "es": 18,
+        "bg": 16,
+        "pt": 16,
+        "id": 15,
+        "fr": 13,
+        "de": 12,
+        "it": 12,
+        "pl": 12,
+        "hu": 11,
+        "lv": 11,
+        "lt": 11,
+        "cs": 10,
+        "nl": 9,
+        "fil": 9,
+        "ro": 6,
+        "en": 5
+      },
+      "scope": {
+        "intra_component": 134,
+        "cross_component_only": 71
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 118,
+        "regular_only": 87
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": [
+    {
+      "language": "bg",
+      "source": "Гррр-хрр!",
+      "members": [
+        {
+          "component": "tutorial",
+          "context": "DialogueAfterUpgradeHorse1",
+          "target": "Гррр-хррр!",
+          "unit": 394290
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueBeforeUpgradeHorse2",
+          "target": "Хррр-грр!",
+          "unit": 394287
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueClaimedChestHorse1",
+          "target": "Хррр-грр!",
+          "unit": 394324
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueNewTerrainOpenedHorse3",
+          "target": "Гррр-хър!",
+          "unit": 394333
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueNewTerrainStartedHorse1",
+          "target": "Гррр-хррр!",
+          "unit": 394336
+        },
+        {
+          "component": "tutorial",
+          "context": "DialoguePrepareToWormHorse1",
+          "target": "Гррр-хърр!",
+          "unit": 394340
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Гррр-хрр! Бррр...",
+      "members": [
+        {
+          "component": "tutorial",
+          "context": "DialogueAfterChestHorse1",
+          "target": "Хррр-грр! Бррр...",
+          "unit": 394322
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueWormAppearHorse1",
+          "target": "Грр-хрр! Бррр...",
+          "unit": 394342
+        },
+        {
+          "component": "tutorial",
+          "context": "DialoguerAfterCraftHorse2",
+          "target": "Грр-хрр! Пррр...",
+          "unit": 394279
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Белоземье",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"Belomar\", \"Белоземье\"]",
+          "target": "Беломар",
+          "unit": 404703
+        },
+        {
+          "component": "glossary",
+          "context": "[\"Whitelands\", \"Белоземье\"]",
+          "target": "Бели земи",
+          "unit": 404973
+        },
+        {
+          "component": "ui",
+          "context": "terrain2Title",
+          "target": "Беломар",
+          "unit": 396516
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Вместимость",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Вместимость\"]",
+          "target": "Капацитет",
+          "unit": 404726
+        },
+        {
+          "component": "ui",
+          "context": "capacity",
+          "target": "Вместимост",
+          "unit": 396544
+        },
+        {
+          "component": "ui",
+          "context": "upgradeStorageWeightStat",
+          "target": "Капацитет",
+          "unit": 396690
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Дай мне Сундук Конунга. Канарейка поможет найти его в Белоземье.",
+      "members": [
+        {
+          "component": "orders",
+          "context": "orderTerrain2.3Step3Description",
+          "target": "Дайте ми Раклата на ярла. Канарчето ще ви помогне да я намерите в Белите земи.",
+          "unit": 391752
+        },
+        {
+          "component": "orders",
+          "context": "orderTerrain2.3Step3HelpInfo",
+          "target": "Дай ми Раклата на ярла. Канарчето ще ти помогне да я намериш в Бели земи.",
+          "unit": 391751
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Звездопад",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"Starfall\", \"Звездопад\"]",
+          "target": "Звездопад",
+          "unit": 404949
+        },
+        {
+          "component": "ui",
+          "context": "terrain1Biome2Title",
+          "target": "Метеорит",
+          "unit": 396787
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Мёрзлая Верфь",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Мёрзлая Верфь\"]",
+          "target": "Замръзнала корабостроителница",
+          "unit": 404806
+        },
+        {
+          "component": "ui",
+          "context": "terrain2Biome1Title",
+          "target": "Замръзнала верф",
+          "unit": 396893
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Плавильня",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Плавильня\"]",
+          "target": "Слот за изработка",
+          "unit": 404751
+        },
+        {
+          "component": "ui",
+          "context": "craftSlot",
+          "target": "Израб. слот",
+          "unit": 396590
+        },
+        {
+          "component": "ui",
+          "context": "upgradeCraftCraftSlotsStat",
+          "target": "Слот за изработка",
+          "unit": 396704
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Получить",
+      "members": [
+        {
+          "component": "ui",
+          "context": "claim",
+          "target": "Изискване",
+          "unit": 396773
+        },
+        {
+          "component": "ui",
+          "context": "getASlot",
+          "target": "Вземете Слот",
+          "unit": 396564
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Руби Рэй",
+      "members": [
+        {
+          "component": "buyers",
+          "context": "Buyer8",
+          "target": "Ruby Ray",
+          "unit": 388145
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Руби Рэй\"]",
+          "target": "Рубинов лъч",
+          "unit": 404928
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Склад",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Склад\"]",
+          "target": "Съхранение",
+          "unit": 404951
+        },
+        {
+          "component": "ui",
+          "context": "storage",
+          "target": "Склад",
+          "unit": 396501
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Торги",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Торги\"]",
+          "target": "Търговия",
+          "unit": 404960
+        },
+        {
+          "component": "ui",
+          "context": "trading",
+          "target": "Търгуване",
+          "unit": 396482
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Торговать",
+      "members": [
+        {
+          "component": "ui",
+          "context": "checkOffer",
+          "target": "Проверете",
+          "unit": 396561
+        },
+        {
+          "component": "ui",
+          "context": "toTrade",
+          "target": "Търгувай",
+          "unit": 396778
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Украшение",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Украшение\"]",
+          "target": "Бижута",
+          "unit": 404862
+        },
+        {
+          "component": "ui",
+          "context": "treasure",
+          "target": "Бижу",
+          "unit": 396760
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Фррр!",
+      "members": [
+        {
+          "component": "tutorial",
+          "context": "DialogueBeforeBirdHorse1",
+          "target": "Пррр!",
+          "unit": 394317
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueBeforeUpgradeHorse1",
+          "target": "Пррр!",
+          "unit": 394285
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueIntroHorse1",
+          "target": "Пфррр!",
+          "unit": 394261
+        },
+        {
+          "component": "tutorial",
+          "context": "DialoguerAfterCraftHorse1",
+          "target": "Пфррр!",
+          "unit": 394277
+        }
+      ]
+    },
+    {
+      "language": "bg",
+      "source": "Ых-ых! Ииии-их!",
+      "members": [
+        {
+          "component": "tutorial",
+          "context": "DialogueNewTerrainOpenedHorse2",
+          "target": "Хх-хх! Иии-их!",
+          "unit": 394331
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueTimeIsUpHorse2",
+          "target": "Их-их! Ииии-их!",
+          "unit": 394270
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "Белоземье",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"Belomar\", \"Белоземье\"]",
+          "target": "Belomar",
+          "unit": 405005
+        },
+        {
+          "component": "glossary",
+          "context": "[\"Whitelands\", \"Белоземье\"]",
+          "target": "Bílé země",
+          "unit": 405275
+        },
+        {
+          "component": "ui",
+          "context": "terrain2Title",
+          "target": "Belomar",
+          "unit": 396982
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "Дай мне Сундук Конунга. Канарейка поможет найти его в Белоземье.",
+      "members": [
+        {
+          "component": "orders",
+          "context": "orderTerrain2.3Step3Description",
+          "target": "Dejte mi Truhlu jarla. Kanárek vám ji pomůže najít v Bílých zemích.",
+          "unit": 391863
+        },
+        {
+          "component": "orders",
+          "context": "orderTerrain2.3Step3HelpInfo",
+          "target": "Dej mi Truhlu jarla. Kanárek ti ji pomůže najít v Bílých zemích.",
+          "unit": 391862
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "Звездопад",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"Starfall\", \"Звездопад\"]",
+          "target": "Hvězdopád",
+          "unit": 405251
+        },
+        {
+          "component": "ui",
+          "context": "terrain1Biome2Title",
+          "target": "Meteorický déšť",
+          "unit": 397253
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "И-го-го!",
+      "members": [
+        {
+          "component": "tutorial",
+          "context": "DialogueOrdersThanksHorse1",
+          "target": "I-ha-ha!",
+          "unit": 394417
+        },
+        {
+          "component": "tutorial",
+          "context": "DialogueTimeIsUpHorse1",
+          "target": "Í-hahá!",
+          "unit": 394370
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "Начать",
+      "members": [
+        {
+          "component": "survey",
+          "context": "startSurvey",
+          "target": "Začít",
+          "unit": 393646
+        },
+        {
+          "component": "ui",
+          "context": "start",
+          "target": "Start",
+          "unit": 396983
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "Новый прилавок",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Новый прилавок\"]",
+          "target": "Nový slot",
+          "unit": 405198
+        },
+        {
+          "component": "ui",
+          "context": "upgradeTradeSlotsStat",
+          "target": "Nový pult",
+          "unit": 397163
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "Плавильня",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\", \"Плавильня\"]",
+          "target": "Slot pro výrobu",
+          "unit": 405053
+        },
+        {
+          "component": "ui",
+          "context": "craftSlot",
+          "target": "Výrobní slot",
+          "unit": 397056
+        },
+        {
+          "component": "ui",
+          "context": "upgradeCraftCraftSlotsStat",
+          "target": "Slot pro výrobu",
+          "unit": 397170
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "Получить",
+      "members": [
+        {
+          "component": "ui",
+          "context": "claim",
+          "target": "Nárok",
+          "unit": 397239
+        },
+        {
+          "component": "ui",
+          "context": "getASlot",
+          "target": "Získat Slot",
+          "unit": 397030
+        }
+      ]
+    },
+    {
+      "language": "cs",
+      "source": "Сейчас узнаем, хочу ли я привыкать к местной земле...",
+      "members": [
+        {
+          "component": "orders",
+          "context": "orderTerrain1.1Step2Thank",
+          "target": "Uvidíme, jestli jsem připraven si zvyknout na tuto zemi...",
+          "unit": 391780
+        },
+        {
+          "component": "orders",
+          "context": "orderTerrain1.1Step3Thank",
+          "target": "Uvidíme, jestli jsem připraven si na tuto zemi zvyknout...",
+          "unit": 391783
+        }
+      ]
+    }
+  ]
+}

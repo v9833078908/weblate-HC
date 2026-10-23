@@ -1,0 +1,94 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: pt\n"
+
+msgid "eggItemReceived"
+msgstr "Um ovo! Precisa de ser chocado."
+
+msgid "cursedItemReceived"
+msgstr "Não, uma maldição!"
+
+msgid "geodeItemReceived"
+msgstr ""
+"Oh, uma geode!\n"
+"Pronta para cortar."
+
+msgid "gemItemReceived"
+msgstr "Eba, brilhantes!"
+
+msgid "goldItemReceived"
+msgstr "EU AMO OURO!"
+
+msgid "silverCoinItemReceived"
+msgstr "Mmmmmm, dinheiro…"
+
+msgid "wormSpawned"
+msgstr "Droga!"
+
+msgid "highNoise"
+msgstr "Vamos lá…"
+
+msgid "pileLooted"
+msgstr "Lixo, mas posso vender."
+
+msgid "statsEffectAppliedOnDestroy"
+msgstr "Porque é que isto acontece sempre?!"
+
+msgid "timeIsUp"
+msgstr "O quêx, ninguém mais para incomodar?!"
+
+msgid "noActions1"
+msgstr "Doo-doo-doo…"
+
+msgid "noActions2"
+msgstr "Muito bem, vamos esperar."
+
+msgid "noActions3"
+msgstr "Muito bem, pausa para o cigarro."
+
+msgid "noActions4"
+msgstr "Eh… seja o que for."
+
+msgid "noActions5"
+msgstr "Paciência, paciência…"
+
+msgid "richZoneReached1"
+msgstr "Sinistro… significa muito tesouro!"
+
+msgid "richZoneReached2"
+msgstr "Quanto mais fundo vamos, melhor o saque!"
+
+msgid "richZoneReached3"
+msgstr "Cheira a montanhas de tesouro!"
+
+msgid "coldNight"
+msgstr ""
+"T-t-tá\n"
+"f-f-frio…"
+
+msgid "frostible"
+msgstr ""
+"P-p-preciso de \n"
+"a-a-aquecer!"
+
+msgid "warmedUp"
+msgstr "Viva, está quente!"
+
+msgid "frozenRockHit"
+msgstr "Tenho de derreter o gelo!"
+
+msgid "frozenItemReceived"
+msgstr "Tesouro de Gelo!"
+
+msgid "SuperRare"
+msgstr "Siiiim, Jackpot!"

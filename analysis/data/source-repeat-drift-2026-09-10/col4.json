@@ -1,0 +1,878 @@
+{
+  "project": "col4",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-10",
+  "components": [
+    "localizecommon",
+    "data",
+    "all-glossary"
+  ],
+  "glossary_components": [
+    "all-glossary"
+  ],
+  "languages": [
+    "en",
+    "en_US",
+    "fr",
+    "id",
+    "ru",
+    "tr"
+  ],
+  "units_fetched": 20685,
+  "target_units_compared": 16470,
+  "repeated_source_groups": 653,
+  "folds": {
+    "strict": {
+      "diverging_groups": 253,
+      "distinct_sources": 121,
+      "per_language": {
+        "fr": 80,
+        "tr": 65,
+        "id": 57,
+        "en_US": 51
+      },
+      "scope": {
+        "intra_component": 244,
+        "cross_component_only": 9
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 10,
+        "regular_only": 243
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 246,
+      "distinct_sources": 116,
+      "per_language": {
+        "fr": 76,
+        "tr": 65,
+        "id": 55,
+        "en_US": 50
+      },
+      "scope": {
+        "intra_component": 240,
+        "cross_component_only": 6
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 7,
+        "regular_only": 239
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 246,
+      "distinct_sources": 116,
+      "per_language": {
+        "fr": 76,
+        "tr": 65,
+        "id": 55,
+        "en_US": 50
+      },
+      "scope": {
+        "intra_component": 240,
+        "cross_component_only": 6
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 7,
+        "regular_only": 239
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 245,
+      "distinct_sources": 115,
+      "per_language": {
+        "fr": 76,
+        "tr": 64,
+        "id": 55,
+        "en_US": 50
+      },
+      "scope": {
+        "intra_component": 239,
+        "cross_component_only": 6
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 7,
+        "regular_only": 238
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": [
+    {
+      "language": "tr",
+      "source": "Идти",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_280_ANSWER_495",
+          "target": "Git",
+          "unit": 11377
+        },
+        {
+          "component": "data",
+          "context": "EVENT_335_ANSWER_598",
+          "target": "Git",
+          "unit": 11611
+        },
+        {
+          "component": "data",
+          "context": "EVENT_554_ANSWER_987",
+          "target": "Gidelim",
+          "unit": 12683
+        },
+        {
+          "component": "data",
+          "context": "EVENT_740_ANSWER_1306",
+          "target": "İlerle",
+          "unit": 13615
+        },
+        {
+          "component": "data",
+          "context": "EVENT_842_ANSWER_1489",
+          "target": "Git",
+          "unit": 14013
+        },
+        {
+          "component": "data",
+          "context": "EVENT_861_ANSWER_1538",
+          "target": "Gidelim",
+          "unit": 14107
+        },
+        {
+          "component": "data",
+          "context": "EVENT_87_ANSWER_159",
+          "target": "Derse gir",
+          "unit": 14148
+        },
+        {
+          "component": "data",
+          "context": "EVENT_883_ANSWER_1591",
+          "target": "Kapıya git",
+          "unit": 14201
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "Так точно!",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_203_ANSWER_357",
+          "target": "Yes, sir!",
+          "unit": 7064
+        },
+        {
+          "component": "data",
+          "context": "EVENT_238_ANSWER_507",
+          "target": "Yes, ma’am!",
+          "unit": 7244
+        },
+        {
+          "component": "data",
+          "context": "EVENT_290_ANSWER_517",
+          "target": "Right away!",
+          "unit": 7482
+        },
+        {
+          "component": "data",
+          "context": "EVENT_421_ANSWER_742",
+          "target": "That's right!",
+          "unit": 8065
+        },
+        {
+          "component": "data",
+          "context": "EVENT_494_ANSWER_884",
+          "target": "Yes, sir!",
+          "unit": 8459
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Идти",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_280_ANSWER_495",
+          "target": "Marcher",
+          "unit": 15318
+        },
+        {
+          "component": "data",
+          "context": "EVENT_335_ANSWER_598",
+          "target": "Aller",
+          "unit": 15552
+        },
+        {
+          "component": "data",
+          "context": "EVENT_554_ANSWER_987",
+          "target": "Partir",
+          "unit": 16624
+        },
+        {
+          "component": "data",
+          "context": "EVENT_740_ANSWER_1306",
+          "target": "Partir",
+          "unit": 17556
+        },
+        {
+          "component": "data",
+          "context": "EVENT_842_ANSWER_1489",
+          "target": "Aller",
+          "unit": 17954
+        },
+        {
+          "component": "data",
+          "context": "EVENT_861_ANSWER_1538",
+          "target": "Aller",
+          "unit": 18048
+        },
+        {
+          "component": "data",
+          "context": "EVENT_87_ANSWER_159",
+          "target": "Aller",
+          "unit": 18089
+        },
+        {
+          "component": "data",
+          "context": "EVENT_883_ANSWER_1591",
+          "target": "Y aller",
+          "unit": 18142
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Промолчать",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_14_ANSWER_27",
+          "target": "Garder le silence",
+          "unit": 14646
+        },
+        {
+          "component": "data",
+          "context": "EVENT_401_ANSWER_713",
+          "target": "Se taire",
+          "unit": 15858
+        },
+        {
+          "component": "data",
+          "context": "EVENT_403_ANSWER_716",
+          "target": "Garder le silence",
+          "unit": 15867
+        },
+        {
+          "component": "data",
+          "context": "EVENT_415_ANSWER_735",
+          "target": "Rester silencieux",
+          "unit": 15921
+        },
+        {
+          "component": "data",
+          "context": "EVENT_493_ANSWER_880",
+          "target": "Se taire",
+          "unit": 16336
+        },
+        {
+          "component": "data",
+          "context": "EVENT_496_ANSWER_887",
+          "target": "Garder le silence",
+          "unit": 16349
+        },
+        {
+          "component": "data",
+          "context": "EVENT_497_ANSWER_889",
+          "target": "Ne rien dire",
+          "unit": 16354
+        },
+        {
+          "component": "data",
+          "context": "EVENT_498_ANSWER_891",
+          "target": "Ne rien dire",
+          "unit": 16359
+        },
+        {
+          "component": "data",
+          "context": "EVENT_670_ANSWER_1188",
+          "target": "Ne rien dire",
+          "unit": 17200
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "source": "Так точно!",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_203_ANSWER_357",
+          "target": "Evet efendim",
+          "unit": 11005
+        },
+        {
+          "component": "data",
+          "context": "EVENT_238_ANSWER_507",
+          "target": "Tabi efendim!",
+          "unit": 11185
+        },
+        {
+          "component": "data",
+          "context": "EVENT_290_ANSWER_517",
+          "target": "Hemen gidiyorum",
+          "unit": 11423
+        },
+        {
+          "component": "data",
+          "context": "EVENT_421_ANSWER_742",
+          "target": "Emredersiniz!",
+          "unit": 12006
+        },
+        {
+          "component": "data",
+          "context": "EVENT_494_ANSWER_884",
+          "target": "Evet efendim",
+          "unit": 12400
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "Есть!",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_449_ANSWER_798",
+          "target": "Yes, sir!",
+          "unit": 8215
+        },
+        {
+          "component": "data",
+          "context": "EVENT_469_ANSWER_839",
+          "target": "Got it!",
+          "unit": 8333
+        },
+        {
+          "component": "data",
+          "context": "EVENT_510_ANSWER_909",
+          "target": "Got it!",
+          "unit": 8533
+        },
+        {
+          "component": "data",
+          "context": "EVENT_519_ANSWER_930",
+          "target": "Yes sir!",
+          "unit": 8581
+        },
+        {
+          "component": "data",
+          "context": "EVENT_539_ANSWER_963",
+          "target": "Yes sir!",
+          "unit": 8679
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "Молчать",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_357_ANSWER_630",
+          "target": "Silence",
+          "unit": 7758
+        },
+        {
+          "component": "data",
+          "context": "EVENT_502_ANSWER_896",
+          "target": "Be silent",
+          "unit": 8494
+        },
+        {
+          "component": "data",
+          "context": "EVENT_739_ANSWER_1308",
+          "target": "Shut up",
+          "unit": 9667
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "Ура!",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_104_ANSWER_250",
+          "target": "Hurray!",
+          "unit": 6662
+        },
+        {
+          "component": "data",
+          "context": "EVENT_384_ANSWER_682",
+          "target": "Hooray!",
+          "unit": 7894
+        },
+        {
+          "component": "data",
+          "context": "EVENT_531_ANSWER_950",
+          "target": "Hurrah!",
+          "unit": 8641
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Есть",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_486_ANSWER_871",
+          "target": "Oui",
+          "unit": 16300
+        },
+        {
+          "component": "data",
+          "context": "EVENT_537_ANSWER_960",
+          "target": "Bien",
+          "unit": 16553
+        },
+        {
+          "component": "data",
+          "context": "EVENT_887_ANSWER_1600",
+          "target": "C'est ça",
+          "unit": 18157
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Есть!",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_449_ANSWER_798",
+          "target": "Il y a !",
+          "unit": 16097
+        },
+        {
+          "component": "data",
+          "context": "EVENT_469_ANSWER_839",
+          "target": "Il y en a !",
+          "unit": 16215
+        },
+        {
+          "component": "data",
+          "context": "EVENT_510_ANSWER_909",
+          "target": "Oui !",
+          "unit": 16415
+        },
+        {
+          "component": "data",
+          "context": "EVENT_519_ANSWER_930",
+          "target": "Oui !",
+          "unit": 16463
+        },
+        {
+          "component": "data",
+          "context": "EVENT_539_ANSWER_963",
+          "target": "Oui !",
+          "unit": 16561
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Лежать и не шевелиться",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_11_ANSWER_18",
+          "target": "Rester allongé sans bouger",
+          "unit": 14559
+        },
+        {
+          "component": "data",
+          "context": "EVENT_2_ANSWER_2",
+          "target": "Rester immobile",
+          "unit": 14918
+        },
+        {
+          "component": "data",
+          "context": "EVENT_7_ANSWER_8",
+          "target": "Rester couché et ne pas bouger",
+          "unit": 17348
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Начинается Чествование Знамён Хозяйств",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_156_RESULT_289",
+          "target": "La Célébration des Drapeaux des Exploitations Agricoles commence",
+          "unit": 14723
+        },
+        {
+          "component": "data",
+          "context": "EVENT_156_RESULT_601",
+          "target": "La Célébration des Drapeaux des Ménages commence",
+          "unit": 14724
+        },
+        {
+          "component": "data",
+          "context": "EVENT_156_RESULT_602",
+          "target": "La Célébration des Drapeaux Ménagers commence",
+          "unit": 14725
+        }
+      ]
+    },
+    {
+      "language": "id",
+      "source": "Есть",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_486_ANSWER_871",
+          "target": "Ada",
+          "unit": 88857
+        },
+        {
+          "component": "data",
+          "context": "EVENT_537_ANSWER_960",
+          "target": "Baik.",
+          "unit": 89110
+        },
+        {
+          "component": "data",
+          "context": "EVENT_887_ANSWER_1600",
+          "target": "Siap",
+          "unit": 90714
+        }
+      ]
+    },
+    {
+      "language": "id",
+      "source": "Осмотреться",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_270_ANSWER_480",
+          "target": "Melihat sekeliling",
+          "unit": 87833
+        },
+        {
+          "component": "data",
+          "context": "EVENT_382_ANSWER_678",
+          "target": "Melihat-lihat",
+          "unit": 88322
+        },
+        {
+          "component": "data",
+          "context": "EVENT_488_ANSWER_875",
+          "target": "Lihat-lihat",
+          "unit": 88868
+        }
+      ]
+    },
+    {
+      "language": "id",
+      "source": "Получить награду",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_178_ANSWER_317",
+          "target": "Menerima penghargaan",
+          "unit": 87386
+        },
+        {
+          "component": "data",
+          "context": "EVENT_540_ANSWER_964",
+          "target": "Terima penghargaan",
+          "unit": 89125
+        },
+        {
+          "component": "data",
+          "context": "EVENT_764_ANSWER_1345",
+          "target": "Terima hadiah",
+          "unit": 90215
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "source": "Есть",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_486_ANSWER_871",
+          "target": "Emredersiniz efendim",
+          "unit": 12359
+        },
+        {
+          "component": "data",
+          "context": "EVENT_537_ANSWER_960",
+          "target": "Anlaşıldı",
+          "unit": 12612
+        },
+        {
+          "component": "data",
+          "context": "EVENT_887_ANSWER_1600",
+          "target": "Emredersiniz",
+          "unit": 14216
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "source": "Есть!",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_449_ANSWER_798",
+          "target": "Peki efendim!",
+          "unit": 12156
+        },
+        {
+          "component": "data",
+          "context": "EVENT_469_ANSWER_839",
+          "target": "Anlaşıldı!",
+          "unit": 12274
+        },
+        {
+          "component": "data",
+          "context": "EVENT_510_ANSWER_909",
+          "target": "Emredersiniz!",
+          "unit": 12474
+        },
+        {
+          "component": "data",
+          "context": "EVENT_519_ANSWER_930",
+          "target": "Emredersiniz!",
+          "unit": 12522
+        },
+        {
+          "component": "data",
+          "context": "EVENT_539_ANSWER_963",
+          "target": "Emredersiniz!",
+          "unit": 12620
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "source": "Наблюдать",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_368_ANSWER_651",
+          "target": "Gözlemle",
+          "unit": 11757
+        },
+        {
+          "component": "data",
+          "context": "EVENT_477_ANSWER_855",
+          "target": "İzle",
+          "unit": 12320
+        },
+        {
+          "component": "data",
+          "context": "EVENT_538_ANSWER_961",
+          "target": "Gözlemle",
+          "unit": 12615
+        },
+        {
+          "component": "data",
+          "context": "EVENT_713_ANSWER_1260",
+          "target": "Seyret",
+          "unit": 13479
+        },
+        {
+          "component": "data",
+          "context": "EVENT_746_ANSWER_1316",
+          "target": "İzle",
+          "unit": 13640
+        },
+        {
+          "component": "data",
+          "context": "EVENT_806_ANSWER_1420",
+          "target": "Gözlemle",
+          "unit": 13874
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "source": "Плесенка",
+      "members": [
+        {
+          "component": "all-glossary",
+          "context": "[\"\",\"Плесенка\"]",
+          "target": "Küfdoğan",
+          "unit": 91302
+        },
+        {
+          "component": "data",
+          "context": "HERO_30",
+          "target": "Yeşilimsi Nasta",
+          "unit": 14332
+        },
+        {
+          "component": "data",
+          "context": "HERO_UNKNOWN_30",
+          "target": "Yeşilimsi Nastya",
+          "unit": 14372
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "source": "Хорошо",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_348_ANSWER_618",
+          "target": "Tamamdır",
+          "unit": 11656
+        },
+        {
+          "component": "data",
+          "context": "EVENT_349_ANSWER_619",
+          "target": "Pekala",
+          "unit": 11660
+        },
+        {
+          "component": "data",
+          "context": "EVENT_553_ANSWER_986",
+          "target": "Güzel",
+          "unit": 12680
+        },
+        {
+          "component": "data",
+          "context": "EVENT_558_ANSWER_993",
+          "target": "Güzel",
+          "unit": 12700
+        },
+        {
+          "component": "data",
+          "context": "EVENT_562_ANSWER_1001",
+          "target": "Tamamdır",
+          "unit": 12719
+        },
+        {
+          "component": "data",
+          "context": "EVENT_588_ANSWER_1036",
+          "target": "Pekala",
+          "unit": 12824
+        },
+        {
+          "component": "data",
+          "context": "EVENT_800_ANSWER_1409",
+          "target": "Pekala",
+          "unit": 13850
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "А что ты ещё хотел? Узнать секрет происхождения ГИГАХРУЩА? Ладно, вот, можешь подкрепиться этим концентратом. Силы тебе пригодятся",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_464_RESULT_878",
+          "target": "What else did you want? To learn the secret of GIGASTRUCTURE's origin? Fine, here, you can fortify yourself with this concentrate. You'll need the strength",
+          "unit": 8310
+        },
+        {
+          "component": "data",
+          "context": "EVENT_471_RESULT_892",
+          "target": "What else did you want? To learn the secret of GIGASTRUCTURE's origins? Okay, here, you can fortify yourself with this concentrate. You'll need the strength",
+          "unit": 8353
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "Бабушка",
+      "members": [
+        {
+          "component": "data",
+          "context": "HERO_19",
+          "target": "Grandmother",
+          "unit": 10369
+        },
+        {
+          "component": "data",
+          "context": "HERO_34",
+          "target": "Granny",
+          "unit": 10400
+        },
+        {
+          "component": "data",
+          "context": "HERO_UNKNOWN_34",
+          "target": "Granny",
+          "unit": 10435
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "Бежать дальше",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_646_ANSWER_1141",
+          "target": "Keep running",
+          "unit": 9197
+        },
+        {
+          "component": "data",
+          "context": "EVENT_839_ANSWER_1484",
+          "target": "Run on",
+          "unit": 10054
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "Бежим!",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_688_ANSWER_1226",
+          "target": "Run!",
+          "unit": 9417
+        },
+        {
+          "component": "data",
+          "context": "EVENT_759_ANSWER_1339",
+          "target": "Let's run!",
+          "unit": 9754
+        }
+      ]
+    },
+    {
+      "language": "en_US",
+      "source": "ВНИМАНИЕ. ИДЁТ САМОСБОР. ВСЕМ УКРЫТЬСЯ ЗА ГЕРМОДВЕРЬМИ. ВНИМАНИЕ. ИДЁТ САМОСБОР. ВСЕМ УКРЫТЬСЯ ЗА ГЕРМОДВЕРЬМИ.",
+      "members": [
+        {
+          "component": "data",
+          "context": "EVENT_543",
+          "target": "ATTENTION. SAMOSBOR. EVERYONE TAKE COVER BEHIND THE AIRTIGHT DOORS. ATTENTION. SAMOSBOR. EVERYONE TAKE COVER BEHIND THE AIRTIGHT DOORS",
+          "unit": 8695
+        },
+        {
+          "component": "data",
+          "context": "EVENT_763",
+          "target": "ATTENTION. SAMOSBOR. EVERYONE TAKE SHELTER BEHIND THE AIRTIGHT DOORS. ATTENTION. SAMOSBOR. EVERYONE TAKE SHELTER BEHIND THE AIRTIGHT DOORS",
+          "unit": 9772
+        }
+      ]
+    }
+  ]
+}

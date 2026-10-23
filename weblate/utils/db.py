@@ -1,0 +1,236 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Database specific code to extend Django."""
+
+from __future__ import annotations
+
+import time
+from shutil import disk_usage
+from typing import TYPE_CHECKING
+
+from django.db import DatabaseError, ProgrammingError, connections, transaction
+from django.db.models.lookups import Lookup, PatternLookup, Regex
+
+from .inv_regex import invert_re
+
+if TYPE_CHECKING:
+    from django.db.backends.base.base import BaseDatabaseWrapper
+
+ESCAPED = frozenset(".\\+*?[^]$(){}=!<>|:-")
+
+PG_TRGM = "CREATE INDEX {0}_{1}_fulltext ON trans_{0} USING GIN ({1} gin_trgm_ops {2})"
+PG_DROP = "DROP INDEX {0}_{1}_fulltext"
+
+
+class MissingTransactionError(ProgrammingError):
+    pass
+
+
+def adjust_similarity_threshold(value: float, *, alias: str | None = None) -> None:
+    """
+    Adjust pg_trgm.similarity_threshold for the % operator.
+
+    Ideally we would use directly similarity() in the search, but that doesn't seem
+    to use index, while using % does.
+    """
+    if alias is not None:
+        connection = connections[alias]
+    elif "memory_db" in connections:
+        connection = connections["memory_db"]
+    else:
+        connection = connections["default"]
+
+    current_similarity = getattr(connection, "weblate_similarity", -1)
+    # Ignore only values that are effectively identical at the precision used
+    # by callers. Nearby values can affect whether boundary matches pass the
+    # pg_trgm % operator.
+    if round(current_similarity, 3) == round(value, 3):
+        return
+
+    with connection.cursor() as cursor:
+        # The SELECT has to be executed first as otherwise the trgm extension
+        # might not yet be loaded and GUC setting not possible.
+        if current_similarity == -1:
+            cursor.execute("SELECT show_limit()")
+
+        # Adjust threshold
+        cursor.execute("SELECT set_limit(%s)", [value])
+        connection.weblate_similarity = value  # type: ignore[attr-defined]
+
+
+def is_local_database(connection: BaseDatabaseWrapper) -> bool:
+    """Return whether the database connection points to the local host."""
+    host = connection.settings_dict.get("HOST", "")
+    return host in {"", "localhost", "127.0.0.1", "::1"} or host.startswith("/")
+
+
+def get_database_disk_usage(*, alias: str = "default"):
+    """Return disk usage for the local PostgreSQL data directory."""
+    connection = connections[alias]
+    if connection.vendor != "postgresql" or not is_local_database(connection):
+        return None
+
+    def get_data_directory() -> str:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('data_directory')")
+            return cursor.fetchone()[0]
+
+    try:
+        if connection.in_atomic_block is True:
+            with transaction.atomic(using=alias):
+                data_directory = get_data_directory()
+        else:
+            data_directory = get_data_directory()
+        return disk_usage(data_directory)
+    except (DatabaseError, OSError):
+        return None
+
+
+def get_database_size(*, alias: str = "default") -> int | None:
+    """Return size of the current PostgreSQL database in bytes."""
+    connection = connections[alias]
+    if connection.vendor != "postgresql":
+        return None
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_database_size(current_database())")
+            return cursor.fetchone()[0]
+    except DatabaseError:
+        return None
+
+
+def get_invalid_database_statistics(*, alias: str = "default") -> list[str]:
+    """Return user relations with non-finite PostgreSQL row estimates."""
+    connection = connections[alias]
+    if connection.vendor != "postgresql":
+        return []
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT DISTINCT namespace.nspname, relation.relname
+              FROM pg_catalog.pg_class statistics
+              LEFT JOIN pg_catalog.pg_index index_statistics
+                ON index_statistics.indexrelid = statistics.oid
+              JOIN pg_catalog.pg_class relation
+                ON relation.oid = COALESCE(
+                    index_statistics.indrelid, statistics.oid
+                )
+              JOIN pg_catalog.pg_namespace namespace
+                ON namespace.oid = relation.relnamespace
+             WHERE statistics.relkind IN ('r', 'm', 'p', 'i')
+               AND namespace.nspname !~ '^pg_'
+               AND namespace.nspname <> 'information_schema'
+               AND statistics.reltuples::text IN ('Infinity', '-Infinity', 'NaN')
+             ORDER BY namespace.nspname, relation.relname
+            """
+        )
+        return [f"{namespace}.{relation}" for namespace, relation in cursor.fetchall()]
+
+
+def count_alnum(string):
+    return sum(map(str.isalnum, string))
+
+
+def use_trgm_fallback(string: str) -> bool:
+    return count_alnum(string) <= 3
+
+
+class PostgreSQLFallbackLookupMixin(Lookup):
+    """
+    Mixin to block PostgreSQL from using trigram index.
+
+    It is ineffective for very short strings as these produce a lot of matches
+    which need to be rechecked and full table scan is more effective in that
+    case.
+
+    It is performed by concatenating empty string which will prevent index usage.
+    """
+
+    def process_lhs(self, compiler, connection, lhs=None):
+        if self._needs_fallback:  # type: ignore[attr-defined]
+            lhs_sql, params = super().process_lhs(compiler, connection, lhs)  # type: ignore[misc]
+            if self.lookup_name in {"trgm_search", "substring"}:
+                # These are matched against UPPER, so convert them
+                return f"UPPER({lhs_sql})", params
+            # This concatenation will prevent using trigram index
+            return f"{lhs_sql} || ''", params
+        return super().process_lhs(compiler, connection, lhs)  # type: ignore[misc]
+
+
+class PostgreSQLFallbackLookup(PostgreSQLFallbackLookupMixin, PatternLookup):
+    def __init__(self, lhs, rhs) -> None:
+        self._needs_fallback = isinstance(rhs, str) and use_trgm_fallback(rhs)
+        super().__init__(lhs, rhs)
+
+
+class PostgreSQLRegexLookup(PostgreSQLFallbackLookupMixin, Regex):
+    def __init__(self, lhs, rhs) -> None:
+        self._needs_fallback = isinstance(rhs, str) and (
+            min((count_alnum(match) for match in invert_re(rhs)), default=0) < 3
+        )
+        super().__init__(lhs, rhs)
+
+
+class PostgreSQLSearchLookup(PostgreSQLFallbackLookup):
+    lookup_name = "trgm_search"
+
+    def process_rhs(self, qn, connection):
+        if not self._needs_fallback:
+            self.param_pattern = "%s"
+        return super().process_rhs(qn, connection)
+
+    def get_rhs_op(self, connection, rhs):
+        if self._needs_fallback:
+            return connection.operators["icontains"] % rhs
+        return f"%% {rhs} = true"
+
+
+class PostgreSQLSubstringLookup(PostgreSQLFallbackLookup):
+    """
+    Case insensitive substring lookup.
+
+    This is essentially same as icontains in Django, but utilizes ILIKE
+    operator which can use pg_trgm index.
+    """
+
+    lookup_name = "substring"
+
+    def get_rhs_op(self, connection, rhs):
+        if self._needs_fallback:
+            return connection.operators["icontains"] % rhs
+        return f"ILIKE {rhs}"
+
+
+def re_escape(pattern: str) -> str:
+    """
+    Escape for use in database regexp match.
+
+    This is based on re.escape, but that one escapes too much.
+    """
+    string = list(pattern)
+    for i, char in enumerate(pattern):
+        if char == "\000":
+            string[i] = "\\000"
+        elif char in ESCAPED:
+            string[i] = "\\" + char
+    return "".join(string)
+
+
+def measure_database_latency() -> float:
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import Project
+
+    start = time.monotonic()
+    Project.objects.exists()
+    return round(1000 * (time.monotonic() - start))
+
+
+def verify_in_transaction() -> None:
+    """Verify the code is executed inside a transaction."""
+    connection = transaction.get_connection()
+    if not connection.in_atomic_block:
+        raise MissingTransactionError

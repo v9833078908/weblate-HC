@@ -1,0 +1,121 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Bulgarian <http://l10n.herocraft.com/projects/need-for-greed/"
+"characterdialogue/bg/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: bg\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 65661046784
+msgid "eggItemReceived"
+msgstr "Яйце! Трябва да се излюпи."
+
+#: 12383040049152
+msgid "cursedItemReceived"
+msgstr "Неее, проклятие!"
+
+#: 16277346455552
+msgid "geodeItemReceived"
+msgstr ""
+"О, геода!\n"
+"Готова за рязане."
+
+#: 16667567722496
+msgid "gemItemReceived"
+msgstr "Ура, лъскави неща!"
+
+#: 17079226077184
+msgid "goldItemReceived"
+msgstr "ОБИЧАМ ЗЛАТОТО!"
+
+#: 17591476424704
+msgid "silverCoinItemReceived"
+msgstr "Мммммм, пари…"
+
+#: 25552772927488
+msgid "wormSpawned"
+msgstr "По дяволите!"
+
+#: 26219063283712
+msgid "highNoise"
+msgstr "Хайде…"
+
+#: 42988977000448
+msgid "pileLooted"
+msgstr "Боклук, но мога да го продам."
+
+#: 44098089390080
+msgid "statsEffectAppliedOnDestroy"
+msgstr "Защо това се случва всеки път?!"
+
+#: 50940257505280
+msgid "timeIsUp"
+msgstr "Какво, няма ли кой друг да дразня?!"
+
+#: 73606410539008
+msgid "noActions1"
+msgstr "Ду-ду-ду…"
+
+#: 73762149240832
+msgid "noActions2"
+msgstr "Добре, ще почакаме."
+
+#: 73828930949120
+msgid "noActions3"
+msgstr "Добре, почивка за цигара."
+
+#: 73889177931776
+msgid "noActions4"
+msgstr "Ех… каквото и да е."
+
+#: 73986347372544
+msgid "noActions5"
+msgstr "Търпение, търпение…"
+
+#: 91507905531904
+msgid "richZoneReached1"
+msgstr "Зловещо… значи много съкровища!"
+
+#: 91695428669440
+msgid "richZoneReached2"
+msgstr "Колкото по-дълбоко отиваме, толкова по-добра е плячката!"
+
+#: 91772155072512
+msgid "richZoneReached3"
+msgstr "Мирише на планини от съкровища!"
+
+#: 42860303913062400
+msgid "coldNight"
+msgstr ""
+"С-с-с-студено\n"
+"е-е-е…"
+
+#: 42861209547182080
+msgid "frostible"
+msgstr ""
+"Т-т-трябва да \n"
+"с-с-се стопля!"
+
+#: 42861912688693248
+msgid "warmedUp"
+msgstr "Ура, топло е!"
+
+#: 42862171338838016
+msgid "frozenRockHit"
+msgstr "Трябва да разтопя леда!"
+
+#: 42862467540586496
+msgid "frozenItemReceived"
+msgstr "Ледено съкровище!"
+
+#: 49631762726780928
+msgid "SuperRare"
+msgstr "Дааааа, джакпот!"

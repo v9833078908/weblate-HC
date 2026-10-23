@@ -1,0 +1,252 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from itertools import chain
+from os.path import splitext
+from typing import TYPE_CHECKING
+
+from django.core.management.base import CommandError
+
+from weblate.checks.models import CHECKS
+from weblate.formats.models import FILE_FORMATS
+from weblate.utils.management.base import DocGeneratorCommand
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+FORMAT_DOC_SNIPPETS_MERGES = {
+    "xliff": [
+        "apple-xliff",
+        "plainxliff",
+        "poxliff",
+    ],
+    "xliff2": [
+        "xliff2-placeables",
+    ],
+    "srt": [
+        "ass",
+        "ssa",
+        "sub",
+    ],
+    "csv": [
+        "csv-multi",
+        "csv-simple",
+    ],
+    "go-i18n-json": [
+        "go-i18n-json-v2",
+    ],
+    "json": [
+        "json-nested",
+    ],
+    "txt": [
+        "mediawiki",
+        "dokuwiki",
+    ],
+}
+
+FORMAT_DOC_EXTENSION_OVERRIDES = {
+    "arb": ("arb",),
+    "po-mono": ("po", "pot"),
+    "xliff2": ("xlf", "xliff"),
+    "xlsx": ("xlsx",),
+    "yaml": ("pyml", "yaml", "yml"),
+}
+
+
+class Command(DocGeneratorCommand):
+    help = "Update format features snippets"
+    output_required = True
+
+    def handle(self, *args, **options) -> None:
+        snippets_dir: Path = options["output"]
+
+        if not snippets_dir.is_dir():
+            msg = f"Error: {snippets_dir} must be a directory"
+            raise CommandError(msg)
+
+        # ignore formats that are merged into other formats
+        ignore_list = set(chain(*FORMAT_DOC_SNIPPETS_MERGES.values()))
+
+        check_id_dash_to_doc_id = {
+            check.check_id.replace("_", "-"): check.doc_id for check in CHECKS.values()
+        }
+
+        for format_id, file_format in FILE_FORMATS.items():
+            if format_id in ignore_list:
+                continue
+            file_path = snippets_dir / f"{format_id}-features.rst"
+            output = []
+            output.extend(
+                [
+                    ".. list-table:: Supported features",
+                    "   :stub-columns: 1",
+                    "",
+                ]
+            )
+
+            match file_format.monolingual:
+                case True:
+                    linguality = "Monolingual"
+                case False:
+                    linguality = "Bilingual"
+                case None:
+                    linguality = "Both monolingual and bilingual"
+                case _:
+                    msg = f"Invalid monolinguality: {file_format.monolingual}"
+                    raise ValueError(msg)
+
+            self.new_list_table_row(
+                output,
+                "File extensions",
+                [
+                    f".{extension}"
+                    for extension in sorted(self.get_extensions(file_format))
+                ],
+            )
+            self.new_list_table_row(output, "Linguality", linguality, "bimono")
+            self.new_list_table_row(
+                output,
+                "Supports plural",
+                file_format.supports_plural,
+                "format-plurals",
+            )
+            self.new_list_table_row(
+                output,
+                "Supports descriptions",
+                file_format.supports_descriptions,
+                "format-description",
+            )
+            self.new_list_table_row(
+                output,
+                "Supports explanation",
+                file_format.supports_explanation,
+                "format-explanation",
+            )
+            self.new_list_table_row(
+                output,
+                "Supports context",
+                file_format.supports_context,
+                "format-context",
+            )
+            self.new_list_table_row(
+                output,
+                "Supports location",
+                file_format.supports_location,
+                "format-location",
+            )
+            self.new_list_table_row(
+                output,
+                "Supports flags",
+                file_format.supports_flags,
+                "format-flags",
+            )
+            self.new_list_table_row(
+                output,
+                "Additional states",
+                sorted([str(state.label) for state in file_format.additional_states]),
+                "format-states",
+            )
+            api_identifiers = [file_format.format_id]
+            api_identifiers.extend(
+                FORMAT_DOC_SNIPPETS_MERGES.get(file_format.format_id, [])
+            )
+
+            self.new_list_table_row(output, "API identifier", sorted(api_identifiers))
+
+            self.new_list_table_row(
+                output,
+                "Supports read-only strings",
+                file_format.supports_read_only,
+                "read-only-strings",
+            )
+            self.new_list_table_row(
+                output,
+                "Supports removing obsolete strings",
+                file_format.supports_remove_obsolete_units,
+                "obsolete-strings",
+            )
+
+            if file_format.check_flags:
+                check_doc_ids: str = ", ".join(
+                    [
+                        f":ref:`{check_id_dash_to_doc_id[check_id]}`"
+                        if check_id in check_id_dash_to_doc_id
+                        else f"``{check_id}``"
+                        for check_id in file_format.check_flags
+                    ]
+                )
+
+                self.new_list_table_row(
+                    output,
+                    "Check flags added by this format",
+                    check_doc_ids,
+                    "custom-checks",
+                )
+
+            if file_path.exists():
+                lines = file_path.read_text(encoding="utf-8").splitlines()
+            else:
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                lines = []
+
+            start_marker, end_marker = self.autogenerated_markers(
+                f"format-features {format_id}"
+            )
+            output = self.insert_markers(output, start_marker, end_marker)
+            lines = self.insert_content_in_lines(
+                output,
+                lines,
+                start_marker,
+                end_marker,
+            )
+            lines.append("")
+            file_path.write_text("\n".join(lines), encoding="utf-8")
+
+    def new_list_table_row(
+        self,
+        lines,
+        feature_name: str,
+        value: str | bool | list[str],
+        doc_link: str | None = "",
+    ) -> None:
+        if isinstance(value, bool):
+            value = "``Yes``" if value else "``No``"
+        elif isinstance(value, list):
+            value = ", ".join([f"``{item}``" for item in value])
+
+        if not value:
+            return
+
+        if doc_link:
+            feature_name = f"{feature_name} :ref:`ⓘ <{doc_link}>`"
+
+        lines.extend(
+            [
+                f"   * - {feature_name}",
+                f"     - {value}",
+            ]
+        )
+
+    def get_extensions(self, file_format) -> set[str]:
+        if file_format.format_id in FORMAT_DOC_EXTENSION_OVERRIDES:
+            common_extensions = list(
+                FORMAT_DOC_EXTENSION_OVERRIDES[file_format.format_id]
+            )
+        elif "autoload" in file_format.__dict__ and file_format.autoload:
+            common_extensions = [
+                extension
+                for pattern in file_format.autoload
+                if (extension := splitext(pattern)[1].removeprefix("."))
+            ]
+            common_extensions.append(file_format.extension())
+        else:
+            common_extensions = [file_format.extension()]
+
+        if file_format.format_id in FORMAT_DOC_SNIPPETS_MERGES:
+            for similar_format in FORMAT_DOC_SNIPPETS_MERGES[file_format.format_id]:
+                common_extensions.extend(
+                    self.get_extensions(FILE_FORMATS[similar_format])
+                )
+
+        return set(common_extensions)

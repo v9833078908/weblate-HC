@@ -1,0 +1,106 @@
+{
+  "project": "strategy-and-tactics-2",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-10",
+  "components": [
+    "glosssary",
+    "summer-update"
+  ],
+  "glossary_components": [
+    "glosssary"
+  ],
+  "languages": [
+    "zh_Hans",
+    "en",
+    "ru"
+  ],
+  "units_fetched": 2052,
+  "target_units_compared": 1302,
+  "repeated_source_groups": 26,
+  "folds": {
+    "strict": {
+      "diverging_groups": 1,
+      "distinct_sources": 1,
+      "per_language": {
+        "zh_Hans": 1
+      },
+      "scope": {
+        "intra_component": 1,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 1
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 1,
+      "distinct_sources": 1,
+      "per_language": {
+        "zh_Hans": 1
+      },
+      "scope": {
+        "intra_component": 1,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 1
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 1,
+      "distinct_sources": 1,
+      "per_language": {
+        "zh_Hans": 1
+      },
+      "scope": {
+        "intra_component": 1,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 1
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 1,
+      "distinct_sources": 1,
+      "per_language": {
+        "zh_Hans": 1
+      },
+      "scope": {
+        "intra_component": 1,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 1
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": [
+    {
+      "language": "zh_Hans",
+      "source": "promoted",
+      "members": [
+        {
+          "component": "summer-update",
+          "context": "ID_RANK_STATUS_NOTIFICATION_RANK_UP_MULTI",
+          "target": "晋升",
+          "unit": 387545
+        },
+        {
+          "component": "summer-update",
+          "context": "ID_RANK_STATUS_NOTIFICATION_RANK_UP_SINGLE",
+          "target": "已提升",
+          "unit": 387543
+        }
+      ]
+    }
+  ]
+}

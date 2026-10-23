@@ -1,0 +1,166 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-25 18:39+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: French <http://l10n.herocraft.com/projects/need-for-greed/"
+"survey/fr/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+
+#: 294040899584
+msgid "survey1Intro"
+msgstr ""
+"Hé ! Le Cheval veut éclaircir quelque chose.\n"
+"\n"
+"Juste quelques questions rapides pour savoir à qui elle a affaire.\n"
+"Cela ne prendra pas plus d'une minute."
+
+#: 384566562816
+msgid "survey1Final"
+msgstr ""
+"On dirait que… vous avez réussi le test !\n"
+"\n"
+"Elle s'est souvenue de vos réponses.\n"
+"Et apparemment, elle a décidé de ne pas vous laisser tomber."
+
+#: 5159299321856
+msgid "survey1AcceptDescription"
+msgstr "Vous recevrez une récompense."
+
+#: 5354862940160
+msgid "survey1DeclineDescription"
+msgstr ""
+"Elle survivra…\n"
+"probablement."
+
+#: 5940509413376
+msgid "survey1Question1"
+msgstr ""
+"Quel âge avez-vous ?\n"
+"Ne mentez pas. Elle le saura."
+
+#: 15613778202624
+msgid "survey1Question1Answer1"
+msgstr "Moins de 15 ans"
+
+#: 15721877999616
+msgid "survey1Question1Answer2"
+msgstr "15 - 20 ans"
+
+#: 15806955261952
+msgid "survey1Question1Answer3"
+msgstr "21 - 29 ans"
+
+#: 15875448246272
+msgid "survey1Question1Answer4"
+msgstr "30 - 40 ans"
+
+#: 15939973419008
+msgid "survey1Question1Answer5"
+msgstr "40 ans et plus"
+
+#: 16047045611520
+msgid "survey1Question2"
+msgstr ""
+"Qui êtes-vous ?\n"
+"Pas besoin de trop de détails."
+
+#: 16356262285312
+msgid "survey1Question2Answer1"
+msgstr "H"
+
+#: 16421546627072
+msgid "survey1Question2Answer2"
+msgstr "F"
+
+#: 16480354963456
+msgid "survey1Question2Answer3"
+msgstr "Secret"
+
+#: 16583924912128
+msgid "survey1Question3"
+msgstr "Pourquoi êtes-vous ici ?"
+
+#: 16952520347648
+msgid "survey1Question3Answer1"
+msgstr "Courir partout et ramasser du butin"
+
+#: 17065502314496
+msgid "survey1Question3Answer2"
+msgstr "Fabriquer et vendre"
+
+#: 17147127664640
+msgid "survey1Question3Answer3"
+msgstr "Améliorations et progression"
+
+#: 17285803937792
+msgid "survey1Question3Answer4"
+msgstr "Juste l'ambiance…"
+
+#: 17383480889344
+msgid "survey1Question4"
+msgstr "Que manque-t-il pour vous empêcher de partir ?"
+
+#: 17980544258048
+msgid "survey1Question4Answer1"
+msgstr "Plus d'histoire"
+
+#: 18049771245568
+msgid "survey1Question4Answer2"
+msgstr "Nouveaux dangers, rochers et trésors"
+
+#: 18206881484800
+msgid "survey1Question4Answer3"
+msgstr "Nouveaux objets"
+
+#: 18275869396992
+msgid "survey1Question4Answer4"
+msgstr "Nouveaux lieux"
+
+#: 18730255126528
+msgid "survey1Question4Answer5"
+msgstr "Succès et récompenses"
+
+#: 19109206298624
+msgid "survey1Question5"
+msgstr "Que faut-il corriger en premier ?"
+
+#: 19176772341760
+msgid "survey1Question5Answer1"
+msgstr "Dialogue"
+
+#: 19256145350656
+msgid "survey1Question5Answer2"
+msgstr "Récompenses"
+
+#: 19311245922304
+msgid "survey1Question5Answer3"
+msgstr "Difficulté de la Recette"
+
+#: 19403713548288
+msgid "survey1Question5Answer4"
+msgstr "Densité de la Carte"
+
+#: 19475515838464
+msgid "survey1Question5Answer5"
+msgstr "Tout va bien"
+
+#: 27306583396352
+msgid "surveyDialogTitle"
+msgstr "Sondage rapide"
+
+#: 28690401726464
+msgid "startSurvey"
+msgstr "Démarrer"
+
+#: 30707396382720
+msgid "claimReward"
+msgstr "Réclamer la récompense"

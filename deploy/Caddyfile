@@ -1,0 +1,25 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# CADDY_SITE_ADDRESS controls the listener and TLS:
+#   :80                      plain HTTP, for an office-internal server
+#   weblate.example.com      public hostname, automatic Let's Encrypt TLS
+#   https://loc.office.lan   internal hostname, add `tls internal` below
+
+{$CADDY_SITE_ADDRESS} {
+	encode zstd gzip
+
+	# Weblate serves large translation files and repository operations.
+	request_body {
+		max_size 200MB
+	}
+
+	reverse_proxy weblate:8080 {
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% load i18n static %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'home' %}">{% translate "Internal Server Error" %}</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+  <h2>{% translate "Server Error" %}</h2>
+
+  {% if sentry_event_id %}
+
+    <p>
+      {% blocktranslate with error_id=sentry_event_id %}The server had serious problems serving your request, and this error has been recorded as {{ error_id }}.{% endblocktranslate %}
+    </p>
+
+    {% if sentry_dsn %}
+      <script src="{% static "js/vendor/sentry.js" %}"></script>
+      <script src="{% static 'js/sentry-feedback.js' %}"
+              id="sentry-feedback"
+              data-dsn="{{ sentry_dsn }}"
+              data-event-id="{{ sentry_event_id }}"
+              {% if request.user.is_authenticated %} data-user-name="{{ user.full_name }}" data-user-email="{{ user.email }}" {% endif %}></script>
+    {% endif %}
+
+  {% else %}
+
+    <p>
+      {% blocktranslate %}The server had serious problems serving your request. You might want to contact server admins in case the error persists.{% endblocktranslate %}
+    </p>
+
+  {% endif %}
+
+{% endblock content %}

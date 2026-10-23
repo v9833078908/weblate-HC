@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'about' %}">{% translate "About HCGameLoc" %}</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{% translate "About HCGameLoc" %}</h4>
+    </div>
+    <div class="card-body">{% include "snippets/about.html" %}</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{% translate "HCGameLoc is built on libre software" %}</h4>
+    </div>
+    <div class="card-body formats">
+      {% for ver in versions %}
+        <a class="format-item" href="{{ ver.1 }}">{{ ver.0 }}
+          {% if show_version_details %}<span>{{ ver.2 }}</span>{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+{% endblock content %}

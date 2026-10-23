@@ -1,0 +1,152 @@
+{% load humanize i18n permissions translations %}
+
+{% get_translate_url object as translate_url %}
+{% url 'translate' path=object.get_url_path as edit_url %}
+{% url 'zen' path=object.get_url_path as zen_url %}
+{% url 'browse' path=object.get_url_path as browse_url %}
+
+<div class="card {% if object.is_source %}card-warning{% endif %}">
+  <div class="card-header">
+    <h4 class="card-title">
+      {% if object.is_source %}
+        {% translate "Source strings" %}
+      {% else %}
+        {% translate "Translation status" %}
+      {% endif %}
+    </h4>
+  </div>
+
+  <table class="table table-autowidth">
+    <tr>
+      <th class="number">{{ object.stats.all|intcomma }}</th>
+      <td>{% translate "Strings" %}</td>
+      <td class="progress-cell align-middle d-none d-sm-table-cell">{% translation_progress object %}</td>
+      <td class="percent">{{ object.stats.translated_without_checks_percent|percent_format }}</td>
+      <td rowspan="3" class="buttons-cell full-cell">
+        <div class="float-end">
+          {% if user_can_add_unit %}
+            <a id="string-add" class="btn btn-info" href="#">{{ object.component.get_add_label }}</a>
+          {% endif %}
+          <a href="{{ browse_url }}" class="btn btn-info">{% translate "Browse" %}</a>
+          <a href="{% get_translate_url object glossary_browse=False %}{% if object.stats.todo > 0 %}?q=state:&lt;translated{% endif %}"
+             class="btn btn-primary">{% translate "Translate" %}</a>
+        </div>
+      </td>
+    </tr>
+
+    <tr>
+      <th class="number">{{ object.stats.all_words|intcomma }}</th>
+      <td>{% translate "Words" %}</td>
+      <td class="progress-cell align-middle d-none d-sm-table-cell">{% words_progress object %}</td>
+      <td class="percent">{{ object.stats.translated_without_checks_words_percent|percent_format }}</td>
+    </tr>
+
+    <tr>
+      <th class="number">{{ object.stats.all_chars|intcomma }}</th>
+      <td>{% translate "Characters" %}</td>
+      <td class="progress-cell align-middle d-none d-sm-table-cell">{% chars_progress object %}</td>
+      <td class="percent">{{ object.stats.translated_without_checks_chars_percent|percent_format }}</td>
+    </tr>
+  </table>
+
+  {% if object.is_source %}
+    <div class="card-footer">
+      {% translate "This translation is being used as source strings within this component." %}
+    </div>
+  {% endif %}
+
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h4 class="card-title">
+      {% documentation_icon 'user/translating' 'strings-to-check' right=True %}
+      {% translate "Strings status" %}
+    </h4>
+  </div>
+  <table class="table table-autowidth table-listing table-striped">
+    <thead>
+      <tr>
+        <th class="number split-cell wrap-cell">
+          <span>{% translate "Strings" %}</span>
+          <span>{% translate "Words" %}</span>
+          <span>{% translate "Characters" %}</span>
+        </th>
+      </tr>
+    </thead>
+    {% for item in object.list_translation_checks %}
+      <tr data-href="{{ translate_url }}?q={{ item.query }}" class="clickable-row">
+        <th class="number split-cell wrap-cell">
+          <span>{{ item.total|intcomma }}</span>
+          <span>{{ item.words|intcomma }}</span>
+          <span>{{ item.characters|intcomma }}</span>
+        </th>
+        <td class="legend align-middle">
+          {% if item.name != "all" %}
+            <div class="progress"
+                 role="progressbar"
+                 aria-valuenow="100"
+                 aria-valuemin="0"
+                 aria-valuemax="100"
+                 aria-label="{{ item.name }}"
+                 aria-labelledby="check-label-{{ forloop.counter }}">
+              {% if item.color %}
+                <div class="progress-bar{% if item.color != "primary" %} progress-bar-{{ item.color }}{% endif %}"
+                     style="width: 100%"></div>
+              {% endif %}
+            </div>
+          {% endif %}
+        </td>
+        <td class="full-cell">
+          <a href="{{ translate_url }}?q={{ item.query }}"
+             id="check-label-{{ forloop.counter }}">{{ item.name }}</a>
+          {% if item.advisory %}
+            <span class="badge"
+                  title="{% translate "Reported for information: this check also fires on correct strings, so it is not counted as a defect." %}">{% translate "Advisory" %}</span>
+          {% endif %}
+        </td>
+        <td class="wrap-cell">
+          <a class="btn-inline" href="{{ browse_url }}?q={{ item.query }}">{% translate "Browse" %}</a>
+          <a class="btn-inline" href="{{ edit_url }}?q={{ item.query }}">{% translate "Translate" %}</a>
+          <a class="btn-inline" href="{{ zen_url }}?q={{ item.query }}">{% translate "Zen" %}</a>
+          {% if item.check_id == "repeat-drift" and object.project %}
+            <a class="btn-inline"
+               href="{% url 'repeat-queue' project=object.project.slug language=object.language.code %}">{% translate "Open repeat queue" %}</a>
+          {% endif %}
+          {% comment %}
+            `allow_fix_check` is set only where `object` is exactly a
+            Translation (`templates/translation.html`). The aggregate
+            language/category pages that include this snippet have no
+            approved blast radius and the `fix-check` route rejects their
+            scopes, so they must render no Fix action at all (Task 5
+            step 3/5). `item.fix_url_name` - not `item.mass_fixup` - is the
+            gate: `begin_space`/`end_space` carry no `mass_fixup` of their
+            own (they are only fixable through the mapped
+            `edge-space-remove` mechanical group), so gating on
+            `mass_fixup` alone would silently drop a working Fix link
+            (docs/product/plans/2026-09-09-producer-bulk-punctuation-
+            repair.md, Task D).
+
+            `unit.bulk_edit` is checked here for the very scope the link
+            targets, exactly like `templates/translate.html` does for
+            "Fix all such strings": `check_autotranslate` refuses a
+            source-language translation without an intermediate language
+            outright, before any role or superuser grant is consulted
+            (`weblate/auth/permissions.py`), so on a source-language page
+            an ungated link is always a dead end that answers 403. The
+            one exception is a source check (`ellipsis`) on that very
+            page: its rows are the source strings, so the gate is the
+            component (`fix_check_permission_object`).
+          {% endcomment %}
+          {% if allow_fix_check and item.fix_url_name and object.pk %}
+            {% perm 'unit.bulk_edit' object|fix_check_perm_object:item.fix_url_name as user_can_fix_all %}
+            {% if user_can_fix_all %}
+              <a class="btn-inline"
+                 href="{% url 'fix-check' name=item.fix_url_name path=object.get_url_path %}">{% translate "Fix" %}</a>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>

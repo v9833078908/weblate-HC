@@ -1,0 +1,513 @@
+{
+  "_environment": "dev-docker mirror",
+  "_scope": "col4/data/fr",
+  "glossary_terms_excluded": 153,
+  "layer_a_identical_sources": {
+    "_what": "Groups of units whose normalized source is identical. Directly comparable targets, so these numbers are facts.",
+    "_why_the_check_is_blind": "Unit.objects.same() (weblate/trans/models/unit.py:380-388) matches on source AND context, so the stock inconsistent check only sees repeats that also share a msgctxt. In a keyed game corpus every unit has its own key, which is why the count above is what it is. This is structural, not a configuration mistake.",
+    "drifting_groups_seen_by_inconsistent_check": 0,
+    "drifting_groups_seen_by_inconsistent_check_pct": 0.0,
+    "drifting_groups_with_a_shared_context": 0,
+    "examples": [
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "rester allongé sans bouger",
+          "rester immobile"
+        ],
+        "source": "лежать и не шевелиться",
+        "units": 3
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "c'est elle, la responsable",
+          "c'est tout elle"
+        ],
+        "source": "это всё она",
+        "units": 2
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "vous n'avez pas eu le temps de finir que votre professeur est apparue derrière le coin",
+          "à peine aviez-vous fini de parler que votre professeure apparut au coin de la rue"
+        ],
+        "source": "не успели вы договорить, как из-за угла выглянула ваша учительница",
+        "units": 2
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "garder le silence",
+          "laisser la parole",
+          "ne rien dire",
+          "se taire"
+        ],
+        "source": "промолчать",
+        "units": 9
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "cérémonie des drapeaux de maison commence",
+          "la célébration des bannissements de la faction commence",
+          "le défilé des bannières des ménages commence"
+        ],
+        "source": "начинается чествование знамён хозяйств",
+        "units": 3
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "continuer",
+          "continuer tout droit"
+        ],
+        "source": "идти дальше",
+        "units": 4
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "s'enfuir",
+          "s'échapper"
+        ],
+        "source": "убежать",
+        "units": 2
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "obtenir une récompense",
+          "recevoir la récompense"
+        ],
+        "source": "получить награду",
+        "units": 3
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "rentrer à la maison",
+          "retourner à la cellule"
+        ],
+        "source": "вернуться домой",
+        "units": 2
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "c'est exact",
+          "exactement"
+        ],
+        "source": "так точно",
+        "units": 5
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "avec ce masque à gaz, personne ne vous comprend",
+          "personne ne vous comprend avec ce masque à gaz"
+        ],
+        "source": "в этом противогазе вас никто не понимает",
+        "units": 2
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "jeter un coup d'œil",
+          "regarder"
+        ],
+        "source": "подсмотреть",
+        "units": 2
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "faire signe",
+          "faire un signe de la main"
+        ],
+        "source": "помахать",
+        "units": 2
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "le vieil homme se réveille brusquement, saute comme s'il était brûlé et commence ses exercices",
+          "le vieil homme se réveille en sursaut, bondit comme s'il était brûlé et commence à faire des exercices"
+        ],
+        "source": "старик резко просыпается, вскакивает, как ошпаренный и начинает делать зарядку",
+        "units": 2
+      },
+      {
+        "flagged_by_inconsistent": false,
+        "renderings": [
+          "on vous a donné une base - l'équipement de base du liquidateur. et un jeton avec le numéro personnel bp-1010111",
+          "on vous a donné une base – l'équipement de base d'un liquidateur. et un jeton avec le numéro personnel vp-1010111"
+        ],
+        "source": "вам выдали базу - базовое снаряжение ликвидатора. и жетон с личным номером вп-1010111",
+        "units": 2
+      }
+    ],
+    "groups": 146,
+    "normalized_drift": 84,
+    "normalized_drift_pct": 57.5,
+    "raw_drift": 106,
+    "raw_drift_pct": 72.6,
+    "units_in_drifting_groups": 215,
+    "units_in_groups": 372
+  },
+  "layer_b_repeated_phrases": {
+    "_proxy_bias": "A high ratio calls loose but correct paraphrase a drift; a low ratio calls an accidental shared article a match. Both ratios are reported for that reason.",
+    "_strata": "multiword = phrases of two or more tokens. single_proper = one token seen capitalized mid-sentence somewhere, so a name or a piece of realia - the stratum Cathedral's first-mention canon was about. single_common = one token never capitalized, ordinary vocabulary, reported so its noise is visible rather than folded into the headline.",
+    "_what": "Repeated non-glossary source phrases inside different sentences. No target-side alignment exists, so consistency is a proxy: some substring of length ratio*len(phrase) present in every target of the group.",
+    "candidate_phrases": 9223,
+    "examples": {
+      "multiword": [
+        {
+          "phrase": "смотрит на",
+          "targets": [
+            "le vieil homme vous regarde avec méfiance",
+            "le vieil homme vous regarde, puis bondit sur vous avec un couteau",
+            "l'image du moisi de la petite enfance, surgie dans votre esprit, ne vous permet pas de dire un mot. ",
+            "vous voyez une cellule confortablement meublée. près d'une petite télévision se tient une vieille fe"
+          ],
+          "units": 36
+        },
+        {
+          "phrase": "смотрит на вас",
+          "targets": [
+            "le vieil homme vous regarde avec méfiance",
+            "le vieil homme vous regarde, puis bondit sur vous avec un couteau",
+            "l'image du moisi de la petite enfance, surgie dans votre esprit, ne vous permet pas de dire un mot. ",
+            "vous voyez une cellule confortablement meublée. près d'une petite télévision se tient une vieille fe"
+          ],
+          "units": 30
+        },
+        {
+          "phrase": "ничего не",
+          "targets": [
+            "il y avait de la moisissure ici. un contact est possible. vérifiez tous les coins ! et toi, que dis-",
+            "le scientifique dit à ses hommes d'aller dans cette direction, mais ils ne trouvent rien là-bas",
+            "vous avez rapidement et habilement mis votre masque à gaz, votre vie n'est pas en danger",
+            "vous appuyez sur le bouton, mais rien ne se passe. encore. et encore. la cinquième fois, vous êtes é"
+          ],
+          "units": 26
+        },
+        {
+          "phrase": "а потом",
+          "targets": [
+            "le gaillard vous a aussi regardé, puis s'est détourné. vous ne vous connaissez pas",
+            "vous avez lu jusqu'à la section \"dépressurisation de la cellule\". la première chose à faire est de m",
+            "nastya a souri légèrement, puis s'est éteinte à nouveau",
+            "regarde-moi ça, quel brave type ! alors vas-y, va chercher le registre de présence. c'est deux virag"
+          ],
+          "units": 25
+        },
+        {
+          "phrase": "в лабораторию",
+          "targets": [
+            "en vous précipitant dans le laboratoire, vous trébuchez sur pasha qui rampe vers la porte. des lambe",
+            "le passage vers le laboratoire est désormais ouvert. le commissaire s'y dirige sans se soucier du so",
+            "plus loin dans le couloir, vous trouvez une brèche dans le mur. _x000b_« on dirait le passage que le",
+            "nastya a tenté de s'échapper par le tunnel que les purs avaient percé dans le laboratoire, mais le c"
+          ],
+          "units": 23
+        },
+        {
+          "phrase": "перед вами",
+          "targets": [
+            "pensant que vous aviez affaire à un mutant, vous avez jeté le premier flacon venu sur votre chef. ma",
+            "devant vous se trouve un panneau de commande d'équipement, derrière vous se trouve pasha en feu",
+            "la mémoire n'a pas failli. le bureau des \"professeurs\" est juste devant vous, le journal est sur la ",
+            "tu as réussi à endormir la fille avec tes paroles, puis tu t'es jeté sur elle. à ce moment-là, une d"
+          ],
+          "units": 22
+        },
+        {
+          "phrase": "с вами",
+          "targets": [
+            "donc, je peux aussi juste discuter avec vous",
+            "cinq personnes au total. trois gars silencieux et pas très joyeux. même le cadet maxim est avec vous",
+            "soudain, tu as ressenti une faim atroce et l'homme a partagé avec toi un morceau de viande d'origine",
+            "les tests montrent que tout va bien pour vous. vous êtes en bonne santé, ce qui signifie que les pur"
+          ],
+          "units": 20
+        },
+        {
+          "phrase": "в сторону",
+          "targets": [
+            "vous êtes maîtrisé et emmené à l'écart",
+            "vous n'avez pas le temps de finir, le garde vous frappe à la tête et vous emmène brutalement à l'éca",
+            "s'éloigner",
+            "sauter sur le côté"
+          ],
+          "units": 18
+        },
+        {
+          "phrase": "в училище",
+          "targets": [
+            "tout au long de votre jeunesse, vous vous êtes montré un membre dévoué du parti. vos parents vous fo",
+            "maksim s'est porté garant de vous - on vous croit et on est prêt à considérer votre candidature pour",
+            "le parti vous a examiné et il s'est avéré que vous lui avez été fidèle toute votre jeunesse. vous êt",
+            "stop. à mi-chemin, vous vous êtes souvenu que vous apportiez des documents à l'école. et le principa"
+          ],
+          "units": 16
+        },
+        {
+          "phrase": "даже не",
+          "targets": [
+            "si jeune, je ne me souviens même pas de cette époque... vas-y, mon pote, on se reverra. et souviens-",
+            "pasha hausse les épaules et boit une éprouvette de liquide trouble, sans même manger un concentré al",
+            "quelque chose d'indescriptible était assis sur les toilettes. vous ne vous souvenez même pas comment",
+            "et ils n'ont même pas demandé le statut"
+          ],
+          "units": 15
+        },
+        {
+          "phrase": "что происходит",
+          "targets": [
+            "vous ne comprenez plus ce qui se passe autour",
+            "vous n'entendez plus ce qui se passe autour",
+            "écouter ce qui se passe derrière la porte",
+            "vous écoutez ce qui se passe à l'extérieur et manquez le moment où la propriétaire de la cellule vou"
+          ],
+          "units": 13
+        },
+        {
+          "phrase": "вы чувствуете",
+          "targets": [
+            "vous sentez l'air froid se répandre dans votre poitrine",
+            "vous avez réussi à tenir jusqu'à la fin du défilé, mais vous avez la tête qui tourne et vous vous se",
+            "vous recevez la récompense du meilleur pionnier porte-étendard. tout le monde vous félicite, mais vo",
+            "après la troisième éprouvette, vous sentez que votre conscience vous quitte. voilà pourquoi le clair"
+          ],
+          "units": 12
+        }
+      ],
+      "single_common": [
+        {
+          "phrase": "даже",
+          "targets": [
+            "vous avez lancé le recueil un peu trop fort",
+            "si jeune, je ne me souviens même pas de cette époque... vas-y, mon pote, on se reverra. et souviens-",
+            "vous continuez, en vous retenant, en serrant le manche de l'étendard jusqu'à ce que vos jointures bl",
+            "je ne me salirai même pas la cravate"
+          ],
+          "units": 49
+        },
+        {
+          "phrase": "несколько",
+          "targets": [
+            "plusieurs élèves de première année avec des masques à gaz courent devant vous",
+            "les infirmières changent vos couches et vous nourrissent. quelques cycles passent ainsi",
+            "plusieurs pages du chapitre \"dépressurisation de la cellule\" sont arrachées, vous les avez utilisées",
+            "il vous a semblé voir des morceaux de corps d'habitants du bloc fusionnés dans des poses anormales. "
+          ],
+          "units": 47
+        },
+        {
+          "phrase": "смотрит",
+          "targets": [
+            "le gars vous regarde en retour et sourit",
+            "le scientifique fronce les sourcils et regarde d'un air menaçant",
+            "vous décidez d'ouvrir la porte. de la cabine, cachant soigneusement sa main, une fille de la classe ",
+            "tout autour scintille et vacille. vous êtes allongé dans un berceau pour nouveau-nés. une sorte de m"
+          ],
+          "units": 47
+        },
+        {
+          "phrase": "один",
+          "targets": [
+            "yulia n'y a pas prêté attention non plus. finalement, l'un des enfants a percuté un poteau en béton ",
+            "vous avez forcé les enfants à ranger leur masque à gaz dans leur sac banane. maintenant, ils jouent ",
+            "vous restez seul. l'image de la moisissure surgit dans votre esprit – vous vous en souviendrez pour ",
+            "la porte blindée s'est déjà tordue en spirale et ne tient plus que par le dernier gond. l'un des cad"
+          ],
+          "units": 44
+        },
+        {
+          "phrase": "время",
+          "targets": [
+            "petrovitch a pointé le jet de son lance-flammes sur le tas incompréhensible de vase violette et de c",
+            "hé, ouais, je me souviens, c'était le bon vieux temps. mamie n'a plus jamais laissé d'invités venir ",
+            "un quart de travail complet a été nécessaire pour le nettoyage. pendant ce temps, vous avez eu le te",
+            "il s'est avéré que c'était un voleur qui n'avait pas été pris depuis longtemps. tout le groupe est r"
+          ],
+          "units": 43
+        },
+        {
+          "phrase": "лаборатории",
+          "targets": [
+            "ici, nous avons les analystes, là-bas les laboratoires, ici la cantine... et voici le plus intéressa",
+            "désireux de faire vos preuves, vous classez docilement les résultats sans regarder autour de vous. p",
+            "vous vous ennuyez vite et commencez à compter les mangeurs de béton dans la cage. hé, qu'est-ce que ",
+            "soudain, un bruit sec retentit dans le laboratoire, suivi d'un sifflement. vous courez vers la porte"
+          ],
+          "units": 42
+        },
+        {
+          "phrase": "через",
+          "targets": [
+            "quelques instants plus tard, vous tombez en raison d'une faiblesse aiguë",
+            "couper à travers les couloirs",
+            "petrovitch a pointé le jet de son lance-flammes sur le tas incompréhensible de vase violette et de c",
+            "quelques minutes plus tard, vous le regrettez. vous entendez de faibles gémissements provenant des c"
+          ],
+          "units": 42
+        },
+        {
+          "phrase": "нужно",
+          "targets": [
+            "un silence gênant s'installe. il faut faire quelque chose",
+            "vous avez lu jusqu'à la section \"dépressurisation de la cellule\". la première chose à faire est de m",
+            "bon, les gars, pas de panique. selon le règlement, en cas de dépressurisation de la cellule, il faut",
+            "vous avez juste besoin de parler"
+          ],
+          "units": 41
+        },
+        {
+          "phrase": "перед",
+          "targets": [
+            "vous êtes à l'avant-garde et tenez la bannière devant vous. l'orchestre commence à jouer une musique",
+            "la menace n'a pas fonctionné. le vieil homme sourit et se jette sur vous. avant que vous ne puissiez",
+            "seul un civil a réussi à atteindre la porte blindée, et encore, il a muté une heure plus tard. de pl",
+            "pensant que vous aviez affaire à un mutant, vous avez jeté le premier flacon venu sur votre chef. ma"
+          ],
+          "units": 41
+        },
+        {
+          "phrase": "просто",
+          "targets": [
+            "j'étais juste plus rapide, c'est la vie",
+            "j'étais juste content, c'est tout",
+            "arrêtez de vous ajuster. continuez simplement à marcher",
+            "non, juste rapide"
+          ],
+          "units": 41
+        },
+        {
+          "phrase": "ничего",
+          "targets": [
+            "il y avait de la moisissure ici. un contact est possible. vérifiez tous les coins ! et toi, que dis-",
+            "le scientifique dit à ses hommes d'aller dans cette direction, mais ils ne trouvent rien là-bas",
+            "vous avez rapidement et habilement mis votre masque à gaz, votre vie n'est pas en danger",
+            "il s'est avéré que ce n'était rien de grave. les parents sont déjà au courant que vous êtes bien vu "
+          ],
+          "units": 40
+        },
+        {
+          "phrase": "здесь",
+          "targets": [
+            "il y avait de la moisissure ici. un contact est possible. vérifiez tous les coins ! et toi, que dis-",
+            "bon, vous êtes là depuis un demi-cycle. aujourd'hui, on a une évaluation. on va commencer par vérifi",
+            "c'est le trésor du parti. des gens dignes de respect",
+            "nastya, courage ! ton vétéran du travail - balsaminov pesok palych vit ici. frappe, entre et sois po"
+          ],
+          "units": 39
+        }
+      ],
+      "single_proper": [
+        {
+          "phrase": "хозяйств",
+          "targets": [
+            "jeune homme, vous êtes un vrai pionnier ! vous avez l'honneur de porter la bannière ! n'oubliez pas,",
+            "le directeur vous a réprimandé, et la chef de classe a acquiescé avant de vous coller un -2. vous ne",
+            "moins deux points. vous ne serez pas autorisé à porter le drapeau lors de la cérémonie de l'honneur ",
+            "aujourd'hui est un grand jour : vous portez l'étendard de l'usine de conditionnement de viande lors "
+          ],
+          "units": 9
+        },
+        {
+          "phrase": "хозяйства",
+          "targets": [
+            "les maisonnées sont classées par ancienneté. plus on s'éloigne, plus elles sont jeunes. vous n'avez ",
+            "étonnamment, l'âge de la maisonnée est écrit dessus",
+            "tu ne parviens pas à trouver ta place, car tu ne connais pas l'histoire de ton foyer. il ne reste pl",
+            "vous arrivez au bout de la colonne quand vous remarquez l'âge du foyer sur votre bannière - il a plu"
+          ],
+          "units": 6
+        },
+        {
+          "phrase": "хриплого",
+          "targets": [
+            "vous distinguez à peine les mots de hriplog, quelque chose à propos de livraisons et d'expériences. ",
+            "vous distinguez à peine les mots de hriplog, quelque chose à propos de livraisons et d'expériences, ",
+            "tout est assemblé, et hriplogo n'est plus là depuis deux équipes",
+            "vous étiez tellement surpris de voir un visage familier ici que seul le juron sonore d'enroué vous a"
+          ],
+          "units": 5
+        },
+        {
+          "phrase": "чествование",
+          "targets": [
+            "le défilé des bannières des ménages commence",
+            "cérémonie des drapeaux de maison commence",
+            "la célébration des bannissements de la faction commence",
+            "vous traversez toute la cérémonie avec confiance. excellent"
+          ],
+          "units": 5
+        },
+        {
+          "phrase": "гнилушку",
+          "targets": [
+            "tu te souviens qu'ils appelaient l'écume",
+            "appelons la pourriture. je n'ai pas peur d'elle, et toi",
+            "invoquez le pourri avec nastya"
+          ],
+          "units": 3
+        }
+      ]
+    },
+    "groups_measured": 5253,
+    "max_group_units": 50,
+    "maximal_groups": 5253,
+    "strata": {
+      "multiword": {
+        "groups": 2627,
+        "ratio_0.5": {
+          "normalized_drift": 310,
+          "normalized_drift_pct": 11.8,
+          "raw_drift": 343,
+          "raw_drift_pct": 13.1
+        },
+        "ratio_0.75": {
+          "normalized_drift": 814,
+          "normalized_drift_pct": 31.0,
+          "raw_drift": 849,
+          "raw_drift_pct": 32.3
+        }
+      },
+      "single_common": {
+        "groups": 2600,
+        "ratio_0.5": {
+          "normalized_drift": 669,
+          "normalized_drift_pct": 25.7,
+          "raw_drift": 717,
+          "raw_drift_pct": 27.6
+        },
+        "ratio_0.75": {
+          "normalized_drift": 1017,
+          "normalized_drift_pct": 39.1,
+          "raw_drift": 1082,
+          "raw_drift_pct": 41.6
+        }
+      },
+      "single_proper": {
+        "groups": 26,
+        "ratio_0.5": {
+          "normalized_drift": 5,
+          "normalized_drift_pct": 19.2,
+          "raw_drift": 6,
+          "raw_drift_pct": 23.1
+        },
+        "ratio_0.75": {
+          "normalized_drift": 7,
+          "normalized_drift_pct": 26.9,
+          "raw_drift": 10,
+          "raw_drift_pct": 38.5
+        }
+      }
+    }
+  },
+  "units_scanned": 3941
+}

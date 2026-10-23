@@ -1,0 +1,149 @@
+{
+  "_comment": "docs/misc/col4-eval-harness.py against production at commit e41508f, one arm per model, same 150-string COL4 ru->fr sample (fingerprint 4db4b89dfd4b), batch 10 and concurrency 2 everywhere. EVAL_MODEL routes every language to one model for the run without touching the stored configuration. Costs are for the 150-string sample; a full 3941-string run is 26 times that.",
+  "_findings": [
+    "gemini-2.5-flash is the best of the cheap tier and the fastest: 28 end_stop of 150 strings against 48 for mistral-medium-3.1 and 53 for deepseek-chat-v3.1, with no wasted replies. Public benchmark standing holds on this task too.",
+    "gemini-2.5-pro is the only model with zero punctuation defects, and it keeps coverage and glossary at 100%. It costs 23 times more ($21 for a full run) and takes 29 times longer (about 6.4 hours for a full run at concurrency 2). Single run, unlike the others it has not been repeated.",
+    "Every model that answered kept glossary adherence at 100% and leaked no Cyrillic, so those are properties of the prompt, not of the model.",
+    "gpt-5-mini cannot be used as we ask: the provider returns 400 for our reply schema (probed directly; plain requests and temperature are fine).",
+    "claude-haiku-4.5 accepts a simple schema when probed directly but produced no parsable reply under the real payload; not chased further.",
+    "A model that fails every request costs 285 requests instead of 15, because a hard error keeps splitting the batch in halves. Worth bounding if such a model is ever configured."
+  ],
+  "arms": [
+    {
+      "batch_size": 10,
+      "cached_tokens": 26082,
+      "checks": {
+        "end_stop": 28,
+        "multiple_capital": 1,
+        "reused": 2
+      },
+      "completion_tokens": 8603,
+      "concurrency": 2,
+      "cost_usd": 0.034814,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {
+        "stop": 15
+      },
+      "glossary_adherence_pct": 100.0,
+      "length_ratio_avg": 1.274,
+      "model": "google/gemini-2.5-flash",
+      "prompt_tokens": 67828,
+      "rejects": {},
+      "requests": 15,
+      "requests_logged": 15,
+      "seconds": 30.4
+    },
+    {
+      "batch_size": 10,
+      "cached_tokens": 45731,
+      "checks": {
+        "end_stop": 53,
+        "reused": 2
+      },
+      "completion_tokens": 7069,
+      "concurrency": 2,
+      "cost_usd": 0.023677,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {
+        "stop": 17
+      },
+      "glossary_adherence_pct": 100.0,
+      "length_ratio_avg": 1.283,
+      "model": "deepseek/deepseek-chat-v3.1",
+      "prompt_tokens": 80349,
+      "rejects": {
+        "json_error": 2
+      },
+      "requests": 17,
+      "requests_logged": 17,
+      "seconds": 151.6
+    },
+    {
+      "batch_size": 10,
+      "cached_tokens": 0,
+      "checks": {},
+      "completion_tokens": 0,
+      "concurrency": 2,
+      "cost_usd": 0,
+      "coverage_pct": 0.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {},
+      "glossary_adherence_pct": null,
+      "length_ratio_avg": null,
+      "model": "openai/gpt-5-mini",
+      "prompt_tokens": 0,
+      "rejects": {},
+      "requests": 0,
+      "requests_logged": 285,
+      "seconds": 64.6
+    },
+    {
+      "batch_size": 10,
+      "cached_tokens": 51254,
+      "checks": {
+        "end_stop": 48,
+        "reused": 1
+      },
+      "completion_tokens": 7342,
+      "concurrency": 2,
+      "cost_usd": 0.024201,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {
+        "stop": 15
+      },
+      "glossary_adherence_pct": 100.0,
+      "length_ratio_avg": 1.312,
+      "model": "mistralai/mistral-medium-3.1",
+      "prompt_tokens": 69920,
+      "rejects": {},
+      "requests": 15,
+      "requests_logged": 15,
+      "seconds": 83.2
+    },
+    {
+      "batch_size": 10,
+      "cached_tokens": 0,
+      "checks": {},
+      "completion_tokens": 0,
+      "concurrency": 2,
+      "cost_usd": 0,
+      "coverage_pct": 0.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {},
+      "glossary_adherence_pct": null,
+      "length_ratio_avg": null,
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 0,
+      "rejects": {},
+      "requests": 0,
+      "requests_logged": 285,
+      "seconds": 217.9
+    },
+    {
+      "batch_size": 10,
+      "cached_tokens": 21173,
+      "checks": {
+        "reused": 2
+      },
+      "completion_tokens": 72081,
+      "concurrency": 2,
+      "cost_usd": 0.809038,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {
+        "stop": 21
+      },
+      "glossary_adherence_pct": 100.0,
+      "length_ratio_avg": 1.26,
+      "model": "google/gemini-2.5-pro",
+      "prompt_tokens": 89638,
+      "rejects": {},
+      "requests": 21,
+      "requests_logged": 27,
+      "seconds": 880.8
+    }
+  ]
+}

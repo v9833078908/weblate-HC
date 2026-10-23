@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'about' %}">{% translate "About HCGameLoc" %}</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'donate' %}">{% translate "Support" %}</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+  <div class="engage container">
+    <h1>{% translate "Support HCGameLoc" %}</h1>
+    {% include "snippets/donate.html" %}
+  </div>
+
+{% endblock content %}

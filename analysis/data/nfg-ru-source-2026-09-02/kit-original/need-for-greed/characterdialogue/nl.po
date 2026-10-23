@@ -1,0 +1,121 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Dutch <http://l10n.herocraft.com/projects/need-for-greed/"
+"characterdialogue/nl/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: nl\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 65661046784
+msgid "eggItemReceived"
+msgstr "Een Ei! Het moet uitgebroed worden."
+
+#: 12383040049152
+msgid "cursedItemReceived"
+msgstr "Nee, een vloek!"
+
+#: 16277346455552
+msgid "geodeItemReceived"
+msgstr ""
+"Oh, een Geode!\n"
+"Klaar om te snijden."
+
+#: 16667567722496
+msgid "gemItemReceived"
+msgstr "Jee, glimmertjes!"
+
+#: 17079226077184
+msgid "goldItemReceived"
+msgstr "IK HOU VAN GOUD!"
+
+#: 17591476424704
+msgid "silverCoinItemReceived"
+msgstr "Mmmmmm, geld…"
+
+#: 25552772927488
+msgid "wormSpawned"
+msgstr "Verdomme!"
+
+#: 26219063283712
+msgid "highNoise"
+msgstr "Kom op…"
+
+#: 42988977000448
+msgid "pileLooted"
+msgstr "Rommel, maar ik kan het verkopen."
+
+#: 44098089390080
+msgid "statsEffectAppliedOnDestroy"
+msgstr "Waarom gebeurt dit elke keer?!"
+
+#: 50940257505280
+msgid "timeIsUp"
+msgstr "Wat, niemand anders om lastig te vallen?!"
+
+#: 73606410539008
+msgid "noActions1"
+msgstr "Doe-doe-doe…"
+
+#: 73762149240832
+msgid "noActions2"
+msgstr "Oké, we wachten wel."
+
+#: 73828930949120
+msgid "noActions3"
+msgstr "Oké, rookpauze."
+
+#: 73889177931776
+msgid "noActions4"
+msgstr "Ach… wat dan ook."
+
+#: 73986347372544
+msgid "noActions5"
+msgstr "Geduld, geduld…"
+
+#: 91507905531904
+msgid "richZoneReached1"
+msgstr "Onheilspellend… betekent veel schatten!"
+
+#: 91695428669440
+msgid "richZoneReached2"
+msgstr "Hoe dieper we gaan, hoe beter de Buit!"
+
+#: 91772155072512
+msgid "richZoneReached3"
+msgstr "Het ruikt naar bergen schatten!"
+
+#: 42860303913062400
+msgid "coldNight"
+msgstr ""
+"K-k-k-koud…\n"
+"k-k-koud…"
+
+#: 42861209547182080
+msgid "frostible"
+msgstr ""
+"M-m-m-moet \n"
+"o-o-opwarmen!"
+
+#: 42861912688693248
+msgid "warmedUp"
+msgstr "Hoera, het is warm!"
+
+#: 42862171338838016
+msgid "frozenRockHit"
+msgstr "Moet het ijs smelten!"
+
+#: 42862467540586496
+msgid "frozenItemReceived"
+msgstr "IJsschat!"
+
+#: 49631762726780928
+msgid "SuperRare"
+msgstr "Jazeker, Jackpot!"

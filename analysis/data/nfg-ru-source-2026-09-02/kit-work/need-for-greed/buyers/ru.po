@@ -1,0 +1,43 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: ru\n"
+
+msgid "Buyer1"
+msgstr "Роман фон Вэлиант"
+
+msgid "Buyer2"
+msgstr "Леди Аметиста"
+
+msgid "Buyer3"
+msgstr "Леонард Голдстейн"
+
+msgid "Buyer4"
+msgstr "Элиза Блескфорд"
+
+msgid "Buyer5"
+msgstr "Лорд Глимо"
+
+msgid "Buyer6"
+msgstr "Эльф Лустро"
+
+msgid "Buyer7"
+msgstr "Сэр Максиллион"
+
+msgid "Buyer8"
+msgstr "Руби Рэй"
+
+msgid "Buyer9"
+msgstr "Рубинобород"
+
+msgid "Buyer10"
+msgstr "Граф Блингула"

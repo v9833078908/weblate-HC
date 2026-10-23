@@ -1,0 +1,379 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-22 10:29+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Spanish <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/es/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: es\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+msgid "orderTerrain0.1Step1Title"
+msgstr "¡Necesitamos más oro!"
+
+msgid "orderTerrain0.1Step1Description"
+msgstr "Tráeme 3 pepitas de oro."
+
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Excelente, estas pepitas harán una buena adición a mi colección."
+
+msgid "orderTerrain1.1Step1Title"
+msgstr "Resplandor del amanecer"
+
+msgid "orderTerrain1.1Step1Description"
+msgstr "Tráeme una pepita de oro de cualquier roca aurífera."
+
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"El oro contiene el resplandor del amanecer; si no puedo verlo, al menos "
+"puedo sentirlo..."
+
+msgid "orderTerrain0.1Step2Title"
+msgstr "¡Excelente trabajo!"
+
+msgid "orderTerrain0.1Step2Description"
+msgstr "¡Gracias por la ayuda! Compartiré un lugar curioso contigo."
+
+msgid "orderTerrain1.1Step2Title"
+msgstr "Unas gafas nuevas"
+
+msgid "orderTerrain1.1Step2Description"
+msgstr "Tráeme 2 diamantes. Con frecuencia se encuentran en rocas de cristal."
+
+msgid "orderTerrain1.1Step2Thank"
+msgstr "A ver si estoy listo para acostumbrarme a esta tierra..."
+
+msgid "orderTerrain1.1Step3Title"
+msgstr "Acostumbrarse a la tierra"
+
+msgid "orderTerrain1.1Step3Description"
+msgstr "Tráeme una geoda pequeña. Se pueden encontrar en rocas ordinarias."
+
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Veamos si estoy listo para acostumbrarme a esta tierra..."
+
+msgid "orderTerrain1.1Step4Title"
+msgstr "Cofre del Hombre Muerto"
+
+msgid "orderTerrain1.1Step4Description"
+msgstr "Tráeme un cofre. Un canario podría ayudarte a encontrar uno."
+
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Así que ahí fue donde dejé mis cosas..."
+
+msgid "orderTerrain1.1Step5Title"
+msgstr "Plata para templar"
+
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Tráeme 3 trozos de plata. Se pueden encontrar en geodas y rocas ordinarias."
+
+msgid "orderTerrain1.1Step6Title"
+msgstr "¡Excelente trabajo!"
+
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Esta plata pica agradablemente en las palmas..."
+
+msgid "orderTerrain1.1Step6Description"
+msgstr ""
+"¡Gracias! Pásate por mi casa en algún momento. Aquí tienes la dirección."
+
+msgid "orderTerrain1.2Step1Title"
+msgstr "Dinero Antiguo"
+
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Tráeme 4 Monedas Antiguas. A menudo se encuentran en macetas y jarrones "
+"antiguos."
+
+msgid "orderTerrain1.2Step1Thank"
+msgstr "¡Ahora por fin puedo darle cambio a los antiguos!"
+
+msgid "orderTerrain1.2Step2Title"
+msgstr "Rodabolas"
+
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Tráeme un Escarabajo Dorado. Son escarabajos grandes que se pueden encontrar "
+"arrastrándose por los arbustos."
+
+msgid "orderTerrain1.2Step2Thank"
+msgstr "¡Este escarabajo es un gran rodabolas!"
+
+msgid "orderTerrain1.2Step3Title"
+msgstr "Bolos de Piedra"
+
+msgid "orderTerrain1.2Step3Description"
+msgstr "Tráeme una Geoda Mediana. A veces aparece en rocas ordinarias."
+
+msgid "orderTerrain1.2Step3Thank"
+msgstr "¡Ahora por fin podré lanzar algunas bolas!"
+
+msgid "orderTerrain1.2Step4Title"
+msgstr "Tortilla Dorada"
+
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Tráeme un Huevo Dorado. Busca entre los arbustos para encontrar un nido que "
+"contenga tales huevos."
+
+msgid "orderTerrain1.2Step4Thank"
+msgstr "¡Ahora, ese es un desayuno para la realeza!"
+
+msgid "orderTerrain1.2Step5Title"
+msgstr "Sangre de León"
+
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Tráeme un Rubí de León. Se puede encontrar en geodas con cristales rojos."
+
+msgid "orderTerrain1.2Step5Thank"
+msgstr "¡Ahora seré valiente como un león!"
+
+msgid "orderTerrain1.2Step6Title"
+msgstr "Gracia Celestial"
+
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Tráeme un Zafiro Celestial. Se puede encontrar en geodas con cristales "
+"azules."
+
+msgid "orderTerrain1.2Step6Thank"
+msgstr "¡Los mismos cielos están de mi lado!"
+
+msgid "orderTerrain1.2Step7Title"
+msgstr "Inodoro de oro"
+
+msgid "orderTerrain1.2Step7Description"
+msgstr "Tráeme un lingote de oro 9 de cualquier roca aurífera."
+
+msgid "orderTerrain1.2Step7Thank"
+msgstr "¡Por fin puedo arreglar el baño!"
+
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Si quieres pedir deseos, conozco un lugar donde las estrellas caen todo el "
+"tiempo."
+
+msgid "orderTerrain1.2Step8Title"
+msgstr "¡Excelente trabajo!"
+
+msgid "orderTerrain2.1Step5Title"
+msgstr "¡Excelente trabajo!"
+
+msgid "orderTerrain2.1Step5Description"
+msgstr "El hielo me recuerda a la abuela... ¡Pasa también por su cabaña!"
+
+msgid "orderTerrain2.1Step1Description"
+msgstr "Tráeme 2 objetos congelados de las rocas heladas."
+
+msgid "orderTerrain2.1Step1Title"
+msgstr "Cubos de hielo"
+
+msgid "orderTerrain2.1Step1Thank"
+msgstr "¡Perfecto para mis cócteles!"
+
+msgid "orderTerrain2.2Step7Title"
+msgstr "¡Excelente trabajo!"
+
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Parece que los cangrejos están conectados al Culto del Sol. ¡Sé dónde están "
+"las ruinas de su templo!"
+
+msgid "orderTerrain2.2Step2Description"
+msgstr "Atrapa un cangrejo de hielo. Su caparazón está hecho de Criolis."
+
+msgid "orderTerrain2.2Step2Title"
+msgstr "Metal de cangrejo"
+
+msgid "orderTerrain2.2Step2Thank"
+msgstr "¡Ah, exometal! ¡Me encantan los misterios de la naturaleza!"
+
+msgid "orderTerrain2.3Step8Title"
+msgstr "¡Excelente trabajo!"
+
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Los tesoros más valiosos del Culto del Sol están escondidos en lo profundo "
+"del Laberinto. ¡Te mostraré dónde!"
+
+msgid "orderTerrain2.3Step2Description"
+msgstr "¡Enciende 3 antorchas en el Santuario y roba la Esfera del Sol!"
+
+msgid "orderTerrain2.3Step2Title"
+msgstr "Mejor calentador"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.3Step2Thank"
+msgstr "¡Sí, eso es un buen calentamiento!"
+
+msgid "orderTerrain2.1Step2Description"
+msgstr "Encuentra 2 pepitas de plata dentro de cubitos de hielo y caliéntalas."
+
+msgid "orderTerrain2.1Step2Title"
+msgstr "Plata Helada"
+
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Es como hielo en papel de aluminio... pero al revés..."
+
+msgid "orderTerrain2.1Step3Title"
+msgstr "Oro Helado"
+
+msgid "orderTerrain2.1Step3Thank"
+msgstr "El oro invernal adquiere un brillo muy especial..."
+
+msgid "orderTerrain2.1Step3Description"
+msgstr "Encuentra 2 pepitas de oro dentro de cubitos de hielo y caliéntalas."
+
+msgid "orderTerrain2.1Step4Title"
+msgstr "Gema Invisible"
+
+msgid "orderTerrain2.1Step4Thank"
+msgstr "¡Claro dentro de claro, jajajaja!"
+
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Descongela un diamante mediano. Los diamantes congelados se encuentran a "
+"menudo en todas las rocas."
+
+msgid "orderTerrain2.2Step1Title"
+msgstr "Astrología Terrestre"
+
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Tráeme 2 Hierros Estelares. Se encuentran en los pantanos durante una lluvia "
+"de estrellas."
+
+msgid "orderTerrain2.2Step1Thank"
+msgstr "¡El astrometal es el sueño de cualquier científico!"
+
+msgid "orderTerrain2.2Step3Title"
+msgstr "Intruso Cósmico"
+
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Encuentra un núcleo de meteorito maldito durante una lluvia de estrellas y "
+"destierra la maldición."
+
+msgid "orderTerrain2.2Step3Thank"
+msgstr "¡Un meteorito es una máquina, no solo un cuerpo celeste! ¡Asombroso!"
+
+msgid "orderTerrain2.2Step4Title"
+msgstr "Calor de Cangrejo"
+
+msgid "orderTerrain2.2Step4Description"
+msgstr ""
+"Recoge 5 fragmentos de Cryolis de las conchas de los cangrejos de hielo."
+
+msgid "orderTerrain2.2Step4Thank"
+msgstr "¿También te mueres por saber cómo viven los cangrejos en la nieve?"
+
+msgid "orderTerrain2.2Step5Title"
+msgstr "Nuevos Sensores"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.2Step5Description"
+msgstr "Tráeme 9 piezas de plata. Se encuentran en geodas y rocas simples."
+
+msgid "orderTerrain2.2Step5Thank"
+msgstr "¡Mis instrumentos de investigación dejarán de fallar por fin!"
+
+msgid "orderTerrain2.2Step6Title"
+msgstr "Abrigo térmico de cangrejo"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.2Step6Description"
+msgstr ""
+"Consigue 8 fragmentos de Cryolis de los caparazones de los cangrejos de "
+"hielo."
+
+msgid "orderTerrain2.2Step6Thank"
+msgstr "¡Ahora entenderé por fin cómo sobreviven al invierno!"
+
+msgid "orderTerrain2.3Step1Title"
+msgstr "A lo grande"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.3Step1Description"
+msgstr "Tráeme un diamante grande. Se encuentra en todas las rocas congeladas."
+
+msgid "orderTerrain2.3Step1Thank"
+msgstr "¡Dios mío, es del tamaño de una cabeza! ¿Pero de quién...?"
+
+msgid "orderTerrain2.3Step3Title"
+msgstr "Tesoro de las Tierras Blancas"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Dame el cofre de Jarl. El canario te ayudará a encontrarlo en las Tierras "
+"Blancas."
+
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Me recuerda al abuelo..."
+
+msgid "orderTerrain2.3Step4Title"
+msgstr "Esencia de Llama"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.3Step4Description"
+msgstr "Extrae una chispa de ídolo de la Esfera del Sol."
+
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Qué piedra tan caliente..."
+
+msgid "orderTerrain2.3Step5Title"
+msgstr "Piedra iridiscente"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.3Step5Description"
+msgstr "Tráeme un ópalo. Es un hallazgo raro en las rocas congeladas."
+
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Mira qué bonito brilla..."
+
+msgid "orderTerrain2.3Step6Title"
+msgstr "¡Ha dejado descendencia!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.3Step6Description"
+msgstr "Extrae un polluelo de búho de la Esfera del Sol."
+
+msgid "orderTerrain2.3Step6Thank"
+msgstr "El gran búho trae el frío... ¿Por qué el polluelo está tan caliente?"
+
+msgid "orderTerrain2.3Step7Title"
+msgstr "Gran negocio"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+
+msgid "orderTerrain2.3Step7Description"
+msgstr "Tráeme 5 Trozos de Oro. Son bastante comunes en las rocas congeladas."
+
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Ahora seré el hombre más grande del pueblo."

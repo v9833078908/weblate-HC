@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{{ billing.workspace.get_absolute_url }}">{{ billing.workspace }}</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{{ billing.get_absolute_url }}">{{ billing }}</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+  {% include "billing/detail-content.html" %}
+{% endblock content %}

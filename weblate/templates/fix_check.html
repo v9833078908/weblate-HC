@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags humanize i18n icons translations %}
+
+{% block breadcrumbs %}
+  {% path_object_breadcrumbs path_object %}
+  {% if check.tier == "explicit" %}
+    <li class="breadcrumb-item">
+      <a href="{% url 'checks' path=path_object.get_url_path %}">{% translate "Checks" %}</a>
+    </li>
+  {% else %}
+    <li class="breadcrumb-item">
+      <a href="{% url 'checks' path=path_object.get_url_path name=check.id %}">{{ check.name }}</a>
+    </li>
+  {% endif %}
+  <li class="breadcrumb-item">{% translate "Fix" %}</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+  <h2>
+    {% blocktranslate trimmed with check_name=check.name %}
+      Fix: {{ check_name }}
+    {% endblocktranslate %}
+  </h2>
+
+  <p>{{ check.description }}</p>
+
+  <p>
+    {% blocktranslate trimmed with scope=path_object %}
+      Scope: {{ scope }}.
+    {% endblocktranslate %}
+  </p>
+
+  {% if check.id == "edge-space-remove" %}
+    <p>
+      <a href="{% url 'fix-check' name="edge-space-source" path=path_object.get_url_path %}">
+        {% translate "Looking for edge whitespace the source has? Reproduce source edge whitespace instead." %}
+      </a>
+    </p>
+  {% elif check.id == "edge-space-source" %}
+    <p>
+      <a href="{% url 'fix-check' name="edge-space-remove" path=path_object.get_url_path %}">
+        {% translate "Looking for edge whitespace the source does not have? Remove extra edge whitespace instead." %}
+      </a>
+    </p>
+  {% elif check.family == "terminal-source" and check.id != check.family %}
+    <p>
+      {% translate "Only strings failing this check are included." %}
+      <a href="{% url 'fix-check' name=check.family path=path_object.get_url_path %}">
+        {% translate "Normalize every terminal mark at once instead." %}
+      </a>
+    </p>
+  {% endif %}
+
+  {% if candidates.verdicts_no_longer_current %}
+    {% blocktranslate trimmed count count=candidates.verdicts_no_longer_current asvar verdict_msg %}
+      {{ count }} judge verdict will no longer be current after this fix.
+    {% plural %}
+      {{ count }} judge verdicts will no longer be current after this fix.
+    {% endblocktranslate %}
+    {% show_message "warning" verdict_msg %}
+  {% endif %}
+
+  <p class="text-muted">{% translate "This action has no undo." %}</p>
+
+  <p>
+    <strong>
+      {% blocktranslate trimmed count count=candidates.total %}
+        {{ count }} string fails this check in this scope.
+      {% plural %}
+        {{ count }} strings fail this check in this scope.
+      {% endblocktranslate %}
+    </strong>
+    {% blocktranslate trimmed count count=candidates.total_eligible %}
+      {{ count }} of them is fixed here,
+    {% plural %}
+      {{ count }} of them are fixed here,
+    {% endblocktranslate %}
+    {% if candidates.denied %}
+      {% blocktranslate trimmed count count=candidates.denied %}
+        {{ count }} is outside your permissions,
+      {% plural %}
+        {{ count }} are outside your permissions,
+      {% endblocktranslate %}
+    {% endif %}
+    {% blocktranslate trimmed count count=candidates.manual %}
+      {{ count }} stays for per-string review.
+    {% plural %}
+      {{ count }} stay for per-string review.
+    {% endblocktranslate %}
+  </p>
+
+  {% if candidates.by_operation %}
+    <ul>
+      {% if candidates.by_operation.append %}
+        <li>
+          {% blocktranslate trimmed count count=candidates.by_operation.append %}
+            {{ count }} string gets a missing mark added.
+          {% plural %}
+            {{ count }} strings get a missing mark added.
+          {% endblocktranslate %}
+        </li>
+      {% endif %}
+      {% if candidates.by_operation.replace %}
+        <li>
+          {% blocktranslate trimmed count count=candidates.by_operation.replace %}
+            {{ count }} string gets a mismatched mark replaced.
+          {% plural %}
+            {{ count }} strings get a mismatched mark replaced.
+          {% endblocktranslate %}
+        </li>
+      {% endif %}
+      {% if candidates.by_operation.remove %}
+        <li>
+          {% blocktranslate trimmed count count=candidates.by_operation.remove %}
+            {{ count }} string gets an extra mark removed.
+          {% plural %}
+            {{ count }} strings get an extra mark removed.
+          {% endblocktranslate %}
+        </li>
+      {% endif %}
+    </ul>
+  {% endif %}
+
+  {% if candidates.manual_no_fixup %}
+    <p class="text-muted">
+      {% if check.family == "terminal-source" %}
+        {% blocktranslate trimmed count count=candidates.manual_no_fixup %}
+          {{ count }} failing string is held back by this policy's own
+          guards and never becomes selectable here: a final word short
+          enough to be an abbreviation, a source ending the policy refuses
+          to read through, or a mark it never removes on its own, such as a
+          question mark or a colon the translation added. Review those
+          strings one by one.
+        {% plural %}
+          {{ count }} failing strings are held back by this policy's own
+          guards and never become selectable here: a final word short
+          enough to be an abbreviation, a source ending the policy refuses
+          to read through, or a mark it never removes on its own, such as a
+          question mark or a colon the translation added. Review those
+          strings one by one.
+        {% endblocktranslate %}
+      {% elif check.tier == "review" %}
+        {% blocktranslate trimmed count count=candidates.manual_no_fixup %}
+          {{ count }} failing string has no fixup for this check and never
+          becomes selectable here: this action only restores a mark the
+          source has and the translation lost. The opposite direction, a
+          mark the translation added on its own, is repaired when a string
+          is saved, not from this screen.
+        {% plural %}
+          {{ count }} failing strings have no fixup for this check and
+          never become selectable here: this action only restores a mark
+          the source has and the translation lost. The opposite direction,
+          a mark the translation added on its own, is repaired when a
+          string is saved, not from this screen.
+        {% endblocktranslate %}
+      {% else %}
+        {% blocktranslate trimmed count count=candidates.manual_no_fixup %}
+          {{ count }} failing string has no available fix for this
+          operation and never becomes selectable here.
+        {% plural %}
+          {{ count }} failing strings have no available fix for this
+          operation and never become selectable here.
+        {% endblocktranslate %}
+      {% endif %}
+    </p>
+  {% endif %}
+
+  {% if check.tier == "safe" %}
+
+    <form method="post">
+      {% csrf_token %}
+      {% crispy form %}
+
+      <p>
+        {% blocktranslate trimmed count count=candidates.total_eligible %}
+          {{ count }} string will be fixed.
+        {% plural %}
+          {{ count }} strings will be fixed.
+        {% endblocktranslate %}
+      </p>
+
+      <button type="submit" class="btn btn-primary">
+        {% blocktranslate trimmed count count=candidates.total_eligible %}
+          Fix {{ count }} string
+        {% plural %}
+          Fix {{ count }} strings
+        {% endblocktranslate %}
+      </button>
+      <a href="{{ path_object.get_absolute_url }}" class="btn btn-link">{% translate "Cancel" %}</a>
+    </form>
+
+  {% else %}
+
+    <p>
+      {% blocktranslate trimmed count count=candidates.manual with denied=candidates.denied %}
+        {{ count }} string needs manual review and {{ denied }} could not be checked due to missing permission; neither is selectable below.
+      {% plural %}
+        {{ count }} strings need manual review and {{ denied }} could not be checked due to missing permission; none of them is selectable below.
+      {% endblocktranslate %}
+      <a href="{{ path_object.get_translate_url }}?q={{ check.url_id }}">{% translate "Browse" %}</a>
+    </p>
+
+    {% if candidates.remaining > 0 %}
+      {% blocktranslate trimmed count count=candidates.shown|length with total=candidates.total_eligible asvar limited_msg %}
+        Showing the first {{ count }} applicable of {{ total }}.
+      {% plural %}
+        Showing the first {{ count }} applicable of {{ total }}.
+      {% endblocktranslate %}
+      {% show_message "info" limited_msg %}
+    {% endif %}
+
+    {% if check.tier == "explicit" and candidates.total_eligible > 0 %}
+      <form method="post" class="fix-check-all-form">
+        {% csrf_token %}
+        <input type="hidden" name="selection" value="all">
+        <p>
+          {% blocktranslate trimmed count count=candidates.total_eligible %}
+            {{ count }} string will be fixed.
+          {% plural %}
+            {{ count }} strings will be fixed.
+          {% endblocktranslate %}
+          {% translate "This covers the whole scope, not the preview below: the per-string checkboxes do not change what it fixes." %}
+        </p>
+        <button type="submit" class="btn btn-primary">
+          {% blocktranslate trimmed count count=candidates.total_eligible %}
+            Apply to all {{ count }} matching string
+          {% plural %}
+            Apply to all {{ count }} matching strings
+          {% endblocktranslate %}
+        </button>
+      </form>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      {% if check.tier == "explicit" %}<input type="hidden" name="selection" value="page">{% endif %}
+      {{ form.cohort }}
+      {% for error in form.cohort.errors %}<p class="text-danger">{{ error }}</p>{% endfor %}
+      {% for error in form.non_field_errors %}<p class="text-danger">{{ error }}</p>{% endfor %}
+
+      {% if candidates.shown %}
+        <p>
+          <label>
+            <input type="checkbox" id="fix-check-select-all" />
+            {% blocktranslate trimmed count count=candidates.shown|length %}
+              Select all {{ count }} applicable on this page
+            {% plural %}
+              Select all {{ count }} applicable on this page
+            {% endblocktranslate %}
+          </label>
+        </p>
+
+        <div class="table-scroll"
+             tabindex="0"
+             role="region"
+             aria-label="{% translate "Scrollable table" %}">
+          <table class="table table-listing">
+            <thead>
+              <tr>
+                <th>{% translate "Fix" %}</th>
+                <th>{% translate "String" %}</th>
+                {% if candidates.by_operation %}
+                  <th>{% translate "Operation" %}</th>
+                {% endif %}
+                <th>{% translate "Fixed target" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in candidates.shown %}
+                <tr>
+                  <td class="actions">
+                    <label class="visually-hidden" for="fix-check-unit-{{ row.unit.pk }}">
+                      {% blocktranslate trimmed with context=row.unit.context language=row.unit.translation.language %}
+                        Select {{ context }} ({{ language }}) for fixing
+                      {% endblocktranslate %}
+                    </label>
+                    <input type="checkbox"
+                           name="unit_ids"
+                           value="{{ row.unit.pk }}"
+                           id="fix-check-unit-{{ row.unit.pk }}"
+                           class="fix-check-row" />
+                  </td>
+                  <td>
+                    <a href="{{ row.unit.get_absolute_url }}"
+                       class="btn btn-link btn-xs"
+                       title="{% translate "Edit" %}">{% icon "pencil.svg" %}</a>
+                    <label for="fix-check-unit-{{ row.unit.pk }}">
+                      {{ row.unit.translation }}: {{ row.unit.position }}
+                      {% if row.unit.context %}({{ row.unit.context }}){% endif %}
+                    </label>
+                  </td>
+                  {% if candidates.by_operation %}
+                    <td>
+                      {% if row.operation == "append" %}
+                        {% translate "Add" %}
+                      {% elif row.operation == "replace" %}
+                        {% translate "Replace" %}
+                      {% elif row.operation == "remove" %}
+                        {% translate "Remove" %}
+                      {% endif %}
+                    </td>
+                  {% endif %}
+                  <td>{% format_unit_target row.unit value=row.final_target_value diff=row.unit.target %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          {% translate "Fix selected" %}
+          (<span id="fix-check-selected-count">0</span>)
+        </button>
+      {% else %}
+        <p>{% translate "No applicable strings to fix right now." %}</p>
+      {% endif %}
+      <a href="{{ path_object.get_absolute_url }}" class="btn btn-link">{% translate "Cancel" %}</a>
+    </form>
+
+  {% endif %}
+
+{% endblock content %}

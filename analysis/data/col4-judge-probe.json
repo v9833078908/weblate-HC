@@ -1,0 +1,161 @@
+{
+  "_arm": "probe",
+  "_batch": 10,
+  "_captured": "2026-08-13T17:05Z",
+  "_concurrency": 4,
+  "_few_shot_held_out": [
+    "clean-177707",
+    "mut-177734-cyrillic-fragment",
+    "mut-177829-obscenity-injected"
+  ],
+  "_labels": {
+    "defect": 187,
+    "pass": 189
+  },
+  "_models": [
+    "anthropic/claude-haiku-4.5",
+    "anthropic/claude-sonnet-5",
+    "openai/gpt-5.4-mini",
+    "openai/gpt-5.4-nano",
+    "cohere/command-a",
+    "qwen/qwen3-235b-a22b-2507",
+    "deepseek/deepseek-v4-pro"
+  ],
+  "_records": 376,
+  "_splits": [
+    "dev"
+  ],
+  "_strata": {
+    "clean": 189,
+    "mutation": 92,
+    "terminology": 95
+  },
+  "probe": {
+    "anthropic/claude-haiku-4.5": {
+      "accepted": true,
+      "completion_tokens": 41,
+      "cost_per_1000_records": 0.633,
+      "cost_usd": 0.001266,
+      "prompt_tokens": 1061,
+      "records": 2,
+      "requests": 1,
+      "retries": 0,
+      "seconds": 0.0,
+      "transport_error_samples": [],
+      "transport_errors": {},
+      "unparsed": 0,
+      "verdicts": [
+        "pass",
+        "pass"
+      ]
+    },
+    "anthropic/claude-sonnet-5": {
+      "accepted": true,
+      "completion_tokens": 188,
+      "cost_per_1000_records": 2.258,
+      "cost_usd": 0.004516,
+      "prompt_tokens": 1318,
+      "records": 2,
+      "requests": 1,
+      "retries": 0,
+      "seconds": 0.0,
+      "transport_error_samples": [],
+      "transport_errors": {},
+      "unparsed": 0,
+      "verdicts": [
+        "pass",
+        "pass"
+      ]
+    },
+    "cohere/command-a": {
+      "accepted": true,
+      "completion_tokens": 87,
+      "cost_per_1000_records": 1.0962,
+      "cost_usd": 0.002193,
+      "prompt_tokens": 529,
+      "records": 2,
+      "requests": 1,
+      "retries": 0,
+      "seconds": 0.0,
+      "transport_error_samples": [],
+      "transport_errors": {},
+      "unparsed": 0,
+      "verdicts": [
+        "pass",
+        "pass"
+      ]
+    },
+    "deepseek/deepseek-v4-pro": {
+      "accepted": true,
+      "completion_tokens": 129,
+      "cost_per_1000_records": 0.4669,
+      "cost_usd": 0.000934,
+      "prompt_tokens": 526,
+      "records": 2,
+      "requests": 1,
+      "retries": 0,
+      "seconds": 0.0,
+      "transport_error_samples": [],
+      "transport_errors": {},
+      "unparsed": 0,
+      "verdicts": [
+        "reject",
+        "flag"
+      ]
+    },
+    "openai/gpt-5.4-mini": {
+      "accepted": true,
+      "completion_tokens": 40,
+      "cost_per_1000_records": 0.0,
+      "cost_usd": 0.0,
+      "prompt_tokens": 635,
+      "records": 2,
+      "requests": 1,
+      "retries": 0,
+      "seconds": 0.0,
+      "transport_error_samples": [],
+      "transport_errors": {},
+      "unparsed": 0,
+      "verdicts": [
+        "pass",
+        "pass"
+      ]
+    },
+    "openai/gpt-5.4-nano": {
+      "accepted": true,
+      "completion_tokens": 74,
+      "cost_per_1000_records": 0.0,
+      "cost_usd": 0.0,
+      "prompt_tokens": 635,
+      "records": 2,
+      "requests": 1,
+      "retries": 0,
+      "seconds": 0.0,
+      "transport_error_samples": [],
+      "transport_errors": {},
+      "unparsed": 0,
+      "verdicts": [
+        "flag",
+        "pass"
+      ]
+    },
+    "qwen/qwen3-235b-a22b-2507": {
+      "accepted": true,
+      "completion_tokens": 89,
+      "cost_per_1000_records": 0.0931,
+      "cost_usd": 0.000186,
+      "prompt_tokens": 531,
+      "records": 2,
+      "requests": 1,
+      "retries": 0,
+      "seconds": 0.0,
+      "transport_error_samples": [],
+      "transport_errors": {},
+      "unparsed": 0,
+      "verdicts": [
+        "pass",
+        "pass"
+      ]
+    }
+  }
+}

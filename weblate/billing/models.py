@@ -1,0 +1,1411 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import os.path
+from contextlib import nullcontext, suppress
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from functools import partial
+from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar
+
+from appconf import AppConf
+from django.conf import settings
+from django.contrib import admin
+from django.core.exceptions import ValidationError
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db import models, transaction
+from django.db.models import Min, Prefetch, Q
+from django.db.models.signals import (
+    post_delete,
+    post_save,
+    pre_delete,
+    pre_save,
+)
+from django.dispatch import receiver
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.functional import cached_property
+from django.utils.html import format_html
+from django.utils.translation import gettext, gettext_lazy, ngettext
+
+from weblate.auth.models import User
+from weblate.trans.alerts.base import AlertSeverity
+from weblate.trans.alerts.registry import get_alert_class
+from weblate.trans.models import (
+    Alert,
+    Component,
+    PendingUnitChange,
+    Project,
+    Translation,
+)
+from weblate.utils.decorators import disable_for_loaddata
+from weblate.utils.html import format_html_join_comma, list_to_tuples
+from weblate.utils.stats import prefetch_stats
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from uuid import UUID
+
+    from django.db.models import QuerySet
+    from django_stubs_ext import StrOrPromise
+
+    from weblate.vcs.base import CommitInfo
+
+
+class LibreCheck:
+    def __init__(
+        self,
+        result,
+        message,
+        component=None,
+        alerts=None,
+        license_name=None,
+        license_error=None,
+        repository_url=None,
+        file_format=None,
+    ) -> None:
+        self.result = result
+        self.message = message
+        self.component = component
+        self.alerts = alerts or []
+        self.license_name = license_name
+        self.license_error = license_error
+        self.repository_url = repository_url
+        self.file_format = file_format
+
+    def __bool__(self) -> bool:
+        return self.result
+
+    def __str__(self) -> str:
+        return self.message
+
+
+@dataclass
+class LibreCheckAlert:
+    alert: Alert
+    message: StrOrPromise
+
+
+def get_component_billing_alerts(component: Component) -> list[LibreCheckAlert]:
+    result = []
+    for alert in component.all_alerts.values():
+        try:
+            alert_class = get_alert_class(alert.name)
+        except KeyError:
+            continue
+        result.append(
+            LibreCheckAlert(
+                alert,
+                alert_class.get_description(component),
+            )
+        )
+    return result
+
+
+class PlanQuerySet(models.QuerySet["Plan", "Plan"]):
+    def public(self, user=None):
+        """List of public paid plans which are available."""
+        base = self.exclude(Q(price=0) & Q(yearly_price=0))
+        result = base.filter(public=True)
+        if user:
+            result |= base.filter(
+                public=False, billing__in=Billing.objects.for_user(user)
+            )
+        return result.distinct().order_by("price")
+
+
+class Plan(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100, unique=True)
+    price = models.IntegerField(default=0)
+    yearly_price = models.IntegerField(default=0)
+    limit_strings = models.IntegerField(default=0)
+    display_limit_strings = models.IntegerField(default=0)
+    limit_languages = models.IntegerField(default=0)
+    display_limit_languages = models.IntegerField(default=0)
+    limit_projects = models.IntegerField(default=0)
+    display_limit_projects = models.IntegerField(default=0)
+    limit_hosted_strings = models.IntegerField(default=0)
+    display_limit_hosted_strings = models.IntegerField(default=0)
+    change_access_control = models.BooleanField(default=True)
+    public = models.BooleanField(default=False)
+
+    objects = PlanQuerySet.as_manager()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Billing plan"
+        verbose_name_plural = "Billing plans"
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def vat_price(self):
+        return round(self.price * settings.VAT_RATE, 2)
+
+    @property
+    def vat_yearly_price(self):
+        return round(self.yearly_price * settings.VAT_RATE, 2)
+
+    @property
+    def is_free(self):
+        return self.price == 0 and self.yearly_price == 0
+
+
+class BillingManager(models.Manager["Billing"]):
+    def check_limits(self) -> None:
+        for bill in self.iterator():
+            bill.check_limits()
+
+
+class BillingQuerySet(models.QuerySet["Billing", "Billing"]):
+    def get_out_of_limits(self):
+        return self.filter(in_limits=False)
+
+    def get_unpaid(self):
+        return self.filter(paid=False, state=Billing.STATE_ACTIVE)
+
+    def get_valid(self):
+        return self.filter(
+            Q(in_limits=True)
+            & (
+                (Q(state=Billing.STATE_ACTIVE) & Q(paid=True))
+                | Q(state=Billing.STATE_TRIAL)
+            )
+        )
+
+    def for_user(self, user: User):
+        if user.has_perm("billing.manage"):
+            billings = self.all()
+        else:
+            billings = self.filter(
+                workspace__in=user.workspaces_with_perm("workspace.edit")
+            ).distinct()
+        return billings.order_by("state")
+
+    def for_user_within_limits(self, user: User):
+        """Return billings for the given user which are valid and within project creation limits."""
+        if user.has_perm("billing.manage"):
+            billings = self.get_valid()
+        else:
+            billings = self.get_valid().filter(
+                workspace__in=user.workspaces_with_perm("workspace.add_project")
+            )
+        billings = billings.distinct().prefetch()
+        pks = set()
+        for billing in billings:
+            limit = billing.plan.display_limit_projects
+            if limit == 0 or billing.count_projects < limit:
+                pks.add(billing.pk)
+        return Billing.objects.filter(pk__in=pks).prefetch()
+
+    def prefetch(self):
+        return self.select_related("plan", "workspace").prefetch_related(
+            Prefetch(
+                "workspace__projects",
+                queryset=Project.objects.order(),
+                to_attr="ordered_projects",
+            ),
+        )
+
+    def active(self):
+        return self.filter(state__in=Billing.ACTIVE_STATES)
+
+
+class Billing(models.Model):
+    STATE_ACTIVE = 0
+    STATE_TRIAL = 1
+    STATE_TERMINATED = 3
+
+    EXPIRING_STATES: ClassVar[set[int]] = {STATE_TRIAL}
+    ACTIVE_STATES: ClassVar[set[int]] = {STATE_ACTIVE, STATE_TRIAL}
+
+    plan = models.ForeignKey(
+        Plan,
+        on_delete=models.deletion.CASCADE,
+        verbose_name=gettext_lazy("Billing plan"),
+    )
+    workspace = models.OneToOneField(
+        "workspaces.Workspace",
+        on_delete=models.PROTECT,
+        related_name="billing",
+        verbose_name=gettext_lazy("Workspace"),
+        editable=False,
+    )
+    customer_name = models.CharField(
+        blank=True,
+        default="",
+        max_length=200,
+        verbose_name=gettext_lazy("Customer name"),
+    )
+    state = models.IntegerField(
+        choices=(
+            (STATE_ACTIVE, gettext_lazy("Active")),
+            (STATE_TRIAL, gettext_lazy("Trial")),
+            (STATE_TERMINATED, gettext_lazy("Terminated")),
+        ),
+        default=STATE_ACTIVE,
+        verbose_name=gettext_lazy("Billing state"),
+    )
+    expiry = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=gettext_lazy("Trial expiry date"),
+        help_text="After expiry removal with 15 days grace period is scheduled.",
+    )
+    removal = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=gettext_lazy("Scheduled removal"),
+        help_text="This is automatically set after trial expiry.",
+    )
+    paid = models.BooleanField(
+        default=True, verbose_name=gettext_lazy("Paid"), editable=False
+    )
+    # Translators: Whether the package is inside actual (hard) limits
+    in_limits = models.BooleanField(
+        default=True, verbose_name=gettext_lazy("In limits"), editable=False
+    )
+    # Payment detailed information, used for integration
+    # with payment processor
+    payment = models.JSONField(editable=False, default=dict, encoder=DjangoJSONEncoder)
+    inactive_recurring_notification = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=gettext_lazy("Inactive recurring payment notification"),
+    )
+    inactive_recurring_latest_commit = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=gettext_lazy("Latest upstream commit"),
+    )
+    inactive_recurring_oldest_pending_change = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=gettext_lazy("Oldest pending Weblate change"),
+    )
+    inactive_recurring_repository_changes = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=gettext_lazy("Repository changes alert"),
+    )
+    inactive_recurring_push_failure = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=gettext_lazy("Push failure alert"),
+    )
+    inactive_recurring_disable = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=gettext_lazy("Scheduled recurring payment disablement"),
+    )
+
+    objects = BillingManager.from_queryset(BillingQuerySet)()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Customer billing"
+        verbose_name_plural = "Customer billings"
+
+    INACTIVE_RECURRING_FIELDS: ClassVar[tuple[str, ...]] = (
+        "inactive_recurring_notification",
+        "inactive_recurring_latest_commit",
+        "inactive_recurring_oldest_pending_change",
+        "inactive_recurring_repository_changes",
+        "inactive_recurring_push_failure",
+        "inactive_recurring_disable",
+    )
+    INACTIVE_RECURRING_STATUS_FIELDS: ClassVar[dict[str, str]] = {
+        "latest_commit": "inactive_recurring_latest_commit",
+        "oldest_pending_change": "inactive_recurring_oldest_pending_change",
+        "repository_changes": "inactive_recurring_repository_changes",
+        "push_failure": "inactive_recurring_push_failure",
+        "planned_disable": "inactive_recurring_disable",
+    }
+
+    def __str__(self) -> str:
+        if self.customer_name:
+            base = self.customer_name
+        elif projects := self.projects_display:
+            base = projects
+        elif self.workspace_id:
+            base = self.workspace.name
+        else:
+            base = "Unassigned"
+        trial = ", trial" if self.is_trial else ""
+        return f"{base} ({self.plan}{trial})"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.billing_original_workspace_id = self.workspace_id
+        self.billing_original_customer_name = self.customer_name
+
+    # pylint: disable-next=arguments-differ
+    def save(
+        self,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
+        skip_limits=False,
+    ) -> None:
+        self.validate_workspace()
+        create_workspace = self.workspace_id is None
+        customer_name_saved = update_fields is None or "customer_name" in update_fields
+        workspace_name_changed = (
+            self.pk is not None
+            and self.workspace_id is not None
+            and customer_name_saved
+            and self.customer_name != self.billing_original_customer_name
+        )
+        context = transaction.atomic(using=using) if create_workspace else nullcontext()
+
+        with context:
+            if create_workspace:
+                self.ensure_workspace(using=using)
+                if update_fields is not None:
+                    update_fields = {*update_fields, "workspace"}
+
+            if (
+                not skip_limits
+                and self.pk
+                and self.check_limits(save=False)
+                and update_fields
+            ):
+                update_fields = set(update_fields)
+                update_fields.update(
+                    ("state", "expiry", "removal", "paid", "in_limits")
+                )
+
+            super().save(
+                force_insert=force_insert,
+                force_update=force_update,
+                using=using,
+                update_fields=update_fields,
+            )
+            self.billing_original_workspace_id = self.workspace_id
+            if workspace_name_changed:
+                self.update_workspace_name(using=using)
+            if customer_name_saved:
+                self.billing_original_customer_name = self.customer_name
+
+    def get_absolute_url(self) -> str:
+        return reverse("billing-detail", kwargs={"pk": self.pk})
+
+    def validate_workspace(self) -> None:
+        if not self.pk:
+            return
+        if self.billing_original_workspace_id == self.workspace_id:
+            return
+        msg = gettext("Billing workspace can not be changed.")
+        raise ValidationError({"workspace": msg})
+
+    def get_default_workspace_name(self, using=None) -> str:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.workspaces.models import WORKSPACE_NAME_LENGTH
+
+        if self.customer_name:
+            name = self.customer_name
+        elif project_name := self.get_single_project_workspace_name(using=using):
+            name = project_name
+        elif self.workspace_id:
+            name = self.workspace.name
+        else:
+            name = "Billing"
+        return name[:WORKSPACE_NAME_LENGTH]
+
+    def get_single_project_workspace_name(self, using=None) -> str | None:
+        if not self.workspace_id:
+            return None
+
+        project_objects = Project.objects
+        database = using or self._state.db
+        if database is not None:
+            project_objects = project_objects.db_manager(database)
+
+        project_names = list(
+            project_objects.filter(workspace_id=self.workspace_id)
+            .order_by("id")
+            .values_list("name", flat=True)[:2]
+        )
+        if len(project_names) != 1:
+            return None
+        return project_names[0]
+
+    def update_workspace_name(self, using=None) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.workspaces.models import Workspace
+
+        name = self.get_default_workspace_name(using=using)
+        objects = Workspace.objects
+        database = using or self._state.db
+        if database is not None:
+            objects = objects.db_manager(database)
+        updated = (
+            objects.filter(pk=self.workspace_id, name_managed=True)
+            .exclude(name=name)
+            .update(name=name)
+        )
+        if updated and "workspace" in self._state.fields_cache:
+            self.workspace.name = name
+            self.workspace.workspace_original_name = name
+
+    def ensure_workspace(self, using=None) -> None:
+        if self.workspace_id:
+            return
+        # ruff: ignore[import-outside-top-level]
+        from weblate.workspaces.models import Workspace
+
+        objects = Workspace.objects
+        database = using or self._state.db
+        if database is not None:
+            objects = objects.db_manager(database)
+        self.workspace = objects.create(
+            name=self.get_default_workspace_name(using=using),
+            name_managed=True,
+        )
+
+    def add_project(self, project: Project) -> None:
+        self._set_project_workspace(project, allow_workspace_change=False)
+
+    def transfer_project(self, project: Project) -> None:
+        self._set_project_workspace(project, allow_workspace_change=True)
+
+    def _set_project_workspace(
+        self, project: Project, *, allow_workspace_change: bool
+    ) -> None:
+        if self.pk is None:
+            msg = gettext("Billing needs to be saved before assigning projects.")
+            raise ValidationError(msg)
+        self.ensure_workspace()
+        if (
+            not allow_workspace_change
+            and project.workspace_id
+            and project.workspace_id != self.workspace_id
+        ):
+            msg = gettext("Project already belongs to another workspace.")
+            raise ValidationError(msg)
+        if project.pk is None:
+            msg = gettext("Project needs to be saved before assigning it to billing.")
+            raise ValidationError(msg)
+        previous_workspace_id = project.workspace_id
+        project_objects = Project.objects
+        database = self._state.db
+        if database is not None:
+            project_objects = project_objects.db_manager(database)
+        if not project_objects.filter(pk=project.pk).update(workspace=self.workspace):
+            raise Project.DoesNotExist
+        # ruff: ignore[import-outside-top-level]
+        from weblate.utils.tasks import update_workspace_stats
+
+        update_workspace_stats.delay_on_commit(
+            [
+                str(workspace_id)
+                for workspace_id in (previous_workspace_id, self.workspace_id)
+                if workspace_id is not None
+            ]
+        )
+        project.workspace = self.workspace
+        project.billing_original_workspace_id = self.workspace_id
+        self.update_workspace_name()
+        for key in ("billings", "paid", "is_trial", "is_libre_trial"):
+            project.__dict__.pop(key, None)
+        if previous_workspace_id and previous_workspace_id != self.workspace_id:
+            billing_objects = Billing.objects
+            if database is not None:
+                billing_objects = billing_objects.db_manager(database)
+            for billing in billing_objects.filter(workspace_id=previous_workspace_id):
+                billing.check_limits()
+        self.check_limits()
+        self.flush_cache()
+
+    def get_projects_queryset(self) -> QuerySet[Project, Project]:
+        if not self.workspace_id:
+            return Project.objects.none()
+        return self.workspace.projects.order()
+
+    @cached_property
+    def ordered_projects(self):
+        if not self.workspace_id:
+            return Project.objects.none()
+        if hasattr(self.workspace, "ordered_projects"):
+            return self.workspace.ordered_projects
+        return self.get_projects_queryset()
+
+    @cached_property
+    def all_projects(self):
+        return prefetch_stats(self.ordered_projects)
+
+    @cached_property
+    def projects_display(self):
+        return format_html_join_comma("{}", list_to_tuples(self.all_projects))
+
+    @property
+    def is_trial(self):
+        return self.state == Billing.STATE_TRIAL
+
+    @property
+    def is_terminated(self):
+        return self.state == Billing.STATE_TERMINATED
+
+    @property
+    def is_libre_trial(self) -> bool:
+        return self.is_trial and self.plan.price == 0
+
+    @property
+    def can_terminate(self) -> bool:
+        return self.is_active() and not self.get_projects_queryset().exists()
+
+    @cached_property
+    def can_be_paid(self) -> bool:
+        if self.state in Billing.ACTIVE_STATES:
+            return True
+        return self.count_projects > 0
+
+    @admin.display(description=gettext_lazy("Changes in last month"))
+    def monthly_changes(self) -> int:
+        return sum(project.stats.monthly_changes for project in self.all_projects)
+
+    @admin.display(description=gettext_lazy("Number of changes"))
+    def total_changes(self) -> int:
+        return sum(project.stats.total_changes for project in self.all_projects)
+
+    @cached_property
+    def count_projects(self) -> int:
+        return len(self.all_projects)
+
+    @admin.display(description=gettext_lazy("Projects"))
+    def display_projects(self) -> str:
+        return f"{self.count_projects} / {self.plan.display_limit_projects}"
+
+    @cached_property
+    def count_strings(self) -> int:
+        return sum(p.stats.source_strings for p in self.all_projects)
+
+    @admin.display(description=gettext_lazy("Source strings"))
+    def display_strings(self) -> str:
+        return f"{self.count_strings} / {self.plan.display_limit_strings}"
+
+    @cached_property
+    def count_hosted_strings(self) -> int:
+        return sum(p.stats.all for p in self.all_projects)
+
+    @admin.display(description=gettext_lazy("Hosted strings"))
+    def display_hosted_strings(self) -> str:
+        return f"{self.count_hosted_strings} / {self.plan.display_limit_hosted_strings}"
+
+    @cached_property
+    def count_words(self):
+        return sum(p.stats.source_words for p in self.all_projects)
+
+    @cached_property
+    def hosted_words(self):
+        return sum(p.stats.all_words for p in self.all_projects)
+
+    @admin.display(description=gettext_lazy("Source words"))
+    def display_words(self) -> str:
+        return f"{self.count_words}"
+
+    @cached_property
+    def count_languages(self):
+        return max((p.stats.languages for p in self.all_projects), default=0)
+
+    @admin.display(description=gettext_lazy("Languages"))
+    def display_languages(self) -> str:
+        return f"{self.count_languages} / {self.plan.display_limit_languages}"
+
+    def flush_cache(self) -> None:
+        for cls in type(self).mro():
+            for key, value in cls.__dict__.items():
+                if isinstance(value, cached_property):
+                    self.__dict__.pop(key, None)
+
+    def check_in_limits(self, plan=None):
+        if plan is None:
+            plan = self.plan
+        return (
+            (plan.limit_projects == 0 or self.count_projects <= plan.limit_projects)
+            and (
+                plan.limit_hosted_strings == 0
+                or self.count_hosted_strings <= plan.limit_hosted_strings
+            )
+            and (plan.limit_strings == 0 or self.count_strings <= plan.limit_strings)
+            and (
+                plan.limit_languages == 0
+                or self.count_languages <= plan.limit_languages
+            )
+        )
+
+    def check_expiry(self):
+        return (
+            self.state in Billing.EXPIRING_STATES
+            and self.expiry
+            and self.expiry < timezone.now()
+        )
+
+    @admin.display(description=gettext_lazy("Number of strings"))
+    def unit_count(self):
+        return sum(p.stats.all for p in self.all_projects)
+
+    def get_last_invoice_object(self):
+        return self.invoice_set.order_by("-start")[0]
+
+    @admin.display(description=gettext_lazy("Last invoice"))
+    def last_invoice(self):
+        try:
+            invoice = self.get_last_invoice_object()
+        except IndexError:
+            return gettext("N/A")
+        return f"{invoice.start} - {invoice.end}"
+
+    @admin.display(
+        # Translators: Whether the package is inside displayed (soft) limits
+        description=gettext_lazy("In display limits"),
+        boolean=True,
+    )
+    def in_display_limits(self, plan=None):
+        if plan is None:
+            plan = self.plan
+        return (
+            (
+                plan.display_limit_projects == 0
+                or self.count_projects <= plan.display_limit_projects
+            )
+            and (
+                plan.display_limit_hosted_strings == 0
+                or self.count_hosted_strings <= plan.display_limit_hosted_strings
+            )
+            and (
+                plan.display_limit_strings == 0
+                or self.count_strings <= plan.display_limit_strings
+            )
+            and (
+                plan.display_limit_languages == 0
+                or self.count_languages <= plan.display_limit_languages
+            )
+        )
+
+    def check_payment_status(self, now: bool = False) -> bool:
+        """
+        Check current payment status.
+
+        Compared to paid attribute, this does not include grace period.
+        """
+        end = timezone.now()
+        if not now:
+            end -= timedelta(days=settings.BILLING_GRACE_PERIOD)
+        return (
+            (self.plan.is_free and self.state == Billing.STATE_ACTIVE)
+            or self.invoice_set.filter(end__gte=end).exists()
+            or self.state == Billing.STATE_TRIAL
+        )
+
+    @transaction.atomic
+    def check_limits(self, save=True) -> bool:
+        self.flush_cache()
+        in_limits = self.check_in_limits()
+        paid = self.check_payment_status()
+        modified = False
+
+        if self.check_expiry():
+            self.expiry = None
+            self.removal = timezone.now() + timedelta(
+                days=settings.BILLING_REMOVAL_PERIOD
+            )
+            self.billinglog_set.create(
+                event=BillingEvent.EXPIRED,
+                summary=f"Scheduled removal at {self.removal.isoformat()}",
+            )
+            modified = True
+
+        if self.state not in Billing.EXPIRING_STATES and self.expiry:
+            self.expiry = None
+            modified = True
+
+        if self.in_limits != in_limits or self.paid != paid:
+            self.in_limits = in_limits
+            self.paid = paid
+            modified = True
+
+        if save:
+            if modified:
+                Billing.objects.select_for_update().get(pk=self.pk)
+                self.save(skip_limits=True)
+            self.update_alerts()
+
+        return modified
+
+    def update_alerts(self) -> None:
+        if self.in_limits:
+            Alert.objects.filter(
+                component__project__in=self.get_projects_queryset(), name="BillingLimit"
+            ).delete()
+        else:
+            for project in self.get_projects_queryset().iterator():
+                for component in project.component_set.iterator():
+                    component.add_alert("BillingLimit")
+
+    def is_active(self):
+        return self.state in Billing.ACTIVE_STATES
+
+    def get_notify_users(self):
+        return self.workspace.users_with_permission("workspace.edit").select_related(
+            "profile"
+        )
+
+    @staticmethod
+    def _get_commit_date(commit: CommitInfo | None) -> datetime | None:
+        if not commit:
+            return None
+        dates = []
+        for value in (
+            commit.get("committerdate"),
+            commit.get("commitdate"),
+            commit.get("authordate"),
+            commit.get("date"),
+        ):
+            if isinstance(value, datetime):
+                if timezone.is_naive(value):
+                    value = timezone.make_aware(value)
+                dates.append(value)
+        return max(dates, default=None)
+
+    @staticmethod
+    def _get_project_repo_components(project: Project) -> list[Component]:
+        components = list(project.component_set.with_repo().exclude(vcs="local"))
+        included = {component.id for component in components}
+
+        linked = (
+            project.component_set.filter(
+                repo__startswith="weblate:",
+                linked_component__isnull=False,
+            )
+            .exclude(vcs="local")
+            .exclude(linked_component__vcs="local")
+            .select_related("linked_component")
+        )
+        for component in linked:
+            linked_component = component.linked_component
+            if linked_component is None:
+                continue
+            linked_component_id = linked_component.id
+            if linked_component_id in included:
+                continue
+            included.add(linked_component_id)
+            components.append(linked_component)
+
+        return components
+
+    def get_latest_upstream_commit(self) -> datetime | None:
+        """Return latest known upstream commit timestamp for billed projects."""
+        latest_commit = None
+        has_upstream_component = False
+
+        for project in self.get_projects_queryset():
+            project_latest = None
+            for component in self._get_project_repo_components(project):
+                has_upstream_component = True
+                commit_date = self._get_commit_date(component.get_last_remote_commit())
+                if commit_date is None:
+                    return None
+                if project_latest is None or commit_date > project_latest:
+                    project_latest = commit_date
+
+            if project_latest is None:
+                return None
+            if latest_commit is None or project_latest > latest_commit:
+                latest_commit = project_latest
+
+        if not has_upstream_component:
+            return None
+        return latest_commit
+
+    def _get_project_ids(self) -> list[int]:
+        return list(self.get_projects_queryset().values_list("id", flat=True))
+
+    def get_oldest_pending_weblate_change(self) -> datetime | None:
+        """Return oldest pending Weblate change in billed projects."""
+        project_ids = self._get_project_ids()
+        if not project_ids:
+            return None
+        return (
+            PendingUnitChange.objects.filter(
+                unit__translation__component__project_id__in=project_ids,
+            )
+            .exclude(unit__translation__component__vcs="local")
+            .aggregate(oldest=Min("timestamp"))["oldest"]
+        )
+
+    def get_oldest_active_alert(self, name: str) -> datetime | None:
+        """Return timestamp of the oldest active alert in billed projects."""
+        project_ids = self._get_project_ids()
+        if not project_ids:
+            return None
+        return (
+            Alert.objects.filter(
+                component__project_id__in=project_ids,
+                dismissed_at__isnull=True,
+                name=name,
+                severity__gte=AlertSeverity.ERROR,
+            )
+            .exclude(component__vcs="local")
+            .aggregate(oldest=Min("timestamp"))["oldest"]
+        )
+
+    @classmethod
+    def serialize_inactive_recurring_status(
+        cls, status: Mapping[str, datetime | None]
+    ) -> dict[str, str | bool | None]:
+        details: dict[str, str | bool | None] = {"automatic": True}
+        for key in cls.INACTIVE_RECURRING_STATUS_FIELDS:
+            value = status.get(key)
+            details[key] = value.isoformat() if value else None
+        return details
+
+    def get_inactive_recurring_status(
+        self, now: datetime | None = None
+    ) -> dict[str, datetime] | None:
+        """Return inactivity details for recurring payments, or None when active."""
+        if now is None:
+            now = timezone.now()
+        if (
+            settings.BILLING_INACTIVE_RECURRING_DAYS <= 0
+            or "recurring" not in self.payment
+            or self.plan.yearly_price == 0
+            or self.state != Billing.STATE_ACTIVE
+            or self.count_projects == 0
+        ):
+            return None
+
+        cutoff = now - timedelta(days=settings.BILLING_INACTIVE_RECURRING_DAYS)
+        status = {"cutoff": cutoff}
+
+        latest_commit = self.get_latest_upstream_commit()
+        if latest_commit is not None and latest_commit <= cutoff:
+            status["latest_commit"] = latest_commit
+
+        oldest_pending_change = self.get_oldest_pending_weblate_change()
+        if oldest_pending_change is not None and oldest_pending_change <= cutoff:
+            status["oldest_pending_change"] = oldest_pending_change
+
+        repository_changes = self.get_oldest_active_alert("RepositoryChanges")
+        if repository_changes is not None and repository_changes <= cutoff:
+            status["repository_changes"] = repository_changes
+
+        push_failure = self.get_oldest_active_alert("PushFailure")
+        if push_failure is not None and push_failure <= cutoff:
+            status["push_failure"] = push_failure
+
+        if len(status) == 1:
+            return None
+
+        planned_disable = now + timedelta(
+            days=settings.BILLING_INACTIVE_RECURRING_NOTICE_DAYS
+        )
+        if self.inactive_recurring_disable is not None:
+            planned_disable = self.inactive_recurring_disable
+
+        return {
+            **status,
+            "planned_disable": planned_disable,
+        }
+
+    def clear_inactive_recurring_status(
+        self, *, save: bool = True, log: bool = True
+    ) -> bool:
+        if all(
+            getattr(self, field) is None for field in self.INACTIVE_RECURRING_FIELDS
+        ):
+            return False
+        details = {
+            "notification": (
+                self.inactive_recurring_notification.isoformat()
+                if self.inactive_recurring_notification
+                else None
+            ),
+            **self.serialize_inactive_recurring_status(
+                {
+                    key: getattr(self, field)
+                    for key, field in self.INACTIVE_RECURRING_STATUS_FIELDS.items()
+                }
+            ),
+        }
+        for field in self.INACTIVE_RECURRING_FIELDS:
+            setattr(self, field, None)
+        if save:
+            self.save(update_fields=self.INACTIVE_RECURRING_FIELDS)
+        if log:
+            self.billinglog_set.create(
+                event=BillingEvent.INACTIVE_RECURRING_CLEARED,
+                summary="Cleared recurring payment disablement",
+                details=details,
+            )
+        return True
+
+    def mark_inactive_recurring(
+        self,
+        status: dict[str, datetime],
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        if now is None:
+            now = timezone.now()
+        self.inactive_recurring_notification = now
+        for key, field in self.INACTIVE_RECURRING_STATUS_FIELDS.items():
+            setattr(self, field, status.get(key))
+        self.save(update_fields=self.INACTIVE_RECURRING_FIELDS)
+        self.billinglog_set.create(
+            event=BillingEvent.INACTIVE_RECURRING_SCHEDULED,
+            summary="Scheduled recurring payment disablement",
+            details=self.serialize_inactive_recurring_status(status),
+        )
+
+    def disable_inactive_recurring(self, status: dict[str, datetime]) -> None:
+        payment = self.payment.copy()
+        payment.pop("recurring", None)
+        self.payment = payment
+        for field in self.INACTIVE_RECURRING_FIELDS:
+            setattr(self, field, None)
+        self.save(update_fields=["payment", *self.INACTIVE_RECURRING_FIELDS])
+        self.billinglog_set.create(
+            event=BillingEvent.DISABLED_RECURRING,
+            summary="Disabled recurring payment for inactive projects",
+            details=self.serialize_inactive_recurring_status(status),
+        )
+
+    def _get_libre_checklist(self, *, include_alerts: bool = True):
+        message = ngettext(
+            "Contains %d project", "Contains %d projects", self.count_projects
+        )
+        # Ignore when format string is not present
+        with suppress(TypeError):
+            message %= self.count_projects
+        yield LibreCheck(self.count_projects == 1, message)
+        for project in self.all_projects:
+            yield LibreCheck(
+                bool(project.web),
+                format_html(
+                    '<a href="{0}">{1}</a>, <a href="{2}">{3}</a>',
+                    project.get_absolute_url(),
+                    project,
+                    project.web
+                    or reverse("settings", kwargs={"path": project.get_url_path()}),
+                    project.web or gettext("Project website missing!"),
+                ),
+            )
+            if project.access_control:
+                yield LibreCheck(False, gettext("Only public projects are allowed"))
+        components = Component.objects.filter(
+            project__in=self.all_projects
+        ).select_related("project")
+        if include_alerts:
+            components = components.prefetch_related(
+                Prefetch(
+                    "alert_set",
+                    queryset=Alert.objects.order_component(),
+                )
+            )
+        component_count = len(components)
+        message = ngettext(
+            "Contains %d component", "Contains %d components", component_count
+        )
+        # Ignore when format string is not present
+        with suppress(TypeError):
+            message %= component_count
+        yield LibreCheck(component_count > 0, message)
+        for component in components:
+            license_name = component.get_license_display()
+            license_error = None
+            if not component.libre_license:
+                if not license_name:
+                    license_error = gettext("Missing license")
+                else:
+                    license_error = gettext("Not a libre license")
+            if component.license_url:
+                license_name = format_html(
+                    '<a href="{0}">{1}</a>', component.license_url, license_name
+                )
+            repo_url = component.repo
+            if repo_url.startswith("https://"):
+                repo_url = format_html('<a href="{0}">{0}</a>', repo_url)
+            yield LibreCheck(
+                component.libre_license,
+                format_html(
+                    """
+                    <a href="{0}">{1}</a>,
+                    {2},
+                    {3},
+                    {4}""",
+                    component.get_absolute_url(),
+                    component.name,
+                    license_name,
+                    repo_url,
+                    component.get_file_format_display(),
+                ),
+                component=component,
+                alerts=(
+                    get_component_billing_alerts(component) if include_alerts else []
+                ),
+                license_name=license_name,
+                license_error=license_error,
+                repository_url=repo_url,
+                file_format=component.get_file_format_display(),
+            )
+
+    @cached_property
+    def libre_checklist(self) -> list[LibreCheck]:
+        return list(self._get_libre_checklist())
+
+    @cached_property
+    def libre_checklist_without_alerts(self) -> list[LibreCheck]:
+        return list(self._get_libre_checklist(include_alerts=False))
+
+    @cached_property
+    def libre_general_checklist(self) -> list[LibreCheck]:
+        return [check for check in self.libre_checklist if check.component is None]
+
+    @cached_property
+    def libre_component_checklist(self) -> list[LibreCheck]:
+        return [check for check in self.libre_checklist if check.component is not None]
+
+    @cached_property
+    def libre_general_checklist_without_alerts(self) -> list[LibreCheck]:
+        return [
+            check
+            for check in self.libre_checklist_without_alerts
+            if check.component is None
+        ]
+
+    @cached_property
+    def libre_component_checklist_without_alerts(self) -> list[LibreCheck]:
+        return [
+            check
+            for check in self.libre_checklist_without_alerts
+            if check.component is not None
+        ]
+
+    @property
+    def valid_libre_without_alerts(self) -> bool:
+        return all(self.libre_checklist_without_alerts)
+
+    @property
+    def valid_libre(self) -> bool:
+        return all(self.libre_checklist)
+
+
+class InvoiceQuerySet(models.QuerySet["Invoice", "Invoice"]):
+    def order(self):
+        return self.order_by("-start")
+
+
+class Invoice(models.Model):
+    CURRENCY_EUR = 0
+    CURRENCY_BTC = 1
+    CURRENCY_USD = 2
+    CURRENCY_CZK = 3
+
+    billing = models.ForeignKey(Billing, on_delete=models.deletion.RESTRICT)
+    start = models.DateField()
+    end = models.DateField()
+    amount = models.FloatField()
+    currency = models.IntegerField(
+        choices=(
+            (CURRENCY_EUR, "EUR"),
+            (CURRENCY_BTC, "mBTC"),
+            (CURRENCY_USD, "USD"),
+            (CURRENCY_CZK, "CZK"),
+        ),
+        default=CURRENCY_EUR,
+    )
+    ref = models.CharField(blank=True, max_length=50)
+    note = models.TextField(blank=True)
+    # Payment detailed information, used for integration
+    # with payment processor
+    payment = models.JSONField(editable=False, default=dict)
+    created = models.DateTimeField(auto_now_add=True)
+
+    objects = InvoiceQuerySet.as_manager()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Invoice"
+        verbose_name_plural = "Invoices"
+
+    def __str__(self) -> str:
+        return f"{self.start} - {self.end}: {self.billing if self.billing_id else None}"
+
+    @cached_property
+    def is_legacy(self):
+        return len(self.ref) <= 6
+
+    @cached_property
+    def filename(self) -> str | None:
+        if not self.ref:
+            return None
+        if self.is_legacy:
+            return f"{self.ref}.pdf"
+        return f"Weblate_Invoice_{self.ref}.pdf"
+
+    @cached_property
+    def full_filename(self) -> str | None:
+        if not self.ref:
+            return None
+        if self.is_legacy:
+            invoice_path = Path(settings.INVOICE_PATH_LEGACY)
+        else:
+            invoice_path = (
+                Path(settings.INVOICE_PATH)
+                / f"{self.created.year}"
+                / f"{self.created.month:02d}"
+            )
+        full_path = invoice_path / (self.filename or "")
+        return full_path.as_posix()
+
+    @cached_property
+    def filename_valid(self) -> bool:
+        return self.full_filename and os.path.exists(self.full_filename)
+
+    def clean(self) -> None:
+        if self.end is None or self.start is None:
+            return
+
+        if self.end <= self.start:
+            msg = "Start has to be before end!"
+            raise ValidationError(msg)
+
+        if not self.billing_id:
+            return
+
+        overlapping = Invoice.objects.filter(
+            (Q(start__lte=self.end) & Q(end__gte=self.end))
+            | (Q(start__lte=self.start) & Q(end__gte=self.start))
+        ).filter(billing=self.billing)
+
+        if self.pk:
+            overlapping = overlapping.exclude(pk=self.pk)
+
+        if overlapping.exists():
+            msg = f"Overlapping invoices exist: {format_html_join_comma('{}', list_to_tuples(overlapping))}"
+            raise ValidationError(msg)
+
+
+class BillingEvent(models.IntegerChoices):
+    EMAIL = 1, "Outbound e-mail"
+    EXPIRED = 2, "Trial expired"
+    REMOVED = 3, "Projects removed"
+    PAYMENT = 4, "Payment received"
+    UNPAID = 5, "Unpaid billing"
+    CREATED = 6, "Created billing"
+    DISABLED_RECURRING = 7, "Disabled recurring payment"
+    LIBRE_REQUEST = 8, "Requested Libre hosting"
+    LIBRE_APPROVED = 9, "Approved Libre hosting"
+    TERMINATED = 10, "Billing terminated"
+    EXTENDED_TRIAL = 11, "Trial extended"
+    PROJECT_BACKUP = 12, "Project backed up"
+    ADMIN_ADDED = 13, "Admin added"
+    ADMIN_ADDED_PROJECT = 14, "Admin added on project removal"
+    ADMIN_REMOVED = 15, "Admin removed"
+    INACTIVE_RECURRING_SCHEDULED = 16, "Scheduled recurring payment disablement"
+    INACTIVE_RECURRING_CLEARED = 17, "Cleared recurring payment disablement"
+    PLAN_CHANGED = 18, "Billing plan changed"
+
+
+class BillingLogQuerySet(models.QuerySet["BillingLog", "BillingLog"]):
+    def order(self) -> BillingLogQuerySet:
+        return self.order_by("-timestamp")
+
+    def recent(self) -> BillingLogQuerySet:
+        return self.order()[:20]
+
+
+class BillingLog(models.Model):
+    billing = models.ForeignKey(
+        Billing,
+        on_delete=models.deletion.RESTRICT,
+        verbose_name=gettext_lazy("Billing"),
+    )
+    timestamp = models.DateTimeField(default=timezone.now, verbose_name="Timestamp")
+    event = models.IntegerField(
+        choices=BillingEvent, verbose_name=gettext_lazy("Billing event")
+    )
+    summary = models.CharField(max_length=200, verbose_name="Summary")
+    user = models.ForeignKey(User, null=True, on_delete=models.RESTRICT)
+    details = models.JSONField(default=dict)
+
+    objects = BillingLogQuerySet.as_manager()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+
+    def __str__(self) -> str:
+        return f"{self.timestamp.isoformat()}: {self.billing}: {self.get_event_display()} {self.summary}"
+
+    def get_plan_detail_name(self, key: str) -> str:
+        plan = self.details.get(key)
+        if isinstance(plan, dict):
+            plan = plan.get("name")
+        return str(plan) if plan else ""
+
+    def get_details_display(self) -> StrOrPromise:
+        old_plan = self.get_plan_detail_name("old_plan")
+        new_plan = self.get_plan_detail_name("new_plan")
+        if old_plan and new_plan:
+            return format_html(
+                gettext('Changed from "{}" to "{}".'), old_plan, new_plan
+            )
+        return self.summary
+
+
+@receiver(pre_save, sender=Project)
+@disable_for_loaddata
+def record_project_billing_workspace(
+    sender, instance: Project, using=None, update_fields=None, **kwargs
+) -> None:
+    if update_fields is not None and not {"workspace", "workspace_id"} & set(
+        update_fields
+    ):
+        instance.billing_previous_workspace_id = None
+        return
+    if not instance.pk:
+        instance.billing_previous_workspace_id = None
+        return
+
+    previous_workspace_id = getattr(
+        instance, "billing_original_workspace_id", models.DEFERRED
+    )
+    if previous_workspace_id is models.DEFERRED:
+        objects = sender.objects
+        if using is not None:
+            objects = objects.db_manager(using)
+        previous_workspace_id = objects.values_list("workspace_id", flat=True).get(
+            pk=instance.pk
+        )
+    workspace_id = instance.__dict__.get("workspace_id", previous_workspace_id)
+    if previous_workspace_id == workspace_id:
+        previous_workspace_id = None
+    instance.billing_previous_workspace_id = previous_workspace_id
+
+
+def get_project_billings(
+    project: Project, *, using=None, include_previous=False
+) -> QuerySet[Billing, Billing]:
+    objects = Billing.objects
+    if using is not None:
+        objects = objects.db_manager(using)
+    workspace_ids: set[UUID] = set()
+    if project.workspace_id is not None:
+        workspace_ids.add(project.workspace_id)
+    if include_previous:
+        previous_workspace_id = getattr(project, "billing_previous_workspace_id", None)
+        if previous_workspace_id is not None:
+            workspace_ids.add(previous_workspace_id)
+    if not workspace_ids:
+        return objects.none()
+    return objects.filter(workspace_id__in=workspace_ids)
+
+
+@receiver(post_save, sender=Component)
+@receiver(post_save, sender=Project)
+@receiver(post_save, sender=Plan)
+@disable_for_loaddata
+def update_project_bill(sender, instance, using=None, **kwargs) -> None:
+    if isinstance(instance, Component):
+        billings = get_project_billings(instance.project, using=using)
+    elif isinstance(instance, Project):
+        billings = get_project_billings(instance, using=using, include_previous=True)
+    else:
+        billings = instance.billing_set.all()
+    for billing in billings:
+        billing.check_limits()
+        if (
+            isinstance(instance, Project)
+            and billing.workspace_id == instance.workspace_id
+        ):
+            billing.update_workspace_name(using=using)
+    if isinstance(instance, Project):
+        instance.billing_original_workspace_id = instance.workspace_id
+
+
+@receiver(pre_delete, sender=Project)
+@receiver(pre_delete, sender=Component)
+@receiver(post_delete, sender=Translation)
+@disable_for_loaddata
+def record_project_bill(
+    sender, instance: Project | Component | Translation, **kwargs
+) -> None:
+    if isinstance(instance, Translation):
+        try:
+            instance = instance.component
+        except Component.DoesNotExist:
+            # Happens during component removal
+            return
+    if isinstance(instance, Component):
+        instance = instance.project
+
+    # Sync billing access upon project removal, otherwise users might not be able to
+    # terminate billing for removed project
+    if isinstance(instance, Project):
+        users = User.objects.having_perm("project.edit", instance)
+        for billing in instance.billings:
+            # Do the owners sync only for the last project
+            if billing.get_projects_queryset().exclude(pk=instance.pk).exists():
+                continue
+            # Keep workspace access when the last project in a billing is removed.
+            owners_group = billing.workspace.get_owners_group()
+            existing_owners = set(owners_group.user_set.values_list("id", flat=True))
+            for user in users:
+                if user.id in existing_owners:
+                    continue
+                user.add_team(None, owners_group)
+                billing.billinglog_set.create(
+                    event=BillingEvent.ADMIN_ADDED_PROJECT, summary=user.username
+                )
+
+    # Collect billings to update for delete_project_bill
+    instance.billings_to_update = [billing.pk for billing in instance.billings]
+
+
+@receiver(post_delete, sender=Project)
+@receiver(post_delete, sender=Component)
+@receiver(post_delete, sender=Translation)
+@disable_for_loaddata
+def delete_project_bill(
+    sender, instance: Project | Component | Translation, **kwargs
+) -> None:
+    # ruff: ignore[import-outside-top-level]
+    from weblate.billing.tasks import billing_check
+
+    if isinstance(instance, Translation):
+        try:
+            instance = instance.component
+        except Component.DoesNotExist:
+            # Happens during component removal
+            return
+    if isinstance(instance, Component):
+        instance = instance.project
+    # This is collected in record_project_bill
+    for billing_id in instance.billings_to_update:
+        transaction.on_commit(partial(billing_check, billing_id))
+    # Clear the list to avoid repeated trigger
+    instance.billings_to_update.clear()
+
+
+@receiver(post_save, sender=Invoice)
+@disable_for_loaddata
+def update_invoice_bill(sender, instance, **kwargs) -> None:
+    instance.billing.check_limits()
+
+
+class WeblateConf(AppConf):
+    GRACE_PERIOD = 15
+    REMOVAL_PERIOD = 15
+    INACTIVE_RECURRING_DAYS = 180
+    INACTIVE_RECURRING_NOTICE_DAYS = 30
+
+    class Meta:
+        prefix = "BILLING"

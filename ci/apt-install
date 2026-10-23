@@ -1,0 +1,41 @@
+#!/bin/sh
+
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+set -e -x
+
+mkdir -p /run/user/1000
+chown -R 1000:1000 /run/user/1000
+
+# Add PostgreSQL repo
+install -d /usr/share/postgresql-common/pgdg
+curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+curl -o /etc/apt/keyrings/git-core.launchpad.net.asc --fail 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xe363c90f8f1b6217'
+echo "deb [signed-by=/etc/apt/keyrings/git-core.launchpad.net.asc] https://ppa.launchpadcontent.net/git-core/ppa/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/git.list
+
+# Update package lists
+apt-get update
+
+# Install dependencies
+apt-get install -y \
+    gettext \
+    git \
+    git-svn \
+    gnupg \
+    subversion \
+    postgresql-client-18 \
+    pkg-config \
+    libxml2-dev \
+    libacl1-dev \
+    liblz4-dev \
+    libzstd-dev \
+    libxxhash-dev \
+    libxmlsec1-dev \
+    libsasl2-dev \
+    libldap2-dev \
+    libssl-dev \
+    libffi-dev \
+    liblz4-dev

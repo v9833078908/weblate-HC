@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% load i18n static %}
+
+{% block extra_styles %}
+  <link rel="stylesheet" href="{% static 'styles/repeat-queue.css' %}" />
+{% endblock extra_styles %}
+
+{% block extra_script %}
+  <script defer src="{% static 'js/repeat-queue.js' %}"></script>
+{% endblock extra_script %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item"><a href="{{ project.get_absolute_url }}">{{ project }}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Repeats" %}</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+  <main class="rq">
+    <div class="rq-heading">
+      <div>
+        <h1>{% translate "Repeat queue" %}: {{ language }}</h1>
+        <p class="text-muted">{% translate "The same source text should read the same everywhere in the game. Choose one translation per group; nothing is written until you confirm the preview." %}</p>
+      </div>
+    </div>
+
+    {% if decision %}
+      <div class="alert {% if decision.units %}alert-warning{% else %}alert-success{% endif %}"
+           role="status">
+        {% if decision.action == "apply" %}
+          <p>
+            {% blocktranslate with source=decision.source target=decision.target %}"{{ source }}" now has one shared translation: "{{ target }}".{% endblocktranslate %}
+            {% blocktranslate count counter=decision.written %}{{ counter }} place was changed.{% plural %}{{ counter }} places were changed.{% endblocktranslate %}
+            {% if decision.already %}
+              {% blocktranslate count counter=decision.already %}{{ counter }} more already had this translation.{% plural %}{{ counter }} more already had this translation.{% endblocktranslate %}
+            {% endif %}
+            {% if decision.unchecked %}
+              {% blocktranslate count counter=decision.unchecked %}You left {{ counter }} place unchanged.{% plural %}You left {{ counter }} places unchanged.{% endblocktranslate %}
+            {% endif %}
+          </p>
+          {% if decision.units %}
+            <p>
+              {% blocktranslate count counter=decision.units|length %}{{ counter }} place was not changed because it is approved or locked:{% plural %}{{ counter }} places were not changed because they are approved or locked:{% endblocktranslate %}
+            </p>
+          {% endif %}
+        {% elif decision.action == "independent" %}
+          <p>
+            {% blocktranslate with source=decision.source %}"{{ source }}": the translations stay different, and each place is translated separately from now on.{% endblocktranslate %}
+          </p>
+        {% else %}
+          <p>
+            {% blocktranslate with source=decision.source %}The decision for "{{ source }}" was undone.{% endblocktranslate %}
+            {% blocktranslate count counter=decision.restored %}{{ counter }} place got its previous translation back.{% plural %}{{ counter }} places got their previous translations back.{% endblocktranslate %}
+          </p>
+          {% if decision.units %}
+            <p>
+              {% blocktranslate count counter=decision.units|length %}{{ counter }} place was not restored because it was changed after the decision:{% plural %}{{ counter }} places were not restored because they were changed after the decision:{% endblocktranslate %}
+            </p>
+          {% endif %}
+        {% endif %}
+        {% if decision.units %}
+          <ul>
+            {% for unit in decision.units %}
+              <li>
+                <a href="{{ unit.get_absolute_url }}"><code>{{ unit.context }}</code></a> ({{ unit.translation.component }})
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if decision.can_undo %}
+          <form method="post" action="{% url 'repeat-undo' %}">
+            {% csrf_token %}
+            <input type="hidden" name="token" value="{{ decision.token }}" />
+            <button class="btn btn-outline-secondary btn-sm" type="submit">{% translate "Undo" %}</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if not policy %}
+      <p class="alert alert-info">{% translate "No active repeat rule exists for this language." %} <a href="{% url 'repeat-rule' project=project.slug language=language.code %}">{% translate "Choose where to look for repeats" %}</a></p>
+    {% else %}
+      <form class="rq-filters"
+            method="get"
+            aria-label="{% translate 'Repeat queue filters' %}">
+        <input type="hidden" name="status" value="{{ status }}" />
+        <div>
+          <span class="form-label">{% translate "Components" %}</span>
+          {% for component in components %}
+            <label class="form-check form-check-inline">
+              <input class="form-check-input"
+                     type="checkbox"
+                     name="component"
+                     value="{{ component.pk }}"
+                     {% if component.pk in selected_components %} checked{% endif %} />
+              <span class="form-check-label">{{ component }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        {% if labels %}
+          <div>
+            <span class="form-label">{% translate "Source labels" %}</span>
+            {% for label in labels %}
+              <label class="form-check form-check-inline">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="label"
+                       value="{{ label.pk }}"
+                       {% if label.pk in selected_labels %} checked{% endif %} />
+                <span class="form-check-label">{{ label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <noscript>
+          <button class="btn btn-outline-secondary" type="submit">{% translate "Show" %}</button>
+        </noscript>
+      </form>
+
+      <div class="rq-toolbar">
+        <nav aria-label="{% translate 'Repeat queue status' %}">
+          <a{% if status == 'open' %} aria-current="page"{% endif %} href="?status=open">{% translate "Different translations" %} <span class="badge text-bg-secondary">{{ status_counts.open }}</span></a>
+          <a {% if status == 'conflict' %} aria-current="page"{% endif %}
+             href="?status=conflict">{% translate "Conflicts" %} <span class="badge text-bg-secondary">{{ status_counts.conflict }}</span></a>
+          <a {% if status == 'consistent' %} aria-current="page"{% endif %}
+             href="?status=consistent">{% translate "Make shared" %} <span class="badge text-bg-secondary">{{ status_counts.consistent }}</span></a>
+          <a {% if status == 'resolved' %} aria-current="page"{% endif %}
+             href="?status=resolved">{% translate "Resolved" %} <span class="badge text-bg-secondary">{{ status_counts.resolved }}</span></a>
+          <a{% if status == 'all' %} aria-current="page"{% endif %} href="?status=all">{% translate "All" %} <span class="badge text-bg-secondary">{{ status_counts.all }}</span></a>
+        </nav>
+      </div>
+      <section class="alert alert-info" aria-label="{% translate 'Judge check for repeats' %}">
+        {% if judge_panel.state == 'running' %}
+          <h2 class="h5">{% translate "The judge is checking variants" %}</h2>
+          <div class="progress"
+               role="progressbar"
+               aria-label="{% translate 'Judge check progress' %}"
+               aria-valuenow="{{ judge_panel.checked }}"
+               aria-valuemin="0"
+               aria-valuemax="{{ judge_panel.total }}">
+            <div class="progress-bar"
+                 style="width: {% widthratio judge_panel.checked judge_panel.total 100 %}%"></div>
+          </div>
+          <p class="mt-2">{% blocktranslate with checked=judge_panel.checked count total=judge_panel.total %}Checked {{ checked }} of {{ total }} place{% plural %}Checked {{ checked }} of {{ total }} places{% endblocktranslate %}. {% translate "You can leave this page: the check runs in the background and results appear here." %}</p>
+          {% if judge_panel.can_view_run %}
+            <a href="{{ judge_panel.run.get_absolute_url }}">{% translate "View judge run" %}</a>
+          {% endif %}
+        {% else %}
+          {% if judge_panel.state == 'ready' %}
+            <h2 class="h5">{% translate "Judge check results" %}</h2>
+          {% else %}
+            <h2 class="h5">{% translate "Check variants with the judge" %}</h2>
+            <p>{% blocktranslate count counter=judge_panel.places %}The repeat check covers {{ counter }} place.{% plural %}The repeat check covers {{ counter }} places.{% endblocktranslate %}
+              {% if judge_panel.places != judge_panel.queue_places %}
+                {% blocktranslate count counter=judge_panel.queue_places %}The open queue contains {{ counter }} place.{% plural %}The open queue contains {{ counter }} places.{% endblocktranslate %}
+              {% endif %}
+            </p>
+            {% if judge_panel.can_launch %}
+              <a class="btn btn-primary" href="{{ judge_panel.launch_url }}">{% translate "Check variants with the judge" %}</a>
+              <p class="small text-muted">{% translate "When enough priced history exists, the cost estimate appears before you launch. Actual spend appears in the run report." %}</p>
+            {% endif %}
+          {% endif %}
+        {% endif %}
+        {% if judge_panel.stopped %}
+          <p>{% translate "The last check stopped before it finished." %}</p>
+        {% endif %}
+        {% if judge_panel.state == 'ready' %}
+          <nav aria-label="{% translate 'Judge result filters' %}">
+            <ul class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-2 list-unstyled mb-3">
+              <li class="col">
+                <div class="card h-100 border-primary border-2">
+                  <div class="card-body">
+                    <a href="?status=open&amp;judge=ready"
+                       {% if judge_filter == 'ready' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.ready }}</span>
+                      {% blocktranslate count counter=judge_panel.buckets.ready %}group: a recommended variant is ready{% plural %}groups: a recommended variant is ready{% endblocktranslate %}</a>
+                    {% if bulk_ready %}
+                      <a class="btn btn-primary btn-sm d-block mt-2" href="{{ bulk_review_url }}">{% translate "Make a bulk edit" %}</a>
+                    {% endif %}
+                  </div>
+                </div>
+              </li>
+              <li class="col">
+                <div class="card h-100">
+                  <div class="card-body">
+                    <a href="?status=open&amp;judge=choose"
+                       {% if judge_filter == 'choose' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.choose }}</span>
+                      {% blocktranslate count counter=judge_panel.buckets.choose %}group: no single safe variant, your choice{% plural %}groups: no single safe variant, your choice{% endblocktranslate %}</a>
+                  </div>
+                </div>
+              </li>
+              <li class="col">
+                <div class="card h-100">
+                  <div class="card-body">
+                    <a href="?status=open&amp;judge=rewrite"
+                       {% if judge_filter == 'rewrite' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.rewrite }}</span>
+                      {% blocktranslate count counter=judge_panel.buckets.rewrite %}group: errors in every variant, a new translation is needed{% plural %}groups: errors in every variant, a new translation is needed{% endblocktranslate %}</a>
+                  </div>
+                </div>
+              </li>
+              <li class="col">
+                <div class="card h-100">
+                  <div class="card-body">
+                    <a href="?status=open&amp;judge=unchecked"
+                       {% if judge_filter == 'unchecked' %} aria-current="page"{% endif %}><span class="d-block fs-3 fw-semibold">{{ judge_panel.buckets.unchecked }}</span>
+                      {% blocktranslate count counter=judge_panel.buckets.unchecked %}group the judge could not check{% plural %}groups the judge could not check{% endblocktranslate %}</a>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </nav>
+        {% endif %}
+        {% if judge_panel.comparing %}
+          <p role="status">{% blocktranslate count counter=judge_panel.comparing %}Comparing variants: {{ counter }} group{% plural %}Comparing variants: {{ counter }} groups{% endblocktranslate %}</p>
+        {% endif %}
+        {% if judge_panel.state == 'ready' and judge_panel.relaunch_places and judge_panel.can_launch %}
+          <p><a href="{{ judge_panel.launch_url }}">{% translate "Check the remaining places" %}</a></p>
+        {% endif %}
+        {% if judge_panel.outside_places %}
+          <p>{% blocktranslate count counter=judge_panel.outside_places %}{{ counter }} place is outside the repeat check; the judge does not check it.{% plural %}{{ counter }} places are outside the repeat check; the judge does not check them.{% endblocktranslate %}</p>
+        {% endif %}
+      </section>
+      {% if bulk_ready %}
+        <p class="alert alert-info" role="status">
+          {% blocktranslate count counter=bulk_ready %}{{ counter }} current recommendation is ready to review and apply.{% plural %}{{ counter }} current recommendations are ready to review and apply.{% endblocktranslate %}
+          <a class="alert-link" href="{{ bulk_review_url }}">{% translate "Review and apply" %}</a>
+        </p>
+      {% endif %}
+    {% endif %}
+
+    <p class="rq-summary">{% blocktranslate count counter=shown_count %}Showing {{ counter }} group of {{ total_count }}. Conflicts first, then short strings and the widest groups.{% plural %}Showing {{ counter }} groups of {{ total_count }}. Conflicts first, then short strings and the widest groups.{% endblocktranslate %}</p>
+
+    <ul class="rq-groups">
+      {% for item in groups %}
+        {% include "snippets/repeat_group.html" with item=item %}
+      {% empty %}
+        <li class="alert alert-info">
+          {% if status == 'open' and status_counts.consistent %}
+            {% translate 'No repeat is translated in different ways. Groups that already share one translation are under "Make shared".' %}
+          {% else %}
+            {% translate "There are no exact repeats in the selected scope." %}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if page_obj %}
+      {% include "paginator.html" %}
+    {% endif %}
+  </main>
+{% endblock content %}

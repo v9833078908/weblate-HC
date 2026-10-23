@@ -1,0 +1,2063 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: en\n"
+
+#: 142945292288
+msgid "vibration"
+msgstr "Vibration"
+
+#: 136857827676160
+msgid "loading"
+msgstr "Loading"
+
+#: 140450844643328
+msgid "adsNotReady"
+msgstr "The ad is not ready. Try again later."
+
+#: 340188151943168
+msgid "amount"
+msgstr "{value}"
+
+#: 368875517775872
+msgid "reviewTitle"
+msgstr "Your opinion is important to us!"
+
+#: 368997953703936
+msgid "reviewDescription"
+msgstr "Do you like this game?"
+
+#: 369514264137728
+msgid "reviewConfirm"
+msgstr "Yes, of course!"
+
+#: 369755633750016
+msgid "no"
+msgstr "No"
+
+#: 406497292193792
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+#: 483624632979456
+msgid "leaders"
+msgstr "Leaders"
+
+#: 483894125400064
+msgid "leaderboardAuth"
+msgstr ""
+"The leaderboard is only available to authorized users. \n"
+"Log in to your account in the settings."
+
+#: 693554757505024
+msgid "softCurrency"
+msgstr "Silver coins"
+
+#: 693648756051968
+msgid "gems"
+msgstr "Gems"
+
+#: 2338581875265536
+msgid "day_N"
+msgstr "Day {value}"
+
+#: 2340303519617024
+msgid "dailyRewards"
+msgstr "Daily rewards"
+
+#: 2340513616498688
+msgid "dailyRewardsDescription"
+msgstr ""
+"Visit the game every day\n"
+"and get rewards."
+
+#: 2524665741578240
+msgid "tapToStart"
+msgstr "Tap to start"
+
+#: 2534199759474688
+msgid "settings"
+msgstr "Settings"
+
+#: 2539217615065088
+msgid "sound"
+msgstr "SFX"
+
+#: 2539801025974272
+msgid "music"
+msgstr "Music"
+
+#: 2606360020914176
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?"
+"{seconds}s.|} "
+
+#: 31188945265680384
+msgid "sell"
+msgstr "Sell"
+
+#: 39267299644215296
+msgid "trading"
+msgstr "Trading"
+
+#: 39267930052300800
+msgid "selectAmount"
+msgstr ""
+"Select quantity of gems <size=56><color=#fff>({value}/{total})</color></size>"
+
+#: 39432224572248064
+msgid "apply"
+msgstr "Apply"
+
+#: 88927433573797888
+msgid "exit"
+msgstr "Exit"
+
+#: 89108083400511488
+msgid "loot"
+msgstr "Loot"
+
+#: 89232802619592704
+msgid "inventory"
+msgstr "Inventory"
+
+#: 89233049219502080
+msgid "add_amount"
+msgstr "+{value}"
+
+#: 101508439312961536
+msgid "upgradeCharacterHealthStat"
+msgstr "Health"
+
+#: 101509164025778176
+msgid "Pick"
+msgstr "Pick"
+
+#: 103762241726451712
+msgid "unload"
+msgstr "Unload"
+
+#: 105589950840573952
+msgid "continue"
+msgstr "continue"
+
+#: 105600782735511552
+msgid "continueWithoutTheBird"
+msgstr "Continue without the bird"
+
+#: 128992315220168704
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+#: 129852820621103104
+msgid "make"
+msgstr "Make"
+
+#: 130612002970406912
+msgid "in_progress"
+msgstr "In progress..."
+
+#: 132250436289957888
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+#: 132393404065910784
+msgid "lvl_x"
+msgstr "lvl. {value}"
+
+#: 133085114043469824
+msgid "take"
+msgstr "Take"
+
+#: 168978456979443712
+msgid "tradeDescription"
+msgstr "Drag and drop items to sell here"
+
+#: 168979719083266048
+msgid "storage"
+msgstr "Storage"
+
+#: 168993254521704448
+msgid "backpack"
+msgstr "Backpack"
+
+#: 175428495763312640
+msgid "upgradeCharacterResistanceStat"
+msgstr "Resistance"
+
+#: 175428883866456064
+msgid "completed"
+msgstr "Completed"
+
+#: 175429326734626816
+msgid "upgradeCharacterSpeedStat"
+msgstr "Speed"
+
+#: 175429624488267776
+msgid "detectionRadius"
+msgstr "Trap detection radius"
+
+#: 175437389508120576
+msgid "upgrade"
+msgstr "Upgrade"
+
+#: 175444653988122624
+msgid "upgradeCharacterTitle"
+msgstr "Character lvl {value}"
+
+#: 175444893063450624
+msgid "upgradeToolTitle"
+msgstr "Tool lvl {value}"
+
+#: 175445052228898816
+msgid "bird"
+msgstr "Bird"
+
+#: 175445211058802688
+msgid "craft"
+msgstr "Craft"
+
+#: 175530141390475264
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Additional flights"
+
+#: 175535881710735360
+msgid "upgradeToolSpeedStat"
+msgstr "Impact speed of the tool"
+
+#: 175536172950622208
+msgid "upgradeToolDamageStat"
+msgstr "Tool damage"
+
+#: 185307831437889536
+msgid "terrain1Title"
+msgstr "Fenmar Swamp"
+
+#: 185308054407090176
+msgid "terrain2Title"
+msgstr "Belomar"
+
+#: 185645691072417792
+msgid "start"
+msgstr "Start"
+
+#: 185658961254682624
+msgid "terrain1Description"
+msgstr ""
+"Just a swamp being a swamp — except with gold nuggets and a giant worm that "
+"reacts to every “cling.”\n"
+"The locals say: if you want gold, don’t jingle like a china shop."
+
+#: 185670435373060096
+msgid "howToOpenBiome"
+msgstr ""
+"New places.\n"
+"Complete orders — and the locals will show you \n"
+"where to search next."
+
+#: 185944937449394176
+msgid "revivalTitle"
+msgstr "It's a total fail!"
+
+#: 185946490252038144
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Items in the backpack: {value} / {total}"
+
+#: 185949125390635008
+msgid "exitAndLoseItems"
+msgstr "Exit and lose items"
+
+#: 187764654040420352
+msgid "noBirdEnergy"
+msgstr "No birds, no eyes"
+
+#: 187765165577736192
+msgid "noDetectorEnergy"
+msgstr "Treasure detector"
+
+#: 190252961852821504
+msgid "yes_leave"
+msgstr "Yes, leave"
+
+#: 190253329051553792
+msgid "no_stay"
+msgstr "No, stay here"
+
+#: 190253804719181824
+msgid "leave_location_confirmation"
+msgstr "Do you want to leave the location?"
+
+#: 190609920439357440
+msgid "percentAmount"
+msgstr "{value}%"
+
+#: 190613197834948608
+msgid "pointsAmount"
+msgstr "{value} <size=70%>pt.</size>"
+
+#: 190999934906142720
+msgid "close"
+msgstr "Close"
+
+#: 191001304602251264
+msgid "selectTheShape"
+msgstr "Choose the shape of the treasure"
+
+#: 191001600908857344
+msgid "speedUp"
+msgstr "Speed up"
+
+#: 191062612982894592
+msgid "tutorial"
+msgstr "Tutorial"
+
+#: 214456412639858688
+msgid "terrainPickLootTitle"
+msgstr "Grab all that fits in your bag and storage"
+
+#: 214474517843808256
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+#: 215688832034803712
+msgid "takeToStorageXofY"
+msgstr "Take {value}/{total}"
+
+#: 215688944811249664
+msgid "upgradeBag"
+msgstr "Upgrade bag"
+
+#: 216124892128743424
+msgid "dealerWillBuyTheRest"
+msgstr "The dealer will buy everything else from you"
+
+#: 216274536972423168
+msgid "information"
+msgstr "Information"
+
+#: 216281997183815680
+msgid "weightInformation"
+msgstr ""
+"The capacity of the horse’s bag is an important indicator.\n"
+"The weight of found items affects their transportation.\n"
+"Upgrade your bag to increase its capacity and carry more items."
+
+#: 216292821260570624
+msgid "rank_x"
+msgstr "Rank {value}"
+
+#: 216295079784222720
+msgid "weight"
+msgstr "Weight:"
+
+#: 216455391749607424
+msgid "vehicleUpgradeDescription"
+msgstr "Improve the capacity of the horse’s cargo bag for carrying loads."
+
+#: 216456296213516288
+msgid "capacity"
+msgstr "Capacity"
+
+#: 216456449876037632
+msgid "horseCargoBag"
+msgstr "Horse cargo bag"
+
+#: 216464394802171904
+msgid "hardCurrency"
+msgstr "Golden coins"
+
+#: 216827767398076416
+msgid "confirmation"
+msgstr "Confirmation"
+
+#: 216836939359457280
+msgid "attention!"
+msgstr "Attention!"
+
+#: 216837051221544960
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"If you leave now, <color=#E01114>all found items will be sold to the dealer</"
+"color> for less than usual."
+
+#: 216843048690388992
+msgid "bayerDescription"
+msgstr "Want to earn more? I’ll buy the leftovers with a bonus."
+
+#: 217004942013239296
+msgid "bestProfit"
+msgstr "Best profit"
+
+#: 217005085059977216
+msgid "goodProfit"
+msgstr "Good profit"
+
+#: 217005221878173696
+msgid "badProfit"
+msgstr "Bad profit"
+
+#: 217034757265166336
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+#: 217067111195086848
+msgid "yourProfit"
+msgstr "Your profit:"
+
+#: 219330229052903424
+msgid "eliteSlot"
+msgstr "Elite slot"
+
+#: 219330557043281920
+msgid "tradingShopLevel"
+msgstr "Trading shop lvl {value}"
+
+#: 219331227683131392
+msgid "rent"
+msgstr "Rent"
+
+#: 219333990236295168
+msgid "slot"
+msgstr "Slot"
+
+#: 219334107282542592
+msgid "selectItem"
+msgstr "Select item"
+
+#: 219569917810446336
+msgid "checkOffer"
+msgstr "Check offer"
+
+#: 221184956493467648
+msgid "shopLevel"
+msgstr "Shop lvl {value}"
+
+#: 221731312916238336
+msgid "tradeOpenEliteSlotDialog"
+msgstr "This is where buyers pay big, no haggling."
+
+#: 221732692687065088
+msgid "getASlot"
+msgstr "Get a slot"
+
+#: 221745332360581120
+msgid "customerWillArriveIn"
+msgstr "The customer will arrive in:"
+
+#: 221747748288073728
+msgid "speedUpBy"
+msgstr "Speed up by"
+
+#: 221752584698073088
+msgid "decline?"
+msgstr "Decline?"
+
+#: 221752816395620352
+msgid "tradeDeclineClientInfo"
+msgstr "Until the next customer arrives:"
+
+#: 221785455785676800
+msgid "tradingShop"
+msgstr "Trading shop"
+
+#: 221785885429207040
+msgid "newSlot"
+msgstr "New slot"
+
+#: 221786327613706240
+msgid "tradeUpgradeDescription"
+msgstr "Upgrade the trading shop to unlock more slots for selling."
+
+#: 221790732488544256
+msgid "tradingShopShort"
+msgstr "Shop"
+
+#: 221791365350297600
+msgid "level_x"
+msgstr "Level {value}"
+
+#: 221901028389556224
+msgid "buyersOffer"
+msgstr "Buyer's offer:"
+
+#: 221902690122469376
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+#: 223520514767065088
+msgid "common"
+msgstr "Common"
+
+#: 223520659910955008
+msgid "uncommon"
+msgstr "Uncommon"
+
+#: 223520713283473408
+msgid "rare"
+msgstr "Rare"
+
+#: 223520767448715264
+msgid "epic"
+msgstr "Epic"
+
+#: 223520826210914304
+msgid "legendary"
+msgstr "Legendary"
+
+#: 223520860377714688
+msgid "mythic"
+msgstr "Mythic"
+
+#: 224246507228106752
+msgid "tradeSelectItemTitle"
+msgstr "Select an item for sale"
+
+#: 224277347911864320
+msgid "basePrice"
+msgstr "Base price:"
+
+#: 226508435681972224
+msgid "map"
+msgstr "Map"
+
+#: 226574491591118848
+msgid "wiseNotes"
+msgstr "Wise notes"
+
+#: 226576404894191616
+msgid "emptyPickedItems"
+msgstr "Leave empty-handed?"
+
+#: 226580081470083072
+msgid "settingsDescription"
+msgstr "Shape the world your way!"
+
+#: 226582087576326144
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Upgrade your trading shop to unlock more sales slots — the more shelves you "
+"add, the bigger your profits!"
+
+#: 226633818465112064
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}"
+
+#: 227954852267036672
+msgid "craftSlot"
+msgstr "Craft slot"
+
+#: 227959361919782912
+msgid "superSlot"
+msgstr "Super slot"
+
+#: 228232787804819456
+msgid "forge"
+msgstr "Forge"
+
+#: 228312834624458752
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Forge treasures, crack open chests and magical eggs — who knows what rare "
+"loot awaits inside!"
+
+#: 228318026984067072
+msgid "chestSlot"
+msgstr "Chest slot"
+
+#: 228318447752450048
+msgid "incubator"
+msgstr "Incubator"
+
+#: 228321113740152832
+msgid "craftOpenEliteSlotLabel"
+msgstr "Unleash the ultimate power!"
+
+#: 228357165007769600
+msgid "cancel"
+msgstr "Cancel"
+
+#: 228360236127490048
+msgid "openChest"
+msgstr "Open chest"
+
+#: 228385218756874240
+msgid "timeToOpen:"
+msgstr "Time to open:"
+
+#: 228792391647367168
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "No chests in stock"
+
+#: 228794249094893568
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Find one? Drag it to Craft and open it open\n"
+"(just not with an axe, alright?)"
+
+#: 228796285601452032
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+#: 229526591581196288
+msgid "craftSelectEggTitle"
+msgstr "Select an egg to open"
+
+#: 229526902270070784
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "No eggs in stock"
+
+#: 229528260377317376
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "To the egg we go — not from a coop, but born of magic!"
+
+#: 229528854181711872
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Explore the realm, uncover the rare egg, and deliver it to the Craft. What "
+"lies within — mere yolk, or something far greater?"
+
+#: 229530481219342336
+msgid "openEgg"
+msgstr "Open egg"
+
+#: 229879731472044032
+msgid "craftSelectRecipeTitle"
+msgstr "Choose components for crafting"
+
+#: 229880209643671552
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Nothing in stock!"
+
+#: 229881107660935168
+msgid "craftItem"
+msgstr "Craft item"
+
+#: 229881635711225856
+msgid "crafting:"
+msgstr "Crafting:"
+
+#: 229882264282206208
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "These items has not been found yet."
+
+#: 229887783071911936
+msgid "recipe"
+msgstr "Recipe"
+
+#: 230098234464538624
+msgid "craftClosedRecipeTitle"
+msgstr "The forge is too weak!"
+
+#: 230098538715156480
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Insufficient Forge Level\n"
+"\n"
+"With each upgrade, you'll be able to craft increasingly rare and valuable "
+"treasures. It's time to turn this furnace into a forge of legends!"
+
+#: 230596136282624000
+msgid "craftClosedSlotTitle"
+msgstr "Slot is locked!"
+
+#: 230596696704552960
+msgid "craftClosedSlotDescription"
+msgstr "Your crafting skills aren’t strong enough. You need to level them up."
+
+#: 230974103273869312
+msgid "or"
+msgstr "or"
+
+#: 231685619115626496
+msgid "craftSpeedUpTitle"
+msgstr "Shovel in the coal!"
+
+#: 231686505602748416
+msgid "craftSpeedUpDescription"
+msgstr "It’ll be like the dwarves chugged espresso and hit turbo mode!"
+
+#: 231700678231461888
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Slot unlocked.\n"
+"The furnace melts metal, turning it into brand-new jewelry for sale."
+
+#: 231701488554217472
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Time is money, but jewelry gets crafted even quicker"
+
+#: 231702447166590976
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Boosts your chances of creating a legendary-worthy item."
+
+#: 231703302095769600
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"Wisdom of the ancients flows through you — forge marvels the world has never "
+"seen!"
+
+#: 232003352147529728
+msgid "craftStockFullTitle"
+msgstr "No space for treasure in the storage!"
+
+#: 232004264790331392
+msgid "craftStockFullDescription"
+msgstr ""
+"The storage is packed to the last splinter.\n"
+"Sell the excess at the trading shop or upgrade the storage — then claim your "
+"shiny trophy!"
+
+#: 232054830455328768
+msgid "allItems"
+msgstr "All items"
+
+#: 232055567298072576
+msgid "stockLevel"
+msgstr "Storage lvl {value}"
+
+#: 232285845522223104
+msgid "storageUpgradeDescription"
+msgstr ""
+"Each upgrade grants <color=#E01114>more space</color> for treasures found "
+"and forged. More gold, less suffering!"
+
+#: 238220511437656064
+msgid "revivalDescription"
+msgstr "Respawn — or kiss your loot goodbye."
+
+#: 238225411982757888
+msgid "noBirdEnergyDescription"
+msgstr "Brought you to the treasure and flew off to rest."
+
+#: 238226013823438848
+msgid "callTheBird"
+msgstr "Return now"
+
+#: 238228172388438016
+msgid "noDetectorEnergyDescription"
+msgstr "Think you can handle one more?"
+
+#: 238229156124692480
+msgid "oreSeeker"
+msgstr "Ore Seeker"
+
+#: 238230435035090944
+msgid "gemSeeker"
+msgstr "Gem Seeker"
+
+#: 238805340126449664
+msgid "respawn"
+msgstr "Respawn"
+
+#: 238835918318080000
+msgid "deathExit"
+msgstr "Left with nothing"
+
+#: 241685352961806336
+msgid "terrain0Title"
+msgstr "Quietwood"
+
+#: 241686624016273408
+msgid "terrain2Description"
+msgstr ""
+"A harsh northern wilderness locked in eternal cold. Among icy labyrinths "
+"it’s easy to get lost—and after sunset, to freeze to death. In that order… "
+"or maybe the other way around."
+
+#: 241686676700925952
+msgid "terrain0Description"
+msgstr ""
+"Every hero starts somewhere!\r\n"
+"Buried here are your first treasures — and your first troubles. This is "
+"where you'll learn to mine, smelt, show off, and survive."
+
+#: 242168130602012672
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Earn the villagers’ favor,\n"
+"and a new city will open its gates to you!"
+
+#: 242225089728483328
+msgid "upgradeToolNoiseStat"
+msgstr "Noise reduction"
+
+#: 243276239902871552
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr ""
+"Level up your resistance — and you won’t flinch when the world turns hostile!"
+
+#: 243276804422635520
+msgid "upgradeCharacterHealthStatDescription"
+msgstr "More lives — fewer chances to become a legend... posthumously."
+
+#: 243277089148768256
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr "Faster feet — fewer chances of becoming dinner for the local wildlife!"
+
+#: 243277490971480064
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"The more feathered scouts you’ve got, the better your chances of finding "
+"buried shinies!"
+
+#: 243277858065354752
+msgid "upgradeToolSpeedStatDescription"
+msgstr ""
+"The faster the strike, the slimmer the chance someone else grabs the ore "
+"first!"
+
+#: 243278506789965824
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"The mightier the tool, the tamer the stone —\r\n"
+"and the fuller your bag!"
+
+#: 243278882293420032
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Less noise means less chance of being heard by those who prefer the crunch "
+"of bones over the clink of gold."
+
+#: 243286615193292800
+msgid "resistanceStatLevel"
+msgstr "Resistance lvl {value}"
+
+#: 243287048297123840
+msgid "healthStatLevel"
+msgstr "Health lvl {value}"
+
+#: 243287378833444864
+msgid "speedStatLevel"
+msgstr "Speed lvl {value}"
+
+#: 243287648745295872
+msgid "upgradeBirdTitle"
+msgstr "Bird lvl {value}"
+
+#: 243301960306135040
+msgid "amountPcs"
+msgstr "{value} pcs."
+
+#: 246550123938844672
+msgid "maxLevel"
+msgstr "Max level"
+
+#: 246920055440543744
+msgid "treasureDetector"
+msgstr "Treasure detector"
+
+#: 246920748020797440
+msgid "amountSec"
+msgstr "{value} sec."
+
+#: 246921123041906688
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Ore Seeker"
+
+#: 246921489389195264
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"This magical gizmo sniffs out gold veins better than a dwarf smells a free "
+"lunch!"
+
+#: 246922080165302272
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Gem Seeker"
+
+#: 246922249237696512
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"A device with a nose sharper than a merchant's greed. No gem stays hidden "
+"for long!"
+
+#: 246922743578365952
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "More time for gold hunting"
+
+#: 246922920854818816
+msgid "upgradeDetectorDurationStatDescription"
+msgstr "Runs longer, searches better, grumbles less. More time means more loot!"
+
+#: 247080041558839296
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+#: 247080534393753600
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} pcs."
+
+#: 247080751339933696
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} sec."
+
+#: 247452846670483456
+msgid "gold"
+msgstr "Gold"
+
+#: 247452991940202496
+msgid "chests"
+msgstr "Chests"
+
+#: 247453392370405376
+msgid "eggs"
+msgstr "Eggs"
+
+#: 247453604342140928
+msgid "treasures"
+msgstr "Jewelry"
+
+#: 247453698634289152
+msgid "artifacts"
+msgstr "Artifacts"
+
+#: 249822854419582976
+msgid "deathTitle"
+msgstr "Death is generous — it takes everything!"
+
+#: 249823090609229824
+msgid "deathDescription"
+msgstr "Your loot is now the stuff of legends."
+
+#: 250055490891157504
+msgid "tradeEmptyStorageMessage"
+msgstr "Nothing to sell right now"
+
+#: 250066987813965824
+msgid "craftNoEggs"
+msgstr "No eggs for the incubator"
+
+#: 250067227111591936
+msgid "craftNoChests"
+msgstr "No chests to open"
+
+#: 250067363896233984
+msgid "craftNoItems"
+msgstr "Nothing to craft with"
+
+#: 250187845660315648
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "More time for gem hunting"
+
+#: 251259329547866112
+msgid "newLocationAvailableTitle"
+msgstr "A new location is now available!"
+
+#: 251259543163768832
+msgid "newLocationAvailableDescription"
+msgstr "The villagers agree: you deserve more."
+
+#: 251632108633853952
+msgid "upgradeStock"
+msgstr "Upgrade storage"
+
+#: 252146625037996032
+msgid "storageOverflowedDesctiption"
+msgstr "Your storage can't hold all your riches. Time to upgrade!"
+
+#: 252147840639569920
+msgid "throwAway"
+msgstr "Throw away"
+
+#: 259586112407998464
+msgid "upgradeCraftCostStatDescription"
+msgstr "The base price of items is rising like bread on yeast"
+
+#: 262490762970927104
+msgid "upgradeVehicleWeightStat"
+msgstr "Big bag"
+
+#: 262491576103866368
+msgid "upgradeVehicleWeightStatDescription"
+msgstr ""
+"The horse is now able to carry more treasures. More clutter, more happiness!"
+
+#: 262491999908925440
+msgid "upgradeVehicleTitle"
+msgstr "Horse lvl {value}"
+
+#: 262492464646197248
+msgid "amountKg"
+msgstr "{value} kg."
+
+#: 262492710260445184
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+#: 262493129695039488
+msgid "upgradeStorageWeightStat"
+msgstr "Capacity"
+
+#: 262493626518736896
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Extra space for absolutely worthless treasures!"
+
+#: 262495569987244032
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Generous buyers"
+
+#: 262495864679043072
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Customers are battling for your junk."
+
+#: 262496445971828736
+msgid "upgradeTradeTitle"
+msgstr "Trading shop lvl {value}"
+
+#: 262497898778071040
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "You reek of riches"
+
+#: 262498326018265088
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"Word of your craftsmanship has gotten around — real walking wallets show up "
+"more frequently."
+
+#: 262499250967154688
+msgid "upgradeTradeSlotsStat"
+msgstr "New slot"
+
+#: 262499518630858752
+msgid "upgradeTradeSlotsStatDescription"
+msgstr "An extra trading slot has opened. More customers — more gold!"
+
+#: 262503656592773120
+msgid "upgradeCraftTimeStat"
+msgstr "Jewelry Sprint"
+
+#: 262504135200608256
+msgid "upgradeCraftTitle"
+msgstr "Craft lvl {value}"
+
+#: 262504539359547392
+msgid "upgradeCraftRarityStat"
+msgstr "Rarity"
+
+#: 262505217075187712
+msgid "upgradeCraftRecipesStat"
+msgstr "Recipe book"
+
+#: 262506098214572032
+msgid "upgradeCraftCostStat"
+msgstr "Goldmine"
+
+#: 262506924148527104
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Craft Slot"
+
+#: 262507722794340352
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Chest slot"
+
+#: 262508574351298560
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Slot unlocked.\n"
+"Opens chests and locked objects of any origin — even ones that are clearly "
+"not from this planet."
+
+#: 262508742647746560
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Incubator"
+
+#: 262508816316502016
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Slot unlocked.\n"
+"Don’t think Coco is only good for eggs. If you need to melt ice, heat "
+"something up, or help with other tasks — she’s always useful. And when it "
+"comes to cracking eggs, she doesn’t even ask questions."
+
+#: 262509279946477568
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Slot unlocked.\n"
+"The master craftsman’s main tool.\n"
+"It can do it all: process, restore, polish, crack open, and rework."
+
+#: 262509359629864960
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Super slot"
+
+#: 262698318934839296
+msgid "tradeLockedState"
+msgstr "The trading shop is too small!"
+
+#: 262791601379872768
+msgid "upgradeDetectorTitle"
+msgstr "Treasure detector lvl {value}"
+
+#: 262792683350921216
+msgid "upgradeStorageTitle"
+msgstr "Storage lvl {value}"
+
+#: 266500052736020480
+msgid "selectTrashTitle"
+msgstr "Bulk Junk"
+
+#: 267774055178047488
+msgid "upgradeTradeMoreLikesStat"
+msgstr "All about the likes!"
+
+#: 267774187718053888
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "The audience is screaming with joy!"
+
+#: 286237360443887616
+msgid "metals"
+msgstr "Metals"
+
+#: 289291316380307456
+msgid "craftSelectRoughTitle"
+msgstr "Choose an item to polish"
+
+#: 289293923853275136
+msgid "craftNoRough"
+msgstr "No items to polish"
+
+#: 302325393484156928
+msgid "curseRemovalSlot"
+msgstr "Altar"
+
+#: 302327188075843584
+msgid "inlaySlot"
+msgstr "Insert"
+
+#: 302327678603890688
+msgid "polishingSlot"
+msgstr "Polishing"
+
+#: 310688720811724800
+msgid "rough"
+msgstr "Rough"
+
+#: 310688991746985984
+msgid "cursedItems"
+msgstr "Cursed"
+
+#: 310861865698988032
+msgid "storageDescription"
+msgstr ""
+"All discovered items are stored here.\n"
+"Space is limited — the warehouse isn’t made of rubber.\n"
+"Upgrade your storage so your greed doesn’t hit the walls."
+
+#: 311007630727581696
+msgid "traderName"
+msgstr "Zlatovich the Dealer"
+
+#: 311064004203384832
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Absolutely nothing"
+
+#: 311066402032455680
+msgid "geodes"
+msgstr "Geodes"
+
+#: 311067011754233856
+msgid "unknownItems"
+msgstr "Unknown"
+
+#: 311247067034161152
+msgid "selectItems"
+msgstr "Select items"
+
+#: 311279184229175296
+msgid "proceed"
+msgstr "Proceed"
+
+#: 313943879775948800
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Polishing"
+
+#: 313944205258133504
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Slot unlocked.\n"
+"Repairs, grinds, and brings on the shine — even the shadiest finds look like "
+"treasures again."
+
+#: 313944426742550528
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Insert"
+
+#: 313944595185799168
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Slot unlocked.\n"
+"Insert gemstones into jewelry and turn rough pieces into full-fledged "
+"shinies that make customers lose all willpower."
+
+#: 313944710864703488
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Altar"
+
+#: 313944844453285888
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Slot unlocked.\n"
+"Removes curses and magical seals from cursed items. Sometimes… with "
+"surprises."
+
+#: 313950130396205056
+msgid "craftInfoDescription"
+msgstr ""
+"Here, the fate of what you find is decided.\n"
+"Melt it, socket it, polish it, crack it open, or let it grow — every slot "
+"does something suspiciously useful to your items.\n"
+"Found objects turn into jewelry, treasures, and strange masterpieces that "
+"someone is bound to buy."
+
+#: 313951782213783552
+msgid "superSlotDescription"
+msgstr ""
+"A special slot for everything strange and shiny.\n"
+"It melts metal, cuts gems, lifts curses, restores treasures, cracks geodes, "
+"opens chests, and even handles alien artifacts (with mutual consent)."
+
+#: 313952177879257088
+msgid "chestSlotDescription"
+msgstr ""
+"A chest?\n"
+"Toss it in — the slot will figure it out.\n"
+"\n"
+"What comes out is known only to it.\n"
+"Sometimes it’s disturbingly pleased with the result."
+
+#: 313952634336972800
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"A cursed item? Toss it in!\n"
+"The altar will drain every drop of its magic, wheeze and groan — then give "
+"it back without the hissing.\n"
+"\n"
+"Sometimes it even says “thank you”… which is perfectly normal."
+
+#: 313953216909021184
+msgid "eggSlotDescription"
+msgstr ""
+"Pick any egg — the hen will sit on it, give it a gentle pat, and cluck softly"
+"…\n"
+"then hatch something interesting.\n"
+"\n"
+"Sometimes far too interesting."
+
+#: 313953702185799680
+msgid "inlaySlotDescription"
+msgstr ""
+"Choose a piece of jewelry and jam it full of gemstones — empty slots won’t "
+"cut it!\n"
+"What you get is a fully polished shiny thing that makes buyers squeal with "
+"delight."
+
+#: 313954530854440960
+msgid "craftSlotDescription"
+msgstr ""
+"Throw in anything metal — the furnace will melt it down, mix it up, and "
+"forge a brand-new piece of jewelry.\n"
+"They say it works on inspiration… which it doesn’t have. Still, it gets the "
+"job done!"
+
+#: 313954955250896896
+msgid "polishingSlotDescription"
+msgstr ""
+"Pick any geode, rough stone, or even a ruined ancient treasure —\n"
+"the workbench will polish it, repair it, and bring out its shine.\n"
+"\n"
+"What comes out can be socketed, crafted, or sold for a tidy profit."
+
+#: 314195955441471488
+msgid "unknownSlot"
+msgstr "Appraisal"
+
+#: 314210445310562304
+msgid "unknownSlotTitle"
+msgstr "Select an item for appraisal"
+
+#: 314211470289408000
+msgid "craftNoUnknown"
+msgstr "No items to appraisal"
+
+#: 314211918601785344
+msgid "craftNoCursed"
+msgstr "No cursed items"
+
+#: 314214842253971456
+msgid "craftNoInlay"
+msgstr "No items to insert"
+
+#: 314260890229936128
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Sell jewelry and any other finds, check their value, and close the deals.\n"
+"Upgrade the shop — unlock new slots and sell even more goods."
+
+#: 314261126486691840
+msgid "tradingShopInfoTitle"
+msgstr "Zlatovich’s Trading Shop"
+
+#: 314274887167643648
+msgid "tradeSpeedUp"
+msgstr "Attract a customer"
+
+#: 314278745457561600
+msgid "nextCustomer"
+msgstr "Next customer"
+
+#: 314297063191089152
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Appraisal"
+
+#: 314297243575521280
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Trader Zlatovich will take a look at any item, grunt thoughtfully, and name "
+"a price.\n"
+"Sometimes… a pleasant one."
+
+#: 314612693521928192
+msgid "timeToMoveOut"
+msgstr "Time to make a run for it!"
+
+#: 314914390584594432
+msgid "metal"
+msgstr "Metal"
+
+#: 314914695741181952
+msgid "gem"
+msgstr "Gem"
+
+#: 314915117155487744
+msgid "treasure"
+msgstr "Jewelry"
+
+#: 314915322823184384
+msgid "chest"
+msgstr "Chest"
+
+#: 314915636620038144
+msgid "trash"
+msgstr "Trash"
+
+#: 314915781340303360
+msgid "egg"
+msgstr "Egg"
+
+#: 314915913649623040
+msgid "artifact"
+msgstr "Artifact"
+
+#: 314916000182308864
+msgid "geode"
+msgstr "Geode"
+
+#: 314916165517578240
+msgid "unknown"
+msgstr "Unknown"
+
+#: 314916328457900032
+msgid "cursed"
+msgstr "Cursed"
+
+#: 314925043173036032
+msgid "orders"
+msgstr "Orders"
+
+#: 315250694291722240
+msgid "giveItem"
+msgstr "Give Item"
+
+#: 316337287538675712
+msgid "ordersInfoDescription"
+msgstr ""
+"Complete orders — and customers will point the way forward.\n"
+"New locations, resources, and jewelry are already waiting."
+
+#: 316378780114620416
+msgid "hearthCurrency"
+msgstr "Likes"
+
+#: 316380499837980672
+msgid "reward"
+msgstr "Reward"
+
+#: 316382146563674112
+msgid "claim"
+msgstr "Claim"
+
+#: 316397921840140288
+msgid "terrain0Biome1Title"
+msgstr "Wasteland"
+
+#: 316402101459881984
+msgid "ordersClaimBiomeTitle"
+msgstr "The path to a new location is open"
+
+#: 316402277297688576
+msgid "ordersClaimBiomeDescription"
+msgstr "New finds are available"
+
+#: 317048656315551744
+msgid "terrain1Biome1Title"
+msgstr "Graves"
+
+#: 317908391516442624
+msgid "toTrade"
+msgstr "Trade"
+
+#: 319566851823898624
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Yes, leave"
+
+#: 319567663786627072
+msgid "skipSelectionTreasuresCancel"
+msgstr "No, back to selection"
+
+#: 320015732638486528
+msgid "soldToDealer"
+msgstr "Sold!"
+
+#: 321539636750192640
+msgid "craftSelectBlockedWrongType"
+msgstr "This item isn’t suitable for this type of slot"
+
+#: 321540352067768320
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "You’ve already selected enough items from this group"
+
+#: 332999660336844800
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"The trail is overgrown. You’ve already mastered everything here — time to "
+"get to work."
+
+#: 333367357155315712
+msgid "terrain0Biome0Title"
+msgstr "Wasteland"
+
+#: 333367909771644928
+msgid "terrain1Biome0Title"
+msgstr "Swamp"
+
+#: 333368362697756672
+msgid "terrain1Biome2Title"
+msgstr "Meteorfall"
+
+#: 333841248503992320
+msgid "goldUsedIn"
+msgstr ""
+"Can be <color=#E3BA59>sold</color> at the Trading shop, used in the "
+"<color=#E3BA59>Craft Slot</color>, or placed in the <color=#E3BA59>Super "
+"Slot</color>."
+
+#: 333841848608231424
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Can be <color=#E3BA59>sold</color> at the Trading shop, used in the "
+"<color=#E3BA59>Craft Slot</color>, or placed in the <color=#E3BA59>Super "
+"Slot</color>."
+
+#: 333841973128728576
+msgid "silverUsedIn"
+msgstr ""
+"Can be <color=#E3BA59>sold</color> at the Trading shop, used in the "
+"<color=#E3BA59>Craft Slot</color>, or placed in the <color=#E3BA59>Super "
+"Slot</color>."
+
+#: 333842030875906048
+msgid "gemUsedIn"
+msgstr ""
+"Can be <color=#E3BA59>sold</color> at the Trading shop, used in the "
+"<color=#E3BA59>Craft Slot</color> or <color=#E3BA59>Super Slot</color>, or "
+"<color=#E3BA59>inserted</color> into a Treasure."
+
+#: 333842074681217024
+msgid "gemRoughUsedIn"
+msgstr ""
+"Can be processed in <color=#E3BA59>Polishing</color> or the <color=#E3BA59>"
+"Super Slot</color> to reveal its true value."
+
+#: 333842122626306048
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Can be <color=#E3BA59>sold</color> at the Trading shop or socketed with gems "
+"via <color=#E3BA59>Insert</color> or the <color=#E3BA59>Super Slot</color> "
+"to increase its value."
+
+#: 333842171624165376
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Can be repaired in <color=#E3BA59>Polishing</color> or the <color=#E3BA59>"
+"Super Slot</color>."
+
+#: 333842234089934848
+msgid "chestUsedIn"
+msgstr ""
+"Can be opened in <color=#E3BA59>Chest Slot</color> or the <color=#E3BA59>"
+"Super Slot</color>."
+
+#: 333842279115788288
+msgid "trashUsedIn"
+msgstr "Can only be <color=#E3BA59>sold</color> to the dealer."
+
+#: 333842322942070784
+msgid "eggUsedIn"
+msgstr ""
+"Can be opened in the <color=#E3BA59>Incubator</color> or the <color=#E3BA59>"
+"Super Slot</color>."
+
+#: 333842403657256960
+msgid "artifactUsedIn"
+msgstr "Can only be <color=#E3BA59>sold</color> at the Trading shop."
+
+#: 333842449953984512
+msgid "geodeUsedIn"
+msgstr ""
+"Can be opened in <color=#E3BA59>Polishing</color> or the <color=#E3BA59>"
+"Super Slot</color>."
+
+#: 333842496531730432
+msgid "unknownUsedIn"
+msgstr ""
+"Can be taken to the Trader for <color=#E3BA59>Appraisal</color> to determine "
+"its true value."
+
+#: 333842548465602560
+msgid "cursedUsedIn"
+msgstr ""
+"The curse can be removed at the <color=#E3BA59>Altar</color> or in the "
+"<color=#E3BA59>Super Slot</color>."
+
+#: 334624695946317824
+msgid "terrain2Biome0Title"
+msgstr "Sawmill"
+
+#: 334752689742417920
+msgid "perfect"
+msgstr "Perfect"
+
+#: 334754742782922752
+msgid "decline"
+msgstr "Decline"
+
+#: 334758932242501632
+msgid "putUpForSale"
+msgstr "Put up for sale"
+
+#: 337073088274632704
+msgid "newLocationAvailable"
+msgstr "A new place has appeared!"
+
+#: 338548608547950592
+msgid "retargetingTitle1"
+msgstr ":monocle: Interesting question…"
+
+#: 338548710087856128
+msgid "retargetingDescription1"
+msgstr "How far can you go?"
+
+#: 338548825884200960
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Time to continue."
+
+#: 338548974257704960
+msgid "retargetingDescription2"
+msgstr "Your progress is still here."
+
+#: 338549087440998400
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Ready to jump back in?"
+
+#: 338549137776840704
+msgid "retargetingDescription3"
+msgstr "Continue where you left off."
+
+#: 338569990488985600
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Crafting complete!"
+
+#: 338570100794986496
+msgid "notificationCraftCompletedDescription"
+msgstr "Check out what you got."
+
+#: 338570414583451648
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: You’ve got a buyer!"
+
+#: 338570498368868352
+msgid "notificationTradeCompletedDescription"
+msgstr "Your goods found a customer."
+
+#: 339457185953353728
+msgid "tradeSelectBlockedWrongType"
+msgstr "This item cannot be sold."
+
+#: 340628273341140992
+msgid "skip"
+msgstr "Skip"
+
+#: 354499398722654208
+msgid "daily"
+msgstr "Daily"
+
+#: 354514538620784640
+msgid "available"
+msgstr "Available"
+
+#: 354514769508831232
+msgid "availableIn"
+msgstr "Available In"
+
+#: 355103206058233856
+msgid "dailyRewardClaimTitle"
+msgstr "Take it for profit"
+
+#: 355103597911085056
+msgid "dailyRewardClaimDescription"
+msgstr "Watch a video — get X2 rewards"
+
+#: 355120760352935936
+msgid "withoutBonus"
+msgstr "No bonus"
+
+#: 355145440342315008
+msgid "claimWithBonus"
+msgstr "Claim with bonus"
+
+#: 355146771715067904
+msgid "x2Reward"
+msgstr "x2 Reward"
+
+#: 355255965734670336
+msgid "dailyRewardAlreadyReceived"
+msgstr "Reward already claimed!"
+
+#: 355256265493188608
+msgid "missedDailyReward"
+msgstr "Reward has already been missed!"
+
+#: 355256569236295680
+msgid "futureDailyReward"
+msgstr "Come back for this reward later!"
+
+#: 355276036993454080
+msgid "rateUs"
+msgstr "Rate us"
+
+#: 355276149157531648
+msgid "rateUsTitle"
+msgstr "Rate us with stars"
+
+#: 355276400991932416
+msgid "rateUsDescription"
+msgstr "Rate the game and help us improve."
+
+#: 356305037681758208
+msgid "specialOffers"
+msgstr "Special offers"
+
+#: 356313026543226880
+msgid "quickStart"
+msgstr "Quick Start!"
+
+#: 356313363102568448
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+#: 356342200381214720
+msgid "forever"
+msgstr "Forever"
+
+#: 356345060842016768
+msgid "starterPack"
+msgstr "Starter Pack"
+
+#: 356346443771154432
+msgid "allInOneSupply"
+msgstr "All-in-One Supply"
+
+#: 356350103481749504
+msgid "dealOfTheDay"
+msgstr "Deal of the Day"
+
+#: 356354375627837440
+msgid "xAmount"
+msgstr "X{value}"
+
+#: 356354841824727040
+msgid "free!"
+msgstr "Free!"
+
+#: 356357806572703744
+msgid "watch"
+msgstr "Watch"
+
+#: 356360805877551104
+msgid "coins"
+msgstr "Coins"
+
+#: 356365108071632896
+msgid "mostPopular"
+msgstr "Most popular"
+
+#: 356365403610681344
+msgid "bestPrice"
+msgstr "Best Price"
+
+#: 356519167105699840
+msgid "store"
+msgstr "Store"
+
+#: 357424739636219904
+msgid "dealOfTheDayDescription"
+msgstr "New offers will be available in"
+
+#: 357607511365521408
+msgid "health"
+msgstr "Health"
+
+#: 357784830910664704
+msgid "notificationDealOfTheDayTitle"
+msgstr "Mare wants shopping :sunglasses:"
+
+#: 357784932224077824
+msgid "notificationDealOfTheDayDescription"
+msgstr "All that’s left is to hop in and claim what’s yours."
+
+#: 357785735030640640
+msgid "notificationCoinsReadyTitle"
+msgstr "Shop’s giving out goodies :heart-eyes:"
+
+#: 357785816504995840
+msgid "notificationCoinsReadyDescription"
+msgstr "Drop by the shop and grab the freebies."
+
+#: 358713136833105920
+msgid "wantReceipt"
+msgstr "I want a receipt (we'll email it)"
+
+#: 358722499958280192
+msgid "submit"
+msgstr "Submit"
+
+#: 358723345383165952
+msgid "receiptEmaitTitle"
+msgstr "Enter Email"
+
+#: 358723657267417088
+msgid "receiptEmailDescription"
+msgstr ""
+"Want a receipt?\n"
+"Enter your email and we'll send it after your purchase."
+
+#: 358900766250110976
+msgid "buy"
+msgstr "Buy"
+
+#: 358901413183754240
+msgid "starterPackHeadline"
+msgstr "Grab it in time!"
+
+#: 358901551423819776
+msgid "specialOfferHeadline"
+msgstr "More forever!"
+
+#: 359524475709165568
+msgid "open"
+msgstr "Open"
+
+#: 360153378165362688
+msgid "maximumResources"
+msgstr "Maximum resources"
+
+#: 360200917140901888
+msgid "exchangeCurrencyTitle"
+msgstr "Not enough silver coins."
+
+#: 360201095897944064
+msgid "exchangeCurrencyDescription"
+msgstr "Just a little short."
+
+#: 360201375158898688
+msgid "exchangeCurrencyQuestion"
+msgstr "Buy the rest?"
+
+#: 360510317885919232
+msgid "bankingAwaitingTitle"
+msgstr "Coins on the way"
+
+#: 360511732461080576
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Gold is being loaded onto the wagon…\n"
+"Delivery may take a few minutes."
+
+#: 360689578840166400
+msgid "deleteItemConfirmationTitle"
+msgstr "Throw away the item?"
+
+#: 360689668438888448
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"The item will be gone forever.\n"
+"This action cannot be undone."
+
+#: 360858085955473408
+msgid "noKeepIt"
+msgstr "No, keep it"
+
+#: 361772904917241856
+msgid "allRegionsAvailable"
+msgstr "All regions available"
+
+#: 361805221660463104
+msgid "terrainProgressLabel"
+msgstr "To the next location"
+
+#: 361805489286418432
+msgid "terrainClosedLabel"
+msgstr "Location unavailable"
+
+#: 362095342867714048
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Your ultimate goal is love!</color>\n"
+"Sell your creations to the locals to win them over."
+
+#: 362097539907063808
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Don’t stop until they <color=#E3BA59>ADORE you</color> — \n"
+"then you’ll be ready to conquer new lands."
+
+#: 362500096244584448
+msgid "cryolisUsedIn"
+msgstr ""
+"Can be <color=#E3BA59>sold</color> at the Trading shop, used in the "
+"<color=#E3BA59>Craft Slot</color>, or placed in the <color=#E3BA59>Super "
+"Slot</color>."
+
+#: 362503199635279872
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "This item isn’t suitable for selected recipe."
+
+#: 362505392367079424
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Another item from this group has already been selected."
+
+#: 362831462727421952
+msgid "failedPurchase"
+msgstr ""
+"The mare is sad. The purchase failed.\n"
+"Please trying again."
+
+#: 363945774653116416
+msgid "frozenUsedIn"
+msgstr ""
+"Can be warmed up in the <color=#E3BA59>Incubator</color> or the "
+"<color=#E3BA59>Super Slot</color>."
+
+#: 363945781498220544
+msgid "frozen"
+msgstr "Frozen"
+
+#: 363947917120376832
+msgid "frozens"
+msgstr "Frozen"
+
+#: 371768236233199616
+msgid "language"
+msgstr "Language"
+
+#: 371825767475318784
+msgid "termsOfUse"
+msgstr "Terms of Use"
+
+#: 371825915722993664
+msgid "privacyPolicy"
+msgstr "Privacy Policy"
+
+#: 371826077132394496
+msgid "deleteData"
+msgstr "Delete data"
+
+#: 371826289473228800
+msgid "signInWithGoogle Play"
+msgstr "Sign in with Google Play"
+
+#: 371936637333278720
+msgid "notLinked"
+msgstr "Not linked"
+
+#: 371936898659389440
+msgid "linked"
+msgstr "Linked"
+
+#: 371937387937533952
+msgid "switchGooglePlay"
+msgstr "Switch  Google Play account"
+
+#: 372201325233180672
+msgid "resetProgressDescription"
+msgstr ""
+"Are you sure you want to delete your progress? This action cannot be undone!"
+
+#: 372201851437977600
+msgid "resetProgressConfirm"
+msgstr "Yes, delete"
+
+#: 375231950777225216
+msgid "terrainInDevelopmentDescription"
+msgstr "Sorry. This location is still in development."
+
+#: 375232378373935104
+msgid "terrain2Biome1Title"
+msgstr "Frozen Shipyard"
+
+#: 375232425010401280
+msgid "terrain2Biome2Title"
+msgstr "Beacon"
+
+#: 375232475627261952
+msgid "terrain2Biome3Title"
+msgstr "Lostwood"
+
+#: 376614903423963136
+msgid "collectAll"
+msgstr "Collect All"
+
+#: 376958824981204992
+msgid "healthStatReward"
+msgstr "Health +{value}"
+
+#: 376959365689905152
+msgid "storageStatReward"
+msgstr "Storage Capacity +{value}"
+
+#: 376968663052587008
+msgid "itemsLeft_x"
+msgstr "Items left: {value}"
+
+#: 376983763331321856
+msgid "storageStatRewardSummary"
+msgstr "Storage forever"
+
+#: 376983951106117632
+msgid "healthStatRewardSummary"
+msgstr "Health forever"
+
+#: 379459050652569600
+msgid "prospectors"
+msgstr "Prospectors"
+
+#: 384582485728825344
+msgid "storeStockFullDescription"
+msgstr "The storage is packed to the last splinter."
+
+#: 384852464931966976
+msgid "terrain3Title"
+msgstr "Grimdal"
+
+#: 387215171681259520
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Open your phone settings\n"
+"2. Google - All services - Play Games\n"
+"3. “Sign-in account” - \"Change\" (next to the game)\n"
+"4. Restart the game"
+
+#: 388959282209755136
+msgid "versionAlertMessage"
+msgstr "A new version of the game has been released. Time to update!"
+
+#: 390311463999508480
+msgid "treasureUsedIn"
+msgstr "Can only be <color=#E3BA59>sold</color> at the Trading shop."
+
+#: 390630593516539904
+msgid "noInternetConnectionBlocking"
+msgstr "No internet — no adventure"
+
+#: 390630963617730560
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Reconnecting…\n"
+"{value}"
+
+#: 391415174540824576
+msgid "newsAndCommunication"
+msgstr "News and communication"
+
+#: 392040460349345792
+msgid "statEffectAccumulationFreeze"
+msgstr "Frostbite"
+
+#: 392040705481248768
+msgid "statEffectHeal"
+msgstr "Regeneration"
+
+#: 392040844430151680
+msgid "statEffectMovementSpeedNegative"
+msgstr "Slowdown"
+
+#: 392041019248742400
+msgid "statEffectMovementSpeedPositive"
+msgstr "Speed Boost"
+
+#: 392041155999830016
+msgid "statEffectDamageCurse"
+msgstr "Exhaustion"
+
+#: 392041334085783552
+msgid "statEffectDamageBleed"
+msgstr "Bleed"
+
+#: 392041534623846400
+msgid "statEffectToolNoiseNegative"
+msgstr "Noisy Tool"
+
+#: 392041656803921920
+msgid "statEffectToolNoisePositive"
+msgstr "Silent Tool"
+
+#: 392041855974641664
+msgid "statEffectToolSpeedNegative"
+msgstr "Fatigue"
+
+#: 392042070265827328
+msgid "statEffectToolSpeedPositive"
+msgstr "Dexterity"
+
+#: 392090295794405376
+msgid "pause"
+msgstr "Pause"
+
+#: 392090376618643456
+msgid "pauseDescription"
+msgstr "Effects, orders, and settings — all here."
+
+#: 392092595833278464
+msgid "effects"
+msgstr "Character Status"
+
+#: 392119357174714368
+msgid "settingsDialogTitle"
+msgstr "Settings"
+
+#: 393910691879456768
+msgid "russianPlaymentsBanner"
+msgstr "Payments are available for players in Russia."

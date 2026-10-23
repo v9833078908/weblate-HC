@@ -1,0 +1,14 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[build-system]
+build-backend = "uv_build"
+requires = ["uv_build>=0.8.18,<0.9.0"]
+
+[project]
+dependencies = []
+description = "Hero Craft Weblate customizations"
+name = "weblate-customization"
+requires-python = ">=3.12"
+version = "0.1.0"

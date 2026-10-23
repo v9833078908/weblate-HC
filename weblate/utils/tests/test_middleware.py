@@ -1,0 +1,117 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+from unittest import TestCase
+from unittest.mock import patch
+
+from django.http import HttpResponse, HttpResponseBase
+from django.http.request import HttpRequest
+from django.test import RequestFactory
+from django.test.utils import override_settings
+
+from weblate.middleware import CSPBuilder, ProxyMiddleware
+
+MOCK_RESPONSE_TEXT = "mock response text"
+
+
+class ProxyTest(TestCase):
+    def get_response(self, request: HttpRequest) -> HttpResponseBase:
+        self.assertEqual(request.META["REMOTE_ADDR"], "1.2.3.4")
+        return HttpResponse(MOCK_RESPONSE_TEXT)
+
+    def assert_response(self, response):
+        assert isinstance(response, HttpResponse)
+        self.assertEqual(response.text, MOCK_RESPONSE_TEXT)
+
+    @override_settings(
+        IP_BEHIND_REVERSE_PROXY=False,
+        IP_PROXY_HEADER="HTTP_X_FORWARDED_FOR",
+        IP_PROXY_OFFSET=0,
+    )
+    def test_direct(self) -> None:
+        request = HttpRequest()
+        request.META["REMOTE_ADDR"] = "1.2.3.4"
+        middleware = ProxyMiddleware(self.get_response)
+        self.assert_response(middleware(request))
+
+    @override_settings(
+        IP_BEHIND_REVERSE_PROXY=True,
+        IP_PROXY_HEADER="HTTP_X_FORWARDED_FOR",
+        IP_PROXY_OFFSET=0,
+    )
+    def test_proxy(self) -> None:
+        request = HttpRequest()
+        request.META["REMOTE_ADDR"] = "7.8.9.0"
+        request.META["HTTP_X_FORWARDED_FOR"] = "1.2.3.4"
+        middleware = ProxyMiddleware(self.get_response)
+        self.assert_response(middleware(request))
+
+    @override_settings(
+        IP_BEHIND_REVERSE_PROXY=True,
+        IP_PROXY_HEADER="HTTP_X_FORWARDED_FOR",
+        IP_PROXY_OFFSET=1,
+    )
+    def test_proxy_second(self) -> None:
+        request = HttpRequest()
+        request.META["REMOTE_ADDR"] = "7.8.9.0"
+        request.META["HTTP_X_FORWARDED_FOR"] = "2.3.4.5, 1.2.3.4"
+        middleware = ProxyMiddleware(self.get_response)
+        self.assert_response(middleware(request))
+
+    @override_settings(
+        IP_BEHIND_REVERSE_PROXY=True,
+        IP_PROXY_HEADER="HTTP_X_FORWARDED_FOR",
+        IP_PROXY_OFFSET=0,
+    )
+    def test_proxy_invalid(self) -> None:
+        request = HttpRequest()
+        request.META["REMOTE_ADDR"] = "1.2.3.4"
+        request.META["HTTP_X_FORWARDED_FOR"] = "2.3.4"
+        middleware = ProxyMiddleware(self.get_response)
+        self.assert_response(middleware(request))
+
+    @override_settings(
+        IP_BEHIND_REVERSE_PROXY=True,
+        IP_PROXY_HEADER="HTTP_X_FORWARDED_FOR",
+        IP_PROXY_OFFSET=-1,
+    )
+    def test_proxy_invalid_last(self) -> None:
+        with patch("weblate.middleware.report_error") as mock_report_error:
+            request = HttpRequest()
+            request.META["REMOTE_ADDR"] = "1.2.3.4"
+            request.META["HTTP_X_FORWARDED_FOR"] = "2.3.4, 1.2.3.4"
+            middleware = ProxyMiddleware(self.get_response)
+            self.assert_response(middleware(request))
+            mock_report_error.assert_not_called()
+
+
+class CSPBuilderTest(TestCase):
+    def setUp(self) -> None:
+        self.factory = RequestFactory()
+
+    @override_settings(
+        SENTRY_DSN="https://public@o123.ingest.sentry.io/456",
+    )
+    def test_sentry_error_does_not_allow_inline_scripts(self) -> None:
+        request = self.factory.get("/")
+        request.resolver_match = None
+
+        builder = CSPBuilder(request, HttpResponse(status=500))
+
+        self.assertIn("o123.ingest.sentry.io", builder.directives["script-src"])
+        self.assertIn("sentry.io", builder.directives["script-src"])
+        self.assertIn("o123.ingest.sentry.io", builder.directives["connect-src"])
+        self.assertIn("sentry.io", builder.directives["connect-src"])
+        self.assertNotIn("'unsafe-inline'", builder.directives["script-src"])
+
+    @override_settings(STATIC_URL="https://cdn.example.test/static/")
+    def test_external_static_url_added_to_worker_src(self) -> None:
+        request = self.factory.get("/")
+        request.resolver_match = None
+
+        builder = CSPBuilder(request, HttpResponse())
+
+        self.assertIn("cdn.example.test", builder.directives["worker-src"])

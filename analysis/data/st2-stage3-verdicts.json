@@ -1,0 +1,597 @@
+{
+  "_purpose": "Stage 3 zh verdicts, persisted so the split-gate re-score is reproducible without repeating the paid calls.",
+  "_dated": "2026-08-26",
+  "_slice": "15 zh units: the 7 sealed criticals plus 8 known-clean units. Not the full 124-unit corpus.",
+  "_reasoning": "JUDGE_REASONING_EFFORT=\"none\" via the LiteLLM per-model mapping.",
+  "runs": {
+    "qwen3.8-max": {
+      "24130": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24180": {
+        "verdict": "flag",
+        "errors": [
+          {
+            "span": "省份{0}防御工事失败防御结果",
+            "category": "fluency",
+            "severity": "major",
+            "description": "The target says 'Province {0} fortifications failed defense results', which is a string of nouns lacking grammatical connectors (like '的' or verbs). The source says 'Results of the failed defense of fortifications in province {0}'. The current phrasing reads as disjointed keywords rather than a coherent sentence describing an event outcome."
+          }
+        ],
+        "unparsed": false
+      },
+      "24181": {
+        "verdict": "flag",
+        "errors": [
+          {
+            "span": "省份{0}防御工事失败进攻结果",
+            "category": "fluency",
+            "severity": "major",
+            "description": "The target says 'Province {0} fortifications failed attack results', which is a string of nouns lacking grammatical connectors. The source says 'Results of the failed assault on fortifications in province {0}'. The current phrasing reads as disjointed keywords rather than a coherent sentence describing an event outcome."
+          }
+        ],
+        "unparsed": false
+      },
+      "24182": {
+        "verdict": "flag",
+        "errors": [
+          {
+            "span": "省份{0}防御工事成功防御结果",
+            "category": "fluency",
+            "severity": "major",
+            "description": "The target says 'Province {0} fortifications successful defense results', which is a string of nouns lacking grammatical connectors. The source says 'Results of the successful defense of fortifications in province {0}'. The current phrasing reads as disjointed keywords rather than a coherent sentence describing an event outcome."
+          }
+        ],
+        "unparsed": false
+      },
+      "24207": {
+        "verdict": "reject",
+        "errors": [
+          {
+            "span": "{0} 个国家 {1} 的状态已变更",
+            "category": "mistranslation",
+            "severity": "critical",
+            "description": "The target says 'The status of {1} for {0} countries has changed', treating {0} as a count of countries and {1} as a modifier or name. The source says 'Статус {0} cтран {1}', meaning 'The status of {0} countries [of/belonging to] {1}', where {0} is the count and {1} is likely the faction or player identifier. The target inverts the semantic roles of the placeholders, misleading the player about what entity the status change applies to."
+          }
+        ],
+        "unparsed": false
+      },
+      "24208": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24221": {
+        "verdict": "flag",
+        "errors": [
+          {
+            "span": "{0}级别的{1}师",
+            "category": "mistranslation",
+            "severity": "major",
+            "description": "The target says '{0}-level {1} division', which means the first placeholder is the level and the second is the division name. The source says 'дивизия {0} уровня {1}', meaning 'division {0} of level {1}', where {0} is the division name and {1} is the level. The roles of the two placeholders are swapped."
+          }
+        ],
+        "unparsed": false
+      },
+      "24131": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24132": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24133": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24134": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24135": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24136": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24137": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24138": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      }
+    },
+    "QWEN3.7-plus": {
+      "24130": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24180": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24181": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24182": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24207": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24208": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24221": {
+        "verdict": "reject",
+        "errors": [
+          {
+            "severity": "critical",
+            "description": "The target swaps the placeholders for level and division name/type. The source says 'division {0} of level {1}' (name/ID then level), but the target says '{0} level's {1} division' (level then name/ID). In the rendered example, source is 'division 3 level 7', target is 'level 3's 7 division'. This misleads the player about which value is the level and which is the identifier.",
+            "category": "mistranslation",
+            "span": "{0}级别的{1}师"
+          }
+        ],
+        "unparsed": false
+      },
+      "24131": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24132": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24133": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24134": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24135": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24136": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      },
+      "24137": {
+        "verdict": "flag",
+        "errors": [
+          {
+            "severity": "major",
+            "description": "The target says 'unlock additional reinforcement slots' (额外增援槽位), whereas the source says 'gain access to additional reinforcements' (дополнительным подкреплениям). The source refers to the units/reinforcements themselves, not specifically UI slots, distorting the meaning.",
+            "category": "mistranslation",
+            "span": "额外增援槽位"
+          }
+        ],
+        "unparsed": false
+      },
+      "24138": {
+        "verdict": "pass",
+        "errors": [],
+        "unparsed": false
+      }
+    },
+    "deepseek-v4-pro": {
+      "24130": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24180": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24181": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24182": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24207": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24208": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24221": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24131": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24132": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24133": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24134": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24135": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24136": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24137": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24138": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      }
+    },
+    "deepseek-ai/deepseek-v4-flash": {
+      "24130": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24180": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24181": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24182": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24207": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24208": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24221": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24131": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24132": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24133": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24134": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24135": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24136": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24137": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24138": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      }
+    },
+    "Kimi K2.6": {
+      "24130": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24180": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24181": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24182": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24207": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24208": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24221": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24131": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24132": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24133": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24134": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24135": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24136": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24137": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24138": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      }
+    },
+    "atlas/deepseek-v4-pro-0813": {
+      "24130": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24180": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24181": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24182": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24207": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24208": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24221": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24131": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24132": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24133": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24134": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24135": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24136": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24137": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24138": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      }
+    },
+    "atlas_glm-5.1": {
+      "24130": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24180": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24181": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24182": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24207": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24208": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24221": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24131": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24132": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24133": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24134": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24135": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24136": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24137": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      },
+      "24138": {
+        "verdict": "",
+        "errors": [],
+        "unparsed": true
+      }
+    }
+  },
+  "_note_glm": "atlas_glm-5.1 has zh only: the fr corpus was not run after every zh batch came back unparsed."
+}

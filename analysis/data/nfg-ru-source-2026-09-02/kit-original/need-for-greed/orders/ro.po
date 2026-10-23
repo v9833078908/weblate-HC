@@ -1,0 +1,443 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Romanian <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/ro/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: ro\n"
+"Plural-Forms: nplurals=3; plural=n==1 ? 0 : (n==0 || (n%100 > 0 && n%100 < "
+"20)) ? 1 : 2;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Avem nevoie de mai mult aur!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Adu-mi 3 pepite de aur."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Excelent — aceste pepite se vor adăuga frumos colecției mele."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Strălucirea zorilor"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Adu-mi o pepită de aur din orice rocă auriferă."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Aurul poartă în el sclipirea zorilor — dacă nu-l pot vedea, măcar îl pot "
+"simți..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Muncă excelentă!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Mulțumesc pentru ajutor! Voi împărtăși cu tine un loc curios."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Ochelari noi"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Adu-mi 2 diamante. Acestea cad frecvent din rocile de cristal."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Să vedem dacă sunt gata să mă obișnuiesc cu acest pământ..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "A te obișnui cu pământul"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Adu-mi o Geodă Mică. Ele pot fi găsite în roci obișnuite."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Să vedem dacă sunt gata să mă obișnuiesc cu acest pământ..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Cufărul Omului Mort"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Adu-mi un Cufăr. Un canar te-ar putea ajuta să găsești unul."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Deci acolo mi-am lăsat lucrurile..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Argint pentru călire"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Adu-mi 3 bucăți de Argint. Ele pot fi găsite în geode și roci obișnuite."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Muncă excelentă!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Acest argint îmi înțeapă plăcut palmele..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Mulțumesc! Treci pe la mine cândva — iată adresa."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Bani antici"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr "Adu-mi 4 Monede antice. Se găsesc adesea în oale și vaze antice."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Acum pot, în sfârșit, să dau rest anticilor!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Rulou cu bile"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Adu-mi un Scarab de aur. Sunt gândaci mari care pot fi găsiți târându-se "
+"prin tufișuri."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Acest gândac este un mare rulou cu bile!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Bowling cu pietre"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Adu-mi o Geodă medie. Apare uneori în roci obișnuite."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Acum voi putea în sfârșit să rostogolesc niște bile!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Omletă de aur"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Adu-mi un Ou de Aur. Caută prin tufișuri pentru a găsi un cuib care conține "
+"astfel de ouă."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Acum, acesta este un mic dejun pentru regalitate!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Sângele Leului"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr "Adu-mi un Rubin de Leu. Poate fi găsit în geode cu cristale roșii."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Acum voi fi curajos ca un leu!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Grația Raiului"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr "Adu-mi un Safir Ceresc. Poate fi găsit în geode cu cristale albastre."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Cerurile însele sunt de partea mea!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Toaletă aurie"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Adu-mi o pepită de Aur de 9 unități din orice rocă auriferă."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "În sfârșit, pot repara toaleta!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr "Dacă vrei să-ți pui dorințe — știu un loc unde stelele cad tot timpul."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Muncă excelentă!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Muncă excelentă!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "Gheața îmi amintește de Bunicuța... Trece și pe la cabana ei!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Adu-mi 2 obiecte Înghețate din rocile înghețate"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Cuburi de gheață"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Perfect pentru cocktailurile mele!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Muncă excelentă!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Se pare că crabii sunt conectați la Cultul Soarelui — știu unde sunt ruinele "
+"templului lor!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Prinde un crab de gheață — carapace lui este făcută din Cryolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Metal de Crab"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, exometal! Îmi plac misterele naturii!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Muncă excelentă!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Cele mai valoroase comori ale Cultului Soarelui sunt ascunse adânc în "
+"Labirint — îți voi arăta unde!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Aprinde 3 torțe la Sanctuar și fură Sfera Soarelui!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Cel mai bun încălzitor"
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Da, acum asta e o încălzire bună!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Găsește 2 pepite de argint în Cuburi de gheață și încălzește-le."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Argint înghețat"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "E ca gheața în folie... dar invers..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Aur înghețat"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Aurul de iarnă capătă o strălucire foarte specială..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Găsește 2 pepite de Aur în Cuburi de gheață și încălzește-le."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Gemă invizibilă"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Clar în clar, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Dezgheață un Diamant Mediu. Diamantele Înghețate se găsesc adesea în toate "
+"rocile."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Astrologie Împământenită"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Adu-mi 2 Fiare Stelare. Le poți găsi în Mlaștini în timpul unei Căderi de "
+"stele."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Astrometalul este visul oricărui om de știință!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Intrus Cosmic"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Găsește un Miez de meteorit Blestemat în timpul unei Căderi de stele și "
+"alungă blestemul."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Un meteorit este o mașinărie, nu doar un corp ceresc! Uimitor!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Căldură de crab"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Colectează 5 cioburi de Cryolis din cochiliile crabilor de gheață."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Ești și tu curios să afli cum trăiesc crabii în zăpadă?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Senzori noi"
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr "Adu-mi 9 Bucăți de Argint. Le poți găsi în geode și roci simple."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr ""
+"Instrumentele mele de cercetare vor înceta în sfârșit să mai aibă erori!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Haină călduroasă de crab"
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Colectează 8 cioburi de Cryolis din cochiliile crabilor de gheață."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Acum voi înțelege în sfârșit cum supraviețuiesc iernii!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Mergând la mare"
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr "Adu-mi un Diamant Mare. Poate fi găsit în toate rocile înghețate."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "O, Doamne, e de mărimea unui cap! Dar al cui..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Comoara Tărâmurilor Albe"
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Dă-mi Cufărul Jarlului. Canarul te va ajuta să-l găsești în Ținuturile Albe."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Îmi amintește de Bunicul..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Esența Flăcării"
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Extrage o Scânteie Idolului din Sfera Soarelui."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Ce piatră fierbinte..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Piatră Irizată"
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Adu-mi un Opal. Este o descoperire rară în rocile înghețate."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Uite cât de frumos sclipește..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "A lăsat urmași!"
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Extrage un Pui de bufniță din Sfera Soarelui."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Bufnița mare aduce frigul... De ce este puiul atât de fierbinte?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Afacere mare"
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Adu-mi 5 bucăți de Aur. Sunt destul de comune în rocile înghețate."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Acum voi fi cel mai mare om din oraș."

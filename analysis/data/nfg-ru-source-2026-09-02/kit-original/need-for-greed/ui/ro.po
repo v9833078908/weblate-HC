@@ -1,0 +1,2088 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-28 09:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Romanian <http://l10n.herocraft.com/projects/need-for-greed/"
+"ui/ro/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: ro\n"
+"Plural-Forms: nplurals=3; plural=n==1 ? 0 : (n==0 || (n%100 > 0 && n%100 < "
+"20)) ? 1 : 2;\n"
+
+#: 142945292288
+msgid "vibration"
+msgstr "Vibrații"
+
+#: 136857827676160
+msgid "loading"
+msgstr "Se încarcă"
+
+#: 140450844643328
+msgid "adsNotReady"
+msgstr "Anunțul nu este gata. Încercați din nou mai târziu."
+
+#: 340188151943168
+msgid "amount"
+msgstr "{value}"
+
+#: 368875517775872
+msgid "reviewTitle"
+msgstr "Părerea ta este importantă pentru noi!"
+
+#: 368997953703936
+msgid "reviewDescription"
+msgstr "Îți place acest joc?"
+
+#: 369514264137728
+msgid "reviewConfirm"
+msgstr "Da, desigur!"
+
+#: 369755633750016
+msgid "no"
+msgstr "Nu"
+
+#: 406497292193792
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+#: 483624632979456
+msgid "leaders"
+msgstr "Lideri"
+
+#: 483894125400064
+msgid "leaderboardAuth"
+msgstr ""
+"Clasamentul este disponibil doar utilizatorilor autorizați. \n"
+"Conectați-vă la contul dvs. în setări."
+
+#: 693554757505024
+msgid "softCurrency"
+msgstr "Monede de argint"
+
+#: 693648756051968
+msgid "gems"
+msgstr "Geme"
+
+#: 2338581875265536
+msgid "day_N"
+msgstr "Ziua {value}"
+
+#: 2340303519617024
+msgid "dailyRewards"
+msgstr "Recompense zilnice"
+
+#: 2340513616498688
+msgid "dailyRewardsDescription"
+msgstr ""
+"Vizitați jocul în fiecare zi\n"
+"și obțineți recompense."
+
+#: 2524665741578240
+msgid "tapToStart"
+msgstr "Atingeți pentru a începe"
+
+#: 2534199759474688
+msgid "settings"
+msgstr "Setări"
+
+#: 2539217615065088
+msgid "sound"
+msgstr "Efecte sonore"
+
+#: 2539801025974272
+msgid "music"
+msgstr "Muzică"
+
+#: 2606360020914176
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?"
+"{seconds}s.|} "
+
+#: 31188945265680384
+msgid "sell"
+msgstr "Vinde"
+
+#: 39267299644215296
+msgid "trading"
+msgstr "Comerț"
+
+#: 39267930052300800
+msgid "selectAmount"
+msgstr ""
+"Selectează cantitatea de geme <size=56><color=#fff>( {value} / {total} )</"
+"color></size>"
+
+#: 39432224572248064
+msgid "apply"
+msgstr "Aplică"
+
+#: 88927433573797888
+msgid "exit"
+msgstr "Ieșire"
+
+#: 89108083400511488
+msgid "loot"
+msgstr "Pradă"
+
+#: 89232802619592704
+msgid "inventory"
+msgstr "Inventar"
+
+#: 89233049219502080
+msgid "add_amount"
+msgstr "+ {value}"
+
+#: 101508439312961536
+msgid "upgradeCharacterHealthStat"
+msgstr "Sănătate"
+
+#: 101509164025778176
+msgid "Pick"
+msgstr "Târnăcop"
+
+#: 103762241726451712
+msgid "unload"
+msgstr "Descărcare"
+
+#: 105589950840573952
+msgid "continue"
+msgstr "continuă"
+
+#: 105600782735511552
+msgid "continueWithoutTheBird"
+msgstr "Continuă fără pasăre"
+
+#: 128992315220168704
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+#: 129852820621103104
+msgid "make"
+msgstr "Fă"
+
+#: 130612002970406912
+msgid "in_progress"
+msgstr "În curs de desfășurare..."
+
+#: 132250436289957888
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+#: 132393404065910784
+msgid "lvl_x"
+msgstr "Nivel. {value}"
+
+#: 133085114043469824
+msgid "take"
+msgstr "Ia"
+
+#: 168978456979443712
+msgid "tradeDescription"
+msgstr "Trageți și plasați obiecte pentru a le vinde aici"
+
+#: 168979719083266048
+msgid "storage"
+msgstr "Depozit"
+
+#: 168993254521704448
+msgid "backpack"
+msgstr "Rucsac"
+
+#: 175428495763312640
+msgid "upgradeCharacterResistanceStat"
+msgstr "Rezistență"
+
+#: 175428883866456064
+msgid "completed"
+msgstr "Finalizat"
+
+#: 175429326734626816
+msgid "upgradeCharacterSpeedStat"
+msgstr "Viteză"
+
+#: 175429624488267776
+msgid "detectionRadius"
+msgstr "Raza de detectare a capcanelor"
+
+#: 175437389508120576
+msgid "upgrade"
+msgstr "Actualizare"
+
+#: 175444653988122624
+msgid "upgradeCharacterTitle"
+msgstr "Nivel Caracter {value}"
+
+#: 175444893063450624
+msgid "upgradeToolTitle"
+msgstr "Nivel Instrument {value}"
+
+#: 175445052228898816
+msgid "bird"
+msgstr "Pasăre"
+
+#: 175445211058802688
+msgid "craft"
+msgstr "Meșteșug"
+
+#: 175530141390475264
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Zboruri suplimentare"
+
+#: 175535881710735360
+msgid "upgradeToolSpeedStat"
+msgstr "Viteza de impact a uneltei"
+
+#: 175536172950622208
+msgid "upgradeToolDamageStat"
+msgstr "Daune uneltei"
+
+#: 185307831437889536
+msgid "terrain1Title"
+msgstr "Mlaștina Fenmar"
+
+#: 185308054407090176
+msgid "terrain2Title"
+msgstr "Belomar"
+
+#: 185645691072417792
+msgid "start"
+msgstr "Start"
+
+#: 185658961254682624
+msgid "terrain1Description"
+msgstr ""
+"Doar o mlaștină care este o mlaștină — cu excepția pepitelor de aur și a "
+"unui vierme gigant care reacționează la fiecare „cling.”\n"
+"Localnicii spun: dacă vrei aur, nu zornăi ca un magazin de porțelanuri."
+
+#: 185670435373060096
+msgid "howToOpenBiome"
+msgstr ""
+"Locuri noi.\n"
+"Finalizează comenzile — și localnicii îți vor arăta \n"
+"unde să cauți mai departe."
+
+#: 185944937449394176
+msgid "revivalTitle"
+msgstr "Este un eșec total!"
+
+#: 185946490252038144
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Obiecte în Rucsac: {value} / {total}"
+
+#: 185949125390635008
+msgid "exitAndLoseItems"
+msgstr "Ieși și pierde obiectele"
+
+#: 187764654040420352
+msgid "noBirdEnergy"
+msgstr "Fără păsări, fără ochi"
+
+#: 187765165577736192
+msgid "noDetectorEnergy"
+msgstr "Detector de comori"
+
+#: 190252961852821504
+msgid "yes_leave"
+msgstr "Da, pleacă"
+
+#: 190253329051553792
+msgid "no_stay"
+msgstr "Nu, rămâi aici"
+
+#: 190253804719181824
+msgid "leave_location_confirmation"
+msgstr "Vrei să părăsești locația?"
+
+#: 190609920439357440
+msgid "percentAmount"
+msgstr "{value}%"
+
+#: 190613197834948608
+msgid "pointsAmount"
+msgstr "{value} <size=70%>pct.</size>"
+
+#: 190999934906142720
+msgid "close"
+msgstr "Închide"
+
+#: 191001304602251264
+msgid "selectTheShape"
+msgstr "Alege forma comorii"
+
+#: 191001600908857344
+msgid "speedUp"
+msgstr "Accelerează"
+
+#: 191062612982894592
+msgid "tutorial"
+msgstr "Tutorial"
+
+#: 214456412639858688
+msgid "terrainPickLootTitle"
+msgstr "Ia tot ce încape în geantă și în Depozit"
+
+#: 214474517843808256
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+#: 215688832034803712
+msgid "takeToStorageXofY"
+msgstr "Ia {value}/{total}"
+
+#: 215688944811249664
+msgid "upgradeBag"
+msgstr "Upgrade geantă"
+
+#: 216124892128743424
+msgid "dealerWillBuyTheRest"
+msgstr "Negustorul va cumpăra tot restul de la tine"
+
+#: 216274536972423168
+msgid "information"
+msgstr "Informații"
+
+#: 216281997183815680
+msgid "weightInformation"
+msgstr ""
+"Capacitatea genții Calului este un indicator important.\n"
+"Greutatea obiectelor găsite afectează transportul acestora.\n"
+"Îmbunătățește-ți geanta pentru a-i crește Capacitatea și a transporta mai "
+"multe obiecte."
+
+#: 216292821260570624
+msgid "rank_x"
+msgstr "Rang {value}"
+
+#: 216295079784222720
+msgid "weight"
+msgstr "Greutate:"
+
+#: 216455391749607424
+msgid "vehicleUpgradeDescription"
+msgstr ""
+"Îmbunătățește Capacitatea genții de marfă pentru Cal pentru a transporta "
+"încărcături."
+
+#: 216456296213516288
+msgid "capacity"
+msgstr "Capacitate"
+
+#: 216456449876037632
+msgid "horseCargoBag"
+msgstr "Geantă de marfă pentru cal"
+
+#: 216464394802171904
+msgid "hardCurrency"
+msgstr "Monede de aur"
+
+#: 216827767398076416
+msgid "confirmation"
+msgstr "Confirmare"
+
+#: 216836939359457280
+msgid "attention!"
+msgstr "Atenție!"
+
+#: 216837051221544960
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Dacă pleci acum, <color=#E01114>toate obiectele găsite vor fi vândute "
+"Negustorului</color> la un preț mai mic decât de obicei."
+
+#: 216843048690388992
+msgid "bayerDescription"
+msgstr "Vrei să câștigi mai mult? Voi cumpăra resturile cu un bonus."
+
+#: 217004942013239296
+msgid "bestProfit"
+msgstr "Cel mai bun profit"
+
+#: 217005085059977216
+msgid "goodProfit"
+msgstr "Profit bun"
+
+#: 217005221878173696
+msgid "badProfit"
+msgstr "Profit slab"
+
+#: 217034757265166336
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+#: 217067111195086848
+msgid "yourProfit"
+msgstr "Profitul tău:"
+
+#: 219330229052903424
+msgid "eliteSlot"
+msgstr "Slot de elită"
+
+#: 219330557043281920
+msgid "tradingShopLevel"
+msgstr "Magazin de comerț nivel {value}"
+
+#: 219331227683131392
+msgid "rent"
+msgstr "Chirie"
+
+#: 219333990236295168
+msgid "slot"
+msgstr "Slot"
+
+#: 219334107282542592
+msgid "selectItem"
+msgstr "Selectează obiectul"
+
+#: 219569917810446336
+msgid "checkOffer"
+msgstr "Verifică oferta"
+
+#: 221184956493467648
+msgid "shopLevel"
+msgstr "Magazin nivel {value}"
+
+#: 221731312916238336
+msgid "tradeOpenEliteSlotDialog"
+msgstr "Aici cumpărătorii plătesc mult, fără tocmeală."
+
+#: 221732692687065088
+msgid "getASlot"
+msgstr "Obține un Slot"
+
+#: 221745332360581120
+msgid "customerWillArriveIn"
+msgstr "Clientul va sosi în:"
+
+#: 221747748288073728
+msgid "speedUpBy"
+msgstr "Accelerează cu"
+
+#: 221752584698073088
+msgid "decline?"
+msgstr "Refuzi?"
+
+#: 221752816395620352
+msgid "tradeDeclineClientInfo"
+msgstr "Până la sosirea următorului client:"
+
+#: 221785455785676800
+msgid "tradingShop"
+msgstr "Magazin de comerț"
+
+#: 221785885429207040
+msgid "newSlot"
+msgstr "Slot nou"
+
+#: 221786327613706240
+msgid "tradeUpgradeDescription"
+msgstr ""
+"Îmbunătățește magazinul de comerț pentru a debloca mai multe sloturi de "
+"vânzare."
+
+#: 221790732488544256
+msgid "tradingShopShort"
+msgstr "Magazin"
+
+#: 221791365350297600
+msgid "level_x"
+msgstr "Nivel {value}"
+
+#: 221901028389556224
+msgid "buyersOffer"
+msgstr "Oferta Cumpărătorului:"
+
+#: 221902690122469376
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+#: 223520514767065088
+msgid "common"
+msgstr "Comun"
+
+#: 223520659910955008
+msgid "uncommon"
+msgstr "Neobișnuit"
+
+#: 223520713283473408
+msgid "rare"
+msgstr "Rar"
+
+#: 223520767448715264
+msgid "epic"
+msgstr "Epic"
+
+#: 223520826210914304
+msgid "legendary"
+msgstr "Legendar"
+
+#: 223520860377714688
+msgid "mythic"
+msgstr "Mitice"
+
+#: 224246507228106752
+msgid "tradeSelectItemTitle"
+msgstr "Selectează un obiect de vânzare"
+
+#: 224277347911864320
+msgid "basePrice"
+msgstr "Preț de bază:"
+
+#: 226508435681972224
+msgid "map"
+msgstr "Hartă"
+
+#: 226574491591118848
+msgid "wiseNotes"
+msgstr "Note înțelepte"
+
+#: 226576404894191616
+msgid "emptyPickedItems"
+msgstr "Pleci cu mâna goală?"
+
+#: 226580081470083072
+msgid "settingsDescription"
+msgstr "Modelează lumea în felul tău!"
+
+#: 226582087576326144
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Îmbunătățește-ți magazinul de comerț pentru a debloca mai multe sloturi de "
+"vânzare — cu cât adaugi mai multe rafturi, cu atât profiturile tale sunt mai "
+"mari!"
+
+#: 226633818465112064
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00} |}{minutes:00}:{seconds:00}"
+
+#: 227954852267036672
+msgid "craftSlot"
+msgstr "Craft slot"
+
+#: 227959361919782912
+msgid "superSlot"
+msgstr "Super slot"
+
+#: 228232787804819456
+msgid "forge"
+msgstr "Forjă"
+
+#: 228312834624458752
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Forjează comori, deschide cufere și ouă magice — cine știe ce pradă rară te "
+"așteaptă înăuntru!"
+
+#: 228318026984067072
+msgid "chestSlot"
+msgstr "Slot cufăr"
+
+#: 228318447752450048
+msgid "incubator"
+msgstr "Incubator"
+
+#: 228321113740152832
+msgid "craftOpenEliteSlotLabel"
+msgstr "Dezlănțuie puterea supremă!"
+
+#: 228357165007769600
+msgid "cancel"
+msgstr "Anulează"
+
+#: 228360236127490048
+msgid "openChest"
+msgstr "Deschide cufărul"
+
+#: 228385218756874240
+msgid "timeToOpen:"
+msgstr "Timp de deschidere:"
+
+#: 228792391647367168
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Niciun Cufăr în stoc"
+
+#: 228794249094893568
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Ai găsit unul? Trage-l la Meșteșug și deschide-l\n"
+"(doar nu cu un topor, bine?)"
+
+#: 228796285601452032
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+#: 229526591581196288
+msgid "craftSelectEggTitle"
+msgstr "Selectează un Ou de deschis"
+
+#: 229526902270070784
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Niciun Ou în stoc"
+
+#: 229528260377317376
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "Spre Ou mergem — nu dintr-un coteț, ci născut din magie!"
+
+#: 229528854181711872
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Explorează tărâmul, descoperă Oul Rar și livrează-l la Meșteșug. Ce se află "
+"înăuntru — doar gălbenuș, sau ceva mult mai măreț?"
+
+#: 229530481219342336
+msgid "openEgg"
+msgstr "Deschide Oul"
+
+#: 229879731472044032
+msgid "craftSelectRecipeTitle"
+msgstr "Alege componente pentru meșteșugit"
+
+#: 229880209643671552
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Nimic în stoc!"
+
+#: 229881107660935168
+msgid "craftItem"
+msgstr "Creează obiect"
+
+#: 229881635711225856
+msgid "crafting:"
+msgstr "Creare:"
+
+#: 229882264282206208
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Aceste obiecte nu au fost găsite încă."
+
+#: 229887783071911936
+msgid "recipe"
+msgstr "Rețetă"
+
+#: 230098234464538624
+msgid "craftClosedRecipeTitle"
+msgstr "Forja este prea slabă!"
+
+#: 230098538715156480
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Nivel insuficient al Forjei\n"
+"\n"
+"Cu fiecare îmbunătățire, vei putea crea comori din ce în ce mai rare și mai "
+"valoroase. Este timpul să transformi acest cuptor într-o forjă a legendelor!"
+
+#: 230596136282624000
+msgid "craftClosedSlotTitle"
+msgstr "Slotul este blocat!"
+
+#: 230596696704552960
+msgid "craftClosedSlotDescription"
+msgstr ""
+"Abilitățile tale de creare nu sunt suficient de puternice. Trebuie să le "
+"crești nivelul."
+
+#: 230974103273869312
+msgid "or"
+msgstr "sau"
+
+#: 231685619115626496
+msgid "craftSpeedUpTitle"
+msgstr "Aruncă cărbunele!"
+
+#: 231686505602748416
+msgid "craftSpeedUpDescription"
+msgstr ""
+"Va fi ca și cum piticii ar fi băut espresso și ar fi intrat în modul turbo!"
+
+#: 231700678231461888
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Slot deblocat.\n"
+"Cuptorul topește Metalul, transformându-l în Bijuterii noi-nouțe de vânzare."
+
+#: 231701488554217472
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Timpul înseamnă bani, dar Bijuteriile sunt Forjate și mai repede"
+
+#: 231702447166590976
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Îți mărește șansele de a crea un obiect demn de a fi Legendar."
+
+#: 231703302095769600
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"Înțelepciunea anticilor curge prin tine — Forjează minuni pe care lumea nu "
+"le-a mai văzut!"
+
+#: 232003352147529728
+msgid "craftStockFullTitle"
+msgstr "Nu este spațiu pentru comori în Depozit!"
+
+#: 232004264790331392
+msgid "craftStockFullDescription"
+msgstr ""
+"Depozitul este plin până la refuz.\n"
+"Vinde excesul la Magazinul de comerț sau îmbunătățește Depozitul — apoi "
+"revendică-ți trofeul strălucitor!"
+
+#: 232054830455328768
+msgid "allItems"
+msgstr "Toate obiectele"
+
+#: 232055567298072576
+msgid "stockLevel"
+msgstr "Depozit nivel {value}"
+
+#: 232285845522223104
+msgid "storageUpgradeDescription"
+msgstr ""
+"Fiecare îmbunătățire oferă <color=#E01114>mai mult spațiu</color> pentru "
+"comorile găsite și forjate. Mai mult Aur, mai puțină suferință!"
+
+#: 238220511437656064
+msgid "revivalDescription"
+msgstr "Reînvie — sau ia-ți adio de la pradă."
+
+#: 238225411982757888
+msgid "noBirdEnergyDescription"
+msgstr "Te-a adus la comoară și a zburat să se odihnească."
+
+#: 238226013823438848
+msgid "callTheBird"
+msgstr "Întoarce-te acum"
+
+#: 238228172388438016
+msgid "noDetectorEnergyDescription"
+msgstr "Crezi că poți face față încă unuia?"
+
+#: 238229156124692480
+msgid "oreSeeker"
+msgstr "Căutător de minereuri"
+
+#: 238230435035090944
+msgid "gemSeeker"
+msgstr "Căutător de geme"
+
+#: 238805340126449664
+msgid "respawn"
+msgstr "Reînvie"
+
+#: 238835918318080000
+msgid "deathExit"
+msgstr "Plecat cu nimic"
+
+#: 241685352961806336
+msgid "terrain0Title"
+msgstr "Pădurea Liniștită"
+
+#: 241686624016273408
+msgid "terrain2Description"
+msgstr ""
+"O sălbăticie aspră nordică, blocată într-un frig etern. Printre "
+"labirinturile de gheață este ușor să te pierzi — iar după apus, să îngheți "
+"de moarte. În această ordine... sau poate invers."
+
+#: 241686676700925952
+msgid "terrain0Description"
+msgstr ""
+"Fiecare erou începe de undeva!\r\n"
+"Aici sunt îngropate primele tale comori — și primele tale probleme. Aici vei "
+"învăța să minezi, să topești, să te lauzi și să supraviețuiești."
+
+#: 242168130602012672
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Câștigă favorul sătenilor,\n"
+"și un nou oraș își va deschide porțile pentru tine!"
+
+#: 242225089728483328
+msgid "upgradeToolNoiseStat"
+msgstr "Reducerea zgomotului"
+
+#: 243276239902871552
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr "Crește-ți rezistența — și nu vei tresări când lumea devine ostilă!"
+
+#: 243276804422635520
+msgid "upgradeCharacterHealthStatDescription"
+msgstr "Mai multe vieți — mai puține șanse de a deveni o legendă... postum."
+
+#: 243277089148768256
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr ""
+"Picioare mai rapide — mai puține șanse de a deveni cină pentru fauna locală!"
+
+#: 243277490971480064
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"Cu cât ai mai mulți cercetași înaripați, cu atât ai mai multe șanse să "
+"găsești obiecte strălucitoare îngropate!"
+
+#: 243277858065354752
+msgid "upgradeToolSpeedStatDescription"
+msgstr ""
+"Cu cât lovitura este mai rapidă, cu atât șansele ca altcineva să ia minereul "
+"primul sunt mai mici!"
+
+#: 243278506789965824
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Cu cât unealta este mai puternică, cu atât piatra este mai docilă —\r\n"
+"și cu atât geanta ta este mai plină!"
+
+#: 243278882293420032
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Mai puțin zgomot înseamnă mai puține șanse de a fi auzit de cei care preferă "
+"scrâșnetul oaselor în locul zăngănitului de Aur."
+
+#: 243286615193292800
+msgid "resistanceStatLevel"
+msgstr "Rezistență nivel {value}"
+
+#: 243287048297123840
+msgid "healthStatLevel"
+msgstr "Sănătate nivel {value}"
+
+#: 243287378833444864
+msgid "speedStatLevel"
+msgstr "Viteză nivel {value}"
+
+#: 243287648745295872
+msgid "upgradeBirdTitle"
+msgstr "Pasăre nivel {value}"
+
+#: 243301960306135040
+msgid "amountPcs"
+msgstr "{value} buc."
+
+#: 246550123938844672
+msgid "maxLevel"
+msgstr "Nivel maxim"
+
+#: 246920055440543744
+msgid "treasureDetector"
+msgstr "Detector de comori"
+
+#: 246920748020797440
+msgid "amountSec"
+msgstr "{value} sec."
+
+#: 246921123041906688
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Căutător de minereuri"
+
+#: 246921489389195264
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Acest dispozitiv magic detectează venele de Aur mai bine decât un pitic "
+"simte un prânz gratuit!"
+
+#: 246922080165302272
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Căutător de geme"
+
+#: 246922249237696512
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"Un dispozitiv cu un nas mai ascuțit decât lăcomia unui negustor. Nicio gemă "
+"nu rămâne ascunsă mult timp!"
+
+#: 246922743578365952
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Mai mult timp pentru vânătoarea de aur"
+
+#: 246922920854818816
+msgid "upgradeDetectorDurationStatDescription"
+msgstr ""
+"Funcționează mai mult, caută mai bine, se plânge mai puțin. Mai mult timp "
+"înseamnă mai multă pradă!"
+
+#: 247080041558839296
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+#: 247080534393753600
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} buc."
+
+#: 247080751339933696
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} sec."
+
+#: 247452846670483456
+msgid "gold"
+msgstr "Aur"
+
+#: 247452991940202496
+msgid "chests"
+msgstr "Cufere"
+
+#: 247453392370405376
+msgid "eggs"
+msgstr "Ouă"
+
+#: 247453604342140928
+msgid "treasures"
+msgstr "Bijuterii"
+
+#: 247453698634289152
+msgid "artifacts"
+msgstr "Artefacte"
+
+#: 249822854419582976
+msgid "deathTitle"
+msgstr "Moartea este generoasă — ia totul!"
+
+#: 249823090609229824
+msgid "deathDescription"
+msgstr "Prada ta este acum material de legendă."
+
+#: 250055490891157504
+msgid "tradeEmptyStorageMessage"
+msgstr "Nimic de vândut acum"
+
+#: 250066987813965824
+msgid "craftNoEggs"
+msgstr "Fără ouă pentru Incubator"
+
+#: 250067227111591936
+msgid "craftNoChests"
+msgstr "Fără Cufere de deschis"
+
+#: 250067363896233984
+msgid "craftNoItems"
+msgstr "Nimic de Meșteșugit"
+
+#: 250187845660315648
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Mai mult timp pentru vânătoarea de Geme"
+
+#: 251259329547866112
+msgid "newLocationAvailableTitle"
+msgstr "O nouă locație este acum disponibilă!"
+
+#: 251259543163768832
+msgid "newLocationAvailableDescription"
+msgstr "Sătenii sunt de acord: meriți mai mult."
+
+#: 251632108633853952
+msgid "upgradeStock"
+msgstr "Upgrade Depozit"
+
+#: 252146625037996032
+msgid "storageOverflowedDesctiption"
+msgstr ""
+"Depozitul tău nu poate ține toate bogățiile tale. E timpul să faci un "
+"upgrade!"
+
+#: 252147840639569920
+msgid "throwAway"
+msgstr "Aruncă"
+
+#: 259586112407998464
+msgid "upgradeCraftCostStatDescription"
+msgstr "Prețul de bază al articolelor crește ca pâinea pe drojdie"
+
+#: 262490762970927104
+msgid "upgradeVehicleWeightStat"
+msgstr "Geantă mare"
+
+#: 262491576103866368
+msgid "upgradeVehicleWeightStatDescription"
+msgstr ""
+"Calul poate acum transporta mai multe comori. Mai multă aglomerație, mai "
+"multă fericire!"
+
+#: 262491999908925440
+msgid "upgradeVehicleTitle"
+msgstr "Cal nivel {value}"
+
+#: 262492464646197248
+msgid "amountKg"
+msgstr "{value} kg."
+
+#: 262492710260445184
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+#: 262493129695039488
+msgid "upgradeStorageWeightStat"
+msgstr "Capacitate"
+
+#: 262493626518736896
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Spațiu suplimentar pentru comori absolut lipsite de valoare!"
+
+#: 262495569987244032
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Cumpărători generoși"
+
+#: 262495864679043072
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Clienții se luptă pentru vechiturile tale."
+
+#: 262496445971828736
+msgid "upgradeTradeTitle"
+msgstr "Magazin de comerț nivel {value}"
+
+#: 262497898778071040
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Miroși a bogății"
+
+#: 262498326018265088
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"Vestea măiestriei tale s-a răspândit — portofele umblătoare adevărate apar "
+"mai des."
+
+#: 262499250967154688
+msgid "upgradeTradeSlotsStat"
+msgstr "Slot nou"
+
+#: 262499518630858752
+msgid "upgradeTradeSlotsStatDescription"
+msgstr ""
+"S-a deschis un slot de comerț suplimentar. Mai mulți clienți — mai mult aur!"
+
+#: 262503656592773120
+msgid "upgradeCraftTimeStat"
+msgstr "Sprint de bijuterii"
+
+#: 262504135200608256
+msgid "upgradeCraftTitle"
+msgstr "Meșteșug nivel {value}"
+
+#: 262504539359547392
+msgid "upgradeCraftRarityStat"
+msgstr "Raritate"
+
+#: 262505217075187712
+msgid "upgradeCraftRecipesStat"
+msgstr "Carte de rețete"
+
+#: 262506098214572032
+msgid "upgradeCraftCostStat"
+msgstr "Mină de aur"
+
+#: 262506924148527104
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Slot de meșteșug"
+
+#: 262507722794340352
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Slot cufăr"
+
+#: 262508574351298560
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Slot deblocat.\n"
+"Deschide cufere și obiecte blocate de orice origine — chiar și cele care în "
+"mod clar nu sunt de pe această planetă."
+
+#: 262508742647746560
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Incubator"
+
+#: 262508816316502016
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Slot deblocat.\n"
+"Nu crede că Coco e bună doar pentru ouă. Dacă trebuie să topești gheață, să "
+"încălzești ceva sau să ajuți cu alte sarcini — ea e mereu utilă. Și când "
+"vine vorba de spart ouă, nici măcar nu pune întrebări."
+
+#: 262509279946477568
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Slot deblocat.\n"
+"Principala unealtă a meșterului.\n"
+"Poate face totul: procesează, restaurează, lustruiește, sparge și reface."
+
+#: 262509359629864960
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Super slot"
+
+#: 262698318934839296
+msgid "tradeLockedState"
+msgstr "Magazinul de comerț este prea mic!"
+
+#: 262791601379872768
+msgid "upgradeDetectorTitle"
+msgstr "Detector de comori nivel {value}"
+
+#: 262792683350921216
+msgid "upgradeStorageTitle"
+msgstr "Depozit nivel {value}"
+
+#: 266500052736020480
+msgid "selectTrashTitle"
+msgstr "Junk în vrac"
+
+#: 267774055178047488
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Totul despre aprecieri!"
+
+#: 267774187718053888
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "Audiența strigă de bucurie!"
+
+#: 286237360443887616
+msgid "metals"
+msgstr "Metale"
+
+#: 289291316380307456
+msgid "craftSelectRoughTitle"
+msgstr "Alege un obiect de lustruit"
+
+#: 289293923853275136
+msgid "craftNoRough"
+msgstr "Niciun obiect de lustruit"
+
+#: 302325393484156928
+msgid "curseRemovalSlot"
+msgstr "Altar"
+
+#: 302327188075843584
+msgid "inlaySlot"
+msgstr "Inserare"
+
+#: 302327678603890688
+msgid "polishingSlot"
+msgstr "Lustruire"
+
+#: 310688720811724800
+msgid "rough"
+msgstr "Brut"
+
+#: 310688991746985984
+msgid "cursedItems"
+msgstr "Blestemat"
+
+#: 310861865698988032
+msgid "storageDescription"
+msgstr ""
+"Toate obiectele descoperite sunt stocate aici.\n"
+"Spațiul este limitat — depozitul nu este din cauciuc.\n"
+"Îmbunătățește-ți depozitul pentru ca lăcomia ta să nu lovească pereții."
+
+#: 311007630727581696
+msgid "traderName"
+msgstr "Zlatovich Negustorul"
+
+#: 311064004203384832
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Absolut nimic"
+
+#: 311066402032455680
+msgid "geodes"
+msgstr "Geode"
+
+#: 311067011754233856
+msgid "unknownItems"
+msgstr "Necunoscut"
+
+#: 311247067034161152
+msgid "selectItems"
+msgstr "Selectează obiecte"
+
+#: 311279184229175296
+msgid "proceed"
+msgstr "Continuă"
+
+#: 313943879775948800
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Lustruire"
+
+#: 313944205258133504
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Slot deblocat.\n"
+"Repară, șlefuiește și aduce strălucirea – chiar și cele mai dubioase "
+"descoperiri arată din nou ca Bijuterii."
+
+#: 313944426742550528
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Inserare"
+
+#: 313944595185799168
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Slot deblocat.\n"
+"Inserează pietre prețioase în Bijuterii și transformă piesele Brute în "
+"obiecte strălucitoare complete, care îi fac pe clienți să-și piardă toată "
+"voința."
+
+#: 313944710864703488
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Altar"
+
+#: 313944844453285888
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Slot deblocat.\n"
+"Îndepărtează blestemele și sigiliile magice de pe obiectele Blestemate. "
+"Uneori... cu surprize."
+
+#: 313950130396205056
+msgid "craftInfoDescription"
+msgstr ""
+"Aici se decide soarta a ceea ce găsești.\n"
+"Topeste-l, montează-l, lustruiește-l, sparge-l sau lasă-l să crească – "
+"fiecare Slot face ceva suspect de util pentru obiectele tale.\n"
+"Obiectele găsite se transformă în Bijuterii, comori și capodopere ciudate pe "
+"care cineva le va cumpăra cu siguranță."
+
+#: 313951782213783552
+msgid "superSlotDescription"
+msgstr ""
+"Un Slot special pentru tot ce este ciudat și strălucitor.\n"
+"Topeste Metal, taie Geme, ridică blesteme, restaurează comori, sparge Geode, "
+"deschide Cufere și chiar manipulează Artefacte extraterestre (cu acord "
+"reciproc)."
+
+#: 313952177879257088
+msgid "chestSlotDescription"
+msgstr ""
+"Un Cufăr?\n"
+"Aruncă-l înăuntru — Slotul se va descurca.\n"
+"\n"
+"Ce iese este cunoscut doar de el.\n"
+"Uneori este deranjant de mulțumit de rezultat."
+
+#: 313952634336972800
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Un obiect Blestemat? Aruncă-l înăuntru!\n"
+"Altarul îi va extrage fiecare picătură de magie, va șuiera și va geme — apoi "
+"îl va returna fără șuierat.\n"
+"\n"
+"Uneori chiar spune „mulțumesc”… ceea ce este perfect normal."
+
+#: 313953216909021184
+msgid "eggSlotDescription"
+msgstr ""
+"Alege orice Ou — găina se va așeza pe el, îl va mângâia ușor și va cotcodăci "
+"încet…\n"
+"apoi va scoate ceva interesant.\n"
+"\n"
+"Uneori mult prea interesant."
+
+#: 313953702185799680
+msgid "inlaySlotDescription"
+msgstr ""
+"Alege o piesă de Bijuterii și umple-o cu pietre prețioase — Sloturile goale "
+"nu vor funcționa!\n"
+"Ceea ce obții este un obiect strălucitor, complet șlefuit, care îi face pe "
+"cumpărători să țipe de încântare."
+
+#: 313954530854440960
+msgid "craftSlotDescription"
+msgstr ""
+"Aruncă orice Metal — Forja îl va topi, îl va amesteca și va crea o nouă "
+"piesă de Bijuterii.\n"
+"Se spune că funcționează pe bază de inspirație… pe care nu o are. Totuși, "
+"își face treaba!"
+
+#: 313954955250896896
+msgid "polishingSlotDescription"
+msgstr ""
+"Alege orice Geodă, piatră Brută sau chiar o comoară antică ruinată —\n"
+"masa de lucru o va șlefui, o va repara și îi va scoate în evidență "
+"strălucirea.\n"
+"\n"
+"Ceea ce iese poate fi încastrat, creat sau vândut pentru un profit frumos."
+
+#: 314195955441471488
+msgid "unknownSlot"
+msgstr "Evaluare"
+
+#: 314210445310562304
+msgid "unknownSlotTitle"
+msgstr "Selectează un obiect pentru Evaluare"
+
+#: 314211470289408000
+msgid "craftNoUnknown"
+msgstr "Niciun obiect de Evaluat"
+
+#: 314211918601785344
+msgid "craftNoCursed"
+msgstr "Niciun obiect Blestemat"
+
+#: 314214842253971456
+msgid "craftNoInlay"
+msgstr "Nu există elemente de Inserare"
+
+#: 314260890229936128
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Vinde Bijuterii și alte descoperiri, verifică-le valoarea și încheie "
+"afacerile.\n"
+"Îmbunătățește Magazinul de comerț — deblochează noi sloturi și vinde și mai "
+"multe bunuri."
+
+#: 314261126486691840
+msgid "tradingShopInfoTitle"
+msgstr "Magazinul de Comerț al lui Zlatovich"
+
+#: 314274887167643648
+msgid "tradeSpeedUp"
+msgstr "Atrage un client"
+
+#: 314278745457561600
+msgid "nextCustomer"
+msgstr "Următorul client"
+
+#: 314297063191089152
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Evaluare"
+
+#: 314297243575521280
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Negustorul Zlatovich va arunca o privire la orice obiect, va mormăi gânditor "
+"și va numi un preț.\n"
+"Uneori... unul plăcut."
+
+#: 314612693521928192
+msgid "timeToMoveOut"
+msgstr "E timpul să fugim!"
+
+#: 314914390584594432
+msgid "metal"
+msgstr "Metal"
+
+#: 314914695741181952
+msgid "gem"
+msgstr "Gemă"
+
+#: 314915117155487744
+msgid "treasure"
+msgstr "Bijuterii"
+
+#: 314915322823184384
+msgid "chest"
+msgstr "Cufăr"
+
+#: 314915636620038144
+msgid "trash"
+msgstr "Gunoi"
+
+#: 314915781340303360
+msgid "egg"
+msgstr "Ou"
+
+#: 314915913649623040
+msgid "artifact"
+msgstr "Artefact"
+
+#: 314916000182308864
+msgid "geode"
+msgstr "Geodă"
+
+#: 314916165517578240
+msgid "unknown"
+msgstr "Necunoscut"
+
+#: 314916328457900032
+msgid "cursed"
+msgstr "Blestemat"
+
+#: 314925043173036032
+msgid "orders"
+msgstr "Comenzi"
+
+#: 315250694291722240
+msgid "giveItem"
+msgstr "Dă obiect"
+
+#: 316337287538675712
+msgid "ordersInfoDescription"
+msgstr ""
+"Finalizează comenzile — și clienții îți vor arăta calea de urmat.\n"
+"Locații noi, resurse și bijuterii te așteaptă deja."
+
+#: 316378780114620416
+msgid "hearthCurrency"
+msgstr "Aprecieri"
+
+#: 316380499837980672
+msgid "reward"
+msgstr "Recompensă"
+
+#: 316382146563674112
+msgid "claim"
+msgstr "Revendică"
+
+#: 316397921840140288
+msgid "terrain0Biome1Title"
+msgstr "Ținut pustiu"
+
+#: 316402101459881984
+msgid "ordersClaimBiomeTitle"
+msgstr "Calea către o nouă locație este deschisă"
+
+#: 316402277297688576
+msgid "ordersClaimBiomeDescription"
+msgstr "Noi descoperiri sunt disponibile"
+
+#: 317048656315551744
+msgid "terrain1Biome1Title"
+msgstr "Morminte"
+
+#: 317908391516442624
+msgid "toTrade"
+msgstr "Comerț"
+
+#: 319566851823898624
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Da, pleacă"
+
+#: 319567663786627072
+msgid "skipSelectionTreasuresCancel"
+msgstr "Nu, înapoi la selecție"
+
+#: 320015732638486528
+msgid "soldToDealer"
+msgstr "Vândut!"
+
+#: 321539636750192640
+msgid "craftSelectBlockedWrongType"
+msgstr "Acest obiect nu este potrivit pentru acest tip de slot"
+
+#: 321540352067768320
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Ați selectat deja suficiente obiecte din acest grup"
+
+#: 332999660336844800
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"Traseul este acoperit de vegetație. Ați stăpânit deja totul aici — este "
+"timpul să vă apucați de treabă."
+
+#: 333367357155315712
+msgid "terrain0Biome0Title"
+msgstr "Ținut pustiu"
+
+#: 333367909771644928
+msgid "terrain1Biome0Title"
+msgstr "Mlaștină"
+
+#: 333368362697756672
+msgid "terrain1Biome2Title"
+msgstr "Căderea meteoriților"
+
+#: 333841248503992320
+msgid "goldUsedIn"
+msgstr ""
+"Poate fi <color=#E3BA59>vândut</color> la Magazin de comerț, folosit în "
+"<color=#E3BA59>Slot de meșteșug</color>, sau plasat în <color=#E3BA59>Super "
+"slot</color>."
+
+#: 333841848608231424
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Poate fi <color=#E3BA59>vândut</color> la Magazinul de comerț, utilizat în "
+"<color=#E3BA59>Slotul de meșteșug</color>, sau plasat în <color=#E3BA59>"
+"Super slot</color>."
+
+#: 333841973128728576
+msgid "silverUsedIn"
+msgstr ""
+"Poate fi <color=#E3BA59>vândut</color> la Magazinul de comerț, folosit în "
+"<color=#E3BA59>Slotul de meșteșug</color>, sau plasat în <color=#E3BA59>"
+"Super slot</color>."
+
+#: 333842030875906048
+msgid "gemUsedIn"
+msgstr ""
+"Poate fi <color=#E3BA59>vândut</color> la Magazinul de comerț, folosit în "
+"<color=#E3BA59>Slotul de meșteșug</color> sau <color=#E3BA59>Super slot</"
+"color>, sau <color=#E3BA59>inserat</color> într-o comoară."
+
+#: 333842074681217024
+msgid "gemRoughUsedIn"
+msgstr ""
+"Poate fi prelucrat în <color=#E3BA59>Lustruire</color> sau în <color=#E3BA59>"
+"Super slot</color> pentru a-și dezvălui adevărata valoare."
+
+#: 333842122626306048
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Poate fi <color=#E3BA59>vândut</color> la Magazinul de comerț sau încrustat "
+"cu geme prin <color=#E3BA59>Inserare</color> sau <color=#E3BA59>Super slot</"
+"color> pentru a-și crește valoarea."
+
+#: 333842171624165376
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Poate fi reparat în <color=#E3BA59>Lustruire</color> sau în <color=#E3BA59>"
+"Super slot</color>."
+
+#: 333842234089934848
+msgid "chestUsedIn"
+msgstr ""
+"Poate fi deschis în <color=#E3BA59>Slot cufăr</color> sau în <color=#E3BA59>"
+"Super slot</color>."
+
+#: 333842279115788288
+msgid "trashUsedIn"
+msgstr "Poate fi <color=#E3BA59>vândut</color> doar negustorului."
+
+#: 333842322942070784
+msgid "eggUsedIn"
+msgstr ""
+"Poate fi deschis în <color=#E3BA59>Incubator</color> sau în <color=#E3BA59>"
+"Super slot</color>."
+
+#: 333842403657256960
+msgid "artifactUsedIn"
+msgstr "Poate fi <color=#E3BA59>vândut</color> doar la Magazinul de comerț."
+
+#: 333842449953984512
+msgid "geodeUsedIn"
+msgstr ""
+"Poate fi deschis în <color=#E3BA59>Lustruire</color> sau în <color=#E3BA59>"
+"Super slot</color>."
+
+#: 333842496531730432
+msgid "unknownUsedIn"
+msgstr ""
+"Poate fi dus la Negustor pentru <color=#E3BA59>Evaluare</color> pentru a-i "
+"determina valoarea reală."
+
+#: 333842548465602560
+msgid "cursedUsedIn"
+msgstr ""
+"Blestemul poate fi înlăturat la <color=#E3BA59>Altar</color> sau în "
+"<color=#E3BA59>Super slot</color>."
+
+#: 334624695946317824
+msgid "terrain2Biome0Title"
+msgstr "Gater"
+
+#: 334752689742417920
+msgid "perfect"
+msgstr "Perfect"
+
+#: 334754742782922752
+msgid "decline"
+msgstr "Refuză"
+
+#: 334758932242501632
+msgid "putUpForSale"
+msgstr "Pune la vânzare"
+
+#: 337073088274632704
+msgid "newLocationAvailable"
+msgstr "A apărut un loc nou!"
+
+#: 338548608547950592
+msgid "retargetingTitle1"
+msgstr ":monocle: Întrebare interesantă…"
+
+#: 338548710087856128
+msgid "retargetingDescription1"
+msgstr "Cât de departe poți ajunge?"
+
+#: 338548825884200960
+msgid "retargetingTitle2"
+msgstr ":sunglasses: E timpul să continui."
+
+#: 338548974257704960
+msgid "retargetingDescription2"
+msgstr "Progresul tău este încă aici."
+
+#: 338549087440998400
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Ești gata să te întorci?"
+
+#: 338549137776840704
+msgid "retargetingDescription3"
+msgstr "Continuă de unde ai rămas."
+
+#: 338569990488985600
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Crearea este completă!"
+
+#: 338570100794986496
+msgid "notificationCraftCompletedDescription"
+msgstr "Vezi ce ai obținut."
+
+#: 338570414583451648
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Ai un Cumpărător!"
+
+#: 338570498368868352
+msgid "notificationTradeCompletedDescription"
+msgstr "Bunurile tale și-au găsit un client."
+
+#: 339457185953353728
+msgid "tradeSelectBlockedWrongType"
+msgstr "Acest articol nu poate fi vândut."
+
+#: 340628273341140992
+msgid "skip"
+msgstr "Omite"
+
+#: 354499398722654208
+msgid "daily"
+msgstr "Zilnic"
+
+#: 354514538620784640
+msgid "available"
+msgstr "Disponibil"
+
+#: 354514769508831232
+msgid "availableIn"
+msgstr "Disponibil în"
+
+#: 355103206058233856
+msgid "dailyRewardClaimTitle"
+msgstr "Ia-l pentru profit"
+
+#: 355103597911085056
+msgid "dailyRewardClaimDescription"
+msgstr "Vizionează un videoclip — obține recompense X2"
+
+#: 355120760352935936
+msgid "withoutBonus"
+msgstr "Fără bonus"
+
+#: 355145440342315008
+msgid "claimWithBonus"
+msgstr "Revendică cu bonus"
+
+#: 355146771715067904
+msgid "x2Reward"
+msgstr "Recompensă x2"
+
+#: 355255965734670336
+msgid "dailyRewardAlreadyReceived"
+msgstr "Recompensa a fost deja revendicată!"
+
+#: 355256265493188608
+msgid "missedDailyReward"
+msgstr "Recompensa a fost deja ratată!"
+
+#: 355256569236295680
+msgid "futureDailyReward"
+msgstr "Revino mai târziu pentru această recompensă!"
+
+#: 355276036993454080
+msgid "rateUs"
+msgstr "Evaluează-ne"
+
+#: 355276149157531648
+msgid "rateUsTitle"
+msgstr "Evaluează-ne cu stele"
+
+#: 355276400991932416
+msgid "rateUsDescription"
+msgstr "Evaluează jocul și ajută-ne să ne îmbunătățim."
+
+#: 356305037681758208
+msgid "specialOffers"
+msgstr "Oferte speciale"
+
+#: 356313026543226880
+msgid "quickStart"
+msgstr "Pornire rapidă!"
+
+#: 356313363102568448
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+#: 356342200381214720
+msgid "forever"
+msgstr "Veșnic"
+
+#: 356345060842016768
+msgid "starterPack"
+msgstr "Pachet de început"
+
+#: 356346443771154432
+msgid "allInOneSupply"
+msgstr "Aprovizionare completă"
+
+#: 356350103481749504
+msgid "dealOfTheDay"
+msgstr "Oferta zilei"
+
+#: 356354375627837440
+msgid "xAmount"
+msgstr "X{value}"
+
+#: 356354841824727040
+msgid "free!"
+msgstr "Gratuit!"
+
+#: 356357806572703744
+msgid "watch"
+msgstr "Urmărește"
+
+#: 356360805877551104
+msgid "coins"
+msgstr "Monede"
+
+#: 356365108071632896
+msgid "mostPopular"
+msgstr "Cel mai popular"
+
+#: 356365403610681344
+msgid "bestPrice"
+msgstr "Cel mai bun preț"
+
+#: 356519167105699840
+msgid "store"
+msgstr "Magazin"
+
+#: 357424739636219904
+msgid "dealOfTheDayDescription"
+msgstr "Oferte noi vor fi disponibile în"
+
+#: 357607511365521408
+msgid "health"
+msgstr "Sănătate"
+
+#: 357784830910664704
+msgid "notificationDealOfTheDayTitle"
+msgstr "Mare vrea cumpărături :sunglasses:"
+
+#: 357784932224077824
+msgid "notificationDealOfTheDayDescription"
+msgstr "Tot ce a mai rămas este să intri și să revendici ce-i al tău."
+
+#: 357785735030640640
+msgid "notificationCoinsReadyTitle"
+msgstr "Magazinul oferă bunătăți :heart-eyes:"
+
+#: 357785816504995840
+msgid "notificationCoinsReadyDescription"
+msgstr "Treci pe la magazin și ia cadourile gratuite."
+
+#: 358713136833105920
+msgid "wantReceipt"
+msgstr "Vreau o chitanță (o vom trimite prin e-mail)"
+
+#: 358722499958280192
+msgid "submit"
+msgstr "Trimite"
+
+#: 358723345383165952
+msgid "receiptEmaitTitle"
+msgstr "Introdu e-mailul"
+
+#: 358723657267417088
+msgid "receiptEmailDescription"
+msgstr ""
+"Vrei o chitanță?\n"
+"Introdu e-mailul tău și ți-o vom trimite după achiziție."
+
+#: 358900766250110976
+msgid "buy"
+msgstr "Cumpără"
+
+#: 358901413183754240
+msgid "starterPackHeadline"
+msgstr "Ia-l la timp!"
+
+#: 358901551423819776
+msgid "specialOfferHeadline"
+msgstr "Mai mult pentru totdeauna!"
+
+#: 359524475709165568
+msgid "open"
+msgstr "Deschide"
+
+#: 360153378165362688
+msgid "maximumResources"
+msgstr "Resurse maxime"
+
+#: 360200917140901888
+msgid "exchangeCurrencyTitle"
+msgstr "Nu sunt suficiente Monede de argint."
+
+#: 360201095897944064
+msgid "exchangeCurrencyDescription"
+msgstr "Doar puțin mai puțin."
+
+#: 360201375158898688
+msgid "exchangeCurrencyQuestion"
+msgstr "Cumpărați restul?"
+
+#: 360510317885919232
+msgid "bankingAwaitingTitle"
+msgstr "Monede în drum"
+
+#: 360511732461080576
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Aurul este încărcat în căruță...\n"
+"Livrarea poate dura câteva minute."
+
+#: 360689578840166400
+msgid "deleteItemConfirmationTitle"
+msgstr "Aruncați obiectul?"
+
+#: 360689668438888448
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"Obiectul va dispărea pentru totdeauna.\n"
+"Această acțiune nu poate fi anulată."
+
+#: 360858085955473408
+msgid "noKeepIt"
+msgstr "Nu, păstrați-l"
+
+#: 361772904917241856
+msgid "allRegionsAvailable"
+msgstr "Toate regiunile disponibile"
+
+#: 361805221660463104
+msgid "terrainProgressLabel"
+msgstr "Spre următoarea locație"
+
+#: 361805489286418432
+msgid "terrainClosedLabel"
+msgstr "Locație indisponibilă"
+
+#: 362095342867714048
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Scopul tău suprem este dragostea!</color>\n"
+"Vinde-ți creațiile localnicilor pentru a-i cuceri."
+
+#: 362097539907063808
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Nu te opri până nu te <color=#E3BA59>ADORA</color> — \n"
+"apoi vei fi gata să cucerești noi ținuturi."
+
+#: 362500096244584448
+msgid "cryolisUsedIn"
+msgstr ""
+"Poate fi <color=#E3BA59>vândut</color> la Magazinul de comerț, folosit în "
+"<color=#E3BA59>Slotul de meșteșug</color>, sau plasat în <color=#E3BA59>"
+"Super slot</color>."
+
+#: 362503199635279872
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Acest articol nu este potrivit pentru rețeta selectată."
+
+#: 362505392367079424
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Un alt articol din acest grup a fost deja selectat."
+
+#: 362831462727421952
+msgid "failedPurchase"
+msgstr ""
+"Iapa este tristă. Achiziția a eșuat.\n"
+"Vă rugăm să încercați din nou."
+
+#: 363945774653116416
+msgid "frozenUsedIn"
+msgstr ""
+"Poate fi încălzit în <color=#E3BA59>Incubator</color> sau în <color=#E3BA59>"
+"Super slot</color>."
+
+#: 363945781498220544
+msgid "frozen"
+msgstr "Înghețat"
+
+#: 363947917120376832
+msgid "frozens"
+msgstr "Înghețat"
+
+#: 371768236233199616
+msgid "language"
+msgstr "Limbă"
+
+#: 371825767475318784
+msgid "termsOfUse"
+msgstr "Termeni de utilizare"
+
+#: 371825915722993664
+msgid "privacyPolicy"
+msgstr "Politica de confidențialitate"
+
+#: 371826077132394496
+msgid "deleteData"
+msgstr "Șterge datele"
+
+#: 371826289473228800
+msgid "signInWithGoogle Play"
+msgstr "Conectați-vă cu Google Play"
+
+#: 371936637333278720
+msgid "notLinked"
+msgstr "Neconectat"
+
+#: 371936898659389440
+msgid "linked"
+msgstr "Conectat"
+
+#: 371937387937533952
+msgid "switchGooglePlay"
+msgstr "Schimbați contul Google Play"
+
+#: 372201325233180672
+msgid "resetProgressDescription"
+msgstr ""
+"Ești sigur că vrei să ștergi progresul? Această acțiune nu poate fi anulată!"
+
+#: 372201851437977600
+msgid "resetProgressConfirm"
+msgstr "Da, șterge"
+
+#: 375231950777225216
+msgid "terrainInDevelopmentDescription"
+msgstr "Ne pare rău. Această locație este încă în dezvoltare."
+
+#: 375232378373935104
+msgid "terrain2Biome1Title"
+msgstr "Șantier naval înghețat"
+
+#: 375232425010401280
+msgid "terrain2Biome2Title"
+msgstr "Far"
+
+#: 375232475627261952
+msgid "terrain2Biome3Title"
+msgstr "Lostwood"
+
+#: 376614903423963136
+msgid "collectAll"
+msgstr "Colectează tot"
+
+#: 376958824981204992
+msgid "healthStatReward"
+msgstr "Sănătate +{value}"
+
+#: 376959365689905152
+msgid "storageStatReward"
+msgstr "Capacitate depozit +{value}"
+
+#: 376968663052587008
+msgid "itemsLeft_x"
+msgstr "Obiecte rămase: {value}"
+
+#: 376983763331321856
+msgid "storageStatRewardSummary"
+msgstr "Depozit pentru totdeauna"
+
+#: 376983951106117632
+msgid "healthStatRewardSummary"
+msgstr "Sănătate pentru totdeauna"
+
+#: 379459050652569600
+msgid "prospectors"
+msgstr "Prospectori"
+
+#: 384582485728825344
+msgid "storeStockFullDescription"
+msgstr "Depozitul este plin până la refuz."
+
+#: 384852464931966976
+msgid "terrain3Title"
+msgstr "Grimdal"
+
+#: 387215171681259520
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Deschideți setările telefonului\n"
+"2. Google - Toate serviciile - Jocuri Play\n"
+"3. „Cont de conectare” - „Schimbă” (lângă joc)\n"
+"4. Reporniți jocul"
+
+#: 388959282209755136
+msgid "versionAlertMessage"
+msgstr "A fost lansată o nouă versiune a jocului. Este timpul să actualizați!"
+
+#: 390311463999508480
+msgid "treasureUsedIn"
+msgstr "Poate fi <color=#E3BA59>vândut</color> doar la Magazinul de comerț."
+
+#: 390630593516539904
+msgid "noInternetConnectionBlocking"
+msgstr "Fără internet — fără aventură"
+
+#: 390630963617730560
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Reconectare…\n"
+"{value}"
+
+#: 391415174540824576
+msgid "newsAndCommunication"
+msgstr "Știri și comunicare"
+
+#: 392040460349345792
+msgid "statEffectAccumulationFreeze"
+msgstr "Degerături"
+
+#: 392040705481248768
+msgid "statEffectHeal"
+msgstr "Regenerare"
+
+#: 392040844430151680
+msgid "statEffectMovementSpeedNegative"
+msgstr "Încetinire"
+
+#: 392041019248742400
+msgid "statEffectMovementSpeedPositive"
+msgstr "Creștere de viteză"
+
+#: 392041155999830016
+msgid "statEffectDamageCurse"
+msgstr "Epuizare"
+
+#: 392041334085783552
+msgid "statEffectDamageBleed"
+msgstr "Sângerare"
+
+#: 392041534623846400
+msgid "statEffectToolNoiseNegative"
+msgstr "Unealtă zgomotoasă"
+
+#: 392041656803921920
+msgid "statEffectToolNoisePositive"
+msgstr "Unealtă silențioasă"
+
+#: 392041855974641664
+msgid "statEffectToolSpeedNegative"
+msgstr "Oboseală"
+
+#: 392042070265827328
+msgid "statEffectToolSpeedPositive"
+msgstr "Dexteritate"
+
+#: 392090295794405376
+msgid "pause"
+msgstr "Pauză"
+
+#: 392090376618643456
+msgid "pauseDescription"
+msgstr "Efecte, comenzi și setări — toate aici."
+
+#: 392092595833278464
+msgid "effects"
+msgstr "Stare Caracter"
+
+#: 392119357174714368
+msgid "settingsDialogTitle"
+msgstr "Setări"
+
+#: 393910691879456768
+msgid "russianPlaymentsBanner"
+msgstr "Plățile sunt disponibile pentru jucătorii din Rusia."

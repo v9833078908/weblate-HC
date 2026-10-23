@@ -1,0 +1,245 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+DEFAULT_DATA_DIR = None
+DEFAULT_CACHE_DIR = None
+DEFAULT_SITE_TITLE = "HCGameLoc"
+DEFAULT_SITE_DOMAIN = ""
+DEFAULT_OFFER_HOSTING = False
+DEFAULT_ENABLE_HOOKS = True
+DEFAULT_ENABLE_SHARING = True
+DEFAULT_PAGE_LIMIT = 100
+DEFAULT_NEARBY_MESSAGES = 15
+DEFAULT_SIMILAR_MESSAGES = 5
+DEFAULT_COMMIT_PENDING_HOURS = 24
+DEFAULT_AUTO_UPDATE = False
+
+DEFAULT_AUTOFIX_LIST: tuple[str, ...] = (
+    "weblate.trans.autofixes.whitespace.SameBookendingWhitespace",
+    "weblate.trans.autofixes.chars.ReplaceTrailingDotsWithEllipsis",
+    "weblate.trans.autofixes.chars.RemoveZeroSpace",
+    "weblate.trans.autofixes.chars.RemoveControlChars",
+    "weblate.trans.autofixes.chars.DevanagariDanda",
+    "weblate.trans.autofixes.chars.PunctuationSpacing",
+    "weblate.trans.autofixes.html.BleachHTML",
+)
+
+DEFAULT_REQUIRE_LOGIN = False
+DEFAULT_PUBLIC_ENGAGE = False
+DEFAULT_MATOMO_SITE_ID = None
+DEFAULT_MATOMO_URL = None
+DEFAULT_GOOGLE_ANALYTICS_ID = None
+DEFAULT_CLARITY_PROJECT_ID = None
+DEFAULT_GET_HELP_URL = None
+DEFAULT_STATUS_URL = None
+DEFAULT_LEGAL_URL = None
+DEFAULT_PRIVACY_URL = None
+DEFAULT_LIMIT_TRANSLATION_LENGTH_BY_SOURCE_LENGTH = True
+DEFAULT_ENABLE_HTTPS = False
+DEFAULT_HIDE_REPO_CREDENTIALS = True
+DEFAULT_HIDE_SHARED_GLOSSARY_COMPONENTS = False
+DEFAULT_CREATE_GLOSSARIES = True
+
+# Loc-kit glossary OpenRouter profile analysis (off by default)
+DEFAULT_LOC_KIT_PROFILE_ANALYSIS_ENABLED = False
+DEFAULT_LOC_KIT_PROFILE_OPENROUTER_KEY = ""
+DEFAULT_LOC_KIT_PROFILE_OPENROUTER_MODEL = ""
+DEFAULT_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES = 131072
+DEFAULT_LOC_KIT_IMPORT_DRAFT_EXPIRY = 3600
+
+# LLM judge (off by default; site-wide, like LOC_KIT_PROFILE_*)
+DEFAULT_JUDGE_ENABLED = False
+DEFAULT_JUDGE_CONSENSUS_REJECT = True
+DEFAULT_JUDGE_API_KEY = ""
+DEFAULT_JUDGE_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_JUDGE_MODEL_SEAT_1 = ""
+DEFAULT_JUDGE_MODEL_SEAT_2 = ""
+DEFAULT_JUDGE_MAX_REPAIR_ATTEMPTS = 1
+DEFAULT_JUDGE_BATCH_SIZE = 5
+DEFAULT_JUDGE_MAX_UNITS_PER_RUN = 2000
+# A duplicate delivery retries behind its file-only execution guard for eight hours.
+DEFAULT_JUDGE_GUARD_WAIT_RETRIES = 480
+DEFAULT_JUDGE_REQUEST_SLEEP = 0.0
+DEFAULT_JUDGE_REQUEST_DEADLINE = 120.0
+DEFAULT_JUDGE_REQUEST_IDLE_TIMEOUT = 30.0
+DEFAULT_JUDGE_TRANSPORT_RETRIES = 1
+DEFAULT_JUDGE_PROTOCOL_RETRIES = 1
+DEFAULT_JUDGE_TRANSIENT_HTTP_RETRIES = 1
+DEFAULT_JUDGE_MAX_UNPARSED_RETRY_ROUNDS = 1
+DEFAULT_JUDGE_RETRY_BUDGET_RATIO = 0.2
+DEFAULT_JUDGE_MAY_APPROVE = False
+# Empty: no reasoning parameter is sent at all, which is what the prompt
+# measurement ran with. Set to minimal/low/medium/high to cap the spend.
+DEFAULT_JUDGE_REASONING_EFFORT = ""
+DEFAULT_JUDGE_RESPONSE_FORMAT = "json_schema"
+DEFAULT_JUDGE_STREAM = False
+DEFAULT_JUDGE_TEMPERATURE = 0.0
+# Zero means that no output-token limit is passed to the provider.
+DEFAULT_JUDGE_MAX_TOKENS = 0
+# Per-seat profiles inherit the corresponding global setting by default. They
+# stay strings so the profile resolver can distinguish "inherit" from a value.
+DEFAULT_JUDGE_REASONING_EFFORT_SEAT_1 = "inherit"
+DEFAULT_JUDGE_REASONING_EFFORT_SEAT_2 = "inherit"
+DEFAULT_JUDGE_RESPONSE_FORMAT_SEAT_1 = "inherit"
+DEFAULT_JUDGE_RESPONSE_FORMAT_SEAT_2 = "inherit"
+DEFAULT_JUDGE_STREAM_SEAT_1 = "inherit"
+DEFAULT_JUDGE_STREAM_SEAT_2 = "inherit"
+DEFAULT_JUDGE_BATCH_SIZE_SEAT_1 = "inherit"
+DEFAULT_JUDGE_BATCH_SIZE_SEAT_2 = "inherit"
+DEFAULT_JUDGE_REQUEST_DEADLINE_SEAT_1 = "inherit"
+DEFAULT_JUDGE_REQUEST_DEADLINE_SEAT_2 = "inherit"
+DEFAULT_JUDGE_TEMPERATURE_SEAT_1 = "inherit"
+DEFAULT_JUDGE_TEMPERATURE_SEAT_2 = "inherit"
+DEFAULT_JUDGE_MAX_TOKENS_SEAT_1 = "inherit"
+DEFAULT_JUDGE_MAX_TOKENS_SEAT_2 = "inherit"
+DEFAULT_JUDGE_DEFERRAL_ENABLED = False
+DEFAULT_JUDGE_DEFERRAL_MIN_INTERVAL = 900
+DEFAULT_JUDGE_DEFERRAL_MAX_INTERVAL = 86400
+DEFAULT_JUDGE_DEFERRAL_SLOW_AFTER = 5
+DEFAULT_JUDGE_DEFERRAL_MAX_UNITS_PER_PASS = 200
+DEFAULT_JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD = 5
+DEFAULT_JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS = 900
+DEFAULT_JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY = 200
+DEFAULT_JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND = 0.25
+DEFAULT_JUDGE_DEFERRAL_OPERATOR_STOPPED = False
+DEFAULT_JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS = 90
+DEFAULT_JUDGE_REQUEST_ATTEMPT_RETENTION_DAYS = 90
+# Availability fallback for the judge seats: one alternate endpoint, tried
+# once per batch after the primary's own retries are spent. Empty by default.
+# The six non-reasoning settings must be set together and the endpoint must
+# differ from the primary's; reasoning effort is optional, where empty means
+# "send no reasoning parameter" (see judge.judge_fallback_endpoint).
+DEFAULT_JUDGE_FALLBACK_BASE_URL = ""
+DEFAULT_JUDGE_FALLBACK_API_KEY = ""
+DEFAULT_JUDGE_FALLBACK_MODEL_SEAT_1 = ""
+DEFAULT_JUDGE_FALLBACK_MODEL_SEAT_2 = ""
+DEFAULT_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1 = ""
+DEFAULT_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2 = ""
+DEFAULT_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1 = ""
+DEFAULT_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2 = ""
+DEFAULT_LLM_USAGE_LOG_RETENTION_DAYS = 90
+
+
+# Hard caps enforced regardless of environment input.
+LOC_KIT_PROFILE_SAMPLE_MAX_BYTES_CAP = 131072
+LOC_KIT_IMPORT_DRAFT_EXPIRY_CAP = 3600
+
+
+def clamp_loc_kit_sample_max_bytes(value: int) -> int:
+    return min(int(value), LOC_KIT_PROFILE_SAMPLE_MAX_BYTES_CAP)
+
+
+def clamp_loc_kit_import_draft_expiry(value: int) -> int:
+    return min(int(value), LOC_KIT_IMPORT_DRAFT_EXPIRY_CAP)
+
+
+DEFAULT_COMMITER_EMAIL = "noreply@weblate.org"
+DEFAULT_COMMITER_NAME = "Weblate"
+DEFAULT_TRANSLATION_PROPAGATION = True
+DEFAULT_MERGE_STYLE = "rebase"
+DEFAULT_ACCESS_CONTROL = 0
+DEFAULT_RESTRICTED_COMPONENT = False
+DEFAULT_SHARED_TM = True
+DEFAULT_AUTOCLEAN_TM = False
+DEFAULT_TRANSLATION_REVIEW = False
+DEFAULT_SOURCE_REVIEW = False
+DEFAULT_PUSH_ON_COMMIT = True
+DEFAULT_AUTO_LOCK_ERROR = True
+DEFAULT_VCS = "git"
+
+DEFAULT_COMMIT_MESSAGE = (
+    "chore(l10n): update {{ language_name }} translation\n\n"
+    "Translation: {{ project_name }}/{{ component_name }}\n"
+    "Language: {{ language_name }}\n"
+    "Progress: {{ stats.translated_percent }}% "
+    "({{ stats.translated }} of {{ stats.all }} strings)\n"
+    "Translate-URL: {{ url }}"
+)
+
+DEFAULT_ADD_MESSAGE = (
+    "chore(l10n): add {{ language_name }} translation\n\n"
+    "Translation: {{ project_name }}/{{ component_name }}\n"
+    "Language: {{ language_name }}\n"
+    "Translate-URL: {{ url }}"
+)
+
+DEFAULT_DELETE_MESSAGE = (
+    "chore(l10n): remove {{ language_name }} translation\n\n"
+    "Translation: {{ project_name }}/{{ component_name }}\n"
+    "Language: {{ language_name }}\n"
+    "Translate-URL: {{ url }}"
+)
+
+DEFAULT_MERGE_MESSAGE = (
+    "chore(l10n): merge remote changes\n\n"
+    "Translation: {{ project_name }}/{{ component_name }}\n"
+    "Remote-Branch: {{ component_remote_branch }}\n"
+    "Translate-URL: {{ url }}"
+)
+
+DEFAULT_ADDON_MESSAGE = """chore(l10n): update translation files
+
+Add-on: {{ addon_name }}
+Translation: {{ project_name }}/{{ component_name }}
+Translate-URL: {{ url }}"""
+
+DEFAULT_PULL_MESSAGE = """chore(l10n): update translations
+
+Translations updated in [{{ site_title }}]({{ site_url }}) for [{{ project_name }}/{{ component_name }}]({{ url }}).
+
+{% if component_linked_children %}
+Included components:
+{% for linked in component_linked_children %}
+* [{{ linked.project_name }}/{{ linked.name }}]({{ linked.url }})
+{% endfor %}
+{% endif %}
+
+Translation status:
+
+![Weblate translation status]({{widget_url}})
+"""
+
+DEFAULT_INVOICE_PATH = ""
+DEFAULT_INVOICE_PATH_LEGACY = ""
+DEFAULT_VAT_RATE = 1.21
+DEFAULT_SUPPORT_API_URL = "https://weblate.org/"
+
+DEFAULT_IP_BEHIND_REVERSE_PROXY = False
+DEFAULT_IP_PROXY_HEADER = "HTTP_X_FORWARDED_FOR"
+DEFAULT_IP_PROXY_OFFSET = -1
+
+DEFAULT_AUTH_TOKEN_VALID = 172_800
+DEFAULT_AUTH_LOCK_ATTEMPTS = 10
+DEFAULT_AUTH_PASSWORD_DAYS = 180
+
+DEFAULT_ADMINS_CONTACT: tuple[str, ...] = ()
+DEFAULT_ADMINS_HOSTING: tuple[str, ...] = ()
+DEFAULT_ADMINS_BILLING: tuple[str, ...] = ()
+
+DEFAULT_SPECIAL_CHARS = ("\t", "\n", "\u00a0", "…")
+DEFAULT_ADDONS: dict = {}
+
+DEFAULT_REPOSITORY_ALERT_THRESHOLD = 25
+DEFAULT_UNUSED_ALERT_DAYS = 365
+DEFAULT_BACKGROUND_TASKS = "monthly"
+DEFAULT_SINGLE_PROJECT = False
+DEFAULT_REDIRECT_SINGLE_PROJECT_USER = False
+DEFAULT_LICENSE_EXTRA: tuple[str, ...] = ()
+DEFAULT_LICENSE_FILTER = None
+DEFAULT_LICENSE_REQUIRED = False
+DEFAULT_WEBSITE_REQUIRED = False
+DEFAULT_WEBSITE_ALERTS_ENABLED = True
+DEFAULT_FONTS_CDN_URL = None
+DEFAULT_PROJECT_BACKUP_KEEP_DAYS = 30
+DEFAULT_PROJECT_BACKUP_KEEP_COUNT = 3
+DEFAULT_REPORT_EXPIRY = 90
+DEFAULT_PROJECT_BACKUP_IMPORT_MAX_MEMBERS = 100_000
+DEFAULT_PROJECT_BACKUP_IMPORT_MAX_TOTAL_UNCOMPRESSED_SIZE = 512 * 1024 * 1024
+DEFAULT_PROJECT_BACKUP_IMPORT_MAX_COMPRESSED_ENTRY_SIZE = 250 * 1024 * 1024
+DEFAULT_PROJECT_BACKUP_IMPORT_MIN_RATIO_SIZE = 1 * 1024 * 1024
+DEFAULT_PROJECT_BACKUP_IMPORT_MAX_COMPRESSED_ENTRY_RATIO = 250
+DEFAULT_EXTRA_HTML_HEAD = ""
+DEFAULT_IP_ADDRESSES: tuple[str, ...] = ()

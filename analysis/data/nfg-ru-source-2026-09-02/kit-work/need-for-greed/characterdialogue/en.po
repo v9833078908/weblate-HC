@@ -1,0 +1,119 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: en\n"
+
+#: 65661046784
+msgid "eggItemReceived"
+msgstr "An egg! It needs to be hatched."
+
+#: 12383040049152
+msgid "cursedItemReceived"
+msgstr "Nooo, a curse!"
+
+#: 16277346455552
+msgid "geodeItemReceived"
+msgstr ""
+"Oh, a geode!\n"
+"Ready for cutting."
+
+#: 16667567722496
+msgid "gemItemReceived"
+msgstr "Yay, shinies!"
+
+#: 17079226077184
+msgid "goldItemReceived"
+msgstr "I LOVE GOLD!"
+
+#: 17591476424704
+msgid "silverCoinItemReceived"
+msgstr "Mmmmmm, money…"
+
+#: 25552772927488
+msgid "wormSpawned"
+msgstr "Damn it!"
+
+#: 26219063283712
+msgid "highNoise"
+msgstr "Come on…"
+
+#: 42988977000448
+msgid "pileLooted"
+msgstr "Junk, but I can sell it."
+
+#: 44098089390080
+msgid "statsEffectAppliedOnDestroy"
+msgstr "Why does this happen every time?!"
+
+#: 50940257505280
+msgid "timeIsUp"
+msgstr "What, no one else to bother?!"
+
+#: 73606410539008
+msgid "noActions1"
+msgstr "Doo-doo-doo…"
+
+#: 73762149240832
+msgid "noActions2"
+msgstr "Alright, we’ll wait."
+
+#: 73828930949120
+msgid "noActions3"
+msgstr "Alright, smoke break."
+
+#: 73889177931776
+msgid "noActions4"
+msgstr "Eh… whatever."
+
+#: 73986347372544
+msgid "noActions5"
+msgstr "Patience, patience…"
+
+#: 91507905531904
+msgid "richZoneReached1"
+msgstr "Ominous… means plenty of treasure!"
+
+#: 91695428669440
+msgid "richZoneReached2"
+msgstr "The deeper we go, the better the loot!"
+
+#: 91772155072512
+msgid "richZoneReached3"
+msgstr "Smells like mountains of treasure!"
+
+#: 42860303913062400
+msgid "coldNight"
+msgstr ""
+"B-b-b-it’s\n"
+"c-c-cold…"
+
+#: 42861209547182080
+msgid "frostible"
+msgstr ""
+"N-n-n-need to \n"
+"w-w-warm up!"
+
+#: 42861912688693248
+msgid "warmedUp"
+msgstr "Hooray, it’s warm!"
+
+#: 42862171338838016
+msgid "frozenRockHit"
+msgstr "Gotta melt the ice!"
+
+#: 42862467540586496
+msgid "frozenItemReceived"
+msgstr "Ice Treasure!"
+
+#: 49631762726780928
+msgid "SuperRare"
+msgstr "Yesssss, Jackpot!"

@@ -1,0 +1,629 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: en\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Ring"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Dagger"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Necklace"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Golden Scepter"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Bracelet"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Brooch"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Diadem"
+
+#: 549466071040
+msgid "casket"
+msgstr "Casket"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Golden Crown"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Pure Diamond (Big)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Pure Diamond (Medium)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Pure Diamond (Small)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Crimson Ruby (Big)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Crimson Ruby (Medium)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Crimson Ruby (Small)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Blue Sapphire (Big)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Blue Sapphire (Medium)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Blue Sapphire (Small)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Emerald (Big)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Emerald (Medium)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Emerald (Small)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Amethyst (Big)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Amethyst (Medium)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Amethyst (Small)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Opal (Big)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Opal (Medium)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Opal (Small)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Diamond (Rough)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Amethyst (Rough)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Emerald (Rough)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Opal (Rough)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Ruby (Rough)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Sapphire (Rough)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Gold Nugget (Small)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Paradise Bird Egg"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Large Gold Chunk"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Gold Nugget (Big)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Trash"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Pin"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Earring"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Glasses"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Bondstone (Big)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Bondstone (Medium)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Avian Gemstone"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Geode (Medium)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Wild Gemstone (Medium)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Artifact"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Star Iron (Small)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Mask"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Golden Gauntlet"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Silver Nugget (Small)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Idol"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Ancient Coin (Gold)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Ancient Coin (Silver)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Bondstone (Small)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "Yolk of Fortune"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Swamp Larva"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Meteor Core"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Ancient Tome"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Worn Scroll"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Covenant Stone"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Cursed Relic"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Buried Chest"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Worm Egg"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Geode (Small)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Valuable Geode (Small)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Valuable Geode (Medium)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Golden Scarab"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Wild Gemstone (small)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Fractured Dagger of Will"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Broken Visage Mask"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Shattered Scepter"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Fractured Crown"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Cracked Gauntlet"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Unknown item"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Radiant Medallion (Gold)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Blooming Garden Brooch (Gold)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Pendant of Hidden Light (Gold)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Hidden Gem Pin (Gold)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Ring (Gold)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Narrow Stone Bracelet (Gold)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "King’s Signet (Gold)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Sovereign’s Signet (Gold)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Sunburst Brooch (Gold)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Golden Dagger of Will"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Resonant Earrings (Gold)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Vanity Spectacles (Gold)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Golden Visage Mask"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Twin Fates Ring (Gold)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Celestial Ring"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Celestial Ring"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Bonded Belt (Silver)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Moonlit Ring (Silver)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Serpent Ring (Silver)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Tentacle Signet (Silver)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Needle of Honor (Silver)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Mossy Coin"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Hexed Coin"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Coin of Ancient Glory"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Poor Man's Boar Idol"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "Idol of the Great Boar"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Idol of the Singed Noggin"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Idol of the Blazing Skull"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Keepsake Box"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Mystery-Crap Stone"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Floppy with Flopcoins"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Dummy drive"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Holy Dubai Choco"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Dung Pie"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Friday Night Mask"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Monday 12th Mask"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Source of the Old Blood"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Colophony Mosquito"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Genghis Khan Tooth"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "Your tooth?!?"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Cryolis Nugget (Small)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Frozen item"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Sun Sphere"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Idol Hearth"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Sparkwing"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Collected"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Idol of the Mustachedness"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "Idol of the Wisdom"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "Chest of the Jarl"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Mangled Gold Chunk"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Splendid Gold Chunk"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Crumbled Gold"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Pristine Gold Nugget"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Dull Silver"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Gleaming Silver Nugget"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Chipped Big Diamond"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Colossal Diamond"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Flawed Diamond (Medium)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Flawless Diamond (Medium)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Murky Opal"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Luminous Opal"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Brown Ruby"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Crimson-blood Ruby"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Lopsided Sapphire"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Skyborn Sapphire"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Frozen Ancient Tome"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Frozen Diamond (Big)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Frozen Diamond (Medium)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Frozen Large Gold Chunk"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Frozen Gold Nugget (Small)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Frozen Silver Nugget (Small)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Frozen Opal (Small)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Frozen Ruby (Small)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Frozen Sapphire (Small)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Frozen Idol"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Shimmering Earrings"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Moonlit Earrings"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Icy Gaze"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Moonlit Lake"

@@ -1,0 +1,52 @@
+{
+  "servers": {
+    "pyright": {
+      "disabled": true
+    },
+    "pylsp": {
+      "disabled": true
+    },
+    "ty": {
+      "disabled": true
+    },
+    "basedpyright": {
+      "command": "basedpyright-langserver",
+      "rootMarkers": [
+        "pyproject.toml",
+        ".git"
+      ],
+      "settings": {
+        "python": {
+          "pythonPath": ".venv/bin/python"
+        },
+        "basedpyright": {
+          "analysis": {
+            "typeCheckingMode": "basic",
+            "diagnosticMode": "openFilesOnly",
+            "useLibraryCodeForTypes": true,
+            "autoImportCompletions": true,
+            "exclude": [
+              "**/node_modules",
+              "**/.git",
+              "build",
+              "dist",
+              ".worktrees",
+              "data-test",
+              "dev-docker/data",
+              "weblate-mcp",
+              "analysis/data"
+            ]
+          }
+        }
+      }
+    },
+    "ruff": {
+      "command": "ruff",
+      "rootMarkers": [
+        "pyproject.toml",
+        ".git"
+      ]
+    }
+  },
+  "idleTimeoutMs": 600000
+}

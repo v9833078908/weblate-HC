@@ -1,0 +1,165 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Turkish <http://l10n.herocraft.com/projects/need-for-greed/"
+"survey/tr/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: tr\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 294040899584
+msgid "survey1Intro"
+msgstr ""
+"Hey! At bir şeyi açıklığa kavuşturmak istiyor.\n"
+"\n"
+"Kimle uğraştığını anlamak için sadece birkaç hızlı soru.\n"
+"Bir dakikadan fazla sürmez."
+
+#: 384566562816
+msgid "survey1Final"
+msgstr ""
+"Görünüşe göre… testi geçtin!\n"
+"\n"
+"Cevaplarını hatırladı.\n"
+"Ve görünüşe göre seni terk etmemeye karar verdi."
+
+#: 5159299321856
+msgid "survey1AcceptDescription"
+msgstr "Bir ödül alacaksın."
+
+#: 5354862940160
+msgid "survey1DeclineDescription"
+msgstr ""
+"Hayatta kalır…\n"
+"muhtemelen."
+
+#: 5940509413376
+msgid "survey1Question1"
+msgstr ""
+"Kaç yaşındasın?\n"
+"Yalan söyleme. O anlayabilir."
+
+#: 15613778202624
+msgid "survey1Question1Answer1"
+msgstr "15 yaş altı"
+
+#: 15721877999616
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+#: 15806955261952
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+#: 15875448246272
+msgid "survey1Question1Answer4"
+msgstr "30 - 40"
+
+#: 15939973419008
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+#: 16047045611520
+msgid "survey1Question2"
+msgstr ""
+"Kimsin?\n"
+"Çok fazla detaya gerek yok."
+
+#: 16356262285312
+msgid "survey1Question2Answer1"
+msgstr "E"
+
+#: 16421546627072
+msgid "survey1Question2Answer2"
+msgstr "K"
+
+#: 16480354963456
+msgid "survey1Question2Answer3"
+msgstr "Gizli"
+
+#: 16583924912128
+msgid "survey1Question3"
+msgstr "Burada ne arıyorsun?"
+
+#: 16952520347648
+msgid "survey1Question3Answer1"
+msgstr "Etrafta koşuşturup Ganimet toplamak"
+
+#: 17065502314496
+msgid "survey1Question3Answer2"
+msgstr "Zanaat yapıp satmak"
+
+#: 17147127664640
+msgid "survey1Question3Answer3"
+msgstr "Yükseltmeler ve ilerleme"
+
+#: 17285803937792
+msgid "survey1Question3Answer4"
+msgstr "Sadece takılıyorum…"
+
+#: 17383480889344
+msgid "survey1Question4"
+msgstr "Gitmeni engellemek için ne eksik?"
+
+#: 17980544258048
+msgid "survey1Question4Answer1"
+msgstr "Daha fazla hikaye"
+
+#: 18049771245568
+msgid "survey1Question4Answer2"
+msgstr "Yeni tehlikeler, kayalar ve hazineler"
+
+#: 18206881484800
+msgid "survey1Question4Answer3"
+msgstr "Yeni öğeler"
+
+#: 18275869396992
+msgid "survey1Question4Answer4"
+msgstr "Yeni konumlar"
+
+#: 18730255126528
+msgid "survey1Question4Answer5"
+msgstr "Başarılar ve ödüller"
+
+#: 19109206298624
+msgid "survey1Question5"
+msgstr "Önce ne düzeltilmeli?"
+
+#: 19176772341760
+msgid "survey1Question5Answer1"
+msgstr "Diyalog"
+
+#: 19256145350656
+msgid "survey1Question5Answer2"
+msgstr "Ödüller"
+
+#: 19311245922304
+msgid "survey1Question5Answer3"
+msgstr "Tarif zorluğu"
+
+#: 19403713548288
+msgid "survey1Question5Answer4"
+msgstr "Harita yoğunluğu"
+
+#: 19475515838464
+msgid "survey1Question5Answer5"
+msgstr "Her şey harika"
+
+#: 27306583396352
+msgid "surveyDialogTitle"
+msgstr "Hızlı Anket"
+
+#: 28690401726464
+msgid "startSurvey"
+msgstr "Başlat"
+
+#: 30707396382720
+msgid "claimReward"
+msgstr "Ödülü al"

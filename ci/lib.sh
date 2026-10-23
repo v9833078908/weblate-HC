@@ -1,0 +1,82 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# shell library to help executing tests
+
+# shellcheck shell=sh
+
+if [ -z "$TERM" ]; then
+    export TERM=xterm-256color
+fi
+
+check() {
+    RET=$?
+    if [ $RET -ne 0 ]; then
+        exit $RET
+    fi
+}
+
+run_coverage() {
+    uv run --all-extras coverage run --source . --append "$@"
+}
+
+cleanup_database() {
+    rm -f weblate.db
+
+    if [ -n "$CI_DB_PASSWORD" ]; then
+        export PGPASSWORD="$CI_DB_PASSWORD"
+    fi
+    if [ -n "$CI_DB_PORT" ]; then
+        export PGPORT="$CI_DB_PORT"
+    fi
+    # shellcheck disable=SC2153
+    psql --host="$CI_DB_HOST" -c 'DROP DATABASE IF EXISTS weblate;' -U postgres
+    psql --host="$CI_DB_HOST" -c 'CREATE DATABASE weblate;' -U postgres
+    # Replaces weblate/utils/migrations/0001_alter_role.py
+    psql --host="$CI_DB_HOST" -c 'ALTER ROLE postgres SET timezone = UTC;' -U postgres
+}
+
+print_step() {
+    tput setaf 2
+    echo "$@"
+    tput sgr0
+}
+
+print_version() {
+    for cmd in "$@"; do
+        # Split command candidates with arguments, for example "git svn".
+        # shellcheck disable=SC2086
+        set -- $cmd
+        if command_path=$(command -v "$1" 2> /dev/null); then
+            # shellcheck disable=SC2086
+            if version=$($cmd --version 2>&1); then
+                printf '%s\n%s\n' "$command_path" "$version"
+                return
+            fi
+        fi
+    done
+    echo "not found..."
+}
+
+semver_compare() {
+    [ "$#" -eq 3 ] || {
+        printf 'semver_compare: invalid number of arguments\n' >&2
+        return 2
+    }
+
+    ver1=$1
+    op=$2
+    ver2=$3
+
+    if [ "$ver1" = "$ver2" ]; then
+        [ "$op" = "=" ] || [ "$op" = "<=" ] || [ "$op" = ">=" ]
+        return
+    fi
+
+    if printf '%s\n' "$ver1" "$ver2" | sort -C -V; then
+        [ "$op" = "<" ] || [ "$op" = "<=" ]
+    else
+        [ "$op" = ">" ] || [ "$op" = ">=" ]
+    fi
+}

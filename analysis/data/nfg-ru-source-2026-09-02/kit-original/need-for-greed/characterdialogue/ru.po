@@ -1,0 +1,96 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: ru\n"
+
+msgid "eggItemReceived"
+msgstr "Яйцо! Надо высиживать"
+
+msgid "cursedItemReceived"
+msgstr "Нееет, проклятье!"
+
+msgid "geodeItemReceived"
+msgstr ""
+"О, геод!\n"
+"Для огранки"
+
+msgid "gemItemReceived"
+msgstr "УРА, БЛЯСТЯШКИ!"
+
+msgid "goldItemReceived"
+msgstr "ОБОЖАЮ ЗОЛОТО!"
+
+msgid "silverCoinItemReceived"
+msgstr "Ммммм, денюжки..."
+
+msgid "wormSpawned"
+msgstr "Зараза!!!"
+
+msgid "highNoise"
+msgstr "Давай, поднажми..."
+
+msgid "pileLooted"
+msgstr ""
+"Скупщик \n"
+"и это купит"
+
+msgid "statsEffectAppliedOnDestroy"
+msgstr "Да почему каждый раз!"
+
+msgid "timeIsUp"
+msgstr ""
+"Тут что,\n"
+"больше есть некого?!"
+
+msgid "noActions1"
+msgstr "Пу-пу-пууу..."
+
+msgid "noActions2"
+msgstr "Ага, ну подождем"
+
+msgid "noActions3"
+msgstr "Нормально, перекур"
+
+msgid "noActions4"
+msgstr "Ниче..."
+
+msgid "noActions5"
+msgstr "Бог терпел и нам велел"
+
+msgid "richZoneReached1"
+msgstr "Зловеще... Значит полно сокровищ!"
+
+msgid "richZoneReached2"
+msgstr "Чем дальше в лес — тем выгоднее!"
+
+msgid "richZoneReached3"
+msgstr "Пахнет горами сокровищ!"
+
+msgid "coldNight"
+msgstr ""
+"Н-н-н-у и\n"
+"Х-х-холод..."
+
+msgid "frostible"
+msgstr "Н-н-надо с-с-огреться!"
+
+msgid "warmedUp"
+msgstr "Ура, тепло!"
+
+msgid "frozenRockHit"
+msgstr "Надо растопить лед!"
+
+msgid "frozenItemReceived"
+msgstr "Ледяное Сокровище!"
+
+msgid "SuperRare"
+msgstr "Дааааа, Джекпот!"

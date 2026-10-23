@@ -1,0 +1,187 @@
+{
+  "_comment": "Real production units from heart-abyss/hub-1, captured 2026-08-24 before repair.",
+  "rotation_de": [
+    {
+      "id": 370311,
+      "context": "hub1_asuna_1_3",
+      "source": [
+        "Кхмх! У вас столько редких трав… Потрясающе."
+      ],
+      "target": [
+        "Ähm! Sie haben so viele seltene Kräuter… Erstaunlich."
+      ]
+    },
+    {
+      "id": 370312,
+      "context": "hub1_asuna_1_4",
+      "source": [
+        "А еще настоек,мазей, ядов… Смотря что именно вам нужно."
+      ],
+      "target": [
+        "Und Tinkturen, Salben, Gifte… Je nachdem, was Sie brauchen."
+      ]
+    },
+    {
+      "id": 370313,
+      "context": "hub1_asuna_1_5",
+      "source": [
+        "Хотя тебе я бы просто посоветовала побольше отдыхать."
+      ],
+      "target": [
+        "Obwohl ich dir einfach raten würde, dich mehr auszuruhen."
+      ]
+    },
+    {
+      "id": 370314,
+      "context": "hub1_asuna_1_6",
+      "source": [
+        "У тебя сердце слишком быстро бьётся."
+      ],
+      "target": [
+        "W-was?.."
+      ]
+    },
+    {
+      "id": 370315,
+      "context": "hub1_asuna_1_7",
+      "source": [
+        "Ч-что?.."
+      ],
+      "target": [
+        "Mir wird schlecht."
+      ]
+    },
+    {
+      "id": 370316,
+      "context": "hub1_asuna_1_8",
+      "source": [
+        "Меня сейчас стошнит."
+      ],
+      "target": [
+        "Und warum bist du so stachelig?"
+      ]
+    },
+    {
+      "id": 370317,
+      "context": "hub1_asuna_1_9",
+      "source": [
+        "А ты чего такой колючий?"
+      ],
+      "target": [
+        "Ich muss kotzen."
+      ]
+    },
+    {
+      "id": 370318,
+      "context": "hub1_asuna_1_10",
+      "source": [
+        "Боишься, что я уведу твоего друга?"
+      ],
+      "target": [
+        "Hast du Angst, ich nehme dir deinen Freund weg?"
+      ]
+    },
+    {
+      "id": 370319,
+      "context": "hub1_asuna_1_11",
+      "source": [
+        "Чего?! За языком следи."
+      ],
+      "target": [
+        "Was?! Pass auf, was du sagst."
+      ]
+    },
+    {
+      "id": 370320,
+      "context": "hub1_asuna_1_12",
+      "source": [
+        "Милый ребёнок."
+      ],
+      "target": [
+        "Süßes Kind."
+      ]
+    }
+  ],
+  "cjk_numerals_zh_Hans": [
+    {
+      "id": 371759,
+      "context": "hub1_fisherman_quest_2_14",
+      "source": [
+        "Идем в баню."
+      ],
+      "target": [
+        "去澡堂。"
+      ]
+    },
+    {
+      "id": 371760,
+      "context": "hub1_guard_1_1",
+      "source": [
+        "Смотри!"
+      ],
+      "target": [
+        "看！"
+      ]
+    },
+    {
+      "id": 371761,
+      "context": "hub1_guard_1_2",
+      "source": [
+        "За твою голову назначили награду!"
+      ],
+      "target": [
+        "有人悬赏要你的脑袋！"
+      ]
+    },
+    {
+      "id": 371762,
+      "context": "hub1_guard_1_3",
+      "source": [
+        "10 тысяч мон!"
+      ],
+      "target": [
+        "一万文！"
+      ]
+    },
+    {
+      "id": 371763,
+      "context": "hub1_guard_1_4",
+      "source": [
+        "Научись считать - ваще та 100 тысяч мон!"
+      ],
+      "target": [
+        "学学数数吧——那可是一百万文！"
+      ]
+    },
+    {
+      "id": 371764,
+      "context": "hub1_guard_1_5",
+      "source": [
+        "Я только приехал, а уже надо ломать морды."
+      ],
+      "target": [
+        "我刚到这儿就得开始揍人了。"
+      ]
+    },
+    {
+      "id": 371765,
+      "context": "hub1_guard_1_6",
+      "source": [
+        "Не-не-не, мне столько не платят, шобы я даже смотрел в твою сторону."
+      ],
+      "target": [
+        "不不不，我那点工资可不包括正眼瞧你的份儿。"
+      ]
+    },
+    {
+      "id": 371766,
+      "context": "hub1_guard_1_7",
+      "source": [
+        "Вы в баню шли? Вот и идите. Иннара в помощь."
+      ],
+      "target": [
+        "你们不是要去澡堂吗？那就去呗。愿因纳拉保佑。"
+      ]
+    }
+  ]
+}

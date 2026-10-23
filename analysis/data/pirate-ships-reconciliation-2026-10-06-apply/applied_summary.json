@@ -1,0 +1,15 @@
+{
+ "phase1/patch/ru-team-edit/ok": 27,
+ "phase1/patch/ru-english-in-weblate/ok": 4,
+ "phase2/patch/follows-ru/ok": 407,
+ "phase2/patch/state-fix/ok": 58,
+ "phase3/add/add/ok": 156,
+ "phase4/add/rename-ru-ellipsis/ok": 20,
+ "phase4/add/rename-same/ok": 254,
+ "phase3/patch/add/ok": 2145,
+ "phase3/patch/add/get-failed": 1,
+ "phase4/patch/rename-cleanup/ok": 428,
+ "phase4/patch/rename-same/ok": 3644,
+ "phase4/patch/rename-same/error": 1,
+ "phase4/patch/rename-review/ok": 23
+}

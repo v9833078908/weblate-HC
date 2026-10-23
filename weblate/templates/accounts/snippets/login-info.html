@@ -1,0 +1,37 @@
+{% load i18n %}
+
+{% comment %}
+  HCGameLoc is a private, invite-only instance: browsing requires a login,
+  registration is closed, and commits are authored with the private commit
+  name and e-mail. The upstream notice about the name and username being
+  "visible publicly", and about contributing under each project's license,
+  does not hold here, so the whole block is dropped. Only the legal-app
+  branch below is kept, and `weblate.legal` is not installed.
+{% endcomment %}
+
+{% include "accounts/snippets/login-about.html" %}
+
+{% if has_legal %}
+  {% if terms_url or privacy_url %}
+    {# Translators: This is followed by list of legal documents such as Privacy Policy or General Terms and Conditions #}
+    <p>{% translate "By registering and signing in to this service you accept our:" %}</p>
+    <ul>
+      {% if terms_url %}
+        <li>
+          <a href="{{ terms_url }}">{% blocktranslate %}General Terms and Conditions{% endblocktranslate %}</a>
+        </li>
+      {% endif %}
+      {% if privacy_url %}
+        <li>
+          <a href="{{ privacy_url }}">{% blocktranslate %}Privacy Policy{% endblocktranslate %}</a>
+        </li>
+      {% endif %}
+    </ul>
+  {% endif %}
+
+  <p>
+    {% blocktranslate %}Quick overview of the General Terms and Conditions and the Privacy Policy, but you should still read the original documents to fully understand them:{% endblocktranslate %}
+  </p>
+
+  {% include 'legal/documents/summary.html' %}
+{% endif %}

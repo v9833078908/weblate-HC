@@ -1,0 +1,631 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Czech <http://l10n.herocraft.com/projects/need-for-greed/loot/"
+"cs/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: cs\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Prsten"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Dýka"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Náhrdelník"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Zlaté žezlo"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Náramek"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Brož"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Diadém"
+
+#: 549466071040
+msgid "casket"
+msgstr "Kazeta"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Zlatá koruna"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Čistý diamant (velký)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Čistý diamant (střední)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Čistý diamant (malý)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Karmínový rubín (velký)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Karmínový rubín (střední)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Karmínový rubín (malý)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Modrý safír (velký)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Modrý safír (střední)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Modrý safír (malý)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Smaragd (velký)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Smaragd (střední)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Smaragd (malý)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Ametyst (velký)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Ametyst (střední)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Ametyst (malý)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Opál (velký)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Opál (střední)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Opál (malý)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Diamant (hrubý)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Ametyst (hrubý)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Smaragd (hrubý)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Opál (hrubý)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Rubín (hrubý)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Safír (hrubý)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Zlatý nuget (malý)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Vejce rajského ptáka"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Velký kus zlata"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Zlatý nuget (velký)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Odpad"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Špendlík"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Náušnice"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Brýle"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Poutací kámen (velký)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Poutací kámen (střední)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Ptačí drahokam"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Geoda (střední)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Divoký drahokam (střední)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Artefakt"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Hvězdné železo (malé)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Maska"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Zlatá rukavice"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Stříbrný nuget (malý)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Idol"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Starověká mince (zlatá)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Starověká mince (stříbrná)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Bondstone (malý)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "Žloutek štěstí"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Bažinná larva"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Jádro meteoru"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Starověký svitek"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Opotřebovaný svitek"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Kámen úmluvy"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Prokletá relikvie"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Pohřbená truhla"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Červí vejce"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Geoda (malá)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Cenná geoda (malá)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Cenná geoda (střední)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Zlatý skarabeus"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Divoký drahokam (malý)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Zlomená dýka vůle"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Maska rozbité tváře"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Roztříštěné žezlo"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Zlomená koruna"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Prasklá rukavice"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Neznámá položka"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Zářivý medailon (zlatý)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Brož Kvetoucí zahrady (zlatá)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Přívěsek skrytého světla (zlatý)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Skrytá drahokamová brož (zlatá)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Prsten (zlatý)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Úzký kamenný náramek (zlatý)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "Královský pečetní prsten (zlatý)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Pečeť panovníka (zlatá)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Brož Sluneční záře (zlatá)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Zlatá dýka vůle"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Rezonující náušnice (zlaté)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Brýle marnivosti (zlaté)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Zlatá maska tváře"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Prsten dvojího osudu (zlatý)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Nebeský prsten"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Nebeský prsten"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Poutací opasek (stříbrný)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Měsíční prsten (stříbrný)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Hadí prsten (stříbrný)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Chapadlový pečetní prsten (stříbrný)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Jehla cti (stříbrná)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Mechová mince"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Prokletá mince"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Mince starověké slávy"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Idol chudého muže s kancem"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "Idol Velkého kance"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Idol ožehnuté hlavy"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Idol planoucí lebky"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Pamětní krabička"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Kámen záhadného braku"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Disketa s Flopcoiny"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Falešný disk"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Svatá Dubajská čokoláda"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Hromada hnoje"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Maska páteční noci"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Maska z pondělí 12"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Zdroj staré krve"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Kalafunový komár"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Zub Čingischána"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "Tvůj zub?!?"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Cryolisový nuget (malý)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Zmrazená položka"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Sluneční sféra"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Srdce idolu"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Jiskrokřídlo"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Sebráno"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Idol kníratosti"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "Idol moudrosti"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "Truhla jarla"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Zmrzačený zlatý kus"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Nádherný zlatý kus"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Rozdrolené zlato"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Nedotčený zlatý nuget"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Matné stříbro"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Lesklý stříbrný nuget"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Oštípaný velký diamant"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Kolosální diamant"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Kazový diamant (střední)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Bezchybný diamant (střední)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Kalný opál"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Svítivý opál"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Hnědý rubín"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Karmínově rudý rubín"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Křivý safír"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Nebeský safír"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Zmrazený starověký svitek"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Zmrazený diamant (velký)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Zmrazený diamant (střední)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Zmrzlý velký kus zlata"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Zmrazený zlatý nuget (malý)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Zmrazený stříbrný nuget (malý)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Zmrzlý opál (malý)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Zmrzlý rubín (malý)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Zmrzlý safír (malý)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Zmrazený idol"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Třpytivé náušnice"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Měsíční náušnice"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Ledový pohled"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Měsíční jezero"

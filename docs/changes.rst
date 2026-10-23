@@ -1,0 +1,531 @@
+Weblate 2026.8.1
+----------------
+
+*Not yet released.*
+
+* Unmarking a string as read-only on the source string page now also removes per-language read-only overrides and restores the translations in every language at once; bulk edit and the API do the same when the source string itself carried the flag.
+
+.. rubric:: New features
+
+* Project administrators can rename a key or move a source string in flat JSON components without recreating its translations or metadata; both operations are previewed, audited, and write the resulting source order to the component files.
+
+* Added an optional :ref:`LLM judge <llm-judge>` automatic translation mode, where two independently configured language models review each string in a filter and record a per-string verdict; a rejected string is held in the existing :guilabel:`Needs editing` queue for a human decision instead of shipping automatically.
+* An unresolved LLM-judge critical or major on a writable string now gets one stored, previewable repair candidate instead of an automatic rewrite; a major still ships as translated with advisory ``judge-flag`` evidence attached, and a critical still holds automatically until a reviewer records an audited decision, see :ref:`llm-judge`.
+* The LLM-judge verdict card embedded on the string page is now a full producer triage surface: it previews a stored candidate's diff and provenance, offers :guilabel:`Use suggested fix`, :guilabel:`Generate another`, and a one-string :guilabel:`Re-check this string`, and a reviewer can accept a fresh major as-is directly without first escalating it, see :ref:`llm-judge`.
+* Accepting a stored LLM-judge repair candidate - from the verdict card, or from the new first row of the :guilabel:`Automatic suggestions` tab - now leaves the string translated immediately instead of held fuzzy; the one paid re-check it still queues can hold the string again if it disagrees, see :ref:`llm-judge`.
+* The LLM-judge verdict card no longer offers an on-demand paid :guilabel:`Generate suggested fix` button, and no judge button advertises itself as a paid model request any more: on a string with no stored candidate the producer accepts a variant from the :guilabel:`Automatic suggestions` tab instead, which clears the verdict by changing the judged text, see :ref:`llm-judge`.
+* The component page now shows a conservative LLM-judge hand-off indicator: a :guilabel:`Download for hand-off` action appears only once every judged string is current and clean, re-verified live rather than trusted from cached counts, see :ref:`llm-judge`.
+* A reviewer can now record an audited decision on a held or escalated LLM-judge verdict (accept it as-is or escalate it for a second opinion); the verdict's resolution can move again through an allowed transition, but every transition permanently records who made it, when, and why in the string's history, see :ref:`llm-judge`.
+* Added guarded ``check_judge_repair_routes``, ``enable_review_workflow``, and ``judge_release_advisory_holds`` management commands for the LLM judge rollout.
+* Every LLM judge producer launch is now recorded as one durable, permission-checked run report, addressed by its own URL and independent of the Celery task result that started it. The report opens on the strings that still need a producer's decision - held critical rows, unresolved majors and minors, and any string the judge could not finish - grouped by the error category the judge assigned, worst problem first, with every other outcome one click away; a finished component, project, or translation page lists its recent launches behind a :guilabel:`Latest report` button with the earlier ones in a menu. One-string editor re-checks and background retries of unanswered strings stay out of that menu so they cannot crowd out a component-wide launch; their outcomes remain visible on the string's judge card. The report keeps its recorded outcomes as audit evidence and separately marks strings whose current target changed after the report's verdict, without claiming that a change fixed the reported defect. See :ref:`llm-judge`.
+* Added a :ref:`producer console REST API <api-producer>` for the LLM judge workflow: a permission-scoped cost estimate before any provider call, a durable run that survives a closed client and can be polled, cancelled, or resumed, and guarded endpoints to apply a verified repair candidate (individually or in a per-row-honest bulk batch), answer a meaning-clarifying question, and undo one specific applied fix through its own durable receipt.
+* Ordinary machine-translation launches now have a durable producer-run receipt: the completion notice and translation form history link to a report showing written strings, requests sent to models, and an auditable USD cost breakdown; unknown provider prices remain explicitly incomplete.
+* A repaired LLM-judge major or critical verdict now also sends the judge's own short repair instruction to the machine translation engine, kept out of every human-facing check description.
+* Components can now exchange all language targets through one multilingual CSV or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
+* Added an optional **LiteLLM** :ref:`automatic suggestion <machine-translation-setup>` service for the corporate LiteLLM proxy, alongside the existing OpenRouter service, and made the LLM judge endpoint configurable via :setting:`JUDGE_BASE_URL` (default OpenRouter).
+* Added an optional ``repeat-drift`` :ref:`check <checks>` that flags the same source string translated differently under another key, which the stock consistency check cannot see because it groups by the string key as well as the source text.
+* Added managed exact-repeat decisions: an authorised producer can preview a project-and-language scoped shared target before writing it, preserve conflicting approved targets, undo only unchanged recipients, and explicitly mark one occurrence independent without hiding future stale divergences.
+* Added a ``game-source-markup`` :ref:`check <checks>` that reports a broken closing rich-text tag in the source string itself, such as ``</color=yellow>``, which an honest translation copies and the target-side markup check therefore cannot see; loc-kit table import warns about the same defect in source cells before the component is created, and ``--strict-source`` makes the offline import CLI refuse the kit.
+* Added a read-only ``audit_glossary`` management command reporting glossary terms that contradict each other.
+* Added :ref:`mass-fixing failing checks <mass-fix-failing-checks>`: a check with a deterministic fixup now offers a :guilabel:`Fix` action that repairs every string it currently fails across a translation, component, or project, either after a single count confirmation or, for checks needing a look before applying, from a reviewed per-string preview.
+* Mass-fixing now also offers two aggregate policies that decide a whole family of defects in one pass and can be applied to every eligible string in a scope without paging through the preview. :ref:`Terminal punctuation against the source <terminal-source-policy>` takes the mark the source ends with as the reference and adds a missing mark, replaces a differing one, or removes an added one, leaving ambiguous strings for per-string review; the :guilabel:`Fix` beside one terminal check's count opens that policy over exactly the strings the count reports. :ref:`Mechanical repair groups <mechanical-repair-groups>` group meaning-free defects - doubled spaces, edge whitespace, ellipses, zero-width spaces, whitespace hugging a line separator - by the repair they need rather than by the check that reports them. Every proposed edit is verified to leave placeholder and markup spans unchanged.
+* The header no longer contains a search input; string search opens with the ``/`` key or through the existing :guilabel:`Search` tab of the current project, component, or dashboard scope.
+* With :setting:`REDIRECT_SINGLE_PROJECT_USER` enabled, an authenticated user with exactly one accessible project lands directly on that project after sign in; the dashboard remains available at ``/dashboard/``.
+* Existing monolingual components can now add new strings, language targets, and source explanations directly from a full CSV/TSV/XLSX loc-kit table through a previewed, resumable :guilabel:`Update from a loc-kit table` flow; existing source strings, translations, flags, and notes remain unchanged.
+* An LLM judge run now machine translates every empty string of its selected scope, in all its languages, before the first judge request; if that preparation cannot complete - no engine, missing permission, or a provider refusal - the judges do not start and the run reports why; see :ref:`llm-judge`.
+* An LLM judge run now processes its full confirmed scope in small durable chunks with automatic task continuation across worker deliveries and restarts, rather than truncating at a 2000-unit cap; the report displays cumulative progress, pending strings, and total scope, and the translation autotranslate REST endpoint now returns an asynchronous 202 response with the run ID and report URL in judge mode.
+* A machine-translation run whose every LLM request was refused by the provider now finalizes as ``PARTIAL`` instead of a clean ``COMPLETED``: the refusal reason and request count are aggregated into the run's warnings from the usage log, so a malformed source string that no amount of batch splitting can recover from no longer looks like a successful run. The REST autotranslate endpoint also returns the run's ``warnings`` list and a ``report_url`` link to the producer-run report when a run was created.
+
+.. rubric:: Improvements
+
+* A user-started automatic translation now resumes after a routine service restart instead of being silently lost: its progress bar reports whether it is waiting for a worker, actively updating, or has shown no update for 10 minutes, and its counter now tracks strings actually written rather than technical progress steps. Redelivery after a restart is at-least-once, not exactly-once; already-written strings are not overwritten.
+* LLM judge reports now distinguish strings with a usable conclusion from skipped, pending, and failed rows, and label a known incomplete or unprovable scope instead of presenting a clean subset as a full check.
+* Component operations watched through a progress bar now overtake queued parent-statistics housekeeping, while repeated parent-statistics updates are coalesced into one pending calculation and at most one sequential follow-up.
+* An LLM-judge critical now holds a string only when both seats grade it critical; a critical from one seat that the other grades lower ships as a major with both opinions attached. Administrators can restore the original site-wide policy where either critical holds through :setting:`JUDGE_CONSENSUS_REJECT`, see :ref:`llm-judge`.
+* Project-level OpenRouter settings no longer display an API key input while preserving the configured credential.
+* The component :guilabel:`Files` menu can now download all translations as monolingual JSON files in a ZIP archive, for components with a template.
+* Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
+* Project administrators can now invite new users by e-mail or in bulk even when global registration is disabled, because their project permissions include the invitation flow.
+* Granting a user access to a project now also adds the project to their watched projects, so it appears in the default dashboard view and its notification scope, whichever way the access was granted - manual group assignment, API, invitation, or the user management screen.
+* The project website field is now labelled :guilabel:`Project website or store URL` when creating a project, and is optional by default (:setting:`WEBSITE_REQUIRED` now defaults to disabled), so a project can be created with only a store page or none at all.
+* LLM machine translation and LLM judge requests now record per-request token usage and provider-reported cost with stable service, project, component, and target-language attribution. The ``llm_usage_report`` management command resolves current project and component slugs, reports attribution completeness, and can emit one scoped total with ``--summary``.
+* A refused or partially accepted LLM machine translation reply now keeps its refusal reason and a bounded excerpt of the model's reply on the usage record, so a lost string can be explained after the process log has rotated; the ``Mismatching assistant reply`` message now names what mismatched (ids, items, placeholders, or literal suffixes).
+* A structured LLM machine translation reply that splits or decorates a text part, writes a placeholder token inline inside text, or moves text across a value placeholder is now accepted, as long as every placeholder from the source survives with its metadata intact; a reply that drops, duplicates, or relocates a placeholder across markup is still refused.
+* Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
+* LLM judge requests now receive the producer-authored source string explanation as well as the developer note, and changing either context invalidates cached verdicts and stale repairs.
+* LLM judge runs now show capped scope and observed-cost previews, record per-unit judge usage, and keep delivery state separate from advisory AI evidence.
+* The LLM judge can now fail over once per batch to a configured second endpoint after the primary is unavailable (a dropped connection, a missed deadline, an HTTP 429/5xx, or an HTTP 401/403), see :setting:`JUDGE_FALLBACK_BASE_URL`.
+* A machine-translation request the service accepted but did not answer within its timeout is now repeated up to the same number of times as a rate-limited one, instead of dropping the whole batch; a connection that never reached the service is still not retried.
+* Large language model machine translation now sends only the glossary terms matched in the batch's source strings instead of the whole term base below a size limit, and English source strings match glossary terms through Snowball stems as Russian already did, so plural forms no longer hide a term; measured on production data this cuts the request size by roughly 40-75 times.
+* Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
+* Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
+* Glossary tables where a term is followed by its description on the next row are now recognised deterministically: descriptions become explanations, section captions become sections, and the detected layout can be switched from the import preview, see :ref:`uploading-glossary-tables`.
+* Glossary table import now recognises a column of term notes by its header and imports it as the source term explanation, which automatic suggestion services receive as context, see :ref:`uploading-glossary-tables`.
+* Glossary table import now trims leading and trailing whitespace from a term or its description instead of refusing the table, and reports every trim as a warning.
+* Glossaries imported from a loc-kit table now mark their terms as terminology, so the terms appear in every glossary language.
+* Glossary table import now accepts ``exact`` in its ``flags`` column. The flag is preserved only on non-empty imported target terms; source terms and languages added later retain the existing ``read-only``/``forbidden`` behavior. See :ref:`uploading-glossary-tables`.
+* Glossary table import now trims leading and trailing whitespace from a term description instead of refusing the table, and reports the trim as a warning; whitespace around a term itself remains an error.
+* Glossary table import now detects the CSV delimiter, recognises vendor Chinese codes such as ``zh-TC``, skips a declared technical identifier column, and imports partially translated languages as untranslated terms, see :ref:`uploading-glossary-tables`.
+* An existing glossary can now receive an append-only batch of new terms from a loc-kit table: existing terms, their targets, and their descriptions are never changed, and a non-empty column for a language the glossary does not yet have creates that language, see :ref:`uploading-glossary-tables`.
+* Loc-kit table import now recognises an optional ``explanation`` column and applies it to the ``Unit.explanation`` of the source string it names; the value is stored in the database only and never written to a translation file, once when the table's own upload creates the component and, for a monolingual component that already exists, through a new :guilabel:`Update from a loc-kit table` action, which also adds any key from the table the component does not have yet. No existing key's source, target, state, or flags changes.
+* Added :envvar:`WEBLATE_DEFAULT_LANGUAGE` to choose the interface language used for visitors whose browser language is not available.
+* Editing only the translator persona, style, or language-specific instructions of an :ref:`automatic suggestion <machine-translation-setup>` service no longer performs a live service check, so prompt text stays editable while the service itself is unavailable.
+* The sign-in page no longer states that names and usernames are visible publicly, and the :guilabel:`Full name` field no longer promises that the name is used in version-control commits when the site defaults to a private commit name.
+* The engine line separator ``$`` is now enforced where it is used tightly in the source: whitespace around a separator is removed automatically, and a separator lost or added by a translation is reported by the ``game-line-break`` check.
+* A number stated by the source string is now reported by the ``game-number`` check when it is missing from the translation, so a wrong damage value, radius or duration is caught. A number the translation adds on its own is accepted, because a counter word in the source is often a digit in the target. Differences that are not a lost quantity are ignored: locale digit grouping (``1,900,000`` and ``1 900 000`` are one number), dates, digits inside a URL, and an English ordinal such as ``1st`` in the source that the target spells out. An ordinal in the translation keeps its digit, so a source date written as ``24 декабря`` is not reported as lost when the translation renders it as ``December 24th``.
+  Quantities written with a scale word or with CJK scale characters are compared by numeric value, so ``10 тысяч``, ``10 Tausend``, ``10,000``, ``10천`` and ``一万`` are equal while ``10万`` is ten times larger. A spelling the check cannot read keeps its literal digits, so it is reported exactly as before.
+* :ref:`Automatic translation <auto-translation>` now sends two batches of a large language model service at a time instead of one, fetches the glossary terms of a whole batch at once, and stores every batch as soon as it arrives, so a crash no longer discards the whole run.
+* Automatic translation now reports queue position and progress during LLM judge runs, bounds each judge request by a deadline, keeps verdicts from completed batches, and survives a worker restart instead of stopping silently.
+* A large language model machine translation request now carries ten strings instead of twenty, which answers no slower and no longer wastes replies on truncation or on the model's content filter.
+* The autofix for final punctuation the source does not have now also removes an added exclamation mark, not only a full stop; it looks behind closing quotes and rich-text tags at the end of the source so a mark the source already carries is seen, and it removes a mark only when doing so settles every terminal punctuation check. A question mark or colon is never removed, because the source omits those by convention while the translation needs them.
+* Added the :wladmin:`reapply_autofixes` management command, which replays the active automatic fixes over stored translations; it reports what would change by default and only writes with ``--apply``, committing only its own pending changes and refusing to start or finish a repository that already has pending changes from other work.
+* :ref:`glossary` terms now support two additional per-language flags: ``exact``, for names and abbreviations that must match verbatim, and ``not-applicable``, to exclude a term pair from a language where it does not apply, without duplicating the glossary entry. The source-side matcher now recognises an inflected Russian source term through a Snowball comparison, and the glossary quality check accepts a grammatical inflection of the target term for inflecting languages instead of only the exact form; ``exact``, ``read-only``, and ``forbidden`` terms still require the exact form. Large language model machine translation services now split a glossary mismatch into a mandatory rewrite or an advisory note instead of always demanding a rewrite, and their glossary payload lists a term's ``exact``/``forbidden`` flags explicitly.
+* Added optional session recording using :setting:`CLARITY_PROJECT_ID`.
+* Loc-kit table import now recognises the language codes game kits use for Chinese, Japanese, and Korean (``ch``, ``ch-s``, ``cn``, ``ch-t``, ``jp``, ``kr``), instead of importing those columns as developer comments, and a key the table translated without a source string is now imported with an empty source instead of blocking the whole table; a key with no text in any language is still refused. See :ref:`loc-kit-tables`.
+* Loc-kit table import now skips the section banner rows game kits use to split a sheet - a row with no text in any language column whose key cell is empty or starts with ``#`` - instead of refusing the whole table, and lists the skipped rows in the import report. A key that is named but has no text anywhere is still refused. See :ref:`loc-kit-tables`.
+* The progress of a running :ref:`automatic translation <auto-translation>` is now shown on any page until the run finishes, instead of disappearing with the message that started it, and the reported percentage no longer restarts for every language of a multi-language run.
+* The ``game-markup`` check now also compares Unity sprite tags such as ``<sprite name="fire">``, whose attribute follows a space instead of ``=``, so a renamed or dropped inline icon is reported.
+* An engine substitution token the source string uses is now reported by the ``game-token`` check when it is missing from the translation. Mission descriptions substitute values through ``item_type[|{0}]`` and ``skirmish_league_id[gen|в {0}|в любой лиге]``: the bracketed alternatives are translated, but the identifier in front of the bracket is a lookup key, and a translated one resolves to nothing in the game. Brackets without a ``|`` are ordinary text and are never treated as a substitution.
+* Added the ``game-length`` check, which flags a translation whose visible length (markup and placeholders stripped) grows far past the source: short labels tolerate up to 3.0x, long sentences only 1.35x, with minimum-length floors so legitimate short-label growth is not flagged. Ignore with the ``ignore-game-length`` flag when the space is known to fit.
+* The ``game-length`` check now accepts an explicit per-string budget as a percentage of the source, written ``game-length:110``. It applies to whatever the flag covers, from one string to a whole component, and each string is measured against its own source after markup and placeholders are stripped, so a single value expresses "no longer than 110% of this string". A stated budget replaces the default ratio tiers and their minimum-length floors; without it the tiers are unchanged.
+* An LLM judge batch whose connection is dropped without a reply is now repeated once, configurable through :setting:`JUDGE_TRANSPORT_RETRIES`. A gateway that closes slow connections drops whichever request happens to answer near its ceiling, which previously marked the batch unparsed and looked like a failure of the model rather than of the transport.
+* The ``game-markup`` check now also compares the syntax of Hero Craft conditional placeholders such as ``{hours:cond:>0?{hours}h. |}``: a space inserted inside a conditional header, a lost or added ``|``, a separator moved across a protected placeholder, and a changed identifier, comparison or nested placeholder are reported, while the text of a conditional branch stays translatable.
+* Hero Craft conditional placeholders now use their worst-case visible branch when evaluating ``max-length`` and ``source-max-length`` budgets. Judge-mode automatic translations that exceed an opted-in ``max-length`` budget are retried with the concrete limit and remain pending when the limit cannot be met.
+
+* LLM judge seats can now use independent absolute request deadlines, so a model with a measured heavy latency tail no longer forces every other seat to wait under the same ceiling.
+
+* The ``max-length`` and ``source-max-length`` budgets now count only the characters the player reads: Unity rich-text tags such as ``<color=#RRGGBB>`` render to zero width and no longer spend the budget, so a translation that fits its slot is no longer reported. Engine placeholders keep counting their own characters, because each renders to a real value at runtime; declare that width with ``replacements:``. See :ref:`check-max-length`.
+
+* An LLM judge request the endpoint refuses every time (HTTP 400, 404, 405, 406, 415, 422) now fails the run fast as ``http-request-invalid`` instead of writing a fake unparsed verdict and paying for retries or deferrals of a request that can never succeed; the refused attempt stays in the ledger as the diagnostic, see :setting:`JUDGE_REQUEST_SLEEP`. A guarded ``judge_close_refused_verdicts`` command reclassifies the historical false-unparsed verdicts written by that behaviour.
+
+* Closed rows of the durable deferred judge queue are now removed by the observability cleanup after :setting:`JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS` days (default 90), so enabling the queue no longer grows that table forever; live ``queued`` and ``slow`` rows are never deleted automatically. All eleven queue settings are now documented and accepted as ``WEBLATE_*`` environment variables.
+* The LLM-judge verdict card now leads with the judge's main finding and the stored fix; :guilabel:`Keep as is` is a one-click decision with an optional reason, and escalation is labelled :guilabel:`Send back to queue`.
+* Saving changed text on a judged string now queues the one-string judge re-check automatically and stores the text as translated; the review-state radios are hidden for judged strings.
+* The string page hides the Suggest button for users who can edit, the Screenshots card until a screenshot exists, and moves :guilabel:`Similar keys`, :guilabel:`Variants`, :guilabel:`Other occurrences` and :guilabel:`Comments` under a :guilabel:`More` tab, keeping :guilabel:`Nearby strings`, :guilabel:`History`, :guilabel:`Other languages` and :guilabel:`Automatic suggestions` direct; no tab is open until chosen; the "Automatically translated" notice is removed.
+* The translation editor now keeps the special-characters toolbar behind one button, reduces the pager to previous / position / next, demotes :guilabel:`Save and stay` to a secondary action, and shows the Glossary and String information cards expanded.
+* Added :kbd:`Ctrl+Alt+A`, :kbd:`Ctrl+Alt+K` and :kbd:`Ctrl+Alt+R` for the LLM-judge triage actions, and a paid-request hint on every button that spends a model call.
+* Added the ``judge_backfill_candidates`` management command.
+* The game markup check no longer requires a numbered or named placeholder to keep its source position: Turkish, Hindi, Japanese, Korean, Chinese and Persian targets legitimately move ``{0}`` and ``{1}`` around, and only their presence is checked now. An anonymous ``%s``, ``%d`` or ``{}`` conversion still has to keep its order, because the engine fills those by position. Spreadsheet imports follow the same rule.
+* Failing checks are now reported per check through the REST API: every unit lists its active check identifiers in ``checks``, and projects, components and translations answer a ``/checks/`` endpoint with the count of each failing check. External quality tooling no longer has to guess a list of check identifiers and silently miss whole checks.
+* Checks that fire on every member of a group, including the correct string, are now marked advisory and counted separately. The ``/checks/`` endpoint reports ``failing_blocking`` and ``failing_advisory``, and the strings-status table labels an advisory row, so a single blocking defect is no longer buried under hundreds of advisory ones. ``repeat-drift`` is the first such check.
+* The ``game-length`` check is now opt-in: enable it with the ``game-length`` flag on the components whose slots are actually constrained. A character-count proxy cannot tell a clipped button from an ordinary long sentence, so on a dialogue-heavy component it reported mostly ordinary text.
+* The LLM judge is now told two things explicitly: a defect the source itself carries - broken markup, a wrong number, clumsy phrasing - is not an error of a translation that renders it faithfully, and a conflict with a string it was not given is not evidence. Both were the largest classes of unsupported findings in a full-coverage review of a game corpus, where an independent verification pass rejected most of a single pass's claims. Changing the prompt invalidates cached verdicts, which are re-judged on the next run.
+
+.. rubric:: Bug fixes
+
+* Russian glossary terms with a fleeting vowel, such as ``Стрелок`` or ``Боец``, now match their other case forms (``Стрелков``, ``Бойцами``), so machine translation, the glossary check and the LLM judge no longer lose the term outside the nominative.
+* Automatic translation now rejects a machine-translation request without a selected engine and reports when none of the selected engines is configured for a run.
+* The LLM judge now skips strings that remain untranslated after pretranslation, records the reason in the producer report, and avoids a misleading automatic-translation history entry.
+
+* The matrix view now recovers from a failed batch request instead of leaving its loading indicator stuck: a failed request retries the same offset without skipping or duplicating rows, and an accessible :guilabel:`Load more` button and status text give a fallback for scroll-triggered loading.
+* The French :ref:`check-punctuation-spacing` check now sees a run of double punctuation: ``Quoi?!`` is reported and repaired by inserting one narrow no-break space in front of the run, where previously each mark excused the other and the string passed. The repair never inserts a space inside the run.
+* The ``repeat-drift`` check no longer reaches the LLM judge prompt, where its presence on every member of a same-source group (including the correct translation) told the judge that a defect it could not see had been proven and could suppress a real finding; the judge now drops it exactly as machine-translation repair already did.
+* A string explanation set through the REST API is now written to the translation file on commit, mirrored to the other languages of the string, and recorded in its history, so glossary notes no longer disappear from exports.
+* French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.
+* Large language model machine translation services no longer fail when the optional persona and style settings are absent from the stored configuration, as happens when the service is installed through the REST API.
+* Repository actions now require permission on every component sharing the affected repository, including linked components in other projects.
+* Large language model machine translation services now tolerate replies that echo reference fields such as the string key, accept an unwrapped single result, and retry a rejected batch in halves instead of discarding all its strings.
+* Large language model machine translation now pairs each translated string in a batch reply with its source through an identifier the reply must echo, instead of trusting the reply's order. A reply that answers a different set of strings than it was given - dropping one, repeating one, or adding one from beyond the batch - previously matched on length alone and was stored against the wrong strings; it is now refused and re-asked in smaller batches. Suggestions cached by the previous protocol are no longer reused.
+* Loc-kit table import no longer scales superlinearly with the uploaded sheet, and refuses a sheet whose structure would otherwise be mapped into hundreds of regions; the stored import preview now bounds the number of warnings it keeps.
+* Large language model machine translation services now require the translation to end with the same punctuation as the source, and to repair an existing translation that fails a check instead of treating the check as context only.
+* A machine translation service answering HTTP 429 or 503 is now asked again after a delay instead of being stopped for everyone for half an hour, which used to leave the rest of an :ref:`automatic translation <auto-translation>` run untranslated without saying so. A stop that does happen is now reported as a warning of the run.
+* A large language model service refused because the upstream capacity for its model is momentarily full is now left alone for a minute instead of half an hour, and the batches skipped meanwhile are asked again once the stop passes, so such a refusal costs a moment of an :ref:`automatic translation <auto-translation>` run rather than its remaining strings.
+* :ref:`check-xml-chars-around-tags` no longer reports a translation whose word ends with a combining mark, such as a Devanagari vowel sign or anusvara, and is skipped for languages which do not separate words with spaces, where a particle or suffix attached directly to a tagged word is correct.
+* :ref:`check-duplicate` no longer reports a number whose digits are grouped with spaces, such as ``100 000 000``, when the source groups them with a comma.
+* :ref:`check-multiple-failures` no longer counts a dismissed check, so a source string is reported only while its translations still have checks awaiting a decision.
+* :ref:`check-prohibited-initial-character` no longer reports a translation, only the glossary term it translates, so a translation shortened for a narrow interface can start with a character such as ``%``.
+* An LLM judge run whose batch is too large to answer within :setting:`JUDGE_REQUEST_DEADLINE` now reduces the batch for the rest of that run, instead of repeating the same oversized batch until the run ends. A slow model previously lost every verdict of the run this way, because the reduction was recorded but only applied to the next run.
+* A machine translation service stopped after refusing somebody else's :ref:`automatic translation <auto-translation>` run now says so in the editor, instead of answering a single string with no suggestions and no reason; a suggestion already cached for that string is still served, because a stop only has to prevent new requests.
+* The REST ``autotranslate`` endpoint's ``mode: judge`` request now creates the same durable producer run history (actor, scope, per-string outcome) as automatic translation started from the web UI, see :ref:`llm-judge`; the ``weblate auto_translate`` management command does not offer a ``judge`` mode. Previously a REST judge run left verdicts and request attempts with no linked run, invisible to the run report.
+* The REST ``autotranslate`` endpoint now answers a locked component with the same typed ``423`` the rest of the API uses for a lock conflict, instead of a bare permission error indistinguishable from lacking the right to translate at all.
+
+.. rubric:: Compatibility
+
+* The Docker container now turns on :ref:`project-translation_review` for new projects by default; existing projects are unchanged, and :envvar:`WEBLATE_DEFAULT_TRANSLATION_REVIEW` set to ``0`` restores the previous default.
+
+.. rubric:: Upgrading
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+.. rubric:: Contributors
+
+.. include:: /changes/contributors/2026.8.1.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/171?closed=1>`__.
+
+Weblate 2026.8
+--------------
+
+*Released on August 3rd 2026.*
+
+.. rubric:: New features
+
+* Added a :guilabel:`Show all columns in lists using horizontal scrolling` preference to keep all listing columns visible on narrow screens instead of hiding them.
+* :ref:`Workspaces <workspaces>` now provide aggregate translation statistics and historical metrics, a permission-filtered :guilabel:`My workspaces` list, archive downloads, search and replace, upload guidance, workspace translation memory management, and :ref:`removal of empty workspaces <workspace-removal>` not associated with billing.
+* Added :ref:`project-level translation metrics <monitoring-translation-progress>` in JSON, CSV, and OpenMetrics formats.
+* Added opt-in :ref:`running-granian-asgi` deployment support, including :envvar:`WEBLATE_ASGI` for Docker containers and asynchronous machine translation editor, GitHub App connection, and repository refresh requests.
+* Added grouped project and workspace :guilabel:`Diagnostics` views with state, severity, category, and actionable-by-user filters. Component diagnostics now track dismissal ownership, reopen after relevant changes, and notify only project maintainers who can act on warnings and errors.
+* Added API endpoints for listing, adding, accepting, rejecting, and voting on translation suggestions.
+* :doc:`Translation reports </devel/reporting>` are now generated in the background, stored for later download, available at workspace scope, and include translator work analysis.
+* Added :guilabel:`Use keywords exclusively` option to :ref:`addon-weblate.gettext.xgettext`, allowing projects to disable xgettext default keywords and rely only on a custom keyword.
+* Added API support for reading and updating :ref:`user-profile` preferences. See :ref:`api-users` endpoint.
+* Added :ref:`check-max-lines` and :ref:`check-asciidoc-markup` quality checks for limiting the number of translation lines and validating AsciiDoc strings.
+* Added :ref:`workflow-language-restrictions`, including per-language control for restricting direct translation editing to privileged users.
+* Added support for legacy Qt Linguist TS version 1 files. See :ref:`qtling`.
+* Weblate is now available in Lao language.
+
+.. rubric:: Improvements
+
+* Authenticated web-action rate-limit lockouts are now recorded in the :ref:`audit-log` with the affected scope and request path.
+* OpenMetrics API responses now include metric metadata and a versioned content type.
+* Add-on management now uses separate configuration, logs, and components tabs, while :ref:`activity logs <addon-activity-logging>` distinguish pending, successful, failed, and skipped executions and explain skipped executions.
+* Expanded :ref:`change-actions` documentation with detailed event semantics and improved OpenAPI schema accuracy.
+* Improved loading performance for multi-language matrix views, dashboard component lists, category histories, and shared component listings.
+* Translation memory management now loads origin summaries more efficiently, shows active and pending entry counts, and reports the number of entries processed during import.
+* Static assets now use content-hashed filenames, and CAPTCHA JavaScript is loaded only when needed.
+* :ref:`mt-aws` machine translation now supports configuring formality, brevity, and profanity masking.
+* Improved :ref:`screenshots` OCR reliability and error reporting when downloading recognition data.
+* Repository failure alerts now link directly to component version control settings for users who can edit them, keep technical errors in English, and localize actionable diagnoses for each viewer, including GitHub pull request restrictions.
+* Celery workers now prefetch fewer tasks by default to reduce memory usage and improve task distribution.
+* Improved the recommended :ref:`running-granian` configuration and Docker container worker resilience for Weblate's WSGI workload.
+* Deployment checks now detect corrupted PostgreSQL relation statistics.
+* :ref:`Community diagnostics <alerts>` now show source-string screenshot coverage, recommend key translation-instruction topics, and distinguish inbound from outbound repository automation.
+* User-provided links, such as those in comments, announcements, and profiles, are now underlined and use a higher contrast color.
+
+.. rubric:: Bug fixes
+
+* :ref:`Disabling password authentication <site-wide-user-management>` from site-wide user management now regenerates the user's personal API key by default.
+* Category, project, and comment statistics now stay consistent after component topology and comment changes, and category metrics are collected correctly.
+* Mercurial repository filenames beginning with a dash are now handled safely.
+* URLs containing backslashes are now rejected as invalid.
+* Protected outbound HTTP and Git connections now bind to validated public addresses; protected Git operations fail closed when clients cannot enforce that binding (:ghsa:`45m9-pf98-8jmq`).
+* Permanent same-host Git HTTP redirects are now validated and stored as canonical component repository URLs.
+* Self-service REST API e-mail changes are now restricted to verified addresses (:ghsa:`x84p-6892-473c`).
+* REST API authorization now consistently protects internal accounts, restricted components, add-on configuration, component sharing, repository links, and review states.
+* :ref:`Project backup imports <projectbackup>` now validate restored data before creating project state, skip repository-linked components the importer cannot access, and no longer load archive-supplied Mercurial configuration or shared-repository indirection (:ghsa:`f66g-8pcg-jm8r`, :ghsa:`327h-qqgm-qv55`).
+* Rebuilding project translation memory no longer removes entries imported from files.
+* Suggestion submission and rejection now reject excessively long suggestion text and rejection reasons.
+* Restricted components are now available on Hosted Weblate when the billing plan permits private projects.
+* Machine translation and translation memory AJAX lookups no longer disclose whether inaccessible unit IDs exist.
+* :ref:`RSS feeds <rss>` no longer disclose change history from inaccessible projects or restricted components (:ghsa:`vvc6-wvqm-w5gc`).
+* Authenticated legacy GitHub App webhooks can again trigger repository updates through the :ref:`generic GitHub webhook endpoint <code-hosting-github-notifications>`.
+
+.. rubric:: Compatibility
+
+* django-compressor is no longer used, and the ``COMPRESS_*`` settings have been removed.
+* Legal document styling is now provided through an overridable template instead of Weblate's global stylesheet. See :ref:`legal-customization`.
+* When :setting:`VCS_RESTRICT_PRIVATE` is enabled, Mercurial and Subversion repository hosts must be explicitly included in :setting:`VCS_ALLOW_HOSTS`; Git over HTTPS and SSH enforces connection address pinning without an allowlist entry.
+* Outbound HTTP proxy configuration is limited to the per-protocol environment variables documented in :ref:`http-proxy`.
+* Git SSH validates configured ``HostName`` and ``Port`` destinations before connecting; administrator SSH configuration remains trusted, and :setting:`SSH_EXTRA_ARGS` can override connection routing and address pinning.
+* Git LFS object transfers are unsupported and disabled for Weblate-managed repositories; LFS-tracked files remain pointer files.
+* The project and component ``credits`` REST API endpoints and their ``credits_url`` response fields have been replaced by scoped ``reports`` endpoints and ``reports_url``. Credits report generation is now asynchronous; clients need to submit a ``credits`` report, follow the returned task URL, and fetch the completed report. See :http:post:`/api/reports/`.
+* The top-level ``languages`` field on user REST API responses has been removed; use ``profile.languages`` instead. See :ref:`api-user-profile`.
+
+.. rubric:: Upgrading
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+* There are changes in :file:`settings_example.py`, most notably the new ``STORAGES`` configuration and removal of the ``COMPRESS_*`` settings; please adjust your settings accordingly.
+* Running :program:`weblate compress` is no longer necessary; :program:`weblate collectstatic --noinput` now prepares versioned static assets without clearing the static storage.
+
+.. rubric:: Contributors
+
+.. include:: /changes/contributors/2026.8.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/167?closed=1>`__.
+
+Weblate 2026.7.1
+----------------
+
+*Released on July 10th 2026.*
+
+.. rubric:: New features
+
+* Added :setting:`INTERNAL_BOT_EMAIL_TEMPLATE` to customize internal bot e-mail addresses.
+
+.. rubric:: Improvements
+
+* Restricted components now show a status icon in component listings.
+* Permission checks now reuse materialized team membership data from lightweight relation lookups.
+* Documented that intermediate language files are hidden from language listings and can make target strings read-only.
+* Component diagnostics now warn when regular :ref:`gettext` PO files are configured as monolingual PO files.
+* Translation memory fuzzy lookups are now faster on large translation memories.
+* Permission denied messages when saving translations, editing glossaries, or voting on suggestions now show more specific reasons.
+* Comment notifications for strings you translated now also include strings you previously commented on or suggested translations for.
+* Comments and suggestions now auto-watch the project when :guilabel:`Automatically watch projects on contribution` is enabled.
+* Clarified Hosted Weblate repository access guidance in :doc:`/admin/code-hosting`.
+* :ref:`search-strings` now includes filters for comments by the current user and separate source string comment lookups.
+* Code-hosting account pages now consistently use :guilabel:`Code-hosting connections` and provider-neutral connected account wording.
+* :ref:`discover-weblate` registration can now be started from the management interface without manually copying the activation token.
+* :ref:`discover-weblate` can now be managed from a dedicated management panel, registration starts with discovery enabled, and protected projects are included in the listing.
+* Updated the :ref:`mt-openai`, :ref:`mt-mistral`, and :ref:`mt-anthropic` model lists for currently supported models.
+
+.. rubric:: Bug fixes
+
+* Filtered translation and zen navigation now reuse a stable session result list, keeping positions and counts stable after translated strings leave the filter.
+* Component priority icons are no longer shown on translation listings.
+* :ref:`check-punctuation-spacing` no longer flags Markdown image markers as French punctuation and now shows which punctuation marks triggered the check.
+* :ref:`addon-weblate.fedora_messaging.publish` received several reliability fixes.
+* The :guilabel:`Things to check` panel no longer uses error highlighting for suggestions and other non-error translation states.
+* Translation workflow customization now makes it clearer when per-language workflow settings are disabled until customization is enabled.
+* Anonymous user permission caches are now isolated between requests.
+* GitHub App setup now explains that a workspace is required instead of showing a permission error when no workspace exists.
+* LLM automatic suggestion settings no longer show ``null`` for empty language-specific instructions.
+* File format feature tables now better match actual format support, including descriptions, context, plural metadata, obsolete string removal, specialized file extensions, and merged variants.
+* Accepting a project invitation now automatically adds the project to the user's watched projects.
+* Dismissing a failing check no longer shows a JSON parsing error in the translation editor.
+* Screenshot searches without an explicit field now match screenshot names only, and the search box links to the full screenshot search documentation.
+* Anonymous and internal bot accounts can no longer be edited through generic user management.
+* LLM machine translation suggestions now recover from more malformed structured JSON replies.
+* Azure AI Translator settings now reject malformed region names before validating service connectivity.
+
+.. rubric:: Upgrading
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+* Weblate now requires the PostgreSQL ``btree_gist`` extension for translation memory lookups. The migration installs it automatically when the database user has sufficient privileges. Installations using a non-superuser database user should pre-create it before upgrading; see :ref:`dbsetup-postgres`.
+
+.. rubric:: Contributors
+
+.. include:: /changes/contributors/2026.7.1.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/170?closed=1>`__.
+
+Weblate 2026.7
+--------------
+
+*Released on July 1st 2026.*
+
+.. rubric:: New features
+
+* Added :ref:`check-safe-mdx`, :ref:`check-source-max-length`, and :ref:`check-accelerator` quality checks for :ref:`mdx` JSX expressions, source length limits, and accelerator key consistency.
+* Added :ref:`mt-mistral` machinery integration for Mistral LLM automatic suggestions.
+* Added :ref:`code-hosting-github-app-register` for connecting GitHub repositories through a Weblate GitHub App.
+* :ref:`projectbackup` backups can now be created and downloaded via the :ref:`api`.
+* Added file format parameters for translating individual YAML front matter values in :ref:`markdown` and :ref:`mdx` files and escaping formula-like values in :ref:`csv` files.
+* Added an option to capitalize the text in status badge widgets.
+* Added :ref:`workspace translation memory <memory-scopes>` with asynchronous scope backfill for existing translation memory entries.
+* Added :wladmin:`analyze_translator_work` to estimate realistic daily translator throughput from change history.
+
+.. rubric:: Improvements
+
+* RTL editing and translation display now handle bidirectional text better, including Unicode isolate controls in the :ref:`visual-keyboard`.
+* Management interface access control is now more fine-grained with dedicated site-wide permissions.
+* Default commit and merge request message templates now use Conventional Commits, settings forms can restore installation defaults, and pull request messages use a compact language progress matrix.
+* Documented :ref:`legal` customizations and added options to hide legal pages or disable document numbering.
+* Expanded :doc:`security documentation </security/index>` for data residency, EU cloud sovereignty, release artifacts, supported versions, release verification, SBOMs, dependency handling, vulnerability reporting, hosted-service incident response, and self-hosted operator responsibilities.
+* :ref:`addon-weblate.gettext.linguas` better detects ``LINGUAS`` file presence.
+* :ref:`addon-weblate.gettext.xgettext` can now leave the xgettext language blank to let xgettext guess it from source file extensions.
+* :ref:`addon-weblate.gettext.xgettext`, :ref:`addon-weblate.gettext.meson`, :ref:`addon-weblate.gettext.django`, and :ref:`addon-weblate.gettext.sphinx` can now keep source locations in generated POT files even when translated PO files omit locations.
+* Add-ons installed at higher scopes are now shown on lower-scope add-on pages, and broad-scope add-ons can list affected components with compatibility details.
+* :envvar:`WEBLATE_ALLOWED_ASSET_SIZE` is now available in Docker container.
+* LLM automatic suggestions now use translated examples, language-specific instructions, richer glossary context, and structured placeholder context for more reliable output.
+* Meta descriptions now better match single-project and self-hosted installations.
+* Zen mode, filtered searches, nearby strings, translation form submissions, and add-on management pages now load more efficiently on large sites.
+* Added :ref:`distribution-packaging` guidance for distribution maintainers.
+* Large component imports now avoid duplicate translation-memory processing.
+* :ref:`gettext` files can now be configured to remove obsolete strings on save, including during repository maintenance.
+* :ref:`Bulk accepting suggestions <suggestions>` now confirms the number of affected suggestions, can approve them for reviewers, and processes the acceptance in the background.
+* Committing large numbers of pending translations now queues browser requests in the background and avoids duplicate repository commit tasks.
+* Change-event notification add-ons can now use presets for translation content events, all events, or selected individual events.
+* :ref:`addon-weblate.fedora_messaging.publish` now validates secure broker connections and exposes delivery timing and topic prefix settings.
+* Component diagnostics now sort entries by severity, color-code severity badges, and show the error count on the :guilabel:`Diagnostics` tab.
+* :ref:`manage-performance` now shows PostgreSQL database disk usage next to server disk usage and warns when the database usage cannot be collected.
+* :ref:`manage-performance` now shows PostgreSQL database disk usage next to server disk usage and warns when the database usage cannot be collected or there is not enough free space in the backup destination to store a database dump.
+* The :ref:`search-replace` preview now keeps the search parameters editable so the query can be refined before applying replacements.
+
+.. rubric:: Bug fixes
+
+* :ref:`check-regex` and :ref:`check-placeholders` now enforce regular expression timeouts when evaluating source-string flags (:cve:`2026-62326`, :ghsa:`r52j-4vjp-q949`).
+* Restricted component changes are no longer exposed through nested project, component, or translation API change endpoints (:cve:`2026-62249`, :ghsa:`92m8-wv36-prmx`).
+* ZIP downloads, including :ref:`appstore` translation bundles, no longer follow child symbolic links outside the downloaded tree (:cve:`2026-61792`, :ghsa:`xwj4-fp82-r2rj`).
+* Teams enforcing two-factor authentication now also withhold site-wide permissions from human members without 2FA configured (:cve:`2026-61790`, :ghsa:`x86c-ff69-cr2m`).
+* Globally scoped HTML and AJAX object lookups no longer disclose object existence in private projects (:cve:`2026-55227`, :ghsa:`2p9g-x3cv-5hh4`).
+* Team API access checks now prevent project managers from reading private-project team data or expanding scoped team assignments outside their allowed projects (:cve:`2026-55228`, :ghsa:`2q2q-jr9g-v9rf`).
+* Malformed ``replacements`` flags no longer abort source length checks.
+* Empty component lists are no longer exposed to users without component list management permission.
+* Glossary handling no longer duplicates TBX terms or shows source-language terms in both translation columns.
+* Duplicate string alerts now offer a cleanup action to remove repeated strings from translation files.
+* :ref:`code-hosting-gerrit` review pushes can again include Gerrit push options in the target branch.
+* Webhook target fallback matching is now stricter and reported in component diagnostics.
+* Creating components linked with ``weblate://`` no longer waits on the shared repository lock during the request.
+* Project and workspace translation license defaults now follow component and project licenses more closely.
+* Component and category API ``PATCH`` requests no longer remove the category when the field is omitted.
+* Document and translation-memory uploads now enforce :setting:`TRANSLATION_UPLOAD_MAX_SIZE`, and API document uploads validate file extensions.
+* :ref:`check-rst-syntax` now detects inline roles wrapped in stray backticks.
+* :ref:`check-safe-html` now efficiently detects changed placeholder-only HTML attribute values in translations.
+* :ref:`check-max-size` no longer wraps text configured to fit on one line, checks source strings, and refreshes rendered previews after source edits.
+* Bitmap widgets and :ref:`check-max-size` previews now use Matplotlib and no longer require Pango, Cairo, librsvg, or GObject Introspection.
+* Repository reset and update history now keeps attribution, records remote update failures, and includes follow-up translation-file reconciliation.
+* Updating repository URLs now validates compatible Git history without requiring an immediate successful merge.
+* :ref:`auto-translation` no longer validates hidden component fields when using machine translation.
+* :guilabel:`Strings marked for edit` links now include all strings needing editing, checking, or rewriting.
+* Anonymous permission checks no longer fail when loading teams scoped to projects or workspaces.
+* API project creation can again use the user's only eligible workspace when no explicit workspace is supplied.
+* Git auto-maintenance is now disabled for Weblate-managed repositories to avoid concurrent detached maintenance jobs.
+* Interrupted Git repository operations are now either recovered and recorded or surfaced as a repository alert.
+* Watched translations on the dashboard now include category path segments.
+* Unsupported upload levels now show an upload placeholder pointing to individual translations.
+* Component API responses no longer expose repository export, push branch, or repository browser links to users without repository access.
+
+.. rubric:: Compatibility
+
+* :ref:`mt-deepl` now handles DeepL API versions internally, uses v3 for glossary management and language discovery, and no longer supports DeepL API v1.
+* :ref:`addon-weblate.fedora_messaging.publish` topics now include category path segments, and broker settings are stored as an AMQP URL with existing host and SSL settings migrated automatically.
+
+.. rubric:: Upgrading
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+* There are changes in :file:`settings_example.py`, most notably in ``SOCIAL_AUTH_PIPELINE`` and ``SOCIAL_AUTH_DISCONNECT_PIPELINE``; please adjust your settings accordingly.
+* Existing translation-memory entries are moved to scoped storage by a periodic Celery background task. Keep Celery running after the upgrade; translation-memory suggestions can be incomplete until the backfill finishes.
+
+.. rubric:: Contributors
+
+.. include:: /changes/contributors/2026.7.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/166?closed=1>`__.
+
+Weblate 2026.6.1
+----------------
+
+*Released on June 1st 2026.*
+
+.. rubric:: Bug fixes
+
+* Language-wide :doc:`/admin/announcements` no longer break language overview pages.
+
+.. rubric:: Upgrading
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+.. rubric:: Contributors
+
+.. include:: /changes/contributors/2026.6.1.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/169?closed=1>`__.
+
+Weblate 2026.6
+--------------
+
+*Released on June 1st 2026.*
+
+.. rubric:: New features
+
+* :doc:`/admin/announcements` can now also be managed via the :ref:`api` for specific project languages.
+* Team memberships can now be limited to selected languages for per-user translation permissions.
+* Added :ref:`cost estimates <cost-estimate>` to translation reports.
+* Added optional :ref:`OpenTelemetry tracing <collecting-errors>` for backend requests and tasks, and :ref:`Google Cloud Error Reporting <collecting-errors>` for handled server errors.
+* Added :doc:`/admin/workspaces` to group related projects, with workspace project listings, workspace-scoped teams and project creation permissions, inherited workspace, project, and category defaults for selected component settings, and billing details when available.
+
+.. rubric:: Improvements
+
+* Docker containers can now configure :envvar:`WEBLATE_SAML_SECURITY_CONFIG` to customize SAML security settings, and adjust :setting:`WEBLATE_FORMATS` using :envvar:`WEBLATE_ADD_FORMATS` and :envvar:`WEBLATE_REMOVE_FORMATS`.
+* Improved performance of the :ref:`check-inconsistent` check on large projects.
+* Translation flag fields now use a tag-based editor with autocompletion and grouped suggestions for all known flags.
+* :ref:`Contributor stats <stats>` now de-duplicate repeated work on the same string by default, with an option to count all changes.
+* :doc:`/admin/code-hosting` now documents HTTPS access-token URLs and dedicated-user SSH URLs for accessing repositories, and :doc:`/admin/continuous` now explains why squash merging Weblate conflict-resolution pull requests can require a repository reset.
+* :ref:`alerts` now include dismissible component diagnostics for community localization.
+* :ref:`screenshots` now support bulk assignment from search or image text recognition results, make finding strings in uploaded images easier to discover, show source string coverage counts, and include advanced listing search.
+* :ref:`sbom` release artifacts now include CISA 2025 document-level metadata.
+
+.. rubric:: Bug fixes
+
+* Outbound URL validation now rejects additional non-public targets (:cve:`2026-50127`, :ghsa:`vmfc-9982-2m45`).
+* Project-language :doc:`/admin/announcements` no longer appear across the whole project.
+* Hardened :http:post:`/api/screenshots/` access checks against private project enumeration.
+* Registration-attempt account activity e-mails now link to password reset to help users finish account setup.
+* :ref:`invite-user` links now work for signed-in users whose account owns the invited e-mail address.
+* Searching for strings with content changes without a recorded author now supports ``changed_by:""``, and combined change filters now apply to the same change event.
+* Gitea and Forgejo pull requests no longer reconfigure existing fork remotes to point to the source repository.
+* Project and category language translation sessions now keep strings grouped by component priority and show component switch warnings reliably.
+* Engage page task links now stay centered and show the target translation language.
+* Gettext POT update add-ons now rescan translations after committing updated POT and PO files.
+* Git repositories now update branches correctly when the remote also has a tag with the same name.
+* Conflicting repository setup alerts now allow same-branch direct pushes.
+* Obsolete cleanup schedules are now removed from Celery beat during upgrade.
+* Translation pages for workspace projects no longer crash when workspace fields are deferred.
+
+.. rubric:: Upgrading
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+* There is a change in :setting:`django:INSTALLED_APPS`; ``weblate.workspaces`` should be added.
+* The database migrations might take longer on larger instances.
+
+.. rubric:: Contributors
+
+.. include:: /changes/contributors/2026.6.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/165?closed=1>`__.
+
+Weblate 2026.5
+--------------
+
+*Released on May 15th 2026.*
+
+.. rubric:: New features
+
+* Added :ref:`mdx` support for translating Markdown text while preserving JSX syntax, with :ref:`file_format_params` shared with :ref:`markdown` for line wrapping, code blocks, front matter, and placeholder handling.
+* Added extended :ref:`LLM translation context <llm-translation-context>` for automatic suggestions, covering string context, explanations, secondary-language translations, plurals, failing checks, and placeholders.
+* Added a digest-only translation activity summary notification, see :ref:`notifications`.
+* :ref:`CSV <csv>` and :ref:`XLSX <xlsx>` downloads in :ref:`download` now export plural strings as separate plural-form rows that can be imported back.
+* Added Gettext PO and POT :ref:`file_format_params` to control whether Weblate updates the ``Language-Team``, ``Last-Translator``, ``X-Generator``, and ``Report-Msgid-Bugs-To`` headers.
+* Added a :ref:`backup-management-command` to run configured backup services synchronously.
+* The translation memory lookup API can now skip fuzzy matching with the ``exact`` query parameter.
+* Added :ref:`addon-weblate.cdn.files` to publish translation files to the configured CDN.
+
+.. rubric:: Improvements
+
+* Using DOS line endings can now be configured using the ``dos_eol`` :ref:`file_format_params`.
+* :ref:`mt-openai` and :ref:`mt-alibaba` no longer require their vendor Python SDKs.
+* Audited project and component setting changes are now recorded in history.
+* Gerrit review pushes now use :ref:`component-push_branch` as the target branch.
+* Weblate now checks whether :setting:`CACHE_DIR` allows executing generated helper files.
+* The :ref:`sbom` is now generated during release and published as a versioned release asset instead of being stored in the source repository.
+* The translating page now separates screenshots from string information, collapses rarely used string details, and groups glossary and screenshot actions more consistently.
+* Project access management now paginates users and better explains site-wide automatic team assignments.
+* Added provider-oriented code-hosting documentation and Gettext-style :ref:`plural-formula` guidance.
+* The Python wheel no longer ships source translation catalogs, test files, or deployment example files, reducing the installed package size.
+* The engage page now highlights actionable translation task buckets for newcomers.
+* :ref:`RSS feeds <rss>` can now use the same filters as the changes browsing page.
+* :ref:`addon-weblate.gettext.django` now supports gettext PO files used as templates when they are excluded by the language filter.
+* Reworked :doc:`/security/threat-model` into a contract-style document.
+
+.. rubric:: Bug fixes
+
+* Hardened search previews and :ref:`machine-translation` suggestion origins against XSS, and stopped exposing database error details in upload failures (:cve:`2026-45106` / :ghsa:`6wxc-8mgq-w26m`).
+* Screenshot URL uploads, remote HTML extraction in :ref:`addon-weblate.cdn.cdnjs`, and URL health-check redirects now reject internal or non-public targets by default.
+* Gerrit review pushes now reject target branches containing push options, track the target branch before invoking ``git-review``, and suggest short branch names when full refs are supplied.
+* Category :doc:`/admin/announcements` no longer appear across the whole project, and translation announcement deletion now honors language-scoped permissions.
+* Merge request pushes now refresh stale fork remotes after changing repository hosting.
+* Plural counts parsed from translation file headers are now bounded, and plural formulas are rejected when they can evaluate outside the configured plural form range.
+* :ref:`project-api` expiring today now remain valid until the end of the day.
+* Malformed ALTCHA CAPTCHA submissions and repository URLs in webhook payloads no longer cause server errors.
+* :ref:`check-placeholders` now merges overlapping non-nested spans from multiple flags.
+* :ref:`backup` logs no longer include OpenSSH post-quantum key exchange warnings from remote Borg connections.
+* Category repository paths are now handled more safely during cleanup and moves.
+* Locked component pages now show an unsubscribe action after subscribing to unlock notifications.
+* :ref:`projectbackup` imports now restore in the background to avoid web worker memory limits.
+
+.. rubric:: Compatibility
+
+* The ``dos-eol`` flag is no longer supported. Use the ``dos_eol`` :ref:`file_format_params` instead.
+* The registration CAPTCHA now uses the ALTCHA widget v3 protocol with Argon2id proof-of-work.
+* The ``set_language_team`` project attribute has been replaced with the ``po_set_language_team`` file format parameter at the component level; see :ref:`file_format_params`.
+* Weblate now uses calendar versioning for releases, see :ref:`release-cycle`.
+* Weblate now uses stricter dependency version constraints to better control runtime environment.
+
+.. rubric:: Upgrading
+
+Please follow :ref:`generic-upgrade-instructions` in order to perform update.
+
+* The ``ALTCHA_MAX_NUMBER`` setting has been replaced by :setting:`ALTCHA_COST`, :setting:`ALTCHA_MEMORY_COST`, and :setting:`ALTCHA_PARALLELISM`; please adjust your settings accordingly.
+* The upgrading policy was changed, and upgrades are only supported from the current or previous calendar year.
+* The ``COMMENT_CLEANUP_DAYS`` and ``SUGGESTION_CLEANUP_DAYS`` settings are migrated once to site-wide :ref:`addon-weblate.removal.comments` and :ref:`addon-weblate.removal.suggestions` add-ons; configure those add-ons instead.
+
+.. rubric:: Contributors
+
+.. include:: /changes/contributors/2026.5.rst
+
+`All changes in detail <https://github.com/WeblateOrg/weblate/milestone/162?closed=1>`__.

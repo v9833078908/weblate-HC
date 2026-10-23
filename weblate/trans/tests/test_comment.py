@@ -1,0 +1,327 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Tests for comment views."""
+
+from unittest.mock import patch
+
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+
+from weblate.auth.data import SELECTION_ALL
+from weblate.auth.models import Group, User, UserBlock
+from weblate.trans.models import Comment, Project
+from weblate.trans.models.comment import schedule_comment_stats_update
+from weblate.trans.tests.test_views import FixtureTestCase
+
+
+class CommentViewTest(FixtureTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.translation = self.component.translation_set.get(language_code="cs")
+
+    def test_add_target_comment(self) -> None:
+        unit = self.get_unit()
+
+        # Add comment
+        response = self.client.post(
+            reverse("comment", kwargs={"pk": unit.id}),
+            {"comment": "New target testing comment", "scope": "translation"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+
+        # Check it is shown on page
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "New target testing comment")
+
+        # Reload from database
+        unit = self.get_unit()
+        translation = self.component.translation_set.get(language_code="cs")
+        # Check number of comments
+        self.assertTrue(unit.has_comment)
+        self.assertEqual(translation.stats.comments, 1)
+
+    def test_add_long_comment(self) -> None:
+        unit = self.get_unit()
+
+        # Add comment which is 1000 characters long, but is using \r\n as newlines
+        # which makes it too long. This happens in the browser as it counts newline
+        # as a single character, but posts it as \r\n.
+        response = self.client.post(
+            reverse("comment", kwargs={"pk": unit.id}),
+            {"comment": "123456789\r\n" * 100, "scope": "translation"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+
+        # Check it is shown on page
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "123456789")
+
+        # Reload from database
+        unit = self.get_unit()
+        translation = self.component.translation_set.get(language_code="cs")
+        # Check number of comments
+        self.assertTrue(unit.has_comment)
+        self.assertEqual(translation.stats.comments, 1)
+
+    def test_add_source_comment(self) -> None:
+        unit = self.get_unit()
+
+        # Add comment
+        response = self.client.post(
+            reverse("comment", kwargs={"pk": unit.id}),
+            {"comment": "New source testing comment", "scope": "global"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+
+        # Check it is shown on page
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "New source testing comment")
+
+        # Reload from database
+        unit = self.get_unit()
+        translation = self.component.translation_set.get(language_code="cs")
+        # Check number of comments
+        self.assertFalse(unit.has_comment)
+        self.assertEqual(translation.stats.comments, 0)
+
+    def test_add_source_report(self) -> None:
+        unit = self.get_unit()
+
+        # Add comment
+        response = self.client.post(
+            reverse("comment", kwargs={"pk": unit.id}),
+            {"comment": "New issue testing comment", "scope": "report"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+
+        # Check it is shown on page
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "New source testing comment")
+
+        # Enable reviews
+        self.project.source_review = True
+        self.project.save(update_fields=["source_review"])
+
+        # Add comment
+        response = self.client.post(
+            reverse("comment", kwargs={"pk": unit.id}),
+            {"comment": "New issue testing comment", "scope": "report"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+
+        # Check it is shown on page
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "New issue testing comment")
+        self.assertContains(response, "Source needs review")
+
+        # Reload from database
+        unit = self.get_unit()
+        translation = self.component.translation_set.get(language_code="cs")
+        # Check number of comments
+        self.assertFalse(unit.has_comment)
+        self.assertEqual(translation.stats.comments, 0)
+
+    def test_delete_comment(self, **kwargs) -> None:
+        unit = self.get_unit()
+        self.make_manager()
+
+        # Add comment
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("comment", kwargs={"pk": unit.id}),
+                {"comment": "New target testing comment", "scope": "translation"},
+            )
+        self.assertRedirects(response, unit.get_absolute_url())
+        translation = unit.translation.__class__.objects.get(pk=unit.translation_id)
+        self.assertEqual(translation.stats.comments, 1)
+
+        comment = Comment.objects.all()[0]
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("delete-comment", kwargs={"pk": comment.pk}), kwargs
+            )
+        self.assertRedirects(response, unit.get_absolute_url())
+        translation = unit.translation.__class__.objects.get(pk=unit.translation_id)
+        self.assertEqual(translation.stats.comments, 0)
+
+    def test_spam_comment(self) -> None:
+        self.test_delete_comment(spam=1)
+
+    def test_queryset_delete_comment_updates_stats(self) -> None:
+        unit = self.get_unit()
+        with self.captureOnCommitCallbacks(execute=True):
+            comment = Comment.objects.create(
+                unit=unit, comment="Delete in queryset", user=self.anotheruser
+            )
+        translation = unit.translation.__class__.objects.get(pk=unit.translation_id)
+        self.assertEqual(translation.stats.comments, 1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            Comment.objects.filter(pk=comment.pk).delete()
+
+        translation = unit.translation.__class__.objects.get(pk=unit.translation_id)
+        self.assertEqual(translation.stats.comments, 0)
+
+    def test_comment_stats_update_is_coalesced(self) -> None:
+        with patch(
+            "weblate.utils.tasks.update_translation_stats.delay_on_commit"
+        ) as update:
+            schedule_comment_stats_update(range(201))
+
+        update.assert_called_once_with(list(range(201)))
+
+    def test_user_comment_cascade_updates_stats_once(self) -> None:
+        unit = self.get_unit()
+        comment_user = User.objects.create_user(
+            "comment-owner", "comment-owner@example.com"
+        )
+        comment_user_id = comment_user.pk
+        Comment.objects.bulk_create(
+            [
+                Comment(unit=unit, comment=f"User comment {index}", user=comment_user)
+                for index in range(5)
+            ]
+        )
+
+        with patch(
+            "weblate.utils.tasks.update_translation_stats.delay_on_commit"
+        ) as update:
+            comment_user.delete()
+
+        update.assert_called_once_with([unit.translation_id])
+        self.assertFalse(Comment.objects.filter(user_id=comment_user_id).exists())
+
+    def test_unit_comment_cascade_does_not_queue_comment_stats(self) -> None:
+        unit = self.get_unit()
+        Comment.objects.bulk_create(
+            [Comment(unit=unit, comment=f"Unit comment {index}") for index in range(5)]
+        )
+
+        with patch(
+            "weblate.utils.tasks.update_translation_stats.delay_on_commit"
+        ) as update:
+            unit.delete()
+
+        update.assert_not_called()
+
+    def test_resolve_comment(self) -> None:
+        unit = self.get_unit()
+        self.make_manager()
+
+        # Add comment
+        response = self.client.post(
+            reverse("comment", kwargs={"pk": unit.id}),
+            {"comment": "New target testing comment", "scope": "translation"},
+        )
+
+        comment = Comment.objects.all()[0]
+        response = self.client.post(
+            reverse("resolve-comment", kwargs={"pk": comment.pk})
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+
+        comment.refresh_from_db()
+        self.assertTrue(comment.resolved)
+        self.assertFalse(comment.unit.has_comment)
+
+    def test_comment_views_hide_private_unit_and_comment(self) -> None:
+        self.project.access_control = Project.ACCESS_PRIVATE
+        self.project.save(update_fields=["access_control"])
+        self.user.clear_permissions_cache()
+
+        unit = self.get_unit()
+        comment = Comment.objects.create(
+            user=self.anotheruser, unit=unit, comment="Hidden comment"
+        )
+
+        response = self.client.post(
+            reverse("comment", kwargs={"pk": unit.pk}),
+            {"comment": "Probe comment", "scope": "translation"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("delete-comment", kwargs={"pk": comment.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("resolve-comment", kwargs={"pk": comment.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_comment_views_hide_blocked_project_for_all_projects_user(self) -> None:
+        group = Group.objects.create(
+            name="All projects comments", project_selection=SELECTION_ALL
+        )
+        self.user.groups.add(group)
+        UserBlock.objects.create(user=self.user, project=self.project)
+        self.user.clear_permissions_cache()
+
+        unit = self.get_unit()
+        comment = Comment.objects.create(
+            user=self.anotheruser, unit=unit, comment="Blocked comment"
+        )
+
+        response = self.client.post(
+            reverse("comment", kwargs={"pk": unit.pk}),
+            {"comment": "Probe comment", "scope": "translation"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("delete-comment", kwargs={"pk": comment.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.post(
+            reverse("resolve-comment", kwargs={"pk": comment.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_translate_comment_queries_do_not_scale_with_comment_count(self) -> None:
+        unit = self.get_unit()
+        self.make_manager()
+
+        def render_queries() -> int:
+            for _unused in range(2):
+                session = self.client.session
+                session.clear()
+                session.save()
+                response = self.client.get(
+                    unit.translation.get_translate_url(),
+                    {"checksum": unit.checksum},
+                )
+                self.assertEqual(response.status_code, 200)
+
+            session = self.client.session
+            session.clear()
+            session.save()
+            with CaptureQueriesContext(connection) as queries:
+                response = self.client.get(
+                    unit.translation.get_translate_url(),
+                    {"checksum": unit.checksum},
+                )
+            self.assertEqual(response.status_code, 200)
+            return len(queries)
+
+        Comment.objects.filter(unit__in=(unit, unit.source_unit)).delete()
+        Comment.objects.create(
+            unit=unit,
+            comment="Comment 0",
+            user=self.anotheruser,
+        )
+        baseline_queries = render_queries()
+
+        Comment.objects.filter(unit__in=(unit, unit.source_unit)).delete()
+        for index in range(5):
+            Comment.objects.create(
+                unit=unit,
+                comment=f"Comment {index}",
+                user=self.anotheruser,
+            )
+
+        self.assertEqual(render_queries(), baseline_queries)

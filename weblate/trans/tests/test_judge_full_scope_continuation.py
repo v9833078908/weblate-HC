@@ -1,0 +1,580 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
+
+from django.conf import settings
+from django.test import override_settings
+from django.utils import timezone
+
+from weblate.trans import autotranslate
+from weblate.trans.autotranslate import BatchAutoTranslate, PreparationScope
+from weblate.trans.judge import JudgeError
+from weblate.trans.models.judge import JudgeRunUnit, ProducerRun
+from weblate.trans.models.unit import Unit
+from weblate.trans.tasks import (
+    StaleProducerTaskError,
+    drain_producer_run_dispatches,
+    producer_execution_guard,
+)
+from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.state import STATE_TRANSLATED
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAY_APPROVE=False,
+    WEBLATE_MACHINERY=(
+        *settings.WEBLATE_MACHINERY,
+        "weblate_customization.machinery.RoutedLLMTranslation",
+    ),
+)
+class JudgeFullScopeContinuationTest(ViewTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(
+            update_fields=["translation_review", "machinery_settings"]
+        )
+        self.translation = self.get_translation()
+        Unit.objects.filter(translation__component=self.component).delete()
+        self.units = [
+            Unit.objects.create(
+                translation=self.translation,
+                id_hash=i + 5000,
+                source=f"chunk source {i}",
+                target=f"chunk target {i}",
+                state=STATE_TRANSLATED,
+                position=i,
+            )
+            for i in range(4)
+        ]
+
+    def _make_run(self, **kwargs) -> ProducerRun:
+        defaults = {
+            "actor": self.user,
+            "scope_type": ProducerRun.ScopeType.PROJECT,
+            "scope_id": str(self.project.pk),
+            "scope_label": str(self.project),
+            "scope_path": self.project.get_absolute_url(),
+            "requested_query": "",
+            "requested_mode": "judge",
+            "cap": len(self.units),
+            "execution_version": 1,
+            "scope_cursor": 0,
+            "scope_snapshot": [u.pk for u in self.units],
+            "dispatch_task_id": uuid4(),
+            "dispatch_phase": "judge-project",
+            "dispatch_requested_at": timezone.now(),
+            "preparation_snapshot": PreparationScope(
+                unit_ids=tuple(u.pk for u in self.units),
+                missing_ids=(),
+                per_language_missing={},
+                mt_engine=None,
+            ).to_json(),
+            "preparation_phase": "ready",
+            "status": ProducerRun.Status.QUEUED,
+            "execution_options": {
+                "mode": "judge",
+                "q": "",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+                "judge_proposal_only": True,
+                "judge_pretranslate": False,
+                "judge_mutating_repairs": False,
+            },
+        }
+        defaults.update(kwargs)
+        return ProducerRun.objects.create(**defaults)
+
+    def test_stale_task_uuid_guard_exits_without_lock(self) -> None:
+        run = self._make_run(status=ProducerRun.Status.RUNNING)
+        superseding_task_id = str(uuid4())
+        run.dispatch_task_id = superseding_task_id
+        run.save(update_fields=["dispatch_task_id"])
+
+        old_task_id = str(uuid4())
+        with (
+            self.assertRaises(StaleProducerTaskError),
+            producer_execution_guard(producer_run_id=str(run.pk), task_id=old_task_id),
+        ):
+            pass
+
+    def test_adopt_fails_foreign_uuid_for_running_run(self) -> None:
+        valid_uuid = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.RUNNING,
+            dispatch_task_id=valid_uuid,
+            task_id=valid_uuid,
+        )
+        batch = BatchAutoTranslate(
+            self.project,
+            user=self.user,
+            q="",
+            mode="judge",
+            producer_run_id=str(run.pk),
+            enforce_permissions=False,
+        )
+        foreign_uuid = str(uuid4())
+        with patch("weblate.trans.autotranslate.current_task") as mock_task:
+            mock_task.request.id = foreign_uuid
+            with self.assertRaises(ValueError):
+                batch._adopt_producer_run()  # ruff: ignore[private-member-access]
+
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIn("superseded", run.failure)
+
+    def test_drain_republishes_running_continuation(self) -> None:
+        run = self._make_run(
+            status=ProducerRun.Status.RUNNING,
+            execution_version=1,
+            dispatch_published_at=None,
+        )
+        with patch("weblate.trans.tasks.auto_translate.apply_async") as mock_apply:
+            drain_producer_run_dispatches()
+            mock_apply.assert_called_once()
+            self.assertEqual(
+                mock_apply.call_args.kwargs["task_id"], str(run.dispatch_task_id)
+            )
+        run.refresh_from_db()
+        self.assertIsNotNone(run.dispatch_published_at)
+
+    def test_drain_does_not_republish_an_already_published_continuation(self) -> None:
+        run = self._make_run(
+            status=ProducerRun.Status.RUNNING,
+            execution_version=1,
+            dispatch_published_at=timezone.now(),
+        )
+        with patch("weblate.trans.tasks.auto_translate.apply_async") as mock_apply:
+            drain_producer_run_dispatches()
+            mock_apply.assert_not_called()
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.RUNNING)
+
+    def test_drain_finalizes_cancel_requested(self) -> None:
+        run = self._make_run(
+            status=ProducerRun.Status.CANCEL_REQUESTED,
+        )
+        drain_producer_run_dispatches()
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.CANCELLED)
+        self.assertIsNotNone(run.finished)
+
+    def test_drain_finalizes_cancel_requested_with_results_to_partial(self) -> None:
+        run = self._make_run(
+            status=ProducerRun.Status.CANCEL_REQUESTED,
+        )
+        JudgeRunUnit.objects.create(
+            run=run,
+            unit=self.units[0],
+            unit_id_snapshot=self.units[0].pk,
+            translation_id=self.translation.pk,
+            component_id=self.component.pk,
+            project_id=self.project.pk,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+            input_target_hash="0" * 64,
+            context_hash="0" * 64,
+        )
+        drain_producer_run_dispatches()
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.PARTIAL)
+        self.assertIsNotNone(run.finished)
+
+    def test_multi_chunk_run_progression(self) -> None:
+        task_id_1 = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.QUEUED,
+            dispatch_task_id=task_id_1,
+        )
+        with (
+            patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.tasks.publish_producer_run_dispatch") as mock_pub,
+            patch("weblate.trans.autotranslate.AutoTranslate.perform") as mock_perform,
+        ):
+            mock_task.request.id = task_id_1
+            batch_1 = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            msg_1 = batch_1.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            self.assertIn("chunk", msg_1.lower())
+
+            run.refresh_from_db()
+            self.assertEqual(run.scope_cursor, 2)
+            self.assertEqual(run.status, ProducerRun.Status.RUNNING)
+            task_id_2 = str(run.dispatch_task_id)
+            self.assertNotEqual(task_id_2, task_id_1)
+            mock_pub.assert_called_once_with(run_id=run.pk)
+            mock_perform.assert_called()
+
+            # Second chunk picks up from cursor 2
+            mock_pub.reset_mock()
+            mock_task.request.id = task_id_2
+            batch_2 = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            msg_2 = batch_2.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            self.assertIn("completed", msg_2.lower())
+
+            run.refresh_from_db()
+            self.assertEqual(run.scope_cursor, 4)
+            self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+            self.assertIsNotNone(run.finished)
+
+    def test_cancellation_between_chunks_stops_continuation(self) -> None:
+        task_id = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.QUEUED,
+            dispatch_task_id=task_id,
+        )
+
+        def simulate_cancel(*args, **kwargs):
+            run.status = ProducerRun.Status.CANCEL_REQUESTED
+            run.save(update_fields=["status"])
+
+        with (
+            patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.tasks.publish_producer_run_dispatch") as mock_pub,
+            patch(
+                "weblate.trans.autotranslate.AutoTranslate.perform",
+                side_effect=simulate_cancel,
+            ),
+        ):
+            mock_task.request.id = task_id
+            batch = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            msg = batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            self.assertIn("cancelled", msg.lower())
+
+            run.refresh_from_db()
+            self.assertEqual(run.status, ProducerRun.Status.CANCELLED)
+            mock_pub.assert_not_called()
+
+    def test_invalid_preparation_snapshot_fails_a_later_chunk(self) -> None:
+        """A continuation must not rebuild and reopen a closed scope it cannot read."""
+        task_id = str(uuid4())
+        invalid_snapshot = {"version": 1}
+        run = self._make_run(
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            dispatch_phase="",
+            status=ProducerRun.Status.RUNNING,
+            scope_cursor=2,
+            dispatch_task_id=task_id,
+            task_id=task_id,
+            preparation_snapshot=invalid_snapshot,
+        )
+        with (
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.autotranslate.AutoTranslate.perform") as perform,
+            patch(
+                "weblate.trans.autotranslate.BatchAutoTranslate.build_preparation_scope"
+            ) as build_scope,
+        ):
+            mock_task.request.id = task_id
+            batch = BatchAutoTranslate(
+                self.component,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            with self.assertRaises(JudgeError):
+                batch.perform(
+                    auto_source="mt",
+                    engines=[],
+                    threshold=80,
+                    source_component_ids=None,
+                )
+
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIn("invalid preparation snapshot", run.failure)
+        self.assertEqual(run.preparation_snapshot, invalid_snapshot)
+        self.assertEqual(run.preparation_phase, "ready")
+        build_scope.assert_not_called()
+        perform.assert_not_called()
+
+    def test_provider_error_leaves_run_running_for_version_1(self) -> None:
+        task_id = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.QUEUED,
+            dispatch_task_id=task_id,
+            execution_version=1,
+        )
+        with (
+            patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch(
+                "weblate.trans.autotranslate.AutoTranslate.perform",
+                side_effect=RuntimeError("Provider 503 unavailable"),
+            ),
+        ):
+            mock_task.request.id = task_id
+            batch = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            with self.assertRaises(RuntimeError):
+                batch.perform(
+                    auto_source="mt",
+                    engines=[],
+                    threshold=80,
+                    source_component_ids=None,
+                )
+
+            run.refresh_from_db()
+            self.assertEqual(run.status, ProducerRun.Status.RUNNING)
+
+    def test_provider_refusal_stops_chunk_loop_immediately(self) -> None:
+        task_id = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.QUEUED,
+            dispatch_task_id=task_id,
+            execution_version=1,
+        )
+
+        with (
+            patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.tasks.publish_producer_run_dispatch") as mock_pub,
+            patch("weblate.trans.autotranslate.AutoTranslate") as mock_auto_cls,
+        ):
+            engine = MagicMock()
+            engine.failure_message = "Provider quota exceeded"
+            engine.judge_summary = None
+            engine.updated = 0
+            engine.judge_units_processed = 1
+            engine.get_warnings.return_value = []
+            engine.preview_judge_scope.return_value = (MagicMock(), [])
+            mock_auto_cls.side_effect = lambda **_kwargs: engine
+            mock_task.request.id = task_id
+            batch = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            msg = batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            self.assertEqual(msg, "Provider quota exceeded")
+            run.refresh_from_db()
+            self.assertEqual(run.status, ProducerRun.Status.FAILED)
+            self.assertEqual(run.failure, "Provider quota exceeded")
+            self.assertEqual(run.scope_cursor, 0)
+            mock_pub.assert_not_called()
+
+    def test_cross_chunk_summary_accumulates(self) -> None:
+        """COMPLETED summary after chunk N includes chunks 1..N-1 tallies."""
+        task_id = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.QUEUED,
+            dispatch_task_id=task_id,
+        )
+        with (
+            patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.tasks.publish_producer_run_dispatch"),
+            patch("weblate.trans.autotranslate.AutoTranslate.perform") as mock_perform,
+        ):
+            mock_perform.return_value = "ok"
+            mock_task.request.id = task_id
+            batch_1 = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            batch_1.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            run.refresh_from_db()
+            # Simulate chunk-1 summary already persisted by _finish_producer_run
+            run.summary = {"evaluated": 2, "nothing_blocking": 1, "minor_noted": 1}
+            run.save(update_fields=["summary"])
+
+            task_id_2 = str(run.dispatch_task_id)
+            mock_task.request.id = task_id_2
+            batch_2 = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            batch_2.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            run.refresh_from_db()
+            self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+            # Both chunks ran; chunk-1's _finish_producer_run already counted
+            # the chunk-1 PENDING rows (2), and chunk-2's finalization counts
+            # all 4 scope rows (2 still PENDING + 2 from chunk 2's reservation).
+            # Prior summary added 2 more evaluated from chunk 1's tally.
+            self.assertEqual(run.summary["evaluated"], 6)
+            self.assertEqual(run.summary["nothing_blocking"], 1)
+            self.assertEqual(run.summary["minor_noted"], 1)
+
+    def test_cancel_requested_before_chunk_start_stops_immediately(self) -> None:
+        """A run already CANCEL_REQUESTED at adopt time must not process a chunk."""
+        task_id = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.CANCEL_REQUESTED,
+            dispatch_task_id=task_id,
+        )
+        with (
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.tasks.publish_producer_run_dispatch") as mock_pub,
+            patch("weblate.trans.autotranslate.AutoTranslate.perform") as mock_perform,
+        ):
+            mock_task.request.id = task_id
+            batch = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            msg = batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            # _adopt_producer_run maps CANCEL_REQUESTED -> CANCELLED and
+            # returns immediately; _perform then short-circuits on terminal
+            # status without entering the chunk loop.
+            self.assertIn("completed", msg.lower())
+            mock_perform.assert_not_called()
+            run.refresh_from_db()
+            self.assertEqual(run.status, ProducerRun.Status.CANCELLED)
+            self.assertIsNotNone(run.finished)
+            mock_pub.assert_not_called()
+
+    def test_continuation_chunk_costs_its_chunk_not_the_whole_scope(self) -> None:
+        """A continuation must not re-derive the closed scope it inherits."""
+        task_id = str(uuid4())
+        run = self._make_run(
+            status=ProducerRun.Status.QUEUED,
+            dispatch_task_id=task_id,
+        )
+        with (
+            patch("weblate.trans.autotranslate.JUDGE_CHUNK_SIZE", 2),
+            patch("weblate.trans.autotranslate.current_task") as mock_task,
+            patch("weblate.trans.tasks.publish_producer_run_dispatch"),
+            patch("weblate.trans.autotranslate.AutoTranslate.perform"),
+            patch(
+                "weblate.trans.autotranslate.build_request",
+                wraps=autotranslate.build_request,
+            ) as build_request,
+        ):
+            mock_task.request.id = task_id
+            batch_1 = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            batch_1.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            run.refresh_from_db()
+            scope_size = len(run.scope_snapshot)
+            self.assertGreater(scope_size, 2)
+
+            # The reservation is durable after the first dispatch; the
+            # continuation inherits it and must not resolve the source,
+            # glossary and context of every unit in the run again.
+            build_request.reset_mock()
+            mock_task.request.id = str(run.dispatch_task_id)
+            batch_2 = BatchAutoTranslate(
+                self.project,
+                user=self.user,
+                q="",
+                mode="judge",
+                producer_run_id=str(run.pk),
+                enforce_permissions=False,
+            )
+            batch_2.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+            self.assertLess(
+                build_request.call_count,
+                scope_size,
+                "a continuation chunk resolved more units than the whole scope",
+            )

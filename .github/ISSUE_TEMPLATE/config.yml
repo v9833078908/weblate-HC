@@ -1,0 +1,11 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: CC0-1.0
+blank_issues_enabled: false
+contact_links:
+- name: Ask the community
+  url: https://github.com/v9833078908/weblate-HC/discussions
+  about: Want to discuss something with a community? Do it in discussions!
+- name: translate-toolkit issue tracker
+  url: https://github.com/translate/translate/issues
+  about: For issues with file formats processing.

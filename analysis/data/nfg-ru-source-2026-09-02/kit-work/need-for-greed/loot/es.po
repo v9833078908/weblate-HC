@@ -1,0 +1,478 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-22 09:53+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Spanish <http://l10n.herocraft.com/projects/need-for-greed/"
+"loot/es/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: es\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+msgid "ring"
+msgstr "Anillo"
+
+msgid "dagger"
+msgstr "Daga"
+
+msgid "necklace"
+msgstr "Collar"
+
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Cetro dorado"
+
+msgid "bracelet"
+msgstr "Brazalete"
+
+msgid "brooch"
+msgstr "Broche"
+
+msgid "diadem"
+msgstr "Diadema"
+
+msgid "casket"
+msgstr "Cofre"
+
+msgid "treasureGoldCrownT1.1"
+msgstr "Corona dorada"
+
+msgid "diamondBig"
+msgstr "Diamante puro (grande)"
+
+msgid "diamondMedium"
+msgstr "Diamante puro (mediano)"
+
+msgid "diamondSmall"
+msgstr "Diamante puro (pequeño)"
+
+msgid "rubyBig"
+msgstr "Rubí carmesí (grande)"
+
+msgid "rubyMedium"
+msgstr "Rubí carmesí (mediano)"
+
+msgid "rubySmall"
+msgstr "Rubí carmesí (pequeño)"
+
+msgid "sapphireBig"
+msgstr "Zafiro azul (grande)"
+
+msgid "sapphireMedium"
+msgstr "Zafiro azul (mediano)"
+
+msgid "sapphireSmall"
+msgstr "Zafiro azul (pequeño)"
+
+msgid "emeraldBig"
+msgstr "Esmeralda (grande)"
+
+msgid "emeraldMedium"
+msgstr "Esmeralda (mediana)"
+
+msgid "emeraldSmall"
+msgstr "Esmeralda (Pequeña)"
+
+msgid "amethystBig"
+msgstr "Amatista (Grande)"
+
+msgid "amethystMedium"
+msgstr "Amatista (Mediana)"
+
+msgid "amethystSmall"
+msgstr "Amatista (Pequeña)"
+
+msgid "opalBig"
+msgstr "Ópalo (Grande)"
+
+msgid "opalMedium"
+msgstr "Ópalo (Mediano)"
+
+msgid "opalSmall"
+msgstr "Ópalo (Pequeño)"
+
+msgid "diamondRough"
+msgstr "Diamante (en bruto)"
+
+msgid "amethystRough"
+msgstr "Amatista (en bruto)"
+
+msgid "emeraldRough"
+msgstr "Esmeralda (en bruto)"
+
+msgid "opalRough"
+msgstr "Ópalo (en bruto)"
+
+msgid "rubyRough"
+msgstr "Rubí (en bruto)"
+
+msgid "sapphireRough"
+msgstr "Zafiro (en bruto)"
+
+msgid "goldSmall"
+msgstr "Pepita de oro (pequeña)"
+
+msgid "eggBird"
+msgstr "Huevo de ave del paraíso"
+
+msgid "goldMedium"
+msgstr "Trozo de oro grande"
+
+msgid "goldBig"
+msgstr "Pepita de oro (grande)"
+
+msgid "trash"
+msgstr "Basura"
+
+msgid "pin"
+msgstr "Alfiler"
+
+msgid "earring"
+msgstr "Pendiente"
+
+msgid "glasses"
+msgstr "Gafas"
+
+msgid "loveBig"
+msgstr "Piedra de unión (grande)"
+
+msgid "loveMedium"
+msgstr "Piedra de unión (mediana)"
+
+msgid "gemBirdSmall"
+msgstr "Gema aviar"
+
+msgid "geodeMedium"
+msgstr "Geoda (mediana)"
+
+msgid "gemRoughMedium"
+msgstr "Gema salvaje (mediana)"
+
+msgid "artifact"
+msgstr "Artefacto"
+
+msgid "meteoriteIronSmall"
+msgstr "Hierro estelar (pequeño)"
+
+msgid "mask"
+msgstr "Máscara"
+
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Guantelete dorado"
+
+msgid "silverSmall"
+msgstr "Pepita de plata (pequeña)"
+
+msgid "idol"
+msgstr "Ídolo"
+
+msgid "goldSmallCoin"
+msgstr "Moneda antigua (oro)"
+
+msgid "silverSmallCoin"
+msgstr "Moneda antigua (plata)"
+
+msgid "gemLoveSmall"
+msgstr "Piedra de unión (pequeña)"
+
+msgid "artifactBirdEntity"
+msgstr "Huevo de la fortuna"
+
+msgid "artifactWormEntity"
+msgstr "Larva de pantano"
+
+msgid "artifactGalaxyMechanism"
+msgstr "Núcleo de meteoro"
+
+msgid "artifactBook"
+msgstr "Tomo Antiguo"
+
+msgid "artifactManuscript"
+msgstr "Pergamino gastado"
+
+msgid "artifactTablet"
+msgstr "Piedra del Pacto"
+
+msgid "cursedItem"
+msgstr "Reliquia Maldita"
+
+msgid "chest"
+msgstr "Cofre Enterrado"
+
+msgid "eggWorm"
+msgstr "Huevo de Gusano"
+
+msgid "geodeSmall"
+msgstr "Geoda (pequeña)"
+
+msgid "geodeGemSmall"
+msgstr "Geoda valiosa (pequeña)"
+
+msgid "geodeGemMedium"
+msgstr "Geoda valiosa (mediana)"
+
+msgid "goldSmallScarab"
+msgstr "Escarabajo dorado"
+
+msgid "gemRoughSmall"
+msgstr "Gema salvaje (pequeña)"
+
+msgid "roughDaggerT1"
+msgstr "Daga de voluntad fracturada"
+
+msgid "roughMaskT1"
+msgstr "Máscara de Visaje rota"
+
+msgid "roughtScepterT1"
+msgstr "Cetro destrozado"
+
+msgid "roughCrownT1"
+msgstr "Corona fracturada"
+
+msgid "roughGloveT1"
+msgstr "Guantelete agrietado"
+
+msgid "unknownItem"
+msgstr "Objeto desconocido"
+
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Medallón radiante (oro)"
+
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Broche de jardín floreciente (oro)"
+
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Colgante de luz oculta (oro)"
+
+msgid "treasureGoldPin1GT1.1"
+msgstr "Broche de gema oculta (oro)"
+
+msgid "treasureGoldRing1GT1.1"
+msgstr "Anillo (oro)"
+
+msgid "treasureGoldRing1GT1.2"
+msgstr "Pulsera de piedra estrecha (oro)"
+
+msgid "treasureGoldRing1GT1.3"
+msgstr "Anillo de sello del rey (oro)"
+
+msgid "treasureGoldRing1GT1.4"
+msgstr "Anillo de sello del soberano (oro)"
+
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Broche de sol (oro)"
+
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Daga de oro de la voluntad"
+
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Pendientes resonantes (oro)"
+
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Gafas de vanidad (oro)"
+
+msgid "treasureGoldMask2GT1.1"
+msgstr "Máscara de Visaje Dorado"
+
+msgid "treasureGoldRing2GT1.1"
+msgstr "Anillo de destinos gemelos (oro)"
+
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Anillo Celestial"
+
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Anillo Celeste"
+
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Cinturón de unión (plata)"
+
+msgid "treasureSilverRing1GT1.1"
+msgstr "Anillo de luna (plata)"
+
+msgid "treasureSilverRing1GT1.2"
+msgstr "Anillo de serpiente (plata)"
+
+msgid "treasureSilverRing1GT1.3"
+msgstr "Anillo de sello de tentáculo (plata)"
+
+msgid "treasureSilverPin1GT1.1"
+msgstr "Aguja de honor (plata)"
+
+msgid "artifactGoldCoinCheap"
+msgstr "Moneda musgosa"
+
+msgid "artifactGoldCoin"
+msgstr "Moneda embrujada"
+
+msgid "artifactGoldCoinBest"
+msgstr "Moneda de la antigua gloria"
+
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Ídolo de jabalí de pobre"
+
+msgid "treasure2GIdolT1.1"
+msgstr "Ídolo del Gran Jabalí"
+
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Ídolo del Testarudo Chamuscado"
+
+msgid "treasure2GIdolT1.2"
+msgstr "Ídolo de la Calavera Ardiente"
+
+msgid "Lem"
+msgstr "Caja de Recuerdos"
+
+msgid "Tablet.Cheap"
+msgstr "Piedra Mística Inferior"
+
+msgid "Flop"
+msgstr "Disquete con Flopcoins"
+
+msgid "Flop.Cheap"
+msgstr "Unidad ficticia"
+
+msgid "Shit"
+msgstr "Chocolate Sagrado de Dubái"
+
+msgid "Shit.Cheap"
+msgstr "Pastel de Excremento"
+
+msgid "Frid"
+msgstr "Máscara de Viernes por la Noche"
+
+msgid "Frid.Cheap"
+msgstr "Máscara del Lunes 12"
+
+msgid "Jur"
+msgstr "Fuente de la Vieja Sangre"
+
+msgid "Jur.Cheap"
+msgstr "Mosquito de Colofonia"
+
+msgid "Tooth"
+msgstr "Diente de Gengis Kan"
+
+msgid "Tooth.Cheap"
+msgstr "¿Tu diente?!?"
+
+msgid "cryolisSmall"
+msgstr "Pepita de Criolis (Pequeña)"
+
+msgid "frozenItem"
+msgstr "Artículo congelado"
+
+msgid "emberSphere"
+msgstr "Esfera del Sol"
+
+msgid "gemIdolHearthSmall"
+msgstr "Corazón del Ídolo"
+
+msgid "sparkwing"
+msgstr "Ala Chispeante"
+
+msgid "collected"
+msgstr "Recopilado"
+
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Ídolo del Bigotudo"
+
+msgid "treasure.3g.idol.t1.1"
+msgstr "Ídolo de la Sabiduría"
+
+msgid "winter.chest"
+msgstr "Cofre del Jarl"
+
+msgid "gold.medium.t1.2"
+msgstr "Pedazo de oro destrozado"
+
+msgid "gold.medium.t1.3"
+msgstr "Pedazo de oro espléndido"
+
+msgid "gold.small.t1.bad"
+msgstr "Oro desmenuzado"
+
+msgid "gold.small.t1.good"
+msgstr "Pepita de oro prístina"
+
+msgid "silver.small.t1.bad"
+msgstr "Plata deslustrada"
+
+msgid "silver.small.t1.good"
+msgstr "Pepita de plata reluciente"
+
+msgid "gem.diamond.big.bad"
+msgstr "Diamante grande astillado"
+
+msgid "gem.diamond.big.good"
+msgstr "Diamante colosal"
+
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Diamante defectuoso (Mediano)"
+
+msgid "gem.diamond.medium.t1.good"
+msgstr "Diamante impecable (Mediano)"
+
+msgid "gem.opal.small.t1.bad"
+msgstr "Ópalo turbio"
+
+msgid "gem.opal.small.t1.good"
+msgstr "Ópalo luminoso"
+
+msgid "gem.ruby.small.t1.bad"
+msgstr "Rubí marrón"
+
+msgid "gem.ruby.small.t1.good"
+msgstr "Rubí color sangre"
+
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Zafiro asimétrico"
+
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Zafiro celestial"
+
+msgid "frozen.artifact.book.t4.1"
+msgstr "Tomo Antiguo Congelado"
+
+msgid "frozen.daimond.big.t1.1"
+msgstr "Diamante Congelado (Grande)"
+
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Diamante Congelado (Mediano)"
+
+msgid "frozen.gold.medium.t1.1"
+msgstr "Trozo de Oro Congelado Grande"
+
+msgid "frozen.gold.small.t1"
+msgstr "Pepita de Oro Congelada (Pequeña)"
+
+msgid "frozen.silver.small.t1"
+msgstr "Pepita de Plata Congelada (Pequeña)"
+
+msgid "frozen.opal.small.t1.1"
+msgstr "Ópalo Congelado (Pequeño)"
+
+msgid "frozen.ruby.small.t1.1"
+msgstr "Rubí Congelado (Pequeño)"
+
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Zafiro Congelado (Pequeño)"
+
+msgid "frozen.treasure.1g.idol"
+msgstr "Ídolo Congelado"
+
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Pendientes Brillantes"
+
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Pendientes Lunares"
+
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Mirada Helada"
+
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Lago Lunar"

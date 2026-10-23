@@ -1,0 +1,19 @@
+{
+  "target": "heart-abyss/hub-1",
+  "language": "de",
+  "total_units": 396,
+  "total_words": 2371,
+  "failing_checks": {
+    "duplicate": [
+      370181
+    ],
+    "end_stop": [
+      370355
+    ],
+    "end_question": [
+      370355
+    ]
+  },
+  "candidates": [],
+  "mqm_results": null
+}

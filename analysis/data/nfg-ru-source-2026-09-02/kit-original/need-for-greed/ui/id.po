@@ -1,0 +1,2090 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-28 09:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Indonesian <http://l10n.herocraft.com/projects/need-for-greed/"
+"ui/id/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: id\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: 142945292288
+msgid "vibration"
+msgstr "Getaran"
+
+#: 136857827676160
+msgid "loading"
+msgstr "Memuat"
+
+#: 140450844643328
+msgid "adsNotReady"
+msgstr "Iklan belum siap. Coba lagi nanti."
+
+#: 340188151943168
+msgid "amount"
+msgstr "{value}"
+
+#: 368875517775872
+msgid "reviewTitle"
+msgstr "Pendapat Anda penting bagi kami!"
+
+#: 368997953703936
+msgid "reviewDescription"
+msgstr "Apakah Anda menyukai game ini?"
+
+#: 369514264137728
+msgid "reviewConfirm"
+msgstr "Ya, tentu saja!"
+
+#: 369755633750016
+msgid "no"
+msgstr "Tidak"
+
+#: 406497292193792
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+#: 483624632979456
+msgid "leaders"
+msgstr "Pemimpin"
+
+#: 483894125400064
+msgid "leaderboardAuth"
+msgstr ""
+"Papan peringkat hanya tersedia untuk pengguna yang berwenang. \n"
+"Masuk ke akun Anda di pengaturan."
+
+#: 693554757505024
+msgid "softCurrency"
+msgstr "Koin perak"
+
+#: 693648756051968
+msgid "gems"
+msgstr "Permata"
+
+#: 2338581875265536
+msgid "day_N"
+msgstr "Hari {value}"
+
+#: 2340303519617024
+msgid "dailyRewards"
+msgstr "Hadiah harian"
+
+#: 2340513616498688
+msgid "dailyRewardsDescription"
+msgstr ""
+"Kunjungi game setiap hari\n"
+"dan dapatkan hadiah."
+
+#: 2524665741578240
+msgid "tapToStart"
+msgstr "Ketuk untuk memulai"
+
+#: 2534199759474688
+msgid "settings"
+msgstr "Pengaturan"
+
+#: 2539217615065088
+msgid "sound"
+msgstr "SFX"
+
+#: 2539801025974272
+msgid "music"
+msgstr "Musik"
+
+#: 2606360020914176
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}j. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?"
+"{seconds}d.|} "
+
+#: 31188945265680384
+msgid "sell"
+msgstr "Jual"
+
+#: 39267299644215296
+msgid "trading"
+msgstr "Dagang"
+
+#: 39267930052300800
+msgid "selectAmount"
+msgstr ""
+"Pilih jumlah Permata <size=56><color=#fff>( {value} / {total} )</color></"
+"size>"
+
+#: 39432224572248064
+msgid "apply"
+msgstr "Terapkan"
+
+#: 88927433573797888
+msgid "exit"
+msgstr "Keluar"
+
+#: 89108083400511488
+msgid "loot"
+msgstr "Loot"
+
+#: 89232802619592704
+msgid "inventory"
+msgstr "Inventaris"
+
+#: 89233049219502080
+msgid "add_amount"
+msgstr "+ {value}"
+
+#: 101508439312961536
+msgid "upgradeCharacterHealthStat"
+msgstr "Kesehatan"
+
+#: 101509164025778176
+msgid "Pick"
+msgstr "Pilih"
+
+#: 103762241726451712
+msgid "unload"
+msgstr "Bongkar"
+
+#: 105589950840573952
+msgid "continue"
+msgstr "Lanjutkan"
+
+#: 105600782735511552
+msgid "continueWithoutTheBird"
+msgstr "Lanjutkan tanpa burung"
+
+#: 128992315220168704
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+#: 129852820621103104
+msgid "make"
+msgstr "Buat"
+
+#: 130612002970406912
+msgid "in_progress"
+msgstr "Dalam proses..."
+
+#: 132250436289957888
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+#: 132393404065910784
+msgid "lvl_x"
+msgstr "lvl. {value}"
+
+#: 133085114043469824
+msgid "take"
+msgstr "Ambil"
+
+#: 168978456979443712
+msgid "tradeDescription"
+msgstr "Seret dan lepas item untuk dijual di sini"
+
+#: 168979719083266048
+msgid "storage"
+msgstr "Gudang"
+
+#: 168993254521704448
+msgid "backpack"
+msgstr "Ransel"
+
+#: 175428495763312640
+msgid "upgradeCharacterResistanceStat"
+msgstr "Resistansi"
+
+#: 175428883866456064
+msgid "completed"
+msgstr "Selesai"
+
+#: 175429326734626816
+msgid "upgradeCharacterSpeedStat"
+msgstr "Kecepatan"
+
+#: 175429624488267776
+msgid "detectionRadius"
+msgstr "Jangkauan deteksi jebakan"
+
+#: 175437389508120576
+msgid "upgrade"
+msgstr "Tingkatkan"
+
+#: 175444653988122624
+msgid "upgradeCharacterTitle"
+msgstr "Karakter lvl {value}"
+
+#: 175444893063450624
+msgid "upgradeToolTitle"
+msgstr "Alat lvl {value}"
+
+#: 175445052228898816
+msgid "bird"
+msgstr "Burung"
+
+#: 175445211058802688
+msgid "craft"
+msgstr "Kerajinan"
+
+#: 175530141390475264
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Penerbangan tambahan"
+
+#: 175535881710735360
+msgid "upgradeToolSpeedStat"
+msgstr "Kecepatan dampak alat"
+
+#: 175536172950622208
+msgid "upgradeToolDamageStat"
+msgstr "Kerusakan alat"
+
+#: 185307831437889536
+msgid "terrain1Title"
+msgstr "Rawa Fenmar"
+
+#: 185308054407090176
+msgid "terrain2Title"
+msgstr "Belomar"
+
+#: 185645691072417792
+msgid "start"
+msgstr "Mulai"
+
+#: 185658961254682624
+msgid "terrain1Description"
+msgstr ""
+"Hanya rawa yang menjadi rawa — kecuali dengan bongkahan emas dan cacing "
+"raksasa yang bereaksi terhadap setiap “dentang.”\n"
+"Penduduk setempat berkata: jika kamu ingin emas, jangan bergemerincing "
+"seperti toko pecah belah."
+
+#: 185670435373060096
+msgid "howToOpenBiome"
+msgstr ""
+"Tempat baru.\n"
+"Selesaikan pesanan dan temukan\n"
+"lokasi berikutnya."
+
+#: 185944937449394176
+msgid "revivalTitle"
+msgstr "Ini kegagalan total!"
+
+#: 185946490252038144
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Item di Ransel: {value} / {total}"
+
+#: 185949125390635008
+msgid "exitAndLoseItems"
+msgstr "Keluar dan kehilangan item"
+
+#: 187764654040420352
+msgid "noBirdEnergy"
+msgstr "Tidak ada burung, tidak ada mata"
+
+#: 187765165577736192
+msgid "noDetectorEnergy"
+msgstr "Detektor harta karun"
+
+#: 190252961852821504
+msgid "yes_leave"
+msgstr "Ya, keluar"
+
+#: 190253329051553792
+msgid "no_stay"
+msgstr "Tidak, tetap di sini"
+
+#: 190253804719181824
+msgid "leave_location_confirmation"
+msgstr "Apakah Anda ingin meninggalkan lokasi?"
+
+#: 190609920439357440
+msgid "percentAmount"
+msgstr "{value}%"
+
+#: 190613197834948608
+msgid "pointsAmount"
+msgstr "{value} <size=70%>pt.</size>"
+
+#: 190999934906142720
+msgid "close"
+msgstr "Tutup"
+
+#: 191001304602251264
+msgid "selectTheShape"
+msgstr "Pilih bentuk harta karun"
+
+#: 191001600908857344
+msgid "speedUp"
+msgstr "Percepat"
+
+#: 191062612982894592
+msgid "tutorial"
+msgstr "Tutorial"
+
+#: 214456412639858688
+msgid "terrainPickLootTitle"
+msgstr "Ambil semua yang muat di tas dan Penyimpanan Anda"
+
+#: 214474517843808256
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+#: 215688832034803712
+msgid "takeToStorageXofY"
+msgstr "Ambil {value}/ {total}"
+
+#: 215688944811249664
+msgid "upgradeBag"
+msgstr "Tingkatkan tas"
+
+#: 216124892128743424
+msgid "dealerWillBuyTheRest"
+msgstr "Pedagang akan membeli semua yang lain dari Anda"
+
+#: 216274536972423168
+msgid "information"
+msgstr "Informasi"
+
+#: 216281997183815680
+msgid "weightInformation"
+msgstr ""
+"Kapasitas tas kuda adalah indikator penting.\n"
+"Berat barang yang ditemukan memengaruhi pengangkutannya.\n"
+"Tingkatkan tas Anda untuk menambah kapasitas dan membawa lebih banyak barang."
+
+#: 216292821260570624
+msgid "rank_x"
+msgstr "Peringkat {value}"
+
+#: 216295079784222720
+msgid "weight"
+msgstr "Berat:"
+
+#: 216455391749607424
+msgid "vehicleUpgradeDescription"
+msgstr "Tingkatkan kapasitas tas kargo kuda untuk membawa muatan."
+
+#: 216456296213516288
+msgid "capacity"
+msgstr "Kapasitas"
+
+#: 216456449876037632
+msgid "horseCargoBag"
+msgstr "Tas kargo kuda"
+
+#: 216464394802171904
+msgid "hardCurrency"
+msgstr "Koin emas"
+
+#: 216827767398076416
+msgid "confirmation"
+msgstr "Konfirmasi"
+
+#: 216836939359457280
+msgid "attention!"
+msgstr "Perhatian!"
+
+#: 216837051221544960
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Jika Anda pergi sekarang, <color=#E01114>semua barang yang ditemukan akan "
+"dijual ke pedagang</color> dengan harga lebih rendah dari biasanya."
+
+#: 216843048690388992
+msgid "bayerDescription"
+msgstr ""
+"Ingin mendapatkan lebih banyak? Saya akan membeli sisa-sisa dengan bonus."
+
+#: 217004942013239296
+msgid "bestProfit"
+msgstr "Keuntungan terbaik"
+
+#: 217005085059977216
+msgid "goodProfit"
+msgstr "Keuntungan bagus"
+
+#: 217005221878173696
+msgid "badProfit"
+msgstr "Keuntungan buruk"
+
+#: 217034757265166336
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+#: 217067111195086848
+msgid "yourProfit"
+msgstr "Keuntungan Anda:"
+
+#: 219330229052903424
+msgid "eliteSlot"
+msgstr "Slot elit"
+
+#: 219330557043281920
+msgid "tradingShopLevel"
+msgstr "Toko perdagangan level {value}"
+
+#: 219331227683131392
+msgid "rent"
+msgstr "Sewa"
+
+#: 219333990236295168
+msgid "slot"
+msgstr "Slot"
+
+#: 219334107282542592
+msgid "selectItem"
+msgstr "Pilih item"
+
+#: 219569917810446336
+msgid "checkOffer"
+msgstr "Periksa"
+
+#: 221184956493467648
+msgid "shopLevel"
+msgstr "Toko lvl {value}"
+
+#: 221731312916238336
+msgid "tradeOpenEliteSlotDialog"
+msgstr "Di sinilah pembeli membayar mahal, tidak ada tawar-menawar."
+
+#: 221732692687065088
+msgid "getASlot"
+msgstr "Dapatkan slot"
+
+#: 221745332360581120
+msgid "customerWillArriveIn"
+msgstr "Pelanggan akan tiba dalam:"
+
+#: 221747748288073728
+msgid "speedUpBy"
+msgstr "Percepat dengan"
+
+#: 221752584698073088
+msgid "decline?"
+msgstr "Tolak?"
+
+#: 221752816395620352
+msgid "tradeDeclineClientInfo"
+msgstr "Sampai pelanggan berikutnya tiba:"
+
+#: 221785455785676800
+msgid "tradingShop"
+msgstr "Toko perdagangan"
+
+#: 221785885429207040
+msgid "newSlot"
+msgstr "Slot baru"
+
+#: 221786327613706240
+msgid "tradeUpgradeDescription"
+msgstr ""
+"Tingkatkan toko perdagangan untuk membuka lebih banyak slot untuk menjual."
+
+#: 221790732488544256
+msgid "tradingShopShort"
+msgstr "Toko"
+
+#: 221791365350297600
+msgid "level_x"
+msgstr "Level {value}"
+
+#: 221901028389556224
+msgid "buyersOffer"
+msgstr "Penawaran pembeli:"
+
+#: 221902690122469376
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+#: 223520514767065088
+msgid "common"
+msgstr "Umum"
+
+#: 223520659910955008
+msgid "uncommon"
+msgstr "Tidak Umum"
+
+#: 223520713283473408
+msgid "rare"
+msgstr "Langka"
+
+#: 223520767448715264
+msgid "epic"
+msgstr "Epik"
+
+#: 223520826210914304
+msgid "legendary"
+msgstr "Legendaris"
+
+#: 223520860377714688
+msgid "mythic"
+msgstr "Mitos"
+
+#: 224246507228106752
+msgid "tradeSelectItemTitle"
+msgstr "Pilih item untuk dijual"
+
+#: 224277347911864320
+msgid "basePrice"
+msgstr "Harga dasar:"
+
+#: 226508435681972224
+msgid "map"
+msgstr "Peta"
+
+#: 226574491591118848
+msgid "wiseNotes"
+msgstr "Catatan bijak"
+
+#: 226576404894191616
+msgid "emptyPickedItems"
+msgstr "Pergi dengan tangan kosong?"
+
+#: 226580081470083072
+msgid "settingsDescription"
+msgstr "Bentuk dunia sesuai keinginanmu!"
+
+#: 226582087576326144
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Tingkatkan toko perdaganganmu untuk membuka lebih banyak slot penjualan — "
+"semakin banyak rak yang kamu tambahkan, semakin besar keuntunganmu!"
+
+#: 226633818465112064
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}"
+
+#: 227954852267036672
+msgid "craftSlot"
+msgstr "Slot kerajinan"
+
+#: 227959361919782912
+msgid "superSlot"
+msgstr "Slot super"
+
+#: 228232787804819456
+msgid "forge"
+msgstr "Tempa"
+
+#: 228312834624458752
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Tempa harta karun, buka peti dan telur ajaib — siapa tahu loot langka "
+"menanti di dalamnya!"
+
+#: 228318026984067072
+msgid "chestSlot"
+msgstr "Slot peti"
+
+#: 228318447752450048
+msgid "incubator"
+msgstr "Inkubator"
+
+#: 228321113740152832
+msgid "craftOpenEliteSlotLabel"
+msgstr "Lepaskan kekuatan pamungkas!"
+
+#: 228357165007769600
+msgid "cancel"
+msgstr "Batal"
+
+#: 228360236127490048
+msgid "openChest"
+msgstr "Buka peti"
+
+#: 228385218756874240
+msgid "timeToOpen:"
+msgstr "Waktu untuk membuka:"
+
+#: 228792391647367168
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Tidak ada Peti dalam stok"
+
+#: 228794249094893568
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Temukan satu? Seret ke Kerajinan dan buka\n"
+"(jangan pakai kapak, ya?)"
+
+#: 228796285601452032
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+#: 229526591581196288
+msgid "craftSelectEggTitle"
+msgstr "Pilih Telur untuk dibuka"
+
+#: 229526902270070784
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Tidak ada Telur dalam stok"
+
+#: 229528260377317376
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "Kita menuju Telur — bukan dari kandang, tapi lahir dari sihir!"
+
+#: 229528854181711872
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Jelajahi alam, temukan Telur Langka, dan serahkan ke Kerajinan. Apa yang ada "
+"di dalamnya — hanya kuning telur, atau sesuatu yang jauh lebih besar?"
+
+#: 229530481219342336
+msgid "openEgg"
+msgstr "Buka Telur"
+
+#: 229879731472044032
+msgid "craftSelectRecipeTitle"
+msgstr "Pilih komponen untuk Kerajinan"
+
+#: 229880209643671552
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Tidak ada stok!"
+
+#: 229881107660935168
+msgid "craftItem"
+msgstr "Buat item"
+
+#: 229881635711225856
+msgid "crafting:"
+msgstr "Kerajinan:"
+
+#: 229882264282206208
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Item-item ini belum ditemukan."
+
+#: 229887783071911936
+msgid "recipe"
+msgstr "Resep"
+
+#: 230098234464538624
+msgid "craftClosedRecipeTitle"
+msgstr "Tempa terlalu lemah!"
+
+#: 230098538715156480
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Level Bengkel Tempa Tidak Memadai\n"
+"\n"
+"Dengan setiap peningkatan, Anda akan dapat membuat harta karun yang semakin "
+"langka dan berharga. Saatnya mengubah tungku ini menjadi bengkel tempa "
+"legendaris!"
+
+#: 230596136282624000
+msgid "craftClosedSlotTitle"
+msgstr "Slot terkunci!"
+
+#: 230596696704552960
+msgid "craftClosedSlotDescription"
+msgstr ""
+"Keterampilan kerajinan Anda belum cukup kuat. Anda perlu meningkatkannya."
+
+#: 230974103273869312
+msgid "or"
+msgstr "atau"
+
+#: 231685619115626496
+msgid "craftSpeedUpTitle"
+msgstr "Masukkan batu bara!"
+
+#: 231686505602748416
+msgid "craftSpeedUpDescription"
+msgstr ""
+"Ini akan seperti para kurcaci menenggak espresso dan mengaktifkan mode turbo!"
+
+#: 231700678231461888
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Slot terbuka.\n"
+"Tungku melelehkan Logam, mengubahnya menjadi Perhiasan baru untuk dijual."
+
+#: 231701488554217472
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Waktu adalah uang, tetapi Perhiasan dibuat lebih cepat"
+
+#: 231702447166590976
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Meningkatkan peluangmu untuk membuat item yang layak Legendaris."
+
+#: 231703302095769600
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"Kebijaksanaan para leluhur mengalir dalam dirimu — Tempa keajaiban yang "
+"belum pernah dilihat dunia!"
+
+#: 232003352147529728
+msgid "craftStockFullTitle"
+msgstr "Tidak ada ruang untuk harta di Penyimpanan!"
+
+#: 232004264790331392
+msgid "craftStockFullDescription"
+msgstr ""
+"Penyimpanan penuh hingga serpihan terakhir.\n"
+"Jual kelebihan di Toko perdagangan atau tingkatkan Penyimpanan — lalu klaim "
+"trofi berkilaumu!"
+
+#: 232054830455328768
+msgid "allItems"
+msgstr "Semua item"
+
+#: 232055567298072576
+msgid "stockLevel"
+msgstr "Penyimpanan lvl {value}"
+
+#: 232285845522223104
+msgid "storageUpgradeDescription"
+msgstr ""
+"Setiap peningkatan memberikan <color=#E01114>lebih banyak ruang</color> "
+"untuk harta yang ditemukan dan ditempa. Lebih banyak Emas, lebih sedikit "
+"penderitaan!"
+
+#: 238220511437656064
+msgid "revivalDescription"
+msgstr "Respawn — atau ucapkan selamat tinggal pada Loot Anda."
+
+#: 238225411982757888
+msgid "noBirdEnergyDescription"
+msgstr "Membawa Anda ke harta karun dan terbang untuk beristirahat."
+
+#: 238226013823438848
+msgid "callTheBird"
+msgstr "Kembali sekarang"
+
+#: 238228172388438016
+msgid "noDetectorEnergyDescription"
+msgstr "Pikirkan Anda bisa menangani satu lagi?"
+
+#: 238229156124692480
+msgid "oreSeeker"
+msgstr "Pencari Bijih"
+
+#: 238230435035090944
+msgid "gemSeeker"
+msgstr "Pencari Permata"
+
+#: 238805340126449664
+msgid "respawn"
+msgstr "Respawn"
+
+#: 238835918318080000
+msgid "deathExit"
+msgstr "Pergi tanpa apa-apa"
+
+#: 241685352961806336
+msgid "terrain0Title"
+msgstr "Quietwood"
+
+#: 241686624016273408
+msgid "terrain2Description"
+msgstr ""
+"Gurun utara yang keras terkunci dalam dingin abadi. Di antara labirin es, "
+"mudah tersesat—dan setelah matahari terbenam, membeku sampai mati. Dalam "
+"urutan itu… atau mungkin sebaliknya."
+
+#: 241686676700925952
+msgid "terrain0Description"
+msgstr ""
+"Setiap pahlawan bermula dari suatu tempat!\r\n"
+"Terkubur di sini adalah harta karun pertamamu — dan masalah pertamamu. Di "
+"sinilah kamu akan belajar menambang, melebur, pamer, dan bertahan hidup."
+
+#: 242168130602012672
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Raih simpati penduduk desa,\n"
+"dan kota baru akan membuka gerbangnya untukmu!"
+
+#: 242225089728483328
+msgid "upgradeToolNoiseStat"
+msgstr "Pengurangan kebisingan"
+
+#: 243276239902871552
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr ""
+"Tingkatkan ketahananmu — dan kamu tidak akan gentar saat dunia menjadi tidak "
+"bersahabat!"
+
+#: 243276804422635520
+msgid "upgradeCharacterHealthStatDescription"
+msgstr ""
+"Lebih banyak nyawa — lebih sedikit kesempatan untuk menjadi legenda... "
+"setelah kematian."
+
+#: 243277089148768256
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr ""
+"Kaki lebih cepat — lebih sedikit peluang menjadi santapan satwa liar "
+"setempat!"
+
+#: 243277490971480064
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"Semakin banyak pengintai berbulu yang kamu miliki, semakin besar peluangmu "
+"menemukan kilauan yang terkubur!"
+
+#: 243277858065354752
+msgid "upgradeToolSpeedStatDescription"
+msgstr ""
+"Semakin cepat serangannya, semakin kecil kemungkinan orang lain mengambil "
+"bijihnya terlebih dahulu!"
+
+#: 243278506789965824
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Semakin kuat alatnya, semakin jinak batunya —\r\n"
+"dan semakin penuh tasmu!"
+
+#: 243278882293420032
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Lebih sedikit kebisingan berarti lebih sedikit peluang untuk didengar oleh "
+"mereka yang lebih menyukai suara tulang daripada dentingan Emas."
+
+#: 243286615193292800
+msgid "resistanceStatLevel"
+msgstr "Level Resistansi {value}"
+
+#: 243287048297123840
+msgid "healthStatLevel"
+msgstr "Level Kesehatan {value}"
+
+#: 243287378833444864
+msgid "speedStatLevel"
+msgstr "Level Kecepatan {value}"
+
+#: 243287648745295872
+msgid "upgradeBirdTitle"
+msgstr "Burung level {value}"
+
+#: 243301960306135040
+msgid "amountPcs"
+msgstr "{value} buah."
+
+#: 246550123938844672
+msgid "maxLevel"
+msgstr "Level maksimal"
+
+#: 246920055440543744
+msgid "treasureDetector"
+msgstr "Detektor harta karun"
+
+#: 246920748020797440
+msgid "amountSec"
+msgstr "{value} detik."
+
+#: 246921123041906688
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Pencari Bijih"
+
+#: 246921489389195264
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Alat ajaib ini mengendus urat emas lebih baik daripada kurcaci mengendus "
+"makan siang gratis!"
+
+#: 246922080165302272
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Pencari Permata"
+
+#: 246922249237696512
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"Perangkat dengan hidung yang lebih tajam daripada keserakahan pedagang. "
+"Tidak ada permata yang tersembunyi lama!"
+
+#: 246922743578365952
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Lebih banyak waktu untuk berburu Emas"
+
+#: 246922920854818816
+msgid "upgradeDetectorDurationStatDescription"
+msgstr ""
+"Berjalan lebih lama, mencari lebih baik, mengeluh lebih sedikit. Lebih "
+"banyak waktu berarti lebih banyak Loot!"
+
+#: 247080041558839296
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+#: 247080534393753600
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} pcs."
+
+#: 247080751339933696
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} detik."
+
+#: 247452846670483456
+msgid "gold"
+msgstr "Emas"
+
+#: 247452991940202496
+msgid "chests"
+msgstr "Peti"
+
+#: 247453392370405376
+msgid "eggs"
+msgstr "Telur"
+
+#: 247453604342140928
+msgid "treasures"
+msgstr "Perhiasan"
+
+#: 247453698634289152
+msgid "artifacts"
+msgstr "Artefak"
+
+#: 249822854419582976
+msgid "deathTitle"
+msgstr "Kematian mengambil segalanya!"
+
+#: 249823090609229824
+msgid "deathDescription"
+msgstr "Loot Anda kini menjadi legenda."
+
+#: 250055490891157504
+msgid "tradeEmptyStorageMessage"
+msgstr "Tidak ada yang bisa dijual sekarang"
+
+#: 250066987813965824
+msgid "craftNoEggs"
+msgstr "Tidak ada telur untuk Inkubator"
+
+#: 250067227111591936
+msgid "craftNoChests"
+msgstr "Tidak ada Peti untuk dibuka"
+
+#: 250067363896233984
+msgid "craftNoItems"
+msgstr "Tidak ada yang bisa dibuat"
+
+#: 250187845660315648
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Lebih banyak waktu untuk berburu Permata"
+
+#: 251259329547866112
+msgid "newLocationAvailableTitle"
+msgstr "Lokasi baru kini tersedia!"
+
+#: 251259543163768832
+msgid "newLocationAvailableDescription"
+msgstr "Penduduk desa setuju: Anda pantas mendapatkan lebih."
+
+#: 251632108633853952
+msgid "upgradeStock"
+msgstr "Tingkatkan Penyimpanan"
+
+#: 252146625037996032
+msgid "storageOverflowedDesctiption"
+msgstr ""
+"Penyimpanan Anda tidak dapat menampung semua kekayaan Anda. Saatnya untuk "
+"meningkatkan!"
+
+#: 252147840639569920
+msgid "throwAway"
+msgstr "Buang"
+
+#: 259586112407998464
+msgid "upgradeCraftCostStatDescription"
+msgstr "Harga dasar barang naik seperti roti beragi"
+
+#: 262490762970927104
+msgid "upgradeVehicleWeightStat"
+msgstr "Tas besar"
+
+#: 262491576103866368
+msgid "upgradeVehicleWeightStatDescription"
+msgstr ""
+"Kuda sekarang dapat membawa lebih banyak harta. Lebih banyak barang, lebih "
+"banyak kebahagiaan!"
+
+#: 262491999908925440
+msgid "upgradeVehicleTitle"
+msgstr "Kuda lvl {value}"
+
+#: 262492464646197248
+msgid "amountKg"
+msgstr "{value} kg."
+
+#: 262492710260445184
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+#: 262493129695039488
+msgid "upgradeStorageWeightStat"
+msgstr "Kapasitas"
+
+#: 262493626518736896
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Ruang ekstra untuk harta yang sama sekali tidak berharga!"
+
+#: 262495569987244032
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Pembeli murah hati"
+
+#: 262495864679043072
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Pelanggan berebut barang rongsokan Anda."
+
+#: 262496445971828736
+msgid "upgradeTradeTitle"
+msgstr "Toko perdagangan lvl {value}"
+
+#: 262497898778071040
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Anda berbau kekayaan"
+
+#: 262498326018265088
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"Kabar tentang keahlian Anda telah menyebar — dompet berjalan sungguhan lebih "
+"sering muncul."
+
+#: 262499250967154688
+msgid "upgradeTradeSlotsStat"
+msgstr "Slot baru"
+
+#: 262499518630858752
+msgid "upgradeTradeSlotsStatDescription"
+msgstr ""
+"Slot perdagangan tambahan telah dibuka. Lebih banyak pelanggan — lebih "
+"banyak emas!"
+
+#: 262503656592773120
+msgid "upgradeCraftTimeStat"
+msgstr "Sprint Perhiasan"
+
+#: 262504135200608256
+msgid "upgradeCraftTitle"
+msgstr "Kerajinan lvl {value}"
+
+#: 262504539359547392
+msgid "upgradeCraftRarityStat"
+msgstr "Kelangkaan"
+
+#: 262505217075187712
+msgid "upgradeCraftRecipesStat"
+msgstr "Buku resep"
+
+#: 262506098214572032
+msgid "upgradeCraftCostStat"
+msgstr "Tambang Emas"
+
+#: 262506924148527104
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Slot Kerajinan"
+
+#: 262507722794340352
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Slot peti"
+
+#: 262508574351298560
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Slot terbuka.\n"
+"Membuka peti dan objek terkunci dari asal apa pun — bahkan yang jelas bukan "
+"dari planet ini."
+
+#: 262508742647746560
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Inkubator"
+
+#: 262508816316502016
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Slot terbuka.\n"
+"Jangan berpikir Coco hanya bagus untuk telur. Jika Anda perlu mencairkan es, "
+"memanaskan sesuatu, atau membantu dengan tugas lain — dia selalu berguna. "
+"Dan ketika harus memecahkan telur, dia bahkan tidak bertanya."
+
+#: 262509279946477568
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Slot terbuka.\n"
+"Alat utama pengrajin ahli.\n"
+"Ia bisa melakukan semuanya: memproses, memulihkan, memoles, membuka, dan "
+"mengerjakan ulang."
+
+#: 262509359629864960
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Slot super"
+
+#: 262698318934839296
+msgid "tradeLockedState"
+msgstr "Toko perdagangan terlalu kecil!"
+
+#: 262791601379872768
+msgid "upgradeDetectorTitle"
+msgstr "Detektor harta karun lvl {value}"
+
+#: 262792683350921216
+msgid "upgradeStorageTitle"
+msgstr "Penyimpanan lvl {value}"
+
+#: 266500052736020480
+msgid "selectTrashTitle"
+msgstr "Sampah Massal"
+
+#: 267774055178047488
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Semua tentang suka!"
+
+#: 267774187718053888
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "Penonton berteriak kegirangan!"
+
+#: 286237360443887616
+msgid "metals"
+msgstr "Logam"
+
+#: 289291316380307456
+msgid "craftSelectRoughTitle"
+msgstr "Pilih item untuk dipoles"
+
+#: 289293923853275136
+msgid "craftNoRough"
+msgstr "Tidak ada item untuk dipoles"
+
+#: 302325393484156928
+msgid "curseRemovalSlot"
+msgstr "Altar"
+
+#: 302327188075843584
+msgid "inlaySlot"
+msgstr "Sisipkan"
+
+#: 302327678603890688
+msgid "polishingSlot"
+msgstr "Pemolesan"
+
+#: 310688720811724800
+msgid "rough"
+msgstr "Kasar"
+
+#: 310688991746985984
+msgid "cursedItems"
+msgstr "Terkutuk"
+
+#: 310861865698988032
+msgid "storageDescription"
+msgstr ""
+"Semua item yang ditemukan disimpan di sini.\n"
+"Ruang terbatas — gudang tidak terbuat dari karet.\n"
+"Tingkatkan Penyimpanan Anda agar keserakahan Anda tidak membentur dinding."
+
+#: 311007630727581696
+msgid "traderName"
+msgstr "Zlatovich sang Pedagang"
+
+#: 311064004203384832
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Sama sekali tidak ada"
+
+#: 311066402032455680
+msgid "geodes"
+msgstr "Geode"
+
+#: 311067011754233856
+msgid "unknownItems"
+msgstr "Tidak Dikenal"
+
+#: 311247067034161152
+msgid "selectItems"
+msgstr "Pilih item"
+
+#: 311279184229175296
+msgid "proceed"
+msgstr "Lanjutkan"
+
+#: 313943879775948800
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Pemolesan"
+
+#: 313944205258133504
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Slot terbuka.\n"
+"Memperbaiki, mengasah, dan memunculkan kilau — bahkan temuan paling "
+"mencurigakan pun terlihat seperti harta karun lagi."
+
+#: 313944426742550528
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Sisipkan"
+
+#: 313944595185799168
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Slot terbuka.\n"
+"Sisipkan batu permata ke dalam perhiasan dan ubah potongan kasar menjadi "
+"kilauan penuh yang membuat pelanggan kehilangan semua kemauan."
+
+#: 313944710864703488
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Altar"
+
+#: 313944844453285888
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Slot terbuka.\n"
+"Menghilangkan kutukan dan segel magis dari item terkutuk. Terkadang… dengan "
+"kejutan."
+
+#: 313950130396205056
+msgid "craftInfoDescription"
+msgstr ""
+"Di sini, nasib dari apa yang Anda temukan diputuskan.\n"
+"Lelehkan, pasang, poles, pecahkan, atau biarkan tumbuh — setiap slot "
+"melakukan sesuatu yang mencurigakan berguna untuk item Anda.\n"
+"Benda yang ditemukan berubah menjadi perhiasan, harta karun, dan mahakarya "
+"aneh yang pasti akan dibeli seseorang."
+
+#: 313951782213783552
+msgid "superSlotDescription"
+msgstr ""
+"Slot khusus untuk segala sesuatu yang aneh dan berkilau.\n"
+"Ini melelehkan logam, memotong permata, mengangkat kutukan, memulihkan harta "
+"karun, memecahkan geode, membuka peti, dan bahkan menangani artefak alien "
+"(dengan persetujuan bersama)."
+
+#: 313952177879257088
+msgid "chestSlotDescription"
+msgstr ""
+"Sebuah Peti?\n"
+"Lemparkan saja — Slot akan mengurusnya.\n"
+"\n"
+"Apa yang keluar hanya diketahui olehnya.\n"
+"Terkadang ia sangat senang dengan hasilnya."
+
+#: 313952634336972800
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Item Terkutuk? Lemparkan saja!\n"
+"Altar akan menguras setiap tetes sihirnya, mendesah dan mengerang — lalu "
+"mengembalikannya tanpa desisan.\n"
+"\n"
+"Terkadang ia bahkan mengucapkan “terima kasih”… yang sangat normal."
+
+#: 313953216909021184
+msgid "eggSlotDescription"
+msgstr ""
+"Pilih Telur apa saja — induk ayam akan mengeraminya, menepuknya dengan "
+"lembut, dan berkotek pelan…\n"
+"lalu menetaskan sesuatu yang menarik.\n"
+"\n"
+"Terkadang terlalu menarik."
+
+#: 313953702185799680
+msgid "inlaySlotDescription"
+msgstr ""
+"Pilih sepotong Perhiasan dan penuhi dengan batu permata — Slot kosong tidak "
+"akan berhasil!\n"
+"Yang Anda dapatkan adalah benda berkilau yang dipoles sempurna yang membuat "
+"pembeli menjerit kegirangan."
+
+#: 313954530854440960
+msgid "craftSlotDescription"
+msgstr ""
+"Lemparkan apa saja yang Logam — tungku akan melelehkannya, mencampurnya, dan "
+"menempa sepotong Perhiasan baru.\n"
+"Mereka bilang itu bekerja berdasarkan inspirasi… yang tidak dimilikinya. "
+"Namun, itu menyelesaikan pekerjaan!"
+
+#: 313954955250896896
+msgid "polishingSlotDescription"
+msgstr ""
+"Pilih Geode, batu Kasar, atau bahkan harta karun kuno yang hancur —\n"
+"meja kerja akan memolesnya, memperbaikinya, dan memunculkan kilaunya.\n"
+"\n"
+"Apa yang keluar dapat disoketkan, dibuat, atau dijual untuk keuntungan besar."
+
+#: 314195955441471488
+msgid "unknownSlot"
+msgstr "Penilaian"
+
+#: 314210445310562304
+msgid "unknownSlotTitle"
+msgstr "Pilih item untuk Penilaian"
+
+#: 314211470289408000
+msgid "craftNoUnknown"
+msgstr "Tidak ada item untuk Penilaian"
+
+#: 314211918601785344
+msgid "craftNoCursed"
+msgstr "Tidak ada item Terkutuk"
+
+#: 314214842253971456
+msgid "craftNoInlay"
+msgstr "Tidak ada item untuk Sisipkan"
+
+#: 314260890229936128
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Jual Perhiasan dan temuan lainnya, periksa nilainya, dan selesaikan "
+"kesepakatan.\n"
+"Tingkatkan toko — buka slot baru dan jual lebih banyak barang."
+
+#: 314261126486691840
+msgid "tradingShopInfoTitle"
+msgstr "Toko Perdagangan Zlatovich"
+
+#: 314274887167643648
+msgid "tradeSpeedUp"
+msgstr "Menarik pelanggan"
+
+#: 314278745457561600
+msgid "nextCustomer"
+msgstr "Pelanggan berikutnya"
+
+#: 314297063191089152
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Penilaian"
+
+#: 314297243575521280
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Pedagang Zlatovich akan melihat setiap item, menggerutu dengan penuh "
+"pertimbangan, dan menyebutkan harga.\n"
+"Terkadang… harga yang menyenangkan."
+
+#: 314612693521928192
+msgid "timeToMoveOut"
+msgstr "Waktunya untuk melarikan diri!"
+
+#: 314914390584594432
+msgid "metal"
+msgstr "Logam"
+
+#: 314914695741181952
+msgid "gem"
+msgstr "Permata"
+
+#: 314915117155487744
+msgid "treasure"
+msgstr "Perhiasan"
+
+#: 314915322823184384
+msgid "chest"
+msgstr "Peti"
+
+#: 314915636620038144
+msgid "trash"
+msgstr "Sampah"
+
+#: 314915781340303360
+msgid "egg"
+msgstr "Telur"
+
+#: 314915913649623040
+msgid "artifact"
+msgstr "Artefak"
+
+#: 314916000182308864
+msgid "geode"
+msgstr "Geode"
+
+#: 314916165517578240
+msgid "unknown"
+msgstr "Tidak Dikenal"
+
+#: 314916328457900032
+msgid "cursed"
+msgstr "Terkutuk"
+
+#: 314925043173036032
+msgid "orders"
+msgstr "Pesanan"
+
+#: 315250694291722240
+msgid "giveItem"
+msgstr "Berikan Item"
+
+#: 316337287538675712
+msgid "ordersInfoDescription"
+msgstr ""
+"Selesaikan pesanan — dan pelanggan akan menunjukkan jalan ke depan.\n"
+"Lokasi, sumber daya, dan Perhiasan baru sudah menunggu."
+
+#: 316378780114620416
+msgid "hearthCurrency"
+msgstr "Suka"
+
+#: 316380499837980672
+msgid "reward"
+msgstr "Hadiah"
+
+#: 316382146563674112
+msgid "claim"
+msgstr "Klaim"
+
+#: 316397921840140288
+msgid "terrain0Biome1Title"
+msgstr "Tanah Tandus"
+
+#: 316402101459881984
+msgid "ordersClaimBiomeTitle"
+msgstr "Jalur ke lokasi baru terbuka"
+
+#: 316402277297688576
+msgid "ordersClaimBiomeDescription"
+msgstr "Penemuan baru tersedia"
+
+#: 317048656315551744
+msgid "terrain1Biome1Title"
+msgstr "Makam"
+
+#: 317908391516442624
+msgid "toTrade"
+msgstr "Perdagangan"
+
+#: 319566851823898624
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Ya, tinggalkan"
+
+#: 319567663786627072
+msgid "skipSelectionTreasuresCancel"
+msgstr "Tidak, kembali ke pilihan"
+
+#: 320015732638486528
+msgid "soldToDealer"
+msgstr "Terjual!"
+
+#: 321539636750192640
+msgid "craftSelectBlockedWrongType"
+msgstr "Item ini tidak cocok untuk jenis slot ini"
+
+#: 321540352067768320
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Anda sudah memilih item yang cukup dari grup ini"
+
+#: 332999660336844800
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"Jejak sudah ditumbuhi. Anda sudah menguasai semuanya di sini — saatnya untuk "
+"mulai bekerja."
+
+#: 333367357155315712
+msgid "terrain0Biome0Title"
+msgstr "Tanah Tandus"
+
+#: 333367909771644928
+msgid "terrain1Biome0Title"
+msgstr "Rawa"
+
+#: 333368362697756672
+msgid "terrain1Biome2Title"
+msgstr "Jatuhnya Meteor"
+
+#: 333841248503992320
+msgid "goldUsedIn"
+msgstr ""
+"Dapat <color=#E3BA59>dijual</color> di Toko perdagangan, digunakan di "
+"<color=#E3BA59>Slot kerajinan</color>, atau ditempatkan di <color=#E3BA59>"
+"Slot super</color>."
+
+#: 333841848608231424
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Dapat <color=#E3BA59>dijual</color> di Toko perdagangan, digunakan di "
+"<color=#E3BA59>Slot kerajinan</color>, atau ditempatkan di <color=#E3BA59>"
+"Slot super</color>."
+
+#: 333841973128728576
+msgid "silverUsedIn"
+msgstr ""
+"Dapat <color=#E3BA59>dijual</color> di Toko Perdagangan, digunakan di "
+"<color=#E3BA59>Slot Kerajinan</color>, atau ditempatkan di <color=#E3BA59>"
+"Slot Super</color>."
+
+#: 333842030875906048
+msgid "gemUsedIn"
+msgstr ""
+"Dapat <color=#E3BA59>dijual</color> di Toko Perdagangan, digunakan di "
+"<color=#E3BA59>Slot Kerajinan</color> atau <color=#E3BA59>Slot Super</color>"
+", atau <color=#E3BA59>disisipkan</color> ke dalam Harta Karun."
+
+#: 333842074681217024
+msgid "gemRoughUsedIn"
+msgstr ""
+"Dapat diproses di <color=#E3BA59>Pemolesan</color> atau <color=#E3BA59>Slot "
+"Super</color> untuk mengungkapkan nilai sebenarnya."
+
+#: 333842122626306048
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Dapat <color=#E3BA59>dijual</color> di Toko Perdagangan atau disoket dengan "
+"permata melalui <color=#E3BA59>Sisipkan</color> atau <color=#E3BA59>Slot "
+"Super</color> untuk meningkatkan nilainya."
+
+#: 333842171624165376
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Dapat diperbaiki di <color=#E3BA59>Pemolesan</color> atau <color=#E3BA59>"
+"Slot Super</color>."
+
+#: 333842234089934848
+msgid "chestUsedIn"
+msgstr ""
+"Dapat dibuka di <color=#E3BA59>Slot Peti</color> atau <color=#E3BA59>Slot "
+"Super</color>."
+
+#: 333842279115788288
+msgid "trashUsedIn"
+msgstr "Hanya dapat <color=#E3BA59>dijual</color> kepada pedagang."
+
+#: 333842322942070784
+msgid "eggUsedIn"
+msgstr ""
+"Dapat dibuka di <color=#E3BA59>Inkubator</color> atau <color=#E3BA59>Slot "
+"Super</color>."
+
+#: 333842403657256960
+msgid "artifactUsedIn"
+msgstr "Hanya dapat <color=#E3BA59>dijual</color> di Toko Perdagangan."
+
+#: 333842449953984512
+msgid "geodeUsedIn"
+msgstr ""
+"Dapat dibuka di <color=#E3BA59>Pemolesan</color> atau <color=#E3BA59>Slot "
+"Super</color>."
+
+#: 333842496531730432
+msgid "unknownUsedIn"
+msgstr ""
+"Dapat dibawa ke Pedagang untuk <color=#E3BA59>Penilaian</color> untuk "
+"menentukan nilai sebenarnya."
+
+#: 333842548465602560
+msgid "cursedUsedIn"
+msgstr ""
+"Kutukan dapat dihilangkan di <color=#E3BA59>Altar</color> atau di "
+"<color=#E3BA59>Slot super</color>."
+
+#: 334624695946317824
+msgid "terrain2Biome0Title"
+msgstr "Pabrik Gergaji"
+
+#: 334752689742417920
+msgid "perfect"
+msgstr "Sempurna"
+
+#: 334754742782922752
+msgid "decline"
+msgstr "Tolak"
+
+#: 334758932242501632
+msgid "putUpForSale"
+msgstr "Jual"
+
+#: 337073088274632704
+msgid "newLocationAvailable"
+msgstr "Tempat baru telah muncul!"
+
+#: 338548608547950592
+msgid "retargetingTitle1"
+msgstr ":monocle: Pertanyaan menarik…"
+
+#: 338548710087856128
+msgid "retargetingDescription1"
+msgstr "Seberapa jauh Anda bisa melangkah?"
+
+#: 338548825884200960
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Saatnya melanjutkan."
+
+#: 338548974257704960
+msgid "retargetingDescription2"
+msgstr "Kemajuan Anda masih ada di sini."
+
+#: 338549087440998400
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Siap untuk melanjutkan?"
+
+#: 338549137776840704
+msgid "retargetingDescription3"
+msgstr "Lanjutkan dari bagian terakhir Anda."
+
+#: 338569990488985600
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Pembuatan selesai!"
+
+#: 338570100794986496
+msgid "notificationCraftCompletedDescription"
+msgstr "Lihat apa yang Anda dapatkan."
+
+#: 338570414583451648
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Anda mendapatkan seorang Pembeli!"
+
+#: 338570498368868352
+msgid "notificationTradeCompletedDescription"
+msgstr "Barang Anda menemukan pelanggan."
+
+#: 339457185953353728
+msgid "tradeSelectBlockedWrongType"
+msgstr "Item ini tidak dapat dijual."
+
+#: 340628273341140992
+msgid "skip"
+msgstr "Lewati"
+
+#: 354499398722654208
+msgid "daily"
+msgstr "Harian"
+
+#: 354514538620784640
+msgid "available"
+msgstr "Tersedia"
+
+#: 354514769508831232
+msgid "availableIn"
+msgstr "Tersedia Di"
+
+#: 355103206058233856
+msgid "dailyRewardClaimTitle"
+msgstr "Ambil untuk keuntungan"
+
+#: 355103597911085056
+msgid "dailyRewardClaimDescription"
+msgstr "Tonton video — dapatkan hadiah X2"
+
+#: 355120760352935936
+msgid "withoutBonus"
+msgstr "Tidak ada bonus"
+
+#: 355145440342315008
+msgid "claimWithBonus"
+msgstr "Klaim dengan bonus"
+
+#: 355146771715067904
+msgid "x2Reward"
+msgstr "Hadiah x2"
+
+#: 355255965734670336
+msgid "dailyRewardAlreadyReceived"
+msgstr "Hadiah sudah diklaim!"
+
+#: 355256265493188608
+msgid "missedDailyReward"
+msgstr "Hadiah sudah terlewatkan!"
+
+#: 355256569236295680
+msgid "futureDailyReward"
+msgstr "Kembali untuk hadiah ini nanti!"
+
+#: 355276036993454080
+msgid "rateUs"
+msgstr "Nilai kami"
+
+#: 355276149157531648
+msgid "rateUsTitle"
+msgstr "Nilai kami dengan bintang"
+
+#: 355276400991932416
+msgid "rateUsDescription"
+msgstr "Nilai game ini dan bantu kami meningkatkan."
+
+#: 356305037681758208
+msgid "specialOffers"
+msgstr "Penawaran khusus"
+
+#: 356313026543226880
+msgid "quickStart"
+msgstr "Mulai Cepat!"
+
+#: 356313363102568448
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+#: 356342200381214720
+msgid "forever"
+msgstr "Selamanya"
+
+#: 356345060842016768
+msgid "starterPack"
+msgstr "Paket Pemula"
+
+#: 356346443771154432
+msgid "allInOneSupply"
+msgstr "Pasokan Lengkap"
+
+#: 356350103481749504
+msgid "dealOfTheDay"
+msgstr "Penawaran Hari Ini"
+
+#: 356354375627837440
+msgid "xAmount"
+msgstr "X{value}"
+
+#: 356354841824727040
+msgid "free!"
+msgstr "Gratis!"
+
+#: 356357806572703744
+msgid "watch"
+msgstr "Tonton"
+
+#: 356360805877551104
+msgid "coins"
+msgstr "Koin"
+
+#: 356365108071632896
+msgid "mostPopular"
+msgstr "Terpopuler"
+
+#: 356365403610681344
+msgid "bestPrice"
+msgstr "Harga Terbaik"
+
+#: 356519167105699840
+msgid "store"
+msgstr "Toko"
+
+#: 357424739636219904
+msgid "dealOfTheDayDescription"
+msgstr "Penawaran baru akan tersedia dalam"
+
+#: 357607511365521408
+msgid "health"
+msgstr "Kesehatan"
+
+#: 357784830910664704
+msgid "notificationDealOfTheDayTitle"
+msgstr "Mare ingin berbelanja :sunglasses:"
+
+#: 357784932224077824
+msgid "notificationDealOfTheDayDescription"
+msgstr "Yang tersisa hanyalah masuk dan klaim milikmu."
+
+#: 357785735030640640
+msgid "notificationCoinsReadyTitle"
+msgstr "Toko membagikan hadiah :heart-eyes:"
+
+#: 357785816504995840
+msgid "notificationCoinsReadyDescription"
+msgstr "Mampir ke toko dan ambil hadiah gratisnya."
+
+#: 358713136833105920
+msgid "wantReceipt"
+msgstr "Saya ingin tanda terima (kami akan mengirimkannya melalui email)"
+
+#: 358722499958280192
+msgid "submit"
+msgstr "Kirim"
+
+#: 358723345383165952
+msgid "receiptEmaitTitle"
+msgstr "Masukkan Email"
+
+#: 358723657267417088
+msgid "receiptEmailDescription"
+msgstr ""
+"Ingin tanda terima?\n"
+"Masukkan email Anda dan kami akan mengirimkannya setelah pembelian Anda."
+
+#: 358900766250110976
+msgid "buy"
+msgstr "Beli"
+
+#: 358901413183754240
+msgid "starterPackHeadline"
+msgstr "Raih tepat waktu!"
+
+#: 358901551423819776
+msgid "specialOfferHeadline"
+msgstr "Lebih banyak selamanya!"
+
+#: 359524475709165568
+msgid "open"
+msgstr "Buka"
+
+#: 360153378165362688
+msgid "maximumResources"
+msgstr "Sumber daya maksimum"
+
+#: 360200917140901888
+msgid "exchangeCurrencyTitle"
+msgstr "Koin perak tidak cukup."
+
+#: 360201095897944064
+msgid "exchangeCurrencyDescription"
+msgstr "Hanya kurang sedikit."
+
+#: 360201375158898688
+msgid "exchangeCurrencyQuestion"
+msgstr "Beli sisanya?"
+
+#: 360510317885919232
+msgid "bankingAwaitingTitle"
+msgstr "Koin sedang dalam perjalanan"
+
+#: 360511732461080576
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Emas sedang dimuat ke gerobak…\n"
+"Pengiriman mungkin memakan waktu beberapa menit."
+
+#: 360689578840166400
+msgid "deleteItemConfirmationTitle"
+msgstr "Buang item ini?"
+
+#: 360689668438888448
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"Item ini akan hilang selamanya.\n"
+"Tindakan ini tidak dapat dibatalkan."
+
+#: 360858085955473408
+msgid "noKeepIt"
+msgstr "Tidak, simpan saja"
+
+#: 361772904917241856
+msgid "allRegionsAvailable"
+msgstr "Semua wilayah tersedia"
+
+#: 361805221660463104
+msgid "terrainProgressLabel"
+msgstr "Ke lokasi berikutnya"
+
+#: 361805489286418432
+msgid "terrainClosedLabel"
+msgstr "Lokasi tidak tersedia"
+
+#: 362095342867714048
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Tujuan utamamu adalah cinta!</color>\n"
+"Jual kreasimu kepada penduduk setempat untuk memenangkan hati mereka."
+
+#: 362097539907063808
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Jangan berhenti sampai mereka <color=#E3BA59>MENGAGUMIMU</color> — \n"
+"lalu kamu akan siap menaklukkan tanah baru."
+
+#: 362500096244584448
+msgid "cryolisUsedIn"
+msgstr ""
+"Bisa <color=#E3BA59>dijual</color> di Toko perdagangan, digunakan di "
+"<color=#E3BA59>Slot kerajinan</color>, atau ditempatkan di <color=#E3BA59>"
+"Slot super</color>."
+
+#: 362503199635279872
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Item ini tidak cocok untuk resep yang dipilih."
+
+#: 362505392367079424
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Item lain dari grup ini sudah dipilih."
+
+#: 362831462727421952
+msgid "failedPurchase"
+msgstr ""
+"Kuda betina sedih. Pembelian gagal.\n"
+"Silakan coba lagi."
+
+#: 363945774653116416
+msgid "frozenUsedIn"
+msgstr ""
+"Bisa dihangatkan di <color=#E3BA59>Inkubator</color> atau <color=#E3BA59>"
+"Slot super</color>."
+
+#: 363945781498220544
+msgid "frozen"
+msgstr "Beku"
+
+#: 363947917120376832
+msgid "frozens"
+msgstr "Beku"
+
+#: 371768236233199616
+msgid "language"
+msgstr "Bahasa"
+
+#: 371825767475318784
+msgid "termsOfUse"
+msgstr "Ketentuan Penggunaan"
+
+#: 371825915722993664
+msgid "privacyPolicy"
+msgstr "Kebijakan Privasi"
+
+#: 371826077132394496
+msgid "deleteData"
+msgstr "Hapus data"
+
+#: 371826289473228800
+msgid "signInWithGoogle Play"
+msgstr "Masuk dengan Google Play"
+
+#: 371936637333278720
+msgid "notLinked"
+msgstr "Tidak tertaut"
+
+#: 371936898659389440
+msgid "linked"
+msgstr "Tertaut"
+
+#: 371937387937533952
+msgid "switchGooglePlay"
+msgstr "Ganti akun Google Play"
+
+#: 372201325233180672
+msgid "resetProgressDescription"
+msgstr ""
+"Apakah Anda yakin ingin menghapus progres Anda? Tindakan ini tidak dapat "
+"dibatalkan!"
+
+#: 372201851437977600
+msgid "resetProgressConfirm"
+msgstr "Ya, hapus"
+
+#: 375231950777225216
+msgid "terrainInDevelopmentDescription"
+msgstr "Maaf. Lokasi ini masih dalam pengembangan."
+
+#: 375232378373935104
+msgid "terrain2Biome1Title"
+msgstr "Galangan Kapal Beku"
+
+#: 375232425010401280
+msgid "terrain2Biome2Title"
+msgstr "Suar"
+
+#: 375232475627261952
+msgid "terrain2Biome3Title"
+msgstr "Lostwood"
+
+#: 376614903423963136
+msgid "collectAll"
+msgstr "Kumpulkan Semua"
+
+#: 376958824981204992
+msgid "healthStatReward"
+msgstr "Kesehatan +{value}"
+
+#: 376959365689905152
+msgid "storageStatReward"
+msgstr "Kapasitas Penyimpanan +{value}"
+
+#: 376968663052587008
+msgid "itemsLeft_x"
+msgstr "Item tersisa: {value}"
+
+#: 376983763331321856
+msgid "storageStatRewardSummary"
+msgstr "Penyimpanan selamanya"
+
+#: 376983951106117632
+msgid "healthStatRewardSummary"
+msgstr "Kesehatan selamanya"
+
+#: 379459050652569600
+msgid "prospectors"
+msgstr "Prospektor"
+
+#: 384582485728825344
+msgid "storeStockFullDescription"
+msgstr "Penyimpanan penuh sampai serpihan terakhir."
+
+#: 384852464931966976
+msgid "terrain3Title"
+msgstr "Grimdal"
+
+#: 387215171681259520
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Buka pengaturan ponsel Anda\n"
+"2. Google - Semua layanan - Play Game\n"
+"3. “Akun masuk” - \"Ubah\" (di sebelah game)\n"
+"4. Mulai ulang game"
+
+#: 388959282209755136
+msgid "versionAlertMessage"
+msgstr "Versi baru game telah dirilis. Saatnya memperbarui!"
+
+#: 390311463999508480
+msgid "treasureUsedIn"
+msgstr "Hanya dapat <color=#E3BA59>dijual</color> di Toko perdagangan."
+
+#: 390630593516539904
+msgid "noInternetConnectionBlocking"
+msgstr "Tidak ada internet — tidak ada petualangan"
+
+#: 390630963617730560
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Menyambungkan kembali…\n"
+"{value}"
+
+#: 391415174540824576
+msgid "newsAndCommunication"
+msgstr "Berita dan komunikasi"
+
+#: 392040460349345792
+msgid "statEffectAccumulationFreeze"
+msgstr "Radang Dingin"
+
+#: 392040705481248768
+msgid "statEffectHeal"
+msgstr "Regenerasi"
+
+#: 392040844430151680
+msgid "statEffectMovementSpeedNegative"
+msgstr "Perlambatan"
+
+#: 392041019248742400
+msgid "statEffectMovementSpeedPositive"
+msgstr "Peningkatan Kecepatan"
+
+#: 392041155999830016
+msgid "statEffectDamageCurse"
+msgstr "Kelelahan"
+
+#: 392041334085783552
+msgid "statEffectDamageBleed"
+msgstr "Pendarahan"
+
+#: 392041534623846400
+msgid "statEffectToolNoiseNegative"
+msgstr "Alat Berisik"
+
+#: 392041656803921920
+msgid "statEffectToolNoisePositive"
+msgstr "Alat Senyap"
+
+#: 392041855974641664
+msgid "statEffectToolSpeedNegative"
+msgstr "Kelelahan"
+
+#: 392042070265827328
+msgid "statEffectToolSpeedPositive"
+msgstr "Ketangkasan"
+
+#: 392090295794405376
+msgid "pause"
+msgstr "Jeda"
+
+#: 392090376618643456
+msgid "pauseDescription"
+msgstr "Efek, perintah, dan pengaturan — semuanya ada di sini."
+
+#: 392092595833278464
+msgid "effects"
+msgstr "Status Karakter"
+
+#: 392119357174714368
+msgid "settingsDialogTitle"
+msgstr "Pengaturan"
+
+#: 393910691879456768
+msgid "russianPlaymentsBanner"
+msgstr "Pembayaran tersedia untuk pemain di Rusia."

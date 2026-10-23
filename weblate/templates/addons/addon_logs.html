@@ -1,0 +1,70 @@
+{% extends "addons/addon_base.html" %}
+
+{% load crispy_forms_tags i18n permissions translations %}
+
+{% block addon_content %}
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{% translate "Add-on Activity Logs" %}</h4>
+    </div>
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th width="30">{% translate "Status" %}</th>
+          <th>{% translate "Event" %}</th>
+          <th>{% translate "Details" %}</th>
+          <th>{% translate "Timestamp" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in addon_activity_log %}
+          <tr>
+            <td>
+              {% if log.status == log.Status.ERROR %}
+                <span class="text-danger" aria-hidden="true">⚠</span>
+              {% elif log.status == log.Status.SUCCESS %}
+                <span class="text-success" aria-hidden="true">✔</span>
+              {% elif log.status == log.Status.SKIPPED %}
+                <span aria-hidden="true">⊘</span>
+              {% else %}
+                <span aria-hidden="true">…</span>
+              {% endif %}
+              {{ log.get_status_display }}
+            </td>
+            <td>{{ log.get_event_display }}</td>
+            <td>{{ log.get_details_display }}</td>
+            <td>{{ log.created|naturaltime:True }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4">{% translate "No add-on activity logs available." %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if addon_activity_log.has_other_pages %}
+      <div class="card-footer">
+        <div class="text-center">
+          <nav>
+            <ul class="pagination">
+              {% if addon_activity_log.has_previous %}
+                <li>
+                  <a href="?page={{ addon_activity_log.previous_page_number }}">« {% translate "Previous" %}</a>
+                </li>
+              {% endif %}
+              {% if addon_activity_log.has_next %}
+                <li>
+                  <a href="?page={{ addon_activity_log.next_page_number }}">{% translate "Next" %} »</a>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+{% endblock addon_content %}

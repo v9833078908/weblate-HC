@@ -1,0 +1,127 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: ru\n"
+
+msgid "survey1Intro"
+msgstr ""
+"Хэй! Лошадь хочет кое-что уточнить.\n"
+"\n"
+"Пара быстрых вопросов, чтобы понять, \n"
+"с кем она вообще связалась.  Займёт меньше минуты."
+
+msgid "survey1Final"
+msgstr ""
+"Похоже… ты подходишь!\n"
+"\n"
+"Она запомнила ответы. \n"
+"И, кажется, решила тебя не бросать."
+
+msgid "survey1AcceptDescription"
+msgstr "Получишь награду"
+
+msgid "survey1DeclineDescription"
+msgstr ""
+"Она переживёт…\n"
+"наверное."
+
+msgid "survey1Question1"
+msgstr ""
+"Сколько тебе лет?\n"
+"Не ври. Она чувствует."
+
+msgid "survey1Question1Answer1"
+msgstr "Младше 15"
+
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+msgid "survey1Question1Answer4"
+msgstr "30 -40"
+
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+msgid "survey1Question2"
+msgstr "Кто ты?  Можно без лишних подробностей"
+
+msgid "survey1Question2Answer1"
+msgstr "М"
+
+msgid "survey1Question2Answer2"
+msgstr "Ж"
+
+msgid "survey1Question2Answer3"
+msgstr "Секрет"
+
+msgid "survey1Question3"
+msgstr "Зачем ты здесь?"
+
+msgid "survey1Question3Answer1"
+msgstr "Бегать и лутаться"
+
+msgid "survey1Question3Answer2"
+msgstr "Крафтить и продавать"
+
+msgid "survey1Question3Answer3"
+msgstr "Прокачка и прогрессия"
+
+msgid "survey1Question3Answer4"
+msgstr "Просто красиво…"
+
+msgid "survey1Question4"
+msgstr "Чего не хватает, чтобы не уйти?"
+
+msgid "survey1Question4Answer1"
+msgstr "Больше сюжета"
+
+msgid "survey1Question4Answer2"
+msgstr "Новые опасности, скалы и клады"
+
+msgid "survey1Question4Answer3"
+msgstr "Новые предметы"
+
+msgid "survey1Question4Answer4"
+msgstr "Новые локации"
+
+msgid "survey1Question4Answer5"
+msgstr "Достижения и награды"
+
+msgid "survey1Question5"
+msgstr "Что стоит починить в первую очередь?"
+
+msgid "survey1Question5Answer1"
+msgstr "Диалоги"
+
+msgid "survey1Question5Answer2"
+msgstr "Награды"
+
+msgid "survey1Question5Answer3"
+msgstr "Сложность рецептов"
+
+msgid "survey1Question5Answer4"
+msgstr "Насыщенность карт"
+
+msgid "survey1Question5Answer5"
+msgstr "Все отлично"
+
+msgid "surveyDialogTitle"
+msgstr "Быстрый опрос"
+
+msgid "startSurvey"
+msgstr "Начать"
+
+msgid "claimReward"
+msgstr "Забрать награду"

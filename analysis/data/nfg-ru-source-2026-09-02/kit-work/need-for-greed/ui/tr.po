@@ -1,0 +1,2075 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-28 09:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Turkish <http://l10n.herocraft.com/projects/need-for-greed/ui/"
+"tr/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: tr\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 142945292288
+msgid "vibration"
+msgstr "Titreşim"
+
+#: 136857827676160
+msgid "loading"
+msgstr "Yükleniyor"
+
+#: 140450844643328
+msgid "adsNotReady"
+msgstr "Reklam hazır değil. Lütfen daha sonra tekrar deneyin."
+
+#: 340188151943168
+msgid "amount"
+msgstr "{value}"
+
+#: 368875517775872
+msgid "reviewTitle"
+msgstr "Fikriniz bizim için önemli!"
+
+#: 368997953703936
+msgid "reviewDescription"
+msgstr "Bu oyunu beğendiniz mi?"
+
+#: 369514264137728
+msgid "reviewConfirm"
+msgstr "Evet, tabii ki!"
+
+#: 369755633750016
+msgid "no"
+msgstr "Hayır"
+
+#: 406497292193792
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+#: 483624632979456
+msgid "leaders"
+msgstr "Liderler"
+
+#: 483894125400064
+msgid "leaderboardAuth"
+msgstr ""
+"Liderlik tablosu yalnızca yetkili kullanıcılar tarafından kullanılabilir. \n"
+"Ayarlardan hesabınıza giriş yapın."
+
+#: 693554757505024
+msgid "softCurrency"
+msgstr "Gümüş paralar"
+
+#: 693648756051968
+msgid "gems"
+msgstr "Mücevherler"
+
+#: 2338581875265536
+msgid "day_N"
+msgstr "Gün {value}"
+
+#: 2340303519617024
+msgid "dailyRewards"
+msgstr "Günlük ödüller"
+
+#: 2340513616498688
+msgid "dailyRewardsDescription"
+msgstr ""
+"Oyunu her gün ziyaret edin\n"
+"ve ödüller kazanın."
+
+#: 2524665741578240
+msgid "tapToStart"
+msgstr "Başlamak için dokunun"
+
+#: 2534199759474688
+msgid "settings"
+msgstr "Ayarlar"
+
+#: 2539217615065088
+msgid "sound"
+msgstr "SFX"
+
+#: 2539801025974272
+msgid "music"
+msgstr "Müzik"
+
+#: 2606360020914176
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours} sa. |}{minutes:cond:>0?{minutes} dk. |}{seconds:cond:>"
+"=0?{seconds} sn.|} "
+
+#: 31188945265680384
+msgid "sell"
+msgstr "Sat"
+
+#: 39267299644215296
+msgid "trading"
+msgstr "Ticaret"
+
+#: 39267930052300800
+msgid "selectAmount"
+msgstr ""
+"Mücevher miktarını seçin <size=56><color=#fff>( {value} / {total} )</color></"
+"size>"
+
+#: 39432224572248064
+msgid "apply"
+msgstr "Uygula"
+
+#: 88927433573797888
+msgid "exit"
+msgstr "Çıkış"
+
+#: 89108083400511488
+msgid "loot"
+msgstr "Ganimet"
+
+#: 89232802619592704
+msgid "inventory"
+msgstr "Envanter"
+
+#: 89233049219502080
+msgid "add_amount"
+msgstr "+ {value}"
+
+#: 101508439312961536
+msgid "upgradeCharacterHealthStat"
+msgstr "Sağlık"
+
+#: 101509164025778176
+msgid "Pick"
+msgstr "Kazma"
+
+#: 103762241726451712
+msgid "unload"
+msgstr "Boşalt"
+
+#: 105589950840573952
+msgid "continue"
+msgstr "devam et"
+
+#: 105600782735511552
+msgid "continueWithoutTheBird"
+msgstr "Kuşsuz devam et"
+
+#: 128992315220168704
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+#: 129852820621103104
+msgid "make"
+msgstr "Yap"
+
+#: 130612002970406912
+msgid "in_progress"
+msgstr "Devam ediyor..."
+
+#: 132250436289957888
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+#: 132393404065910784
+msgid "lvl_x"
+msgstr "seviye. {value}"
+
+#: 133085114043469824
+msgid "take"
+msgstr "Al"
+
+#: 168978456979443712
+msgid "tradeDescription"
+msgstr "Satmak için öğeleri buraya sürükleyip bırakın"
+
+#: 168979719083266048
+msgid "storage"
+msgstr "Depo"
+
+#: 168993254521704448
+msgid "backpack"
+msgstr "Sırt Çantası"
+
+#: 175428495763312640
+msgid "upgradeCharacterResistanceStat"
+msgstr "Direnç"
+
+#: 175428883866456064
+msgid "completed"
+msgstr "Tamamlandı"
+
+#: 175429326734626816
+msgid "upgradeCharacterSpeedStat"
+msgstr "Hız"
+
+#: 175429624488267776
+msgid "detectionRadius"
+msgstr "Tuzak algılama yarıçapı"
+
+#: 175437389508120576
+msgid "upgrade"
+msgstr "Yükselt"
+
+#: 175444653988122624
+msgid "upgradeCharacterTitle"
+msgstr "Karakter seviyesi {value}"
+
+#: 175444893063450624
+msgid "upgradeToolTitle"
+msgstr "Alet seviyesi {value}"
+
+#: 175445052228898816
+msgid "bird"
+msgstr "Kuş"
+
+#: 175445211058802688
+msgid "craft"
+msgstr "Zanaat"
+
+#: 175530141390475264
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Ek uçuşlar"
+
+#: 175535881710735360
+msgid "upgradeToolSpeedStat"
+msgstr "Aletin darbe hızı"
+
+#: 175536172950622208
+msgid "upgradeToolDamageStat"
+msgstr "Alet hasarı"
+
+#: 185307831437889536
+msgid "terrain1Title"
+msgstr "Fenmar Bataklığı"
+
+#: 185308054407090176
+msgid "terrain2Title"
+msgstr "Belomar"
+
+#: 185645691072417792
+msgid "start"
+msgstr "Başlat"
+
+#: 185658961254682624
+msgid "terrain1Description"
+msgstr ""
+"Sadece bir bataklık, bataklık gibi — altın külçeleri ve her “çınlamaya” "
+"tepki veren dev bir Solucan dışında.\n"
+"Yerliler der ki: altın istiyorsan, bir porselen dükkanında çınlama."
+
+#: 185670435373060096
+msgid "howToOpenBiome"
+msgstr ""
+"Yeni yerler.\n"
+"Siparişleri tamamla — ve yerliler sana\n"
+"bir sonraki arama yerini gösterecek."
+
+#: 185944937449394176
+msgid "revivalTitle"
+msgstr "Tamamen başarısız oldu!"
+
+#: 185946490252038144
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Sırt Çantası'ndaki öğeler: {value} / {total}"
+
+#: 185949125390635008
+msgid "exitAndLoseItems"
+msgstr "Çık ve eşyaları kaybet"
+
+#: 187764654040420352
+msgid "noBirdEnergy"
+msgstr "Kuş yok, göz yok"
+
+#: 187765165577736192
+msgid "noDetectorEnergy"
+msgstr "Hazine dedektörü"
+
+#: 190252961852821504
+msgid "yes_leave"
+msgstr "Evet, ayrıl"
+
+#: 190253329051553792
+msgid "no_stay"
+msgstr "Hayır, burada kal"
+
+#: 190253804719181824
+msgid "leave_location_confirmation"
+msgstr "Konumdan ayrılmak istiyor musunuz?"
+
+#: 190609920439357440
+msgid "percentAmount"
+msgstr "{value}%"
+
+#: 190613197834948608
+msgid "pointsAmount"
+msgstr "{value} <size=70%>puan</size>"
+
+#: 190999934906142720
+msgid "close"
+msgstr "Kapat"
+
+#: 191001304602251264
+msgid "selectTheShape"
+msgstr "Hazine şeklini seçin"
+
+#: 191001600908857344
+msgid "speedUp"
+msgstr "Hızlandır"
+
+#: 191062612982894592
+msgid "tutorial"
+msgstr "Eğitim"
+
+#: 214456412639858688
+msgid "terrainPickLootTitle"
+msgstr "Çantanıza ve depolama alanınıza sığan her şeyi alın"
+
+#: 214474517843808256
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+#: 215688832034803712
+msgid "takeToStorageXofY"
+msgstr "Al {value}/ {total}"
+
+#: 215688944811249664
+msgid "upgradeBag"
+msgstr "Çantayı yükselt"
+
+#: 216124892128743424
+msgid "dealerWillBuyTheRest"
+msgstr "Satıcı diğer her şeyi sizden satın alacak"
+
+#: 216274536972423168
+msgid "information"
+msgstr "Bilgi"
+
+#: 216281997183815680
+msgid "weightInformation"
+msgstr ""
+"At çantasının Kapasite'si önemli bir göstergedir.\n"
+"Bulunan eşyaların ağırlığı taşımalarını etkiler.\n"
+"Kapasite'sini artırmak ve daha fazla eşya taşımak için çantanızı yükseltin."
+
+#: 216292821260570624
+msgid "rank_x"
+msgstr "Sıra {value}"
+
+#: 216295079784222720
+msgid "weight"
+msgstr "Ağırlık:"
+
+#: 216455391749607424
+msgid "vehicleUpgradeDescription"
+msgstr "Yük taşımak için At kargo çantası'nın Kapasite'sini geliştirin."
+
+#: 216456296213516288
+msgid "capacity"
+msgstr "Kapasite"
+
+#: 216456449876037632
+msgid "horseCargoBag"
+msgstr "At kargo çantası"
+
+#: 216464394802171904
+msgid "hardCurrency"
+msgstr "Altın paralar"
+
+#: 216827767398076416
+msgid "confirmation"
+msgstr "Onay"
+
+#: 216836939359457280
+msgid "attention!"
+msgstr "Dikkat!"
+
+#: 216837051221544960
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Şimdi ayrılırsanız, <color=#E01114>bulunan tüm eşyalar Satıcı'ya</color> "
+"normalden daha ucuza satılacaktır."
+
+#: 216843048690388992
+msgid "bayerDescription"
+msgstr "Daha fazla kazanmak ister misiniz? Kalanları bonusla satın alacağım."
+
+#: 217004942013239296
+msgid "bestProfit"
+msgstr "En iyi kar"
+
+#: 217005085059977216
+msgid "goodProfit"
+msgstr "İyi kâr"
+
+#: 217005221878173696
+msgid "badProfit"
+msgstr "Kötü kâr"
+
+#: 217034757265166336
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+#: 217067111195086848
+msgid "yourProfit"
+msgstr "Kârınız:"
+
+#: 219330229052903424
+msgid "eliteSlot"
+msgstr "Elit yuva"
+
+#: 219330557043281920
+msgid "tradingShopLevel"
+msgstr "Ticaret dükkanı seviye {value}"
+
+#: 219331227683131392
+msgid "rent"
+msgstr "Kira"
+
+#: 219333990236295168
+msgid "slot"
+msgstr "Yuva"
+
+#: 219334107282542592
+msgid "selectItem"
+msgstr "Öğe seç"
+
+#: 219569917810446336
+msgid "checkOffer"
+msgstr "Teklif"
+
+#: 221184956493467648
+msgid "shopLevel"
+msgstr "Mağaza seviyesi {value}"
+
+#: 221731312916238336
+msgid "tradeOpenEliteSlotDialog"
+msgstr "Burası alıcıların çok para ödediği, pazarlık yapılmayan yer."
+
+#: 221732692687065088
+msgid "getASlot"
+msgstr "Yuva al"
+
+#: 221745332360581120
+msgid "customerWillArriveIn"
+msgstr "Müşteri şu zaman içinde gelecek:"
+
+#: 221747748288073728
+msgid "speedUpBy"
+msgstr "Hızlandır:"
+
+#: 221752584698073088
+msgid "decline?"
+msgstr "Reddet?"
+
+#: 221752816395620352
+msgid "tradeDeclineClientInfo"
+msgstr "Bir sonraki müşteri gelene kadar:"
+
+#: 221785455785676800
+msgid "tradingShop"
+msgstr "Ticaret dükkanı"
+
+#: 221785885429207040
+msgid "newSlot"
+msgstr "Yeni yuva"
+
+#: 221786327613706240
+msgid "tradeUpgradeDescription"
+msgstr "Daha fazla satış yuvası açmak için ticaret dükkanını yükseltin."
+
+#: 221790732488544256
+msgid "tradingShopShort"
+msgstr "Dükkan"
+
+#: 221791365350297600
+msgid "level_x"
+msgstr "Seviye {value}"
+
+#: 221901028389556224
+msgid "buyersOffer"
+msgstr "Alıcı teklifi:"
+
+#: 221902690122469376
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+#: 223520514767065088
+msgid "common"
+msgstr "Yaygın"
+
+#: 223520659910955008
+msgid "uncommon"
+msgstr "Sıradışı"
+
+#: 223520713283473408
+msgid "rare"
+msgstr "Nadir"
+
+#: 223520767448715264
+msgid "epic"
+msgstr "Epik"
+
+#: 223520826210914304
+msgid "legendary"
+msgstr "Efsanevi"
+
+#: 223520860377714688
+msgid "mythic"
+msgstr "Efsanevi"
+
+#: 224246507228106752
+msgid "tradeSelectItemTitle"
+msgstr "Satılık bir öğe seçin"
+
+#: 224277347911864320
+msgid "basePrice"
+msgstr "Taban fiyat:"
+
+#: 226508435681972224
+msgid "map"
+msgstr "Harita"
+
+#: 226574491591118848
+msgid "wiseNotes"
+msgstr "Bilge notlar"
+
+#: 226576404894191616
+msgid "emptyPickedItems"
+msgstr "Eli boş mu ayrılsın?"
+
+#: 226580081470083072
+msgid "settingsDescription"
+msgstr "Dünyayı kendi tarzınızla şekillendirin!"
+
+#: 226582087576326144
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Daha fazla satış alanı açmak için ticaret dükkanınızı yükseltin — ne kadar "
+"çok raf eklerseniz, kârınız o kadar artar!"
+
+#: 226633818465112064
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}"
+
+#: 227954852267036672
+msgid "craftSlot"
+msgstr "Zanaat yuvası"
+
+#: 227959361919782912
+msgid "superSlot"
+msgstr "Süper yuva"
+
+#: 228232787804819456
+msgid "forge"
+msgstr "Dövme"
+
+#: 228312834624458752
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Hazineleri dövün, sandıkları ve büyülü yumurtaları açın — içinde hangi nadir "
+"ganimetlerin beklediğini kim bilebilir!"
+
+#: 228318026984067072
+msgid "chestSlot"
+msgstr "Sandık yuvası"
+
+#: 228318447752450048
+msgid "incubator"
+msgstr "Kuluçka"
+
+#: 228321113740152832
+msgid "craftOpenEliteSlotLabel"
+msgstr "Nihai gücü serbest bırakın!"
+
+#: 228357165007769600
+msgid "cancel"
+msgstr "İptal"
+
+#: 228360236127490048
+msgid "openChest"
+msgstr "Sandığı aç"
+
+#: 228385218756874240
+msgid "timeToOpen:"
+msgstr "Açılma zamanı:"
+
+#: 228792391647367168
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Stokta Sandıklar yok"
+
+#: 228794249094893568
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Bir tane mi buldun? Onu Zanaat'a sürükle ve aç\n"
+"(sadece baltayla değil, tamam mı?)"
+
+#: 228796285601452032
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+#: 229526591581196288
+msgid "craftSelectEggTitle"
+msgstr "Açmak için bir Yumurta seç"
+
+#: 229526902270070784
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Stokta Yumurtalar yok"
+
+#: 229528260377317376
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "Yumurtaya gidiyoruz — kümesinden değil, sihirle doğmuş!"
+
+#: 229528854181711872
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Diyarı keşfet, Nadir Yumurta'yı ortaya çıkar ve Zanaat'a teslim et. İçinde "
+"ne yatıyor — sadece yumurta sarısı mı, yoksa çok daha büyük bir şey mi?"
+
+#: 229530481219342336
+msgid "openEgg"
+msgstr "Yumurta aç"
+
+#: 229879731472044032
+msgid "craftSelectRecipeTitle"
+msgstr "Zanaat için bileşenleri seçin"
+
+#: 229880209643671552
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Stokta hiçbir şey yok!"
+
+#: 229881107660935168
+msgid "craftItem"
+msgstr "Eşya üret"
+
+#: 229881635711225856
+msgid "crafting:"
+msgstr "Zanaat:"
+
+#: 229882264282206208
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Bu öğeler henüz bulunamadı."
+
+#: 229887783071911936
+msgid "recipe"
+msgstr "Tarif"
+
+#: 230098234464538624
+msgid "craftClosedRecipeTitle"
+msgstr "Dövme çok zayıf!"
+
+#: 230098538715156480
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Yetersiz Demirhane Seviyesi\n"
+"\n"
+"Her yükseltmeyle giderek daha nadir ve değerli hazineler üretebileceksiniz. "
+"Bu fırını efsanelere yaraşır bir demirhaneye dönüştürme zamanı!"
+
+#: 230596136282624000
+msgid "craftClosedSlotTitle"
+msgstr "Yuva kilitli!"
+
+#: 230596696704552960
+msgid "craftClosedSlotDescription"
+msgstr ""
+"Zanaat becerileriniz yeterince güçlü değil. Onları yükseltmeniz gerekiyor."
+
+#: 230974103273869312
+msgid "or"
+msgstr "veya"
+
+#: 231685619115626496
+msgid "craftSpeedUpTitle"
+msgstr "Kömürü kürekle atın!"
+
+#: 231686505602748416
+msgid "craftSpeedUpDescription"
+msgstr "Cüceler espresso içip turbo moda geçmiş gibi olacak!"
+
+#: 231700678231461888
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Yuva açıldı.\n"
+"Fırın metali eriterek satılık yepyeni Mücevherat'a dönüştürür."
+
+#: 231701488554217472
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Vakit nakittir ama Mücevherat daha da hızlı üretilir"
+
+#: 231702447166590976
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Efsanevi değere sahip bir eşya yaratma şansınızı artırır."
+
+#: 231703302095769600
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"Kadimlerin bilgeliği içinizden akıyor — dünyanın daha önce görmediği "
+"harikalar Dövme!"
+
+#: 232003352147529728
+msgid "craftStockFullTitle"
+msgstr "Depoda hazine için yer yok!"
+
+#: 232004264790331392
+msgid "craftStockFullDescription"
+msgstr ""
+"Depolama son kıymığına kadar dolu.\n"
+"Fazlalıkları Ticaret dükkanı'nda satın veya Depolama'yı yükseltin — sonra "
+"parlak kupanızı alın!"
+
+#: 232054830455328768
+msgid "allItems"
+msgstr "Tüm öğeler"
+
+#: 232055567298072576
+msgid "stockLevel"
+msgstr "Depolama seviyesi {value}"
+
+#: 232285845522223104
+msgid "storageUpgradeDescription"
+msgstr ""
+"Her yükseltme, bulunan ve Dövme edilen Mücevherat için <color=#E01114>daha "
+"fazla alan</color> sağlar. Daha fazla Altın, daha az acı!"
+
+#: 238220511437656064
+msgid "revivalDescription"
+msgstr "Yeniden doğ — ya da ganimetine veda et."
+
+#: 238225411982757888
+msgid "noBirdEnergyDescription"
+msgstr "Seni hazineye getirdi ve dinlenmek için uçup gitti."
+
+#: 238226013823438848
+msgid "callTheBird"
+msgstr "Şimdi dön"
+
+#: 238228172388438016
+msgid "noDetectorEnergyDescription"
+msgstr "Bir tane daha kaldırabileceğini mi düşünüyorsun?"
+
+#: 238229156124692480
+msgid "oreSeeker"
+msgstr "Cevher Arayıcısı"
+
+#: 238230435035090944
+msgid "gemSeeker"
+msgstr "Mücevher Arayıcısı"
+
+#: 238805340126449664
+msgid "respawn"
+msgstr "Yeniden Doğ"
+
+#: 238835918318080000
+msgid "deathExit"
+msgstr "Hiçbir şey kalmadı"
+
+#: 241685352961806336
+msgid "terrain0Title"
+msgstr "Sakin Orman"
+
+#: 241686624016273408
+msgid "terrain2Description"
+msgstr ""
+"Ebedi soğuğa kilitlenmiş sert bir kuzey vahşi doğası. Buzlu labirentler "
+"arasında kaybolmak kolaydır ve gün batımından sonra donarak ölmek. Bu sırayla"
+"… ya da belki tam tersi."
+
+#: 241686676700925952
+msgid "terrain0Description"
+msgstr ""
+"Her kahraman bir yerden başlar!\r\n"
+"Burada ilk hazinelerin ve ilk sorunların gömülü. Burası madencilik yapmayı, "
+"eritme yapmayı, gösteriş yapmayı ve hayatta kalmayı öğreneceğin yer."
+
+#: 242168130602012672
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Köylülerin beğenisini kazan,\r\n"
+"ve yeni bir şehir sana kapılarını açacak!"
+
+#: 242225089728483328
+msgid "upgradeToolNoiseStat"
+msgstr "Gürültü azaltma"
+
+#: 243276239902871552
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr ""
+"Direncinizi artırın — ve dünya düşmanca davrandığında bile gözünüzü "
+"kırpmayacaksınız!"
+
+#: 243276804422635520
+msgid "upgradeCharacterHealthStatDescription"
+msgstr "Daha fazla can — efsane olma şansı daha az... ölümden sonra."
+
+#: 243277089148768256
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr ""
+"Daha hızlı ayaklar — yerel vahşi yaşam için akşam yemeği olma şansı daha az!"
+
+#: 243277490971480064
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"Ne kadar çok tüylü gözcünüz olursa, gömülü parlayan şeyleri bulma şansınız o "
+"kadar artar!"
+
+#: 243277858065354752
+msgid "upgradeToolSpeedStatDescription"
+msgstr ""
+"Vuruş ne kadar hızlı olursa, başkasının cevheri ilk kapma şansı o kadar "
+"azalır!"
+
+#: 243278506789965824
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Alet ne kadar güçlü olursa, taş o kadar uysal olur —\r\n"
+"ve çantan o kadar dolu olur!"
+
+#: 243278882293420032
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Daha az gürültü, kemiklerin çıtırtısını Altın şıngırtısına tercih edenler "
+"tarafından duyulma şansının daha az olması demektir."
+
+#: 243286615193292800
+msgid "resistanceStatLevel"
+msgstr "Direnç seviyesi {value}"
+
+#: 243287048297123840
+msgid "healthStatLevel"
+msgstr "Sağlık seviyesi {value}"
+
+#: 243287378833444864
+msgid "speedStatLevel"
+msgstr "Hız seviyesi {value}"
+
+#: 243287648745295872
+msgid "upgradeBirdTitle"
+msgstr "Kuş seviyesi {value}"
+
+#: 243301960306135040
+msgid "amountPcs"
+msgstr "{value} adet"
+
+#: 246550123938844672
+msgid "maxLevel"
+msgstr "Maksimum seviye"
+
+#: 246920055440543744
+msgid "treasureDetector"
+msgstr "Hazine dedektörü"
+
+#: 246920748020797440
+msgid "amountSec"
+msgstr "{value} sn."
+
+#: 246921123041906688
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Cevher Arayıcısı"
+
+#: 246921489389195264
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Bu büyülü alet, altın damarlarını bir cücenin bedava yemeği kokladığından "
+"daha iyi koklar!"
+
+#: 246922080165302272
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Mücevher Arayıcısı"
+
+#: 246922249237696512
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"Bir tüccarın açgözlülüğünden daha keskin burunlu bir cihaz. Hiçbir mücevher "
+"uzun süre gizli kalmaz!"
+
+#: 246922743578365952
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Altın avı için daha fazla zaman"
+
+#: 246922920854818816
+msgid "upgradeDetectorDurationStatDescription"
+msgstr ""
+"Daha uzun çalışır, daha iyi arar, daha az homurdanır. Daha fazla zaman, daha "
+"fazla ganimet demektir!"
+
+#: 247080041558839296
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+#: 247080534393753600
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} adet"
+
+#: 247080751339933696
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} sn."
+
+#: 247452846670483456
+msgid "gold"
+msgstr "Altın"
+
+#: 247452991940202496
+msgid "chests"
+msgstr "Sandıklar"
+
+#: 247453392370405376
+msgid "eggs"
+msgstr "Yumurtalar"
+
+#: 247453604342140928
+msgid "treasures"
+msgstr "Mücevherat"
+
+#: 247453698634289152
+msgid "artifacts"
+msgstr "Eserler"
+
+#: 249822854419582976
+msgid "deathTitle"
+msgstr "Ölüm cömerttir — her şeyi alır!"
+
+#: 249823090609229824
+msgid "deathDescription"
+msgstr "Ganimetiniz artık efsanelere konu oldu."
+
+#: 250055490891157504
+msgid "tradeEmptyStorageMessage"
+msgstr "Şu an satılacak bir şey yok"
+
+#: 250066987813965824
+msgid "craftNoEggs"
+msgstr "Kuluçka makinesi için yumurta yok"
+
+#: 250067227111591936
+msgid "craftNoChests"
+msgstr "Açılacak sandık yok"
+
+#: 250067363896233984
+msgid "craftNoItems"
+msgstr "Üretilecek bir şey yok"
+
+#: 250187845660315648
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Mücevher avı için daha fazla zaman"
+
+#: 251259329547866112
+msgid "newLocationAvailableTitle"
+msgstr "Yeni bir konum artık mevcut!"
+
+#: 251259543163768832
+msgid "newLocationAvailableDescription"
+msgstr "Köylüler hemfikir: daha fazlasını hak ediyorsunuz."
+
+#: 251632108633853952
+msgid "upgradeStock"
+msgstr "Depolama yükseltmesi"
+
+#: 252146625037996032
+msgid "storageOverflowedDesctiption"
+msgstr "Depolama alanınız tüm zenginliklerinizi tutamıyor. Yükseltme zamanı!"
+
+#: 252147840639569920
+msgid "throwAway"
+msgstr "At"
+
+#: 259586112407998464
+msgid "upgradeCraftCostStatDescription"
+msgstr "Eşyaların taban fiyatı maya üzerindeki ekmek gibi yükseliyor"
+
+#: 262490762970927104
+msgid "upgradeVehicleWeightStat"
+msgstr "Büyük çanta"
+
+#: 262491576103866368
+msgid "upgradeVehicleWeightStatDescription"
+msgstr ""
+"At artık daha fazla hazine taşıyabiliyor. Daha fazla dağınıklık, daha fazla "
+"mutluluk!"
+
+#: 262491999908925440
+msgid "upgradeVehicleTitle"
+msgstr "At seviye {value}"
+
+#: 262492464646197248
+msgid "amountKg"
+msgstr "{value} kg."
+
+#: 262492710260445184
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+#: 262493129695039488
+msgid "upgradeStorageWeightStat"
+msgstr "Kapasite"
+
+#: 262493626518736896
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Kesinlikle değersiz hazineler için ekstra alan!"
+
+#: 262495569987244032
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Cömert alıcılar"
+
+#: 262495864679043072
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Müşteriler hurdanız için savaşıyor."
+
+#: 262496445971828736
+msgid "upgradeTradeTitle"
+msgstr "Ticaret dükkanı seviye {value}"
+
+#: 262497898778071040
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Zenginlik kokuyorsun"
+
+#: 262498326018265088
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"İşçiliğinizin ünü yayıldı — gerçek yürüyen cüzdanlar daha sık ortaya çıkıyor."
+
+#: 262499250967154688
+msgid "upgradeTradeSlotsStat"
+msgstr "Yeni yuva"
+
+#: 262499518630858752
+msgid "upgradeTradeSlotsStatDescription"
+msgstr ""
+"Ekstra bir ticaret yuvası açıldı. Daha fazla müşteri — daha fazla altın!"
+
+#: 262503656592773120
+msgid "upgradeCraftTimeStat"
+msgstr "Mücevher Sprinti"
+
+#: 262504135200608256
+msgid "upgradeCraftTitle"
+msgstr "Zanaat seviyesi {value}"
+
+#: 262504539359547392
+msgid "upgradeCraftRarityStat"
+msgstr "Nadirlik"
+
+#: 262505217075187712
+msgid "upgradeCraftRecipesStat"
+msgstr "Tarif kitabı"
+
+#: 262506098214572032
+msgid "upgradeCraftCostStat"
+msgstr "Altın madeni"
+
+#: 262506924148527104
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Zanaat Yuvası"
+
+#: 262507722794340352
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Sandık yuvası"
+
+#: 262508574351298560
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Yuva açıldı.\n"
+"Her kökenden sandıkları ve kilitli nesneleri açar — hatta bu gezegenden "
+"olmadığı açıkça belli olanları bile."
+
+#: 262508742647746560
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Kuluçka"
+
+#: 262508816316502016
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Yuva açıldı.\n"
+"Coco'nun sadece yumurtalar için iyi olduğunu düşünmeyin. Buz eritmeniz, bir "
+"şeyi ısıtmanız veya başka görevlerde yardım etmeniz gerekirse — o her zaman "
+"kullanışlıdır. Ve yumurta kırmaya gelince, soru bile sormaz."
+
+#: 262509279946477568
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Yuva açıldı.\n"
+"Usta zanaatkarın ana aracı.\n"
+"Hepsini yapabilir: işleyebilir, restore edebilir, parlatabilir, kırabilir ve "
+"yeniden işleyebilir."
+
+#: 262509359629864960
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Süper yuva"
+
+#: 262698318934839296
+msgid "tradeLockedState"
+msgstr "Ticaret dükkanı çok küçük!"
+
+#: 262791601379872768
+msgid "upgradeDetectorTitle"
+msgstr "Hazine dedektörü seviye {value}"
+
+#: 262792683350921216
+msgid "upgradeStorageTitle"
+msgstr "Depolama seviye {value}"
+
+#: 266500052736020480
+msgid "selectTrashTitle"
+msgstr "Toplu Hurda"
+
+#: 267774055178047488
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Her şey beğenilerle ilgili!"
+
+#: 267774187718053888
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "Seyirci sevinçten çığlık atıyor!"
+
+#: 286237360443887616
+msgid "metals"
+msgstr "Metaller"
+
+#: 289291316380307456
+msgid "craftSelectRoughTitle"
+msgstr "Parlatılacak bir öğe seçin"
+
+#: 289293923853275136
+msgid "craftNoRough"
+msgstr "Parlatılacak öğe yok"
+
+#: 302325393484156928
+msgid "curseRemovalSlot"
+msgstr "Altar"
+
+#: 302327188075843584
+msgid "inlaySlot"
+msgstr "Ekle"
+
+#: 302327678603890688
+msgid "polishingSlot"
+msgstr "Parlatma"
+
+#: 310688720811724800
+msgid "rough"
+msgstr "Ham"
+
+#: 310688991746985984
+msgid "cursedItems"
+msgstr "Lanetli"
+
+#: 310861865698988032
+msgid "storageDescription"
+msgstr ""
+"Keşfedilen tüm öğeler burada saklanır.\n"
+"Alan sınırlıdır — depo kauçuktan yapılmamıştır.\n"
+"Açgözlülüğünüz duvarlara çarpmaması için depolama alanınızı yükseltin."
+
+#: 311007630727581696
+msgid "traderName"
+msgstr "Tüccar Zlatovich"
+
+#: 311064004203384832
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Kesinlikle hiçbir şey"
+
+#: 311066402032455680
+msgid "geodes"
+msgstr "Jeotlar"
+
+#: 311067011754233856
+msgid "unknownItems"
+msgstr "Bilinmeyen"
+
+#: 311247067034161152
+msgid "selectItems"
+msgstr "Öğeleri seçin"
+
+#: 311279184229175296
+msgid "proceed"
+msgstr "Devam et"
+
+#: 313943879775948800
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Parlatma"
+
+#: 313944205258133504
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Yuva açıldı.\n"
+"Onarır, zımparalar ve parlatır — en şüpheli buluntular bile tekrar "
+"mücevherat gibi görünür."
+
+#: 313944426742550528
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Ekle"
+
+#: 313944595185799168
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Yuva açıldı.\n"
+"Mücevherleri takılara ekleyin ve ham parçaları, müşterilerin tüm iradelerini "
+"kaybetmelerine neden olan tam teşekküllü parlak parçalara dönüştürün."
+
+#: 313944710864703488
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Altar"
+
+#: 313944844453285888
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Yuva açıldı.\n"
+"Lanetli eşyalardaki lanetleri ve büyülü mühürleri kaldırır. Bazen… "
+"sürprizlerle."
+
+#: 313950130396205056
+msgid "craftInfoDescription"
+msgstr ""
+"Burada, bulduklarınızın kaderi belirlenir.\n"
+"Eritin, yuvaya yerleştirin, parlatın, kırın veya büyümesine izin verin — her "
+"yuva eşyalarınıza şüpheli derecede faydalı bir şeyler yapar.\n"
+"Bulunan nesneler mücevherat, hazineler ve birilerinin kesinlikle satın "
+"alacağı tuhaf başyapıtlara dönüşür."
+
+#: 313951782213783552
+msgid "superSlotDescription"
+msgstr ""
+"Her tuhaf ve parlak şey için özel bir yuva.\n"
+"Metali eritir, mücevherleri keser, lanetleri kaldırır, hazineleri restore "
+"eder, jeotları kırar, sandıkları açar ve hatta uzaylı eserlerini (karşılıklı "
+"rıza ile) işler."
+
+#: 313952177879257088
+msgid "chestSlotDescription"
+msgstr ""
+"Bir Sandık mı?\n"
+"İçine atın — Yuva onu çözecektir.\n"
+"\n"
+"İçinden ne çıkacağı sadece ona malumdur.\n"
+"Bazen sonuçtan rahatsız edici derecede memnun kalır."
+
+#: 313952634336972800
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Lanetli bir eşya mı? İçine atın!\n"
+"Altar, tüm büyüsünü boşaltacak, hırıltılar çıkaracak ve inleyecek — sonra "
+"tıslama olmadan geri verecek.\n"
+"\n"
+"Bazen \"teşekkür ederim\" bile der… ki bu tamamen normaldir."
+
+#: 313953216909021184
+msgid "eggSlotDescription"
+msgstr ""
+"Herhangi bir Yumurta seçin — tavuk üzerine oturacak, hafifçe okşayacak ve "
+"nazikçe gıdaklayacak…\n"
+"sonra ilginç bir şey yumurtlayacak.\n"
+"\n"
+"Bazen çok fazla ilginç."
+
+#: 313953702185799680
+msgid "inlaySlotDescription"
+msgstr ""
+"Bir Mücevherat parçası seçin ve onu değerli taşlarla doldurun — boş Yuvalar "
+"işe yaramaz!\n"
+"Elde ettiğiniz şey, alıcıları sevinçle çığlık attıran, tamamen cilalanmış "
+"parlak bir şeydir."
+
+#: 313954530854440960
+msgid "craftSlotDescription"
+msgstr ""
+"Herhangi bir Metal atın — fırın onu eritecek, karıştıracak ve yepyeni bir "
+"Mücevherat parçası Dövme edecek.\n"
+"İlhamla çalıştığını söylerler… ki bu onda yok. Yine de işini halleder!"
+
+#: 313954955250896896
+msgid "polishingSlotDescription"
+msgstr ""
+"Herhangi bir Jeot, Ham taş veya hatta harap olmuş eski bir hazine seçin —\n"
+"tezgah onu parlatacak, onaracak ve parlaklığını ortaya çıkaracak.\n"
+"\n"
+"Çıkan şey soketlenebilir, üretilebilir veya iyi bir karla satılabilir."
+
+#: 314195955441471488
+msgid "unknownSlot"
+msgstr "Değerleme"
+
+#: 314210445310562304
+msgid "unknownSlotTitle"
+msgstr "Değerleme için bir eşya seçin"
+
+#: 314211470289408000
+msgid "craftNoUnknown"
+msgstr "Değerlenecek eşya yok"
+
+#: 314211918601785344
+msgid "craftNoCursed"
+msgstr "Lanetli eşya yok"
+
+#: 314214842253971456
+msgid "craftNoInlay"
+msgstr "Eklenecek öğe yok"
+
+#: 314260890229936128
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Mücevherat ve diğer buluntuları satın, değerlerini kontrol edin ve "
+"anlaşmaları kapatın.\n"
+"Dükkanı yükseltin — yeni yuvalar açın ve daha fazla ürün satın."
+
+#: 314261126486691840
+msgid "tradingShopInfoTitle"
+msgstr "Zlatovich'in Ticaret Dükkanı"
+
+#: 314274887167643648
+msgid "tradeSpeedUp"
+msgstr "Müşteri çek"
+
+#: 314278745457561600
+msgid "nextCustomer"
+msgstr "Sonraki müşteri"
+
+#: 314297063191089152
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Değerleme"
+
+#: 314297243575521280
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Tüccar Zlatovich her öğeye bakacak, düşünceli bir şekilde homurdanacak ve "
+"bir fiyat belirleyecek.\n"
+"Bazen… hoş bir fiyat."
+
+#: 314612693521928192
+msgid "timeToMoveOut"
+msgstr "Kaçma zamanı!"
+
+#: 314914390584594432
+msgid "metal"
+msgstr "Metal"
+
+#: 314914695741181952
+msgid "gem"
+msgstr "Mücevher"
+
+#: 314915117155487744
+msgid "treasure"
+msgstr "Mücevherat"
+
+#: 314915322823184384
+msgid "chest"
+msgstr "Sandık"
+
+#: 314915636620038144
+msgid "trash"
+msgstr "Çöp"
+
+#: 314915781340303360
+msgid "egg"
+msgstr "Yumurta"
+
+#: 314915913649623040
+msgid "artifact"
+msgstr "Eser"
+
+#: 314916000182308864
+msgid "geode"
+msgstr "Jeot"
+
+#: 314916165517578240
+msgid "unknown"
+msgstr "Bilinmeyen"
+
+#: 314916328457900032
+msgid "cursed"
+msgstr "Lanetli"
+
+#: 314925043173036032
+msgid "orders"
+msgstr "Siparişler"
+
+#: 315250694291722240
+msgid "giveItem"
+msgstr "Öğe Ver"
+
+#: 316337287538675712
+msgid "ordersInfoDescription"
+msgstr ""
+"Siparişleri tamamlayın — müşteriler size yolu gösterecek.\n"
+"Yeni konumlar, kaynaklar ve mücevherat sizi bekliyor."
+
+#: 316378780114620416
+msgid "hearthCurrency"
+msgstr "Beğeniler"
+
+#: 316380499837980672
+msgid "reward"
+msgstr "Ödül"
+
+#: 316382146563674112
+msgid "claim"
+msgstr "Talep Et"
+
+#: 316397921840140288
+msgid "terrain0Biome1Title"
+msgstr "Çorak Toprak"
+
+#: 316402101459881984
+msgid "ordersClaimBiomeTitle"
+msgstr "Yeni bir konuma giden yol açık"
+
+#: 316402277297688576
+msgid "ordersClaimBiomeDescription"
+msgstr "Yeni buluntular mevcut"
+
+#: 317048656315551744
+msgid "terrain1Biome1Title"
+msgstr "Mezarlar"
+
+#: 317908391516442624
+msgid "toTrade"
+msgstr "Ticaret"
+
+#: 319566851823898624
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Evet, ayrıl"
+
+#: 319567663786627072
+msgid "skipSelectionTreasuresCancel"
+msgstr "Hayır, seçime geri dön"
+
+#: 320015732638486528
+msgid "soldToDealer"
+msgstr "Satıldı!"
+
+#: 321539636750192640
+msgid "craftSelectBlockedWrongType"
+msgstr "Bu öğe bu tür yuva için uygun değil"
+
+#: 321540352067768320
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Bu gruptan zaten yeterli sayıda öğe seçtiniz"
+
+#: 332999660336844800
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"Yol otlarla kaplı. Buradaki her şeye zaten hakim oldunuz — şimdi işe koyulma "
+"zamanı."
+
+#: 333367357155315712
+msgid "terrain0Biome0Title"
+msgstr "Çorak Toprak"
+
+#: 333367909771644928
+msgid "terrain1Biome0Title"
+msgstr "Bataklık"
+
+#: 333368362697756672
+msgid "terrain1Biome2Title"
+msgstr "Meteor Düşüşü"
+
+#: 333841248503992320
+msgid "goldUsedIn"
+msgstr ""
+"Ticaret dükkanında <color=#E3BA59>satılabilir</color>, <color=#E3BA59>Zanaat "
+"Yuvası</color>'nda kullanılabilir veya <color=#E3BA59>Süper Yuva</color>'ya "
+"yerleştirilebilir."
+
+#: 333841848608231424
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Ticaret dükkanında <color=#E3BA59>satılabilir</color>, <color=#E3BA59>Zanaat "
+"yuvası</color>nda kullanılabilir veya <color=#E3BA59>Süper yuva</color>ya "
+"yerleştirilebilir."
+
+#: 333841973128728576
+msgid "silverUsedIn"
+msgstr ""
+"Ticaret dükkanında <color=#E3BA59>satılabilir</color>, <color=#E3BA59>Zanaat "
+"yuvası</color>nda kullanılabilir veya <color=#E3BA59>Süper yuva</color>ya "
+"yerleştirilebilir."
+
+#: 333842030875906048
+msgid "gemUsedIn"
+msgstr ""
+"Ticaret dükkanında <color=#E3BA59>satılabilir</color>, <color=#E3BA59>Zanaat "
+"Yuvası</color> veya <color=#E3BA59>Süper Yuva</color> içinde kullanılabilir "
+"veya bir Hazineye <color=#E3BA59>yerleştirilebilir</color>."
+
+#: 333842074681217024
+msgid "gemRoughUsedIn"
+msgstr ""
+"Gerçek değerini ortaya çıkarmak için <color=#E3BA59>Parlatma</color> veya "
+"<color=#E3BA59>Süper yuva</color> içinde işlenebilir."
+
+#: 333842122626306048
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Ticaret dükkanında <color=#E3BA59>satılabilir</color> veya değerini artırmak "
+"için <color=#E3BA59>Ekle</color> veya <color=#E3BA59>Süper yuva</color> "
+"aracılığıyla mücevherler ile yuvalanabilir."
+
+#: 333842171624165376
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Şurada tamir edilebilir: <color=#E3BA59>Parlatma</color> veya <color=#E3BA59>"
+"Süper Yuva</color>."
+
+#: 333842234089934848
+msgid "chestUsedIn"
+msgstr ""
+"Şurada açılabilir: <color=#E3BA59>Sandık yuvası</color> veya <color=#E3BA59>"
+"Süper yuva</color>."
+
+#: 333842279115788288
+msgid "trashUsedIn"
+msgstr "Yalnızca satıcıya <color=#E3BA59>satılabilir</color>."
+
+#: 333842322942070784
+msgid "eggUsedIn"
+msgstr ""
+"Şurada açılabilir: <color=#E3BA59>Kuluçka Makinesi</color> veya "
+"<color=#E3BA59>Süper yuva</color>."
+
+#: 333842403657256960
+msgid "artifactUsedIn"
+msgstr "Yalnızca Ticaret dükkanında <color=#E3BA59>satılabilir</color>."
+
+#: 333842449953984512
+msgid "geodeUsedIn"
+msgstr ""
+"Şurada açılabilir: <color=#E3BA59>Parlatma</color> veya <color=#E3BA59>Süper "
+"yuva</color>."
+
+#: 333842496531730432
+msgid "unknownUsedIn"
+msgstr ""
+"Gerçek değerini belirlemek için <color=#E3BA59>Değerleme</color> için "
+"Tüccar'a götürülebilir."
+
+#: 333842548465602560
+msgid "cursedUsedIn"
+msgstr ""
+"Lanet, <color=#E3BA59>Altar</color>'da veya <color=#E3BA59>Süper yuva</color>"
+"'da kaldırılabilir."
+
+#: 334624695946317824
+msgid "terrain2Biome0Title"
+msgstr "Kereste Fabrikası"
+
+#: 334752689742417920
+msgid "perfect"
+msgstr "Mükemmel"
+
+#: 334754742782922752
+msgid "decline"
+msgstr "Reddet"
+
+#: 334758932242501632
+msgid "putUpForSale"
+msgstr "Satışa çıkar"
+
+#: 337073088274632704
+msgid "newLocationAvailable"
+msgstr "Yeni bir yer belirdi!"
+
+#: 338548608547950592
+msgid "retargetingTitle1"
+msgstr ":monocle: İlginç bir soru…"
+
+#: 338548710087856128
+msgid "retargetingDescription1"
+msgstr "Ne kadar ileri gidebilirsin?"
+
+#: 338548825884200960
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Devam etme zamanı."
+
+#: 338548974257704960
+msgid "retargetingDescription2"
+msgstr "İlerlemeniz hala burada."
+
+#: 338549087440998400
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Geri dönmeye hazır mısınız?"
+
+#: 338549137776840704
+msgid "retargetingDescription3"
+msgstr "Kaldığınız yerden devam edin."
+
+#: 338569990488985600
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Üretim tamamlandı!"
+
+#: 338570100794986496
+msgid "notificationCraftCompletedDescription"
+msgstr "Ne aldığınıza bakın."
+
+#: 338570414583451648
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Bir Alıcınız var!"
+
+#: 338570498368868352
+msgid "notificationTradeCompletedDescription"
+msgstr "Mallarınız bir müşteri buldu."
+
+#: 339457185953353728
+msgid "tradeSelectBlockedWrongType"
+msgstr "Bu öğe satılamaz."
+
+#: 340628273341140992
+msgid "skip"
+msgstr "Atla"
+
+#: 354499398722654208
+msgid "daily"
+msgstr "Günlük"
+
+#: 354514538620784640
+msgid "available"
+msgstr "Mevcut"
+
+#: 354514769508831232
+msgid "availableIn"
+msgstr "Şurada Mevcut"
+
+#: 355103206058233856
+msgid "dailyRewardClaimTitle"
+msgstr "Kâr için alın"
+
+#: 355103597911085056
+msgid "dailyRewardClaimDescription"
+msgstr "Bir video izleyin — X2 ödül kazanın"
+
+#: 355120760352935936
+msgid "withoutBonus"
+msgstr "Bonus yok"
+
+#: 355145440342315008
+msgid "claimWithBonus"
+msgstr "Bonusla talep et"
+
+#: 355146771715067904
+msgid "x2Reward"
+msgstr "x2 Ödül"
+
+#: 355255965734670336
+msgid "dailyRewardAlreadyReceived"
+msgstr "Ödül zaten talep edildi!"
+
+#: 355256265493188608
+msgid "missedDailyReward"
+msgstr "Ödül zaten kaçırıldı!"
+
+#: 355256569236295680
+msgid "futureDailyReward"
+msgstr "Bu ödül için daha sonra geri gelin!"
+
+#: 355276036993454080
+msgid "rateUs"
+msgstr "Bizi değerlendir"
+
+#: 355276149157531648
+msgid "rateUsTitle"
+msgstr "Bizi yıldızlarla değerlendir"
+
+#: 355276400991932416
+msgid "rateUsDescription"
+msgstr "Oyunu değerlendir ve gelişmemize yardımcı ol."
+
+#: 356305037681758208
+msgid "specialOffers"
+msgstr "Özel teklifler"
+
+#: 356313026543226880
+msgid "quickStart"
+msgstr "Hızlı Başlangıç!"
+
+#: 356313363102568448
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+#: 356342200381214720
+msgid "forever"
+msgstr "Sonsuza dek"
+
+#: 356345060842016768
+msgid "starterPack"
+msgstr "Başlangıç Paketi"
+
+#: 356346443771154432
+msgid "allInOneSupply"
+msgstr "Hepsi Bir Arada Tedarik"
+
+#: 356350103481749504
+msgid "dealOfTheDay"
+msgstr "Günün Fırsatı"
+
+#: 356354375627837440
+msgid "xAmount"
+msgstr "X{value}"
+
+#: 356354841824727040
+msgid "free!"
+msgstr "Ücretsiz!"
+
+#: 356357806572703744
+msgid "watch"
+msgstr "İzle"
+
+#: 356360805877551104
+msgid "coins"
+msgstr "Madeni Paralar"
+
+#: 356365108071632896
+msgid "mostPopular"
+msgstr "En popüler"
+
+#: 356365403610681344
+msgid "bestPrice"
+msgstr "En İyi Fiyat"
+
+#: 356519167105699840
+msgid "store"
+msgstr "Mağaza"
+
+#: 357424739636219904
+msgid "dealOfTheDayDescription"
+msgstr "Yeni teklifler şu süre sonra sunulacak:"
+
+#: 357607511365521408
+msgid "health"
+msgstr "Sağlık"
+
+#: 357784830910664704
+msgid "notificationDealOfTheDayTitle"
+msgstr "Mare alışveriş yapmak istiyor :sunglasses:"
+
+#: 357784932224077824
+msgid "notificationDealOfTheDayDescription"
+msgstr "Tek yapman gereken içeri atlayıp sana ait olanı almak."
+
+#: 357785735030640640
+msgid "notificationCoinsReadyTitle"
+msgstr "Mağaza güzellikler dağıtıyor :heart-eyes:"
+
+#: 357785816504995840
+msgid "notificationCoinsReadyDescription"
+msgstr "Mağazaya uğra ve bedavaları kap."
+
+#: 358713136833105920
+msgid "wantReceipt"
+msgstr "Fiş istiyorum (e-posta ile göndereceğiz)"
+
+#: 358722499958280192
+msgid "submit"
+msgstr "Gönder"
+
+#: 358723345383165952
+msgid "receiptEmaitTitle"
+msgstr "E-posta Girin"
+
+#: 358723657267417088
+msgid "receiptEmailDescription"
+msgstr ""
+"Fiş ister misin?\n"
+"E-postanı gir, satın alımından sonra sana gönderelim."
+
+#: 358900766250110976
+msgid "buy"
+msgstr "Satın Al"
+
+#: 358901413183754240
+msgid "starterPackHeadline"
+msgstr "Zamanında kap!"
+
+#: 358901551423819776
+msgid "specialOfferHeadline"
+msgstr "Daha fazla sonsuza kadar!"
+
+#: 359524475709165568
+msgid "open"
+msgstr "Aç"
+
+#: 360153378165362688
+msgid "maximumResources"
+msgstr "Maksimum kaynaklar"
+
+#: 360200917140901888
+msgid "exchangeCurrencyTitle"
+msgstr "Yeterli Gümüş paralar yok."
+
+#: 360201095897944064
+msgid "exchangeCurrencyDescription"
+msgstr "Sadece biraz eksik."
+
+#: 360201375158898688
+msgid "exchangeCurrencyQuestion"
+msgstr "Kalanı satın al?"
+
+#: 360510317885919232
+msgid "bankingAwaitingTitle"
+msgstr "Madeni Paralar yolda"
+
+#: 360511732461080576
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Altın vagona yükleniyor…\n"
+"Teslimat birkaç dakika sürebilir."
+
+#: 360689578840166400
+msgid "deleteItemConfirmationTitle"
+msgstr "Öğeyi atılsın mı?"
+
+#: 360689668438888448
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"Öğe sonsuza dek gidecek.\n"
+"Bu eylem geri alınamaz."
+
+#: 360858085955473408
+msgid "noKeepIt"
+msgstr "Hayır, kalsın"
+
+#: 361772904917241856
+msgid "allRegionsAvailable"
+msgstr "Tüm bölgeler mevcut"
+
+#: 361805221660463104
+msgid "terrainProgressLabel"
+msgstr "Bir sonraki konuma"
+
+#: 361805489286418432
+msgid "terrainClosedLabel"
+msgstr "Konum kullanılamıyor"
+
+#: 362095342867714048
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Nihai hedefin aşk!</color>\n"
+"Yaratımlarını yerel halka satarak onları kazan."
+
+#: 362097539907063808
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Seni <color=#E3BA59>SEVENE</color> kadar durma — \n"
+"sonra yeni toprakları fethetmeye hazır olacaksın."
+
+#: 362500096244584448
+msgid "cryolisUsedIn"
+msgstr ""
+"Ticaret dükkanında <color=#E3BA59>satılabilir</color>, <color=#E3BA59>Zanaat "
+"yuvası</color>nda kullanılabilir veya <color=#E3BA59>Süper yuva</color>ya "
+"yerleştirilebilir."
+
+#: 362503199635279872
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Bu öğe seçilen Tarif için uygun değil."
+
+#: 362505392367079424
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Bu gruptan başka bir öğe zaten seçildi."
+
+#: 362831462727421952
+msgid "failedPurchase"
+msgstr ""
+"Kısrak üzgün. Satın alma başarısız oldu.\n"
+"Lütfen tekrar deneyin."
+
+#: 363945774653116416
+msgid "frozenUsedIn"
+msgstr ""
+"Şurada ısıtılabilir: <color=#E3BA59>Kuluçka Makinesi</color> veya "
+"<color=#E3BA59>Süper yuva</color>."
+
+#: 363945781498220544
+msgid "frozen"
+msgstr "Donmuş"
+
+#: 363947917120376832
+msgid "frozens"
+msgstr "Donmuş"
+
+#: 371768236233199616
+msgid "language"
+msgstr "Dil"
+
+#: 371825767475318784
+msgid "termsOfUse"
+msgstr "Kullanım Şartları"
+
+#: 371825915722993664
+msgid "privacyPolicy"
+msgstr "Gizlilik Politikası"
+
+#: 371826077132394496
+msgid "deleteData"
+msgstr "Verileri sil"
+
+#: 371826289473228800
+msgid "signInWithGoogle Play"
+msgstr "Google Play ile oturum aç"
+
+#: 371936637333278720
+msgid "notLinked"
+msgstr "Bağlı değil"
+
+#: 371936898659389440
+msgid "linked"
+msgstr "Bağlı"
+
+#: 371937387937533952
+msgid "switchGooglePlay"
+msgstr "Google Play hesabını değiştir"
+
+#: 372201325233180672
+msgid "resetProgressDescription"
+msgstr ""
+"İlerlemenizi silmek istediğinizden emin misiniz? Bu eylem geri alınamaz!"
+
+#: 372201851437977600
+msgid "resetProgressConfirm"
+msgstr "Evet, sil"
+
+#: 375231950777225216
+msgid "terrainInDevelopmentDescription"
+msgstr "Üzgünüz. Bu konum hala geliştirilme aşamasındadır."
+
+#: 375232378373935104
+msgid "terrain2Biome1Title"
+msgstr "Donmuş Tersane"
+
+#: 375232425010401280
+msgid "terrain2Biome2Title"
+msgstr "Fener"
+
+#: 375232475627261952
+msgid "terrain2Biome3Title"
+msgstr "Lostwood"
+
+#: 376614903423963136
+msgid "collectAll"
+msgstr "Hepsini Topla"
+
+#: 376958824981204992
+msgid "healthStatReward"
+msgstr "Can + {value}"
+
+#: 376959365689905152
+msgid "storageStatReward"
+msgstr "Depolama Kapasitesi + {value}"
+
+#: 376968663052587008
+msgid "itemsLeft_x"
+msgstr "Kalan öğeler: {value}"
+
+#: 376983763331321856
+msgid "storageStatRewardSummary"
+msgstr "Depolama sonsuza dek"
+
+#: 376983951106117632
+msgid "healthStatRewardSummary"
+msgstr "Sağlık sonsuza dek"
+
+#: 379459050652569600
+msgid "prospectors"
+msgstr "Prospektörler"
+
+#: 384582485728825344
+msgid "storeStockFullDescription"
+msgstr "Depolama son kırıntısına kadar dolu."
+
+#: 384852464931966976
+msgid "terrain3Title"
+msgstr "Grimdal"
+
+#: 387215171681259520
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Telefon ayarlarınızı açın\n"
+"2. Google - Tüm hizmetler - Play Oyunlar\n"
+"3. “Oturum açma hesabı” - \"Değiştir\" (oyunun yanında)\n"
+"4. Oyunu yeniden başlatın"
+
+#: 388959282209755136
+msgid "versionAlertMessage"
+msgstr "Oyunun yeni bir sürümü yayınlandı. Güncelleme zamanı!"
+
+#: 390311463999508480
+msgid "treasureUsedIn"
+msgstr "Sadece Ticaret dükkanında <color=#E3BA59>satılabilir</color>."
+
+#: 390630593516539904
+msgid "noInternetConnectionBlocking"
+msgstr "İnternet yok — macera yok"
+
+#: 390630963617730560
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Yeniden bağlanılıyor…\n"
+"{value}"
+
+#: 391415174540824576
+msgid "newsAndCommunication"
+msgstr "Haberler ve iletişim"
+
+#: 392040460349345792
+msgid "statEffectAccumulationFreeze"
+msgstr "Donma"
+
+#: 392040705481248768
+msgid "statEffectHeal"
+msgstr "Yenilenme"
+
+#: 392040844430151680
+msgid "statEffectMovementSpeedNegative"
+msgstr "Yavaşlama"
+
+#: 392041019248742400
+msgid "statEffectMovementSpeedPositive"
+msgstr "Hız Takviyesi"
+
+#: 392041155999830016
+msgid "statEffectDamageCurse"
+msgstr "Tükenmişlik"
+
+#: 392041334085783552
+msgid "statEffectDamageBleed"
+msgstr "Kanama"
+
+#: 392041534623846400
+msgid "statEffectToolNoiseNegative"
+msgstr "Gürültülü Alet"
+
+#: 392041656803921920
+msgid "statEffectToolNoisePositive"
+msgstr "Sessiz Alet"
+
+#: 392041855974641664
+msgid "statEffectToolSpeedNegative"
+msgstr "Yorgunluk"
+
+#: 392042070265827328
+msgid "statEffectToolSpeedPositive"
+msgstr "Çeviklik"
+
+#: 392090295794405376
+msgid "pause"
+msgstr "Duraklat"
+
+#: 392090376618643456
+msgid "pauseDescription"
+msgstr "Efektler, siparişler ve ayarlar — hepsi burada."
+
+#: 392092595833278464
+msgid "effects"
+msgstr "Karakter Durumu"
+
+#: 392119357174714368
+msgid "settingsDialogTitle"
+msgstr "Ayarlar"
+
+#: 393910691879456768
+msgid "russianPlaymentsBanner"
+msgstr "Rusya'daki oyuncular için ödemeler mevcuttur."

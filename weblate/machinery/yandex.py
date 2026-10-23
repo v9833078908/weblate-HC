@@ -1,0 +1,88 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import httpx2
+
+from .base import (
+    MACHINERY_DEFAULT_THRESHOLD,
+    MachineTranslation,
+    MachineTranslationError,
+)
+from .forms import KeyMachineryForm
+
+if TYPE_CHECKING:
+    from weblate.auth.models import User
+    from weblate.trans.models import Unit
+
+    from .base import DownloadTranslations
+
+
+class YandexTranslation(MachineTranslation):
+    """Yandex machine translation support."""
+
+    name = "Yandex"
+    max_score = 90
+    settings_form = KeyMachineryForm
+
+    def check_failure(self, response: httpx2.Response) -> None:
+        super().check_failure(response)
+        payload = response.json()
+        if "message" in payload:
+            raise MachineTranslationError(payload["message"])
+        if "code" in payload and payload["code"] != 200:
+            msg = f"Error: {payload['code']}"
+            raise MachineTranslationError(msg)
+
+    def download_languages(self):
+        """Download list of supported languages from a service."""
+        response = self.request(
+            "get",
+            "https://translate.yandex.net/api/v1.5/tr.json/getLangs",
+            params={"key": self.settings["key"], "ui": "en"},
+        )
+        payload = response.json()
+        return payload["langs"].keys()
+
+    def download_translations(
+        self,
+        source_language,
+        target_language,
+        text: str,
+        unit: Unit | None,
+        user: User | None,
+        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+    ) -> DownloadTranslations:
+        """Download list of possible translations from a service."""
+        response = self.request(
+            "get",
+            "https://translate.yandex.net/api/v1.5/tr.json/translate",
+            params={
+                "key": self.settings["key"],
+                "text": text,
+                "lang": f"{source_language}-{target_language}",
+                "target": target_language,
+            },
+        )
+        payload = response.json()
+
+        for translation in payload["text"]:
+            yield {
+                "text": translation,
+                "quality": self.max_score,
+                "service": self.name,
+                "source": text,
+            }
+
+    def get_error_message(self, exc: Exception) -> str:
+        response = getattr(exc, "response", None)
+        if isinstance(exc, httpx2.HTTPError) and response is not None:
+            try:
+                return response.json()["message"]
+            # ruff: ignore[try-except-pass]
+            except Exception:
+                pass
+        return super().get_error_message(exc)

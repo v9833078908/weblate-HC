@@ -1,0 +1,2060 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-28 09:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Czech <http://l10n.herocraft.com/projects/need-for-greed/ui/"
+"cs/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: cs\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+
+#: 142945292288
+msgid "vibration"
+msgstr "Vibrace"
+
+#: 136857827676160
+msgid "loading"
+msgstr "Načítání"
+
+#: 140450844643328
+msgid "adsNotReady"
+msgstr "Reklama není připravena. Zkuste to prosím později."
+
+#: 340188151943168
+msgid "amount"
+msgstr "{value}"
+
+#: 368875517775872
+msgid "reviewTitle"
+msgstr "Váš názor je pro nás důležitý!"
+
+#: 368997953703936
+msgid "reviewDescription"
+msgstr "Líbí se vám tato hra?"
+
+#: 369514264137728
+msgid "reviewConfirm"
+msgstr "Ano, samozřejmě!"
+
+#: 369755633750016
+msgid "no"
+msgstr "Ne"
+
+#: 406497292193792
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+#: 483624632979456
+msgid "leaders"
+msgstr "Vůdci"
+
+#: 483894125400064
+msgid "leaderboardAuth"
+msgstr ""
+"Žebříček je dostupný pouze autorizovaným uživatelům.\n"
+"Přihlaste se ke svému účtu v nastavení."
+
+#: 693554757505024
+msgid "softCurrency"
+msgstr "Stříbrné mince"
+
+#: 693648756051968
+msgid "gems"
+msgstr "Drahokamy"
+
+#: 2338581875265536
+msgid "day_N"
+msgstr "Den {value}"
+
+#: 2340303519617024
+msgid "dailyRewards"
+msgstr "Denní odměny"
+
+#: 2340513616498688
+msgid "dailyRewardsDescription"
+msgstr ""
+"Navštěvujte hru každý den\n"
+"a získejte odměny."
+
+#: 2524665741578240
+msgid "tapToStart"
+msgstr "Klepnutím spustíte"
+
+#: 2534199759474688
+msgid "settings"
+msgstr "Nastavení"
+
+#: 2539217615065088
+msgid "sound"
+msgstr "SFX"
+
+#: 2539801025974272
+msgid "music"
+msgstr "Hudba"
+
+#: 2606360020914176
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?"
+"{seconds}s.|} "
+
+#: 31188945265680384
+msgid "sell"
+msgstr "Prodat"
+
+#: 39267299644215296
+msgid "trading"
+msgstr "Obchod"
+
+#: 39267930052300800
+msgid "selectAmount"
+msgstr ""
+"Vyberte množství Drahokamů <size=56><color=#fff>( {value} / {total} )</color>"
+"</size>"
+
+#: 39432224572248064
+msgid "apply"
+msgstr "Použít"
+
+#: 88927433573797888
+msgid "exit"
+msgstr "Konec"
+
+#: 89108083400511488
+msgid "loot"
+msgstr "Kořist"
+
+#: 89232802619592704
+msgid "inventory"
+msgstr "Inventář"
+
+#: 89233049219502080
+msgid "add_amount"
+msgstr "+ {value}"
+
+#: 101508439312961536
+msgid "upgradeCharacterHealthStat"
+msgstr "Zdraví"
+
+#: 101509164025778176
+msgid "Pick"
+msgstr "Krumpáč"
+
+#: 103762241726451712
+msgid "unload"
+msgstr "Vyložit"
+
+#: 105589950840573952
+msgid "continue"
+msgstr "pokračovat"
+
+#: 105600782735511552
+msgid "continueWithoutTheBird"
+msgstr "Pokračovat bez Ptáka"
+
+#: 128992315220168704
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+#: 129852820621103104
+msgid "make"
+msgstr "Vyrobit"
+
+#: 130612002970406912
+msgid "in_progress"
+msgstr "Probíhá..."
+
+#: 132250436289957888
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+#: 132393404065910784
+msgid "lvl_x"
+msgstr "úroveň {value}"
+
+#: 133085114043469824
+msgid "take"
+msgstr "Vzít"
+
+#: 168978456979443712
+msgid "tradeDescription"
+msgstr "Přetáhněte a pusťte předměty k prodeji sem"
+
+#: 168979719083266048
+msgid "storage"
+msgstr "Sklad"
+
+#: 168993254521704448
+msgid "backpack"
+msgstr "Batoh"
+
+#: 175428495763312640
+msgid "upgradeCharacterResistanceStat"
+msgstr "Odolnost"
+
+#: 175428883866456064
+msgid "completed"
+msgstr "Dokončeno"
+
+#: 175429326734626816
+msgid "upgradeCharacterSpeedStat"
+msgstr "Rychlost"
+
+#: 175429624488267776
+msgid "detectionRadius"
+msgstr "Poloměr detekce pastí"
+
+#: 175437389508120576
+msgid "upgrade"
+msgstr "Vylepšit"
+
+#: 175444653988122624
+msgid "upgradeCharacterTitle"
+msgstr "Postava úroveň {value}"
+
+#: 175444893063450624
+msgid "upgradeToolTitle"
+msgstr "Nástroj úroveň {value}"
+
+#: 175445052228898816
+msgid "bird"
+msgstr "Pták"
+
+#: 175445211058802688
+msgid "craft"
+msgstr "Vytvořit"
+
+#: 175530141390475264
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Další lety"
+
+#: 175535881710735360
+msgid "upgradeToolSpeedStat"
+msgstr "Rychlost dopadu nástroje"
+
+#: 175536172950622208
+msgid "upgradeToolDamageStat"
+msgstr "Poškození nástroje"
+
+#: 185307831437889536
+msgid "terrain1Title"
+msgstr "Fenmarský močál"
+
+#: 185308054407090176
+msgid "terrain2Title"
+msgstr "Belomar"
+
+#: 185645691072417792
+msgid "start"
+msgstr "Start"
+
+#: 185658961254682624
+msgid "terrain1Description"
+msgstr ""
+"Jen bažina, která je bažinou – kromě zlatých nugetů a obřího červa, který "
+"reaguje na každé „cinknutí“.\n"
+"Místní říkají: pokud chceš zlato, necinkej jako v obchodě s porcelánem."
+
+#: 185670435373060096
+msgid "howToOpenBiome"
+msgstr ""
+"Nová místa.\n"
+"Dokončete objednávky – a místní vám ukážou,\n"
+"kde hledat dál."
+
+#: 185944937449394176
+msgid "revivalTitle"
+msgstr "Je to naprostý propadák!"
+
+#: 185946490252038144
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Položky v Batoh: {value} / {total}"
+
+#: 185949125390635008
+msgid "exitAndLoseItems"
+msgstr "Opustit a ztratit předměty"
+
+#: 187764654040420352
+msgid "noBirdEnergy"
+msgstr "Žádní ptáci, žádné oči"
+
+#: 187765165577736192
+msgid "noDetectorEnergy"
+msgstr "Detektor pokladů"
+
+#: 190252961852821504
+msgid "yes_leave"
+msgstr "Ano, odejít"
+
+#: 190253329051553792
+msgid "no_stay"
+msgstr "Ne, zůstat zde"
+
+#: 190253804719181824
+msgid "leave_location_confirmation"
+msgstr "Chcete opustit lokaci?"
+
+#: 190609920439357440
+msgid "percentAmount"
+msgstr "{value}%"
+
+#: 190613197834948608
+msgid "pointsAmount"
+msgstr "{value} <size=70%>b.</size>"
+
+#: 190999934906142720
+msgid "close"
+msgstr "Zavřít"
+
+#: 191001304602251264
+msgid "selectTheShape"
+msgstr "Vyberte tvar pokladu"
+
+#: 191001600908857344
+msgid "speedUp"
+msgstr "Zrychlit"
+
+#: 191062612982894592
+msgid "tutorial"
+msgstr "Návod"
+
+#: 214456412639858688
+msgid "terrainPickLootTitle"
+msgstr "Vezměte vše, co se vejde do vašeho batohu a Skladu"
+
+#: 214474517843808256
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+#: 215688832034803712
+msgid "takeToStorageXofY"
+msgstr "Vzít {value}/ {total}"
+
+#: 215688944811249664
+msgid "upgradeBag"
+msgstr "Vylepšit batoh"
+
+#: 216124892128743424
+msgid "dealerWillBuyTheRest"
+msgstr "Prodejce od vás koupí vše ostatní"
+
+#: 216274536972423168
+msgid "information"
+msgstr "Informace"
+
+#: 216281997183815680
+msgid "weightInformation"
+msgstr ""
+"Kapacita brašny na koně je důležitým ukazatelem.\n"
+"Hmotnost nalezených předmětů ovlivňuje jejich přepravu.\n"
+"Vylepšete svou brašnu, abyste zvýšili její Kapacitu a mohli přepravovat více "
+"předmětů."
+
+#: 216292821260570624
+msgid "rank_x"
+msgstr "Hodnost {value}"
+
+#: 216295079784222720
+msgid "weight"
+msgstr "Hmotnost:"
+
+#: 216455391749607424
+msgid "vehicleUpgradeDescription"
+msgstr "Zlepšete Kapacitu Brašny na koně pro přepravu nákladů."
+
+#: 216456296213516288
+msgid "capacity"
+msgstr "Kapacita"
+
+#: 216456449876037632
+msgid "horseCargoBag"
+msgstr "Brašna na koně"
+
+#: 216464394802171904
+msgid "hardCurrency"
+msgstr "Zlaté mince"
+
+#: 216827767398076416
+msgid "confirmation"
+msgstr "Potvrzení"
+
+#: 216836939359457280
+msgid "attention!"
+msgstr "Pozor!"
+
+#: 216837051221544960
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Pokud odejdete nyní, <color=#E01114>všechny nalezené předměty budou prodány "
+"Prodejci</color> za méně než obvykle."
+
+#: 216843048690388992
+msgid "bayerDescription"
+msgstr "Chcete vydělat více? Odkoupím zbytky s bonusem."
+
+#: 217004942013239296
+msgid "bestProfit"
+msgstr "Nejlepší zisk"
+
+#: 217005085059977216
+msgid "goodProfit"
+msgstr "Dobrý zisk"
+
+#: 217005221878173696
+msgid "badProfit"
+msgstr "Špatný zisk"
+
+#: 217034757265166336
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+#: 217067111195086848
+msgid "yourProfit"
+msgstr "Váš zisk:"
+
+#: 219330229052903424
+msgid "eliteSlot"
+msgstr "Elitní slot"
+
+#: 219330557043281920
+msgid "tradingShopLevel"
+msgstr "Obchod lvl {value}"
+
+#: 219331227683131392
+msgid "rent"
+msgstr "Pronájem"
+
+#: 219333990236295168
+msgid "slot"
+msgstr "Slot"
+
+#: 219334107282542592
+msgid "selectItem"
+msgstr "Vybrat položku"
+
+#: 219569917810446336
+msgid "checkOffer"
+msgstr "Zkontrolovat"
+
+#: 221184956493467648
+msgid "shopLevel"
+msgstr "Úroveň obchodu {value}"
+
+#: 221731312916238336
+msgid "tradeOpenEliteSlotDialog"
+msgstr "Zde kupující platí hodně, žádné smlouvání."
+
+#: 221732692687065088
+msgid "getASlot"
+msgstr "Získat Slot"
+
+#: 221745332360581120
+msgid "customerWillArriveIn"
+msgstr "Zákazník dorazí za:"
+
+#: 221747748288073728
+msgid "speedUpBy"
+msgstr "Zrychlit o"
+
+#: 221752584698073088
+msgid "decline?"
+msgstr "Odmítnout?"
+
+#: 221752816395620352
+msgid "tradeDeclineClientInfo"
+msgstr "Dokud nepřijde další zákazník:"
+
+#: 221785455785676800
+msgid "tradingShop"
+msgstr "Obchod"
+
+#: 221785885429207040
+msgid "newSlot"
+msgstr "Nový slot"
+
+#: 221786327613706240
+msgid "tradeUpgradeDescription"
+msgstr "Vylepšete obchod, abyste odemkli více slotů pro prodej."
+
+#: 221790732488544256
+msgid "tradingShopShort"
+msgstr "Obchod"
+
+#: 221791365350297600
+msgid "level_x"
+msgstr "Úroveň {value}"
+
+#: 221901028389556224
+msgid "buyersOffer"
+msgstr "Nabídka Kupujícího:"
+
+#: 221902690122469376
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+#: 223520514767065088
+msgid "common"
+msgstr "Běžné"
+
+#: 223520659910955008
+msgid "uncommon"
+msgstr "Neobvyklé"
+
+#: 223520713283473408
+msgid "rare"
+msgstr "Vzácné"
+
+#: 223520767448715264
+msgid "epic"
+msgstr "Epický"
+
+#: 223520826210914304
+msgid "legendary"
+msgstr "Legendární"
+
+#: 223520860377714688
+msgid "mythic"
+msgstr "Mýtický"
+
+#: 224246507228106752
+msgid "tradeSelectItemTitle"
+msgstr "Vyberte položku k prodeji"
+
+#: 224277347911864320
+msgid "basePrice"
+msgstr "Základní cena:"
+
+#: 226508435681972224
+msgid "map"
+msgstr "Mapa"
+
+#: 226574491591118848
+msgid "wiseNotes"
+msgstr "Moudré poznámky"
+
+#: 226576404894191616
+msgid "emptyPickedItems"
+msgstr "Odejít s prázdnou?"
+
+#: 226580081470083072
+msgid "settingsDescription"
+msgstr "Utvářejte svět podle sebe!"
+
+#: 226582087576326144
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Vylepšete svůj obchod, abyste odemkli více prodejních slotů – čím více polic "
+"přidáte, tím větší budou vaše zisky!"
+
+#: 226633818465112064
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00}: |}{minutes:00}:{seconds:00}"
+
+#: 227954852267036672
+msgid "craftSlot"
+msgstr "Výrobní slot"
+
+#: 227959361919782912
+msgid "superSlot"
+msgstr "Super slot"
+
+#: 228232787804819456
+msgid "forge"
+msgstr "Kovárna"
+
+#: 228312834624458752
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Kujte poklady, otevírejte truhly a magická vejce – kdo ví, jaká vzácná "
+"kořist na vás čeká uvnitř!"
+
+#: 228318026984067072
+msgid "chestSlot"
+msgstr "Slot pro truhlu"
+
+#: 228318447752450048
+msgid "incubator"
+msgstr "Inkubátor"
+
+#: 228321113740152832
+msgid "craftOpenEliteSlotLabel"
+msgstr "Uvolněte maximální sílu!"
+
+#: 228357165007769600
+msgid "cancel"
+msgstr "Zrušit"
+
+#: 228360236127490048
+msgid "openChest"
+msgstr "Otevřít truhlu"
+
+#: 228385218756874240
+msgid "timeToOpen:"
+msgstr "Čas k otevření:"
+
+#: 228792391647367168
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Žádné Truhly skladem"
+
+#: 228794249094893568
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Našli jste jednu? Přetáhněte ji do Craft a otevřete ji\n"
+"(jen ne se sekerou, dobře?)"
+
+#: 228796285601452032
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+#: 229526591581196288
+msgid "craftSelectEggTitle"
+msgstr "Vyberte Vejce k otevření"
+
+#: 229526902270070784
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Žádné Vejce skladem"
+
+#: 229528260377317376
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "Jdeme na Vejce – ne z kurníku, ale zrozené z magie!"
+
+#: 229528854181711872
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Prozkoumejte říši, objevte vzácné Vejce a doručte ho do Craft. Co se skrývá "
+"uvnitř – pouhý žloutek, nebo něco mnohem většího?"
+
+#: 229530481219342336
+msgid "openEgg"
+msgstr "Otevřít Vejce"
+
+#: 229879731472044032
+msgid "craftSelectRecipeTitle"
+msgstr "Vyberte komponenty pro Vytvoření"
+
+#: 229880209643671552
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Nic skladem!"
+
+#: 229881107660935168
+msgid "craftItem"
+msgstr "Vytvořit předmět"
+
+#: 229881635711225856
+msgid "crafting:"
+msgstr "Vytváření:"
+
+#: 229882264282206208
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Tyto předměty ještě nebyly nalezeny."
+
+#: 229887783071911936
+msgid "recipe"
+msgstr "Recept"
+
+#: 230098234464538624
+msgid "craftClosedRecipeTitle"
+msgstr "Kovárna je příliš slabá!"
+
+#: 230098538715156480
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Nedostatečná úroveň kovárny\n"
+"\n"
+"S každým vylepšením budete moci vytvářet stále vzácnější a cennější poklady. "
+"Je čas proměnit tuto pec v kovárnu legend!"
+
+#: 230596136282624000
+msgid "craftClosedSlotTitle"
+msgstr "Slot je uzamčen!"
+
+#: 230596696704552960
+msgid "craftClosedSlotDescription"
+msgstr "Vaše řemeslné dovednosti nejsou dostatečně silné. Musíte je vylepšit."
+
+#: 230974103273869312
+msgid "or"
+msgstr "nebo"
+
+#: 231685619115626496
+msgid "craftSpeedUpTitle"
+msgstr "Naložte uhlí!"
+
+#: 231686505602748416
+msgid "craftSpeedUpDescription"
+msgstr "Bude to, jako by trpaslíci vypili espresso a zapnuli turbo režim!"
+
+#: 231700678231461888
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Slot odemčen.\n"
+"Pec taví Kov a přeměňuje ho na zbrusu nové Šperky k prodeji."
+
+#: 231701488554217472
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Čas jsou peníze, ale Šperky se vyrábí ještě rychleji"
+
+#: 231702447166590976
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Zvyšuje vaše šance na vytvoření Legendární položky."
+
+#: 231703302095769600
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"Moudrost starověku proudí skrze vás — Kovárna zázraků, jaké svět ještě "
+"neviděl!"
+
+#: 232003352147529728
+msgid "craftStockFullTitle"
+msgstr "Žádné místo pro poklad ve Skladu!"
+
+#: 232004264790331392
+msgid "craftStockFullDescription"
+msgstr ""
+"Sklad je plný do posledního kousku.\n"
+"Prodejte přebytek v Obchodě nebo vylepšete Sklad — pak si vyzvedněte svou "
+"lesklou trofej!"
+
+#: 232054830455328768
+msgid "allItems"
+msgstr "Všechny položky"
+
+#: 232055567298072576
+msgid "stockLevel"
+msgstr "Sklad úroveň {value}"
+
+#: 232285845522223104
+msgid "storageUpgradeDescription"
+msgstr ""
+"Každé vylepšení poskytuje <color=#E01114>více místa</color> pro nalezené a "
+"ukované poklady. Více Zlata, méně utrpení!"
+
+#: 238220511437656064
+msgid "revivalDescription"
+msgstr "Znovuzrození – nebo se rozlučte s Kořistí."
+
+#: 238225411982757888
+msgid "noBirdEnergyDescription"
+msgstr "Přivedl vás k pokladu a odletěl si odpočinout."
+
+#: 238226013823438848
+msgid "callTheBird"
+msgstr "Vrátit se hned"
+
+#: 238228172388438016
+msgid "noDetectorEnergyDescription"
+msgstr "Myslíte, že zvládnete ještě jeden?"
+
+#: 238229156124692480
+msgid "oreSeeker"
+msgstr "Hledač rudy"
+
+#: 238230435035090944
+msgid "gemSeeker"
+msgstr "Hledač drahokamů"
+
+#: 238805340126449664
+msgid "respawn"
+msgstr "Znovuzrození"
+
+#: 238835918318080000
+msgid "deathExit"
+msgstr "Odešel s prázdnou"
+
+#: 241685352961806336
+msgid "terrain0Title"
+msgstr "Tichý les"
+
+#: 241686624016273408
+msgid "terrain2Description"
+msgstr ""
+"Drsná severní divočina uzamčená ve věčném chladu. Mezi ledovými labyrinty je "
+"snadné se ztratit – a po západu slunce umrznout. V tomto pořadí… nebo možná "
+"naopak."
+
+#: 241686676700925952
+msgid "terrain0Description"
+msgstr ""
+"Každý hrdina někde začíná!\r\n"
+"Zde jsou pohřbeny vaše první poklady — a vaše první potíže. Zde se naučíte "
+"těžit, tavit, předvádět se a přežít."
+
+#: 242168130602012672
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Získejte přízeň vesničanů,\n"
+"a nové město vám otevře své brány!"
+
+#: 242225089728483328
+msgid "upgradeToolNoiseStat"
+msgstr "Snížení hluku"
+
+#: 243276239902871552
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr ""
+"Zvyšte svou odolnost — a nebudete se bát, když se svět stane nepřátelským!"
+
+#: 243276804422635520
+msgid "upgradeCharacterHealthStatDescription"
+msgstr "Více životů — méně šancí stát se legendou... posmrtně."
+
+#: 243277089148768256
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr "Rychlejší nohy — méně šancí stát se večeří pro místní divokou zvěř!"
+
+#: 243277490971480064
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"Čím více opeřených průzkumníků máte, tím větší jsou vaše šance najít "
+"pohřbené třpytky!"
+
+#: 243277858065354752
+msgid "upgradeToolSpeedStatDescription"
+msgstr "Čím rychlejší úder, tím menší šance, že někdo jiný sebere rudu dříve!"
+
+#: 243278506789965824
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Čím mocnější nástroj, tím krotší kámen —\r\n"
+"a tím plnější vaše taška!"
+
+#: 243278882293420032
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Méně hluku znamená menší šanci, že vás uslyší ti, kteří dávají přednost "
+"křupání kostí před cinkáním Zlata."
+
+#: 243286615193292800
+msgid "resistanceStatLevel"
+msgstr "Úroveň odolnosti {value}"
+
+#: 243287048297123840
+msgid "healthStatLevel"
+msgstr "Úroveň zdraví {value}"
+
+#: 243287378833444864
+msgid "speedStatLevel"
+msgstr "Úroveň rychlosti {value}"
+
+#: 243287648745295872
+msgid "upgradeBirdTitle"
+msgstr "Úroveň Pták {value}"
+
+#: 243301960306135040
+msgid "amountPcs"
+msgstr "{value} ks."
+
+#: 246550123938844672
+msgid "maxLevel"
+msgstr "Maximální úroveň"
+
+#: 246920055440543744
+msgid "treasureDetector"
+msgstr "Detektor pokladů"
+
+#: 246920748020797440
+msgid "amountSec"
+msgstr "{value} s."
+
+#: 246921123041906688
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Hledač rudy"
+
+#: 246921489389195264
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Tato magická vychytávka vyhledává zlaté žíly lépe než trpaslík, který cítí "
+"oběd zdarma!"
+
+#: 246922080165302272
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Hledač drahokamů"
+
+#: 246922249237696512
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"Zařízení s ostřejším nosem než chamtivost obchodníka. Žádný drahokam "
+"nezůstane dlouho skrytý!"
+
+#: 246922743578365952
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Více času na hledání zlata"
+
+#: 246922920854818816
+msgid "upgradeDetectorDurationStatDescription"
+msgstr "Běží déle, hledá lépe, méně brblá. Více času znamená více kořisti!"
+
+#: 247080041558839296
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value} %"
+
+#: 247080534393753600
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} ks."
+
+#: 247080751339933696
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} s."
+
+#: 247452846670483456
+msgid "gold"
+msgstr "Zlato"
+
+#: 247452991940202496
+msgid "chests"
+msgstr "Truhly"
+
+#: 247453392370405376
+msgid "eggs"
+msgstr "Vejce"
+
+#: 247453604342140928
+msgid "treasures"
+msgstr "Šperky"
+
+#: 247453698634289152
+msgid "artifacts"
+msgstr "Artefakty"
+
+#: 249822854419582976
+msgid "deathTitle"
+msgstr "Smrt je štědrá – bere všechno!"
+
+#: 249823090609229824
+msgid "deathDescription"
+msgstr "Vaše kořist je nyní legendární."
+
+#: 250055490891157504
+msgid "tradeEmptyStorageMessage"
+msgstr "Momentálně nic k prodeji"
+
+#: 250066987813965824
+msgid "craftNoEggs"
+msgstr "Žádná vejce pro inkubátor"
+
+#: 250067227111591936
+msgid "craftNoChests"
+msgstr "Žádné truhly k otevření"
+
+#: 250067363896233984
+msgid "craftNoItems"
+msgstr "Nic k vytvoření"
+
+#: 250187845660315648
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Více času na lov drahokamů"
+
+#: 251259329547866112
+msgid "newLocationAvailableTitle"
+msgstr "Nová lokace je nyní k dispozici!"
+
+#: 251259543163768832
+msgid "newLocationAvailableDescription"
+msgstr "Vesničané souhlasí: zasloužíte si víc."
+
+#: 251632108633853952
+msgid "upgradeStock"
+msgstr "Vylepšit Sklad"
+
+#: 252146625037996032
+msgid "storageOverflowedDesctiption"
+msgstr "Váš Sklad nemůže pojmout všechno vaše bohatství. Je čas na vylepšení!"
+
+#: 252147840639569920
+msgid "throwAway"
+msgstr "Vyhodit"
+
+#: 259586112407998464
+msgid "upgradeCraftCostStatDescription"
+msgstr "Základní cena předmětů stoupá jako chléb na kvasnicích"
+
+#: 262490762970927104
+msgid "upgradeVehicleWeightStat"
+msgstr "Velká taška"
+
+#: 262491576103866368
+msgid "upgradeVehicleWeightStatDescription"
+msgstr "Kůň je nyní schopen nést více pokladů. Více nepořádku, více štěstí!"
+
+#: 262491999908925440
+msgid "upgradeVehicleTitle"
+msgstr "Kůň úroveň {value}"
+
+#: 262492464646197248
+msgid "amountKg"
+msgstr "{value} kg."
+
+#: 262492710260445184
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+#: 262493129695039488
+msgid "upgradeStorageWeightStat"
+msgstr "Kapacita"
+
+#: 262493626518736896
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Extra prostor pro naprosto bezcenné poklady!"
+
+#: 262495569987244032
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Štědří kupci"
+
+#: 262495864679043072
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Zákazníci bojují o váš šrot."
+
+#: 262496445971828736
+msgid "upgradeTradeTitle"
+msgstr "Obchod lvl {value}"
+
+#: 262497898778071040
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Páchneš bohatstvím"
+
+#: 262498326018265088
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"Pověst o vašem řemeslném umění se rozšířila – skutečné chodící peněženky se "
+"objevují častěji."
+
+#: 262499250967154688
+msgid "upgradeTradeSlotsStat"
+msgstr "Nový slot"
+
+#: 262499518630858752
+msgid "upgradeTradeSlotsStatDescription"
+msgstr "Otevřel se další obchodní slot. Více zákazníků – více zlata!"
+
+#: 262503656592773120
+msgid "upgradeCraftTimeStat"
+msgstr "Šperkový sprint"
+
+#: 262504135200608256
+msgid "upgradeCraftTitle"
+msgstr "Vytvořit úroveň {value}"
+
+#: 262504539359547392
+msgid "upgradeCraftRarityStat"
+msgstr "Vzácnost"
+
+#: 262505217075187712
+msgid "upgradeCraftRecipesStat"
+msgstr "Kniha receptů"
+
+#: 262506098214572032
+msgid "upgradeCraftCostStat"
+msgstr "Zlatý důl"
+
+#: 262506924148527104
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Slot pro výrobu"
+
+#: 262507722794340352
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Slot pro truhlu"
+
+#: 262508574351298560
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Slot odemčen.\n"
+"Otevírá truhly a zamčené předměty jakéhokoli původu – dokonce i ty, které "
+"zjevně nejsou z této planety."
+
+#: 262508742647746560
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Inkubátor"
+
+#: 262508816316502016
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Slot odemčen.\n"
+"Nemyslete si, že Coco je dobrá jen na vejce. Pokud potřebujete roztavit led, "
+"něco zahřát nebo pomoci s jinými úkoly – vždy je užitečná. A pokud jde o "
+"rozbíjení vajec, ani se neptá."
+
+#: 262509279946477568
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Slot odemčen.\n"
+"Hlavní nástroj mistra řemeslníka.\n"
+"Umí vše: zpracovávat, obnovovat, leštit, rozbíjet a přepracovávat."
+
+#: 262509359629864960
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Super slot"
+
+#: 262698318934839296
+msgid "tradeLockedState"
+msgstr "Obchod je příliš malý!"
+
+#: 262791601379872768
+msgid "upgradeDetectorTitle"
+msgstr "Detektor pokladů úroveň {value}"
+
+#: 262792683350921216
+msgid "upgradeStorageTitle"
+msgstr "Sklad úroveň {value}"
+
+#: 266500052736020480
+msgid "selectTrashTitle"
+msgstr "Hromadný odpad"
+
+#: 267774055178047488
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Všechno je o lajcích!"
+
+#: 267774187718053888
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "Publikum křičí radostí!"
+
+#: 286237360443887616
+msgid "metals"
+msgstr "Kovy"
+
+#: 289291316380307456
+msgid "craftSelectRoughTitle"
+msgstr "Vyberte předmět k vyleštění"
+
+#: 289293923853275136
+msgid "craftNoRough"
+msgstr "Žádné předměty k vyleštění"
+
+#: 302325393484156928
+msgid "curseRemovalSlot"
+msgstr "Oltář"
+
+#: 302327188075843584
+msgid "inlaySlot"
+msgstr "Vložit"
+
+#: 302327678603890688
+msgid "polishingSlot"
+msgstr "Leštění"
+
+#: 310688720811724800
+msgid "rough"
+msgstr "Hrubý"
+
+#: 310688991746985984
+msgid "cursedItems"
+msgstr "Prokletý"
+
+#: 310861865698988032
+msgid "storageDescription"
+msgstr ""
+"Všechny objevené předměty jsou uloženy zde.\n"
+"Místo je omezené – sklad není nafukovací.\n"
+"Vylepšete svůj Sklad, aby vaše chamtivost nenarazila na zdi."
+
+#: 311007630727581696
+msgid "traderName"
+msgstr "Zlatovič, obchodník"
+
+#: 311064004203384832
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Naprosto nic"
+
+#: 311066402032455680
+msgid "geodes"
+msgstr "Geody"
+
+#: 311067011754233856
+msgid "unknownItems"
+msgstr "Neznámé"
+
+#: 311247067034161152
+msgid "selectItems"
+msgstr "Vybrat položky"
+
+#: 311279184229175296
+msgid "proceed"
+msgstr "Pokračovat"
+
+#: 313943879775948800
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Leštění"
+
+#: 313944205258133504
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Slot odemčen.\n"
+"Opravuje, brousí a leští – i ty nejpochybnější nálezy vypadají opět jako "
+"poklady."
+
+#: 313944426742550528
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Vložit"
+
+#: 313944595185799168
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Slot odemčen.\n"
+"Vkládejte drahokamy do Šperků a proměňte Hrubé kusy v plnohodnotné lesklé "
+"předměty, které zákazníkům vezmou veškerou vůli."
+
+#: 313944710864703488
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Oltář"
+
+#: 313944844453285888
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Slot odemčen.\n"
+"Odstraňuje kletby a magické pečetě z Prokletých předmětů. Někdy… s "
+"překvapením."
+
+#: 313950130396205056
+msgid "craftInfoDescription"
+msgstr ""
+"Zde se rozhoduje o osudu toho, co najdete.\n"
+"Roztavte to, zasaďte to, vyleštěte to, rozbijte to nebo nechte růst – každý "
+"Slot dělá s vašimi předměty něco podezřele užitečného.\n"
+"Nalezené předměty se mění ve Šperky, poklady a podivná mistrovská díla, "
+"která si někdo určitě koupí."
+
+#: 313951782213783552
+msgid "superSlotDescription"
+msgstr ""
+"Speciální Slot pro všechno zvláštní a lesklé.\n"
+"Roztaví Kov, řeže Drahokamy, zvedá kletby, obnovuje poklady, rozbíjí Geody, "
+"otevírá Truhly a dokonce zpracovává mimozemské Artefakty (se vzájemným "
+"souhlasem)."
+
+#: 313952177879257088
+msgid "chestSlotDescription"
+msgstr ""
+"Truhla?\n"
+"Hoďte ji tam – slot si s tím poradí.\n"
+"\n"
+"Co z toho vzejde, ví jen on.\n"
+"Někdy je s výsledkem znepokojivě spokojen."
+
+#: 313952634336972800
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Prokletá věc? Hoďte ji tam!\n"
+"Oltář z ní vysaje každou kapku magie, zasténá a zavrčí – a pak ji vrátí bez "
+"syčení.\n"
+"\n"
+"Někdy dokonce řekne „děkuji“… což je naprosto normální."
+
+#: 313953216909021184
+msgid "eggSlotDescription"
+msgstr ""
+"Vyberte jakékoli vejce – slepice na něm bude sedět, jemně ho pohladí a tiše "
+"zakvoká…\n"
+"a pak vylíhne něco zajímavého.\n"
+"\n"
+"Někdy až příliš zajímavého."
+
+#: 313953702185799680
+msgid "inlaySlotDescription"
+msgstr ""
+"Vyberte si šperk a nacpěte ho drahokamy – prázdné sloty to nezvládnou!\n"
+"Co získáte, je plně vyleštěná lesklá věc, která kupující rozzáří radostí."
+
+#: 313954530854440960
+msgid "craftSlotDescription"
+msgstr ""
+"Hoďte tam cokoli kovového – pec to roztaví, smíchá a ukuje zbrusu nový "
+"šperk.\n"
+"Říká se, že to funguje na inspiraci… kterou to nemá. Přesto to práci odvede!"
+
+#: 313954955250896896
+msgid "polishingSlotDescription"
+msgstr ""
+"Vyberte jakoukoli geodu, hrubý kámen nebo dokonce zničený starověký poklad "
+"–\n"
+"pracovní stůl ho vyleští, opraví a dodá mu lesk.\n"
+"\n"
+"Co z toho vzejde, lze osadit, vyrobit nebo prodat za slušný zisk."
+
+#: 314195955441471488
+msgid "unknownSlot"
+msgstr "Ocenění"
+
+#: 314210445310562304
+msgid "unknownSlotTitle"
+msgstr "Vyberte položku k ocenění"
+
+#: 314211470289408000
+msgid "craftNoUnknown"
+msgstr "Žádné položky k ocenění"
+
+#: 314211918601785344
+msgid "craftNoCursed"
+msgstr "Žádné prokleté předměty"
+
+#: 314214842253971456
+msgid "craftNoInlay"
+msgstr "Žádné položky k Vložení"
+
+#: 314260890229936128
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Prodávejte Šperky a další nálezy, kontrolujte jejich hodnotu a uzavírejte "
+"obchody.\n"
+"Vylepšete Obchod — odemkněte nové sloty a prodávejte ještě více zboží."
+
+#: 314261126486691840
+msgid "tradingShopInfoTitle"
+msgstr "Obchod Zlatoviče"
+
+#: 314274887167643648
+msgid "tradeSpeedUp"
+msgstr "Přilákat zákazníka"
+
+#: 314278745457561600
+msgid "nextCustomer"
+msgstr "Další zákazník"
+
+#: 314297063191089152
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Ocenění"
+
+#: 314297243575521280
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Obchodník Zlatovič se podívá na jakoukoli položku, zamyšleně zabručí a určí "
+"cenu.\n"
+"Někdy… příjemnou."
+
+#: 314612693521928192
+msgid "timeToMoveOut"
+msgstr "Je čas utéct!"
+
+#: 314914390584594432
+msgid "metal"
+msgstr "Kov"
+
+#: 314914695741181952
+msgid "gem"
+msgstr "Drahokam"
+
+#: 314915117155487744
+msgid "treasure"
+msgstr "Šperky"
+
+#: 314915322823184384
+msgid "chest"
+msgstr "Truhla"
+
+#: 314915636620038144
+msgid "trash"
+msgstr "Odpad"
+
+#: 314915781340303360
+msgid "egg"
+msgstr "Vejce"
+
+#: 314915913649623040
+msgid "artifact"
+msgstr "Artefakt"
+
+#: 314916000182308864
+msgid "geode"
+msgstr "Geoda"
+
+#: 314916165517578240
+msgid "unknown"
+msgstr "Neznámé"
+
+#: 314916328457900032
+msgid "cursed"
+msgstr "Prokletý"
+
+#: 314925043173036032
+msgid "orders"
+msgstr "Objednávky"
+
+#: 315250694291722240
+msgid "giveItem"
+msgstr "Dát předmět"
+
+#: 316337287538675712
+msgid "ordersInfoDescription"
+msgstr ""
+"Vyplňte objednávky — a zákazníci vám ukážou cestu vpřed.\n"
+"Nové lokace, zdroje a šperky už čekají."
+
+#: 316378780114620416
+msgid "hearthCurrency"
+msgstr "Lajky"
+
+#: 316380499837980672
+msgid "reward"
+msgstr "Odměna"
+
+#: 316382146563674112
+msgid "claim"
+msgstr "Nárok"
+
+#: 316397921840140288
+msgid "terrain0Biome1Title"
+msgstr "Pustina"
+
+#: 316402101459881984
+msgid "ordersClaimBiomeTitle"
+msgstr "Cesta k nové lokaci je otevřená"
+
+#: 316402277297688576
+msgid "ordersClaimBiomeDescription"
+msgstr "Nové nálezy jsou k dispozici"
+
+#: 317048656315551744
+msgid "terrain1Biome1Title"
+msgstr "Hroby"
+
+#: 317908391516442624
+msgid "toTrade"
+msgstr "Obchod"
+
+#: 319566851823898624
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Ano, odejít"
+
+#: 319567663786627072
+msgid "skipSelectionTreasuresCancel"
+msgstr "Ne, zpět k výběru"
+
+#: 320015732638486528
+msgid "soldToDealer"
+msgstr "Prodáno!"
+
+#: 321539636750192640
+msgid "craftSelectBlockedWrongType"
+msgstr "Tato položka není vhodná pro tento typ slotu"
+
+#: 321540352067768320
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Z této skupiny jste již vybrali dostatek položek"
+
+#: 332999660336844800
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"Stezka je zarostlá. Všechno zde už máte zvládnuté – je čas pustit se do "
+"práce."
+
+#: 333367357155315712
+msgid "terrain0Biome0Title"
+msgstr "Pustina"
+
+#: 333367909771644928
+msgid "terrain1Biome0Title"
+msgstr "Bažina"
+
+#: 333368362697756672
+msgid "terrain1Biome2Title"
+msgstr "Meteorický déšť"
+
+#: 333841248503992320
+msgid "goldUsedIn"
+msgstr ""
+"Lze <color=#E3BA59>prodat</color> v Obchodě, použít v <color=#E3BA59>Slotu "
+"pro výrobu</color>, nebo umístit do <color=#E3BA59>Super slotu</color>."
+
+#: 333841848608231424
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Lze <color=#E3BA59>prodat</color> v Obchodě, použít v <color=#E3BA59>Slotu "
+"pro výrobu</color> nebo umístit do <color=#E3BA59>Super slotu</color>."
+
+#: 333841973128728576
+msgid "silverUsedIn"
+msgstr ""
+"Lze <color=#E3BA59>prodat</color> v Obchodě, použít v <color=#E3BA59>Slotu "
+"pro výrobu</color> nebo umístit do <color=#E3BA59>Super slotu</color>."
+
+#: 333842030875906048
+msgid "gemUsedIn"
+msgstr ""
+"Lze <color=#E3BA59>prodat</color> v Obchodě, použít v <color=#E3BA59>Slotu "
+"pro výrobu</color> nebo <color=#E3BA59>Super slotu</color>, nebo "
+"<color=#E3BA59>vložit</color> do pokladu."
+
+#: 333842074681217024
+msgid "gemRoughUsedIn"
+msgstr ""
+"Lze zpracovat v <color=#E3BA59>Leštění</color> nebo <color=#E3BA59>Super "
+"slotu</color> k odhalení jeho skutečné hodnoty."
+
+#: 333842122626306048
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Lze <color=#E3BA59>prodat</color> v Obchodě nebo osadit drahokamy pomocí "
+"<color=#E3BA59>Vložení</color> nebo <color=#E3BA59>Super slotu</color> pro "
+"zvýšení jeho hodnoty."
+
+#: 333842171624165376
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Lze opravit v <color=#E3BA59>Leštění</color> nebo <color=#E3BA59>Super "
+"slotu</color>."
+
+#: 333842234089934848
+msgid "chestUsedIn"
+msgstr ""
+"Lze otevřít v <color=#E3BA59>Slotu pro truhlu</color> nebo <color=#E3BA59>"
+"Super slotu</color>."
+
+#: 333842279115788288
+msgid "trashUsedIn"
+msgstr "Lze <color=#E3BA59>prodat</color> pouze prodejci."
+
+#: 333842322942070784
+msgid "eggUsedIn"
+msgstr ""
+"Lze otevřít v <color=#E3BA59>Inkubátoru</color> nebo <color=#E3BA59>Super "
+"slotu</color>."
+
+#: 333842403657256960
+msgid "artifactUsedIn"
+msgstr "Lze <color=#E3BA59>prodat</color> pouze v Obchodě."
+
+#: 333842449953984512
+msgid "geodeUsedIn"
+msgstr ""
+"Lze otevřít v <color=#E3BA59>Leštění</color> nebo <color=#E3BA59>Super "
+"slotu</color>."
+
+#: 333842496531730432
+msgid "unknownUsedIn"
+msgstr ""
+"Lze odnést k Obchodníkovi k <color=#E3BA59>Ocenění</color>, aby se určila "
+"jeho skutečná hodnota."
+
+#: 333842548465602560
+msgid "cursedUsedIn"
+msgstr ""
+"Kletbu lze odstranit u <color=#E3BA59>Oltář</color>e nebo v <color=#E3BA59>"
+"Super slot</color>u."
+
+#: 334624695946317824
+msgid "terrain2Biome0Title"
+msgstr "Pila"
+
+#: 334752689742417920
+msgid "perfect"
+msgstr "Perfektní"
+
+#: 334754742782922752
+msgid "decline"
+msgstr "Odmítnout"
+
+#: 334758932242501632
+msgid "putUpForSale"
+msgstr "Nabídnout k prodeji"
+
+#: 337073088274632704
+msgid "newLocationAvailable"
+msgstr "Objevilo se nové místo!"
+
+#: 338548608547950592
+msgid "retargetingTitle1"
+msgstr ":monocle: Zajímavá otázka…"
+
+#: 338548710087856128
+msgid "retargetingDescription1"
+msgstr "Jak daleko můžete zajít?"
+
+#: 338548825884200960
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Je čas pokračovat."
+
+#: 338548974257704960
+msgid "retargetingDescription2"
+msgstr "Váš pokrok je stále zde."
+
+#: 338549087440998400
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Jste připraveni se vrátit?"
+
+#: 338549137776840704
+msgid "retargetingDescription3"
+msgstr "Pokračujte tam, kde jste skončili."
+
+#: 338569990488985600
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Výroba dokončena!"
+
+#: 338570100794986496
+msgid "notificationCraftCompletedDescription"
+msgstr "Podívejte se, co jste získali."
+
+#: 338570414583451648
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Máte Kupujícího!"
+
+#: 338570498368868352
+msgid "notificationTradeCompletedDescription"
+msgstr "Vaše zboží našlo zákazníka."
+
+#: 339457185953353728
+msgid "tradeSelectBlockedWrongType"
+msgstr "Tuto položku nelze prodat."
+
+#: 340628273341140992
+msgid "skip"
+msgstr "Přeskočit"
+
+#: 354499398722654208
+msgid "daily"
+msgstr "Denně"
+
+#: 354514538620784640
+msgid "available"
+msgstr "Dostupné"
+
+#: 354514769508831232
+msgid "availableIn"
+msgstr "Dostupné v"
+
+#: 355103206058233856
+msgid "dailyRewardClaimTitle"
+msgstr "Vezměte si to pro zisk"
+
+#: 355103597911085056
+msgid "dailyRewardClaimDescription"
+msgstr "Podívejte se na video — získejte odměny Х2"
+
+#: 355120760352935936
+msgid "withoutBonus"
+msgstr "Žádný bonus"
+
+#: 355145440342315008
+msgid "claimWithBonus"
+msgstr "Získat s bonusem"
+
+#: 355146771715067904
+msgid "x2Reward"
+msgstr "x2 odměna"
+
+#: 355255965734670336
+msgid "dailyRewardAlreadyReceived"
+msgstr "Odměna již byla vyzvednuta!"
+
+#: 355256265493188608
+msgid "missedDailyReward"
+msgstr "Odměna již byla zmeškána!"
+
+#: 355256569236295680
+msgid "futureDailyReward"
+msgstr "Vraťte se pro tuto odměnu později!"
+
+#: 355276036993454080
+msgid "rateUs"
+msgstr "Ohodnoťte nás"
+
+#: 355276149157531648
+msgid "rateUsTitle"
+msgstr "Ohodnoťte nás hvězdičkami"
+
+#: 355276400991932416
+msgid "rateUsDescription"
+msgstr "Ohodnoťte hru a pomozte nám ji vylepšit."
+
+#: 356305037681758208
+msgid "specialOffers"
+msgstr "Speciální nabídky"
+
+#: 356313026543226880
+msgid "quickStart"
+msgstr "Rychlý start!"
+
+#: 356313363102568448
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+#: 356342200381214720
+msgid "forever"
+msgstr "Navždy"
+
+#: 356345060842016768
+msgid "starterPack"
+msgstr "Startovací balíček"
+
+#: 356346443771154432
+msgid "allInOneSupply"
+msgstr "Zásoba vše v jednom"
+
+#: 356350103481749504
+msgid "dealOfTheDay"
+msgstr "Nabídka dne"
+
+#: 356354375627837440
+msgid "xAmount"
+msgstr "X{value}"
+
+#: 356354841824727040
+msgid "free!"
+msgstr "Zdarma!"
+
+#: 356357806572703744
+msgid "watch"
+msgstr "Sledovat"
+
+#: 356360805877551104
+msgid "coins"
+msgstr "Mince"
+
+#: 356365108071632896
+msgid "mostPopular"
+msgstr "Nejoblíbenější"
+
+#: 356365403610681344
+msgid "bestPrice"
+msgstr "Nejlepší cena"
+
+#: 356519167105699840
+msgid "store"
+msgstr "Obchod"
+
+#: 357424739636219904
+msgid "dealOfTheDayDescription"
+msgstr "Nové nabídky budou dostupné za"
+
+#: 357607511365521408
+msgid "health"
+msgstr "Zdraví"
+
+#: 357784830910664704
+msgid "notificationDealOfTheDayTitle"
+msgstr "Mare chce nakupovat :sunglasses:"
+
+#: 357784932224077824
+msgid "notificationDealOfTheDayDescription"
+msgstr "Už zbývá jen naskočit a vzít si, co je vaše."
+
+#: 357785735030640640
+msgid "notificationCoinsReadyTitle"
+msgstr "Obchod rozdává dobroty :heart-eyes:"
+
+#: 357785816504995840
+msgid "notificationCoinsReadyDescription"
+msgstr "Zastavte se v obchodě a vezměte si dárky zdarma."
+
+#: 358713136833105920
+msgid "wantReceipt"
+msgstr "Chci účtenku (pošleme ji e-mailem)"
+
+#: 358722499958280192
+msgid "submit"
+msgstr "Odeslat"
+
+#: 358723345383165952
+msgid "receiptEmaitTitle"
+msgstr "Zadejte e-mail"
+
+#: 358723657267417088
+msgid "receiptEmailDescription"
+msgstr ""
+"Chcete účtenku?\n"
+"Zadejte svůj e-mail a my vám ji pošleme po nákupu."
+
+#: 358900766250110976
+msgid "buy"
+msgstr "Koupit"
+
+#: 358901413183754240
+msgid "starterPackHeadline"
+msgstr "Uchopte to včas!"
+
+#: 358901551423819776
+msgid "specialOfferHeadline"
+msgstr "Více navždy!"
+
+#: 359524475709165568
+msgid "open"
+msgstr "Otevřít"
+
+#: 360153378165362688
+msgid "maximumResources"
+msgstr "Maximální zdroje"
+
+#: 360200917140901888
+msgid "exchangeCurrencyTitle"
+msgstr "Nedostatek stříbrných mincí."
+
+#: 360201095897944064
+msgid "exchangeCurrencyDescription"
+msgstr "Jen trochu chybí."
+
+#: 360201375158898688
+msgid "exchangeCurrencyQuestion"
+msgstr "Koupit zbytek?"
+
+#: 360510317885919232
+msgid "bankingAwaitingTitle"
+msgstr "Mince na cestě"
+
+#: 360511732461080576
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Zlato se nakládá na vůz…\n"
+"Doručení může trvat několik minut."
+
+#: 360689578840166400
+msgid "deleteItemConfirmationTitle"
+msgstr "Vyhodit předmět?"
+
+#: 360689668438888448
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"Předmět bude navždy pryč.\n"
+"Tuto akci nelze vrátit zpět."
+
+#: 360858085955473408
+msgid "noKeepIt"
+msgstr "Ne, ponechat"
+
+#: 361772904917241856
+msgid "allRegionsAvailable"
+msgstr "Všechny regiony dostupné"
+
+#: 361805221660463104
+msgid "terrainProgressLabel"
+msgstr "Na další místo"
+
+#: 361805489286418432
+msgid "terrainClosedLabel"
+msgstr "Místo nedostupné"
+
+#: 362095342867714048
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Tvým konečným cílem je láska!</color>\n"
+"Prodávej své výtvory místním, abys si je získal."
+
+#: 362097539907063808
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Nepřestávej, dokud tě <color=#E3BA59>NEBUDOU ZBOŽŇOVAT</color> — \n"
+"pak budeš připraven dobývat nové země."
+
+#: 362500096244584448
+msgid "cryolisUsedIn"
+msgstr ""
+"Lze <color=#E3BA59>prodat</color> v Obchodě, použít v <color=#E3BA59>Slotu "
+"pro výrobu</color> nebo umístit do <color=#E3BA59>Super slotu</color>."
+
+#: 362503199635279872
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Tato položka není vhodná pro vybraný recept."
+
+#: 362505392367079424
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Jiná položka z této skupiny již byla vybrána."
+
+#: 362831462727421952
+msgid "failedPurchase"
+msgstr ""
+"Klisna je smutná. Nákup se nezdařil.\n"
+"Zkuste to prosím znovu."
+
+#: 363945774653116416
+msgid "frozenUsedIn"
+msgstr ""
+"Lze zahřát v <color=#E3BA59>Inkubátoru</color> nebo v <color=#E3BA59>Super "
+"slotu</color>."
+
+#: 363945781498220544
+msgid "frozen"
+msgstr "Zmrazené"
+
+#: 363947917120376832
+msgid "frozens"
+msgstr "Zmrazené"
+
+#: 371768236233199616
+msgid "language"
+msgstr "Jazyk"
+
+#: 371825767475318784
+msgid "termsOfUse"
+msgstr "Podmínky použití"
+
+#: 371825915722993664
+msgid "privacyPolicy"
+msgstr "Zásady ochrany osobních údajů"
+
+#: 371826077132394496
+msgid "deleteData"
+msgstr "Smazat data"
+
+#: 371826289473228800
+msgid "signInWithGoogle Play"
+msgstr "Přihlásit se pomocí Google Play"
+
+#: 371936637333278720
+msgid "notLinked"
+msgstr "Nepropojeno"
+
+#: 371936898659389440
+msgid "linked"
+msgstr "Propojeno"
+
+#: 371937387937533952
+msgid "switchGooglePlay"
+msgstr "Přepnout účet Google Play"
+
+#: 372201325233180672
+msgid "resetProgressDescription"
+msgstr "Opravdu chcete smazat svůj postup? Tuto akci nelze vrátit zpět!"
+
+#: 372201851437977600
+msgid "resetProgressConfirm"
+msgstr "Ano, smazat"
+
+#: 375231950777225216
+msgid "terrainInDevelopmentDescription"
+msgstr "Omlouváme se. Tato lokace je stále ve vývoji."
+
+#: 375232378373935104
+msgid "terrain2Biome1Title"
+msgstr "Zmrazená loděnice"
+
+#: 375232425010401280
+msgid "terrain2Biome2Title"
+msgstr "Maják"
+
+#: 375232475627261952
+msgid "terrain2Biome3Title"
+msgstr "Lostwood"
+
+#: 376614903423963136
+msgid "collectAll"
+msgstr "Sebrat vše"
+
+#: 376958824981204992
+msgid "healthStatReward"
+msgstr "Zdraví +{value}"
+
+#: 376959365689905152
+msgid "storageStatReward"
+msgstr "Kapacita Skladu +{value}"
+
+#: 376968663052587008
+msgid "itemsLeft_x"
+msgstr "Zbývá položek: {value}"
+
+#: 376983763331321856
+msgid "storageStatRewardSummary"
+msgstr "Sklad navždy"
+
+#: 376983951106117632
+msgid "healthStatRewardSummary"
+msgstr "Zdraví navždy"
+
+#: 379459050652569600
+msgid "prospectors"
+msgstr "Prospektoři"
+
+#: 384582485728825344
+msgid "storeStockFullDescription"
+msgstr "Sklad je plný do posledního kousku."
+
+#: 384852464931966976
+msgid "terrain3Title"
+msgstr "Grimdal"
+
+#: 387215171681259520
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Otevřete nastavení telefonu\n"
+"2. Google – Všechny služby – Hry Play\n"
+"3. „Přihlašovací účet“ – „Změnit“ (vedle hry)\n"
+"4. Restartujte hru"
+
+#: 388959282209755136
+msgid "versionAlertMessage"
+msgstr "Byla vydána nová verze hry. Je čas aktualizovat!"
+
+#: 390311463999508480
+msgid "treasureUsedIn"
+msgstr "Lze <color=#E3BA59>prodat</color> pouze v Obchodě."
+
+#: 390630593516539904
+msgid "noInternetConnectionBlocking"
+msgstr "Žádný internet – žádné dobrodružství"
+
+#: 390630963617730560
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Znovu se připojuji…\n"
+"{value}"
+
+#: 391415174540824576
+msgid "newsAndCommunication"
+msgstr "Novinky a komunikace"
+
+#: 392040460349345792
+msgid "statEffectAccumulationFreeze"
+msgstr "Omrzliny"
+
+#: 392040705481248768
+msgid "statEffectHeal"
+msgstr "Regenerace"
+
+#: 392040844430151680
+msgid "statEffectMovementSpeedNegative"
+msgstr "Zpomalení"
+
+#: 392041019248742400
+msgid "statEffectMovementSpeedPositive"
+msgstr "Zvýšení rychlosti"
+
+#: 392041155999830016
+msgid "statEffectDamageCurse"
+msgstr "Vyčerpání"
+
+#: 392041334085783552
+msgid "statEffectDamageBleed"
+msgstr "Krvácení"
+
+#: 392041534623846400
+msgid "statEffectToolNoiseNegative"
+msgstr "Hlučný nástroj"
+
+#: 392041656803921920
+msgid "statEffectToolNoisePositive"
+msgstr "Tichý nástroj"
+
+#: 392041855974641664
+msgid "statEffectToolSpeedNegative"
+msgstr "Únava"
+
+#: 392042070265827328
+msgid "statEffectToolSpeedPositive"
+msgstr "Obratnost"
+
+#: 392090295794405376
+msgid "pause"
+msgstr "Pozastavit"
+
+#: 392090376618643456
+msgid "pauseDescription"
+msgstr "Efekty, příkazy a nastavení – vše zde."
+
+#: 392092595833278464
+msgid "effects"
+msgstr "Stav postavy"
+
+#: 392119357174714368
+msgid "settingsDialogTitle"
+msgstr "Nastavení"
+
+#: 393910691879456768
+msgid "russianPlaymentsBanner"
+msgstr "Platby jsou dostupné pro hráče v Rusku."

@@ -1,0 +1,465 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: German <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/de/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: de\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 75765772134387712
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Na, Stute, riechst du es? Gold! Es ist irgendwo in der Nähe… Und Liebe… in "
+"diesem Felsen da drüben!"
+
+#: 75765971959418880
+msgid "DialogueIntroHorse1"
+msgstr "Frrr!"
+
+#: 75766215002558464
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"Was meinst du mit: „Wenn ich da noch einmal eine Frau höre, wirfst du mich ab"
+"“? Da war definitiv jemand einsam."
+
+#: 75766376147718144
+msgid "DialogueIntroHorse2"
+msgstr "Wiehern! Grr-ha!"
+
+#: 75766594431881216
+msgid "DialogueIntroCharacter3"
+msgstr "Schon gut, schon gut! Es war nur ein Echo… meiner Großartigkeit!"
+
+#: 75766733204623360
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Ein Felsen! Göttlich! Wie Aphrodites Schenkel! Da glänzt definitiv etwas "
+"drin, meine Leber hat gerade gezittert!"
+
+#: 75766977115983872
+msgid "DialogueMineFoundHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 75767084016209920
+msgid "DialogueMineFoundCharacter2"
+msgstr "Nun, tut mir leid, dass mein Körper auf Schönheit reagiert!"
+
+#: 75768133359767552
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Wiehern!"
+
+#: 75768214897037312
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Was? Schon Sonnenuntergang?"
+
+#: 75768748328620032
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 75769024796168192
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Mücken… Schon wieder! Ja-ja, ich erinnere mich, du bist das grüne Häuschen, "
+"ich komme! Lauf nur nicht weg!"
+
+#: 75769959874301952
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Hey! Zu viel Beute. Die Tasche des Pferdes kann nicht alles fassen."
+
+#: 75770225956753408
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Wähle das Beste aus, was du zur Lagerung tragen kannst."
+
+#: 76060126094823424
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr ""
+"Jetzt… Jetzt werde ich ein Meisterwerk schaffen! Ein Schmuckstück, das sie "
+"bereuen lassen wird!"
+
+#: 76060331171123200
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Brrr-r-r."
+
+#: 76061423992836096
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "SCHAU, PFERD! Es glänzt wie meine Augen, bevor ich meinen Ex traf!"
+
+#: 76061521736896512
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Frrr!"
+
+#: 76061738473361408
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Das… das ist das göttliche Licht meiner Rache!"
+
+#: 76061830932598784
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 76061898951626752
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Du bist nur eifersüchtig – du hast keine Finger, um solche Pracht zu tragen. "
+"Bleibt nur noch, einen Käufer mit Fingern zu finden!"
+
+#: 76062368449433600
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Das hast du selbst gemacht? Wunderschön, das nehme ich."
+
+#: 76062530391511040
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"Er… er hat verstanden! Im Schmuck – bin ich. In mir – Gold. Im Gold – ein "
+"Gott."
+
+#: 76062825645346816
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Frrr! Wiehern!"
+
+#: 76062978284457984
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Du hast Recht, Pferd. Sie sind noch nicht bereit für die Wahrheit…"
+
+#: 76063254827503616
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Frrr!"
+
+#: 76063498000666624
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr ""
+"Geld? Ich? Weißt du, was passiert, wenn Sie herausfindet, dass ich reich bin?"
+
+#: 76063745632374784
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Grrr-hrr!"
+
+#: 76063937093963776
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr ""
+"Gut, ich werde in mich selbst investieren – aber nur, damit du aufhörst, "
+"mich zu nerven!"
+
+#: 76064239725580288
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr ""
+"Ich wurde schneller, stärker und billiger in der Herstellung! Es hätte ihr "
+"gefallen."
+
+#: 76064347783434240
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Grrr-hrr!"
+
+#: 76064479283253248
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr ""
+"Nun, es gab keinen Grund zu insistieren! Du hast deine eigenen Fetische – "
+"Hufe und Hafer."
+
+#: 76065879857827840
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Siehst du, Stute? Sie lieben mich!"
+
+#: 76066013412855808
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 76066107042304000
+msgid "DialogueLobbyLikesCharacter2"
+msgstr ""
+"Du hast Recht! Das ist erst der Anfang! Bald werden sie alle meine Fans sein…"
+
+#: 76344321220284416
+msgid "character"
+msgstr "Charakter"
+
+#: 76344471367979008
+msgid "horse"
+msgstr "Pferd"
+
+#: 76344680219152384
+msgid "trader"
+msgstr "Händler"
+
+#: 76344756748423168
+msgid "buyer"
+msgstr "Käufer"
+
+#: 131220345145528320
+msgid "terrainDispenserFound"
+msgstr "Wow! Beute!"
+
+#: 131220694531051520
+msgid "terrainDispenserCollecting"
+msgstr "Komm schon! Zerbrich es!"
+
+#: 131220939017031680
+msgid "exitDoorDescription"
+msgstr "Grün – ist das ein Pferd?"
+
+#: 131221107242176512
+msgid "exitDoorDescription2"
+msgstr "Grün? Ist sie… krank?"
+
+#: 137323318787444736
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Tippe auf Gegenstände, um sie in die Tasche des Pferdes zu legen."
+
+#: 137351439217594368
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Das ist alles, was reinpasst? Die Stute braucht eine größere Tasche!"
+
+#: 137381643633823744
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr "Keine Sorge! Ich kaufe den Rest. Ich lege sogar noch etwas extra drauf."
+
+#: 137616255752605696
+msgid "terrainWantMoreItems"
+msgstr "Ich will mehr Gold!"
+
+#: 137629488379072512
+msgid "terrainRoadIsClue"
+msgstr "Der Weg führt zu Reichtümern"
+
+#: 138087561421918208
+msgid "DialogueOrdersIntroBuyer1"
+msgstr ""
+"Oh, ein neues Gesicht! Ich habe einen Auftrag für dich. Hilfst du mir, meine "
+"Sammlung aufzufüllen?"
+
+#: 138088926181330944
+msgid "DialogueOrdersIntroCharacter1"
+msgstr "Sieh mal, Stute, sie kommen keinen Tag ohne meine Hilfe aus!"
+
+#: 138089230444531712
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Frrrr!"
+
+#: 138089454202261504
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Ja, ja, ohne deins auch nicht."
+
+#: 138110517984366592
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Du hast mir sehr geholfen, und ich werde dir helfen – ich habe eine Stelle "
+"markiert, wo die Felsen lauter als sonst klingen."
+
+#: 138111196928937984
+msgid "DialogueOrdersThanksCharacter1"
+msgstr ""
+"SIE LIEBEN MICH SO SEHR, DASS SIE BEREIT SIND, IHRE GEDANKEN PREISZUGEBEN!"
+
+#: 138111354584436736
+msgid "DialogueOrdersThanksCharacter2"
+msgstr ""
+"Nein, Geld kannst du nicht einstecken, aber Wissen – das kannst du absolut!"
+
+#: 138111433626095616
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Wiehern!"
+
+#: 139150891347611648
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Dieser seltsame Kerl hat diesen Ort auf der Karte markiert. Es ist anders "
+"als alles, was wir bisher gesehen haben – und ich rieche schon SCHATZ!"
+
+#: 139151218457186304
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Frrr!"
+
+#: 139151464675414016
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Ein Käfig auf meinem Rücken? Das ist der Schatzsucher-Kanarienvogel! Mal "
+"sehen, wo der Hund begraben liegt."
+
+#: 139160840467386368
+msgid "DialogueUseBirdCharacter1"
+msgstr "Jetzt folgen wir der Federspur und der Schatz gehört mir!"
+
+#: 139178592703877120
+msgid "DialogueAfterChestCharacter1"
+msgstr "HAST DU DAS GESEHEN, PFERD!"
+
+#: 139178671472906240
+msgid "DialogueAfterChestCharacter2"
+msgstr "Du wirst nicht nur mich, sondern auch diese Truhe schleppen müssen."
+
+#: 139178702909214720
+msgid "DialogueAfterChestHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 139180374293221376
+msgid "chestCollecting"
+msgstr "SCHATZ!"
+
+#: 139496544913330176
+msgid "DialogueClaimedChestHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139496773167353856
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Ja, die Truhe ist hier, aber es gibt keinen Schlüssel – aber du hast die "
+"magische Schmiede vergessen, Stute! Sie kann alles mit allem machen."
+
+#: 139512809946091520
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "DAS IST EIN JACKPOT! Wir müssen es schnell verkaufen!"
+
+#: 139537206085947392
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr ""
+"JA! Ich wurde erkannt. HEUTE DIESER SUMPF, MORGEN DIE GANZE WELT! VORWÄRTS, "
+"PFERD!"
+
+#: 139537401876058112
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ha-ha – es scheint, als würden alle Einheimischen deine glänzenden Sachen "
+"tragen. Schließlich bin ich der Einzige, der hier lebt, Ha-ha-ha."
+
+#: 139766416519991296
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Brrr-r-r!"
+
+#: 139766737396830208
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Es riecht… nach Rauch?"
+
+#: 139767066540642304
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 139767291636355072
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Sagen Sie, ich habe die Kohlen auf das Dach des Lagers fallen lassen?"
+
+#: 139767459110719488
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Grrr-hrr!"
+
+#: 139767686714626048
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "Oh… Vielleicht sollten wir nicht zurückgehen."
+
+#: 139772805363535872
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Anderes Terrain. Matschiger Boden. Ugh, die Luft stinkt nach Bedeutung!"
+
+#: 139772978911252480
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139773239633383424
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "In Ordnung, wir schnappen uns schnell die Wertsachen und rennen."
+
+#: 140259502945734656
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Was für ein klingender Fels! Als ob die Natur selbst mir applaudiert!"
+
+#: 140260138097577984
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "Was war das?!"
+
+#: 140260175347191808
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Grrr-hrr!"
+
+#: 140260548501835776
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "Oh nein… War das… sie?"
+
+#: 140262190995476480
+msgid "DialogueWormAppearHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 140262312860979200
+msgid "DialogueWormAppearCharacter1"
+msgstr "Mein Gott. Ich habe den Tod geweckt. Schon wieder."
+
+#: 140263122399399936
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "SAG IHR, DASS ICH DAS BEREUT HABE!!!"
+
+#: 140263995359891456
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Ist das der Himmel? Warum riecht es dann so schlecht…"
+
+#: 140264148288409600
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Ich verstehe. Nicht tot. Noch schlimmer – lebendig!"
+
+#: 140264664699506688
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Das war knapp, aber jetzt bin ich für alles bereit! Ich werde versuchen, die "
+"Spitzhacke etwas leiser zu schwingen…"
+
+#: 142736080803991552
+msgid "tip1"
+msgstr ""
+"Du kannst eine Vase schieben. Schiebe sie zweimal, um sie zu zerbrechen."
+
+#: 142736223703928832
+msgid "tip2"
+msgstr "Der Wurm folgt dir nicht ins Wasser oder in den Sumpf."
+
+#: 142736293392289792
+msgid "tip3"
+msgstr "Zerstöre Käfer – sie hinterlassen Münzen."
+
+#: 142736344843816960
+msgid "tip4"
+msgstr "Manche Büsche verstecken Vögel, die goldene Eier legen."
+
+#: 142736408026812416
+msgid "tip5"
+msgstr "Lärm zieht gefährliche Feinde an."
+
+#: 142736477400600576
+msgid "tip6"
+msgstr "Pfade führen zu interessanten Orten."
+
+#: 142736521784725504
+msgid "tip7"
+msgstr "Der Händler kauft zusätzliche Gegenstände aus deiner Tasche."
+
+#: 142736594941775872
+msgid "tip8"
+msgstr "Schließe Aufträge ab, um neue Orte freizuschalten."
+
+#: 142736659890573312
+msgid "tip9"
+msgstr "Verbessere die Schmiede, um neue Schmuckrezepte freizuschalten."
+
+#: 142736729293721600
+msgid "tip10"
+msgstr "Entferne Flüche am Altar oder im Super-Platz."
+
+#: 142736813704089600
+msgid "tip11"
+msgstr ""
+"Gegenstände, die mit „?“ markiert sind, können vom Händler geschätzt werden."
+
+#: 142736907266428928
+msgid "tip12"
+msgstr "Verbessere deine Lagerung, um mehr Beute aufzunehmen."
+
+#: 201164984023257088
+msgid "tip13"
+msgstr "In der Pause können Sie jederzeit Bestellungen und Effekte überprüfen."
+
+#: 201320091704627200
+msgid "tip14"
+msgstr "Ein Elite-Platz garantiert den besten Käufer."

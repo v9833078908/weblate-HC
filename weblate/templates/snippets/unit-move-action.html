@@ -1,0 +1,7 @@
+{% load i18n %}
+
+{% if unit.is_source and user_can_edit_component and unit.translation.component.manage_units and unit.translation.component.edit_template and unit.translation.component.file_format_supports_key_order and not unit.translation.component.locked %}
+  <button type="button"
+          class="btn btn-sm btn-outline-secondary js-move-string"
+          data-url="{% url 'move-string' pk=unit.pk %}">{% translate "Move" %}</button>
+{% endif %}

@@ -1,0 +1,166 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Latvian <http://l10n.herocraft.com/projects/need-for-greed/"
+"survey/lv/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lv\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 0 || n % 100 >= 11 && n % 100 <= "
+"19) ? 0 : ((n % 10 == 1 && n % 100 != 11) ? 1 : 2);\n"
+
+#: 294040899584
+msgid "survey1Intro"
+msgstr ""
+"Sveiki! Zirgs vēlas kaut ko noskaidrot.\n"
+"\n"
+"Pāris ātri jautājumi, lai saprastu, ar ko viņa ir darīšana.\n"
+"Aizņems ne vairāk kā minūti."
+
+#: 384566562816
+msgid "survey1Final"
+msgstr ""
+"Izskatās, ka… jūs izturējāt pārbaudījumu!\n"
+"\n"
+"Viņa atcerējās jūsu atbildes.\n"
+"Un acīmredzot nolēma jūs neatstāt."
+
+#: 5159299321856
+msgid "survey1AcceptDescription"
+msgstr "Jūs saņemsiet atlīdzību."
+
+#: 5354862940160
+msgid "survey1DeclineDescription"
+msgstr ""
+"Viņa izdzīvos…\n"
+"varbūt."
+
+#: 5940509413376
+msgid "survey1Question1"
+msgstr ""
+"Cik jums gadu?\n"
+"Nemelojiet. Viņa to zinās."
+
+#: 15613778202624
+msgid "survey1Question1Answer1"
+msgstr "Zem 15"
+
+#: 15721877999616
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+#: 15806955261952
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+#: 15875448246272
+msgid "survey1Question1Answer4"
+msgstr "30 - 40"
+
+#: 15939973419008
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+#: 16047045611520
+msgid "survey1Question2"
+msgstr ""
+"Kas tu esi?\n"
+"Nav nepieciešamas pārāk daudz detaļu."
+
+#: 16356262285312
+msgid "survey1Question2Answer1"
+msgstr "V"
+
+#: 16421546627072
+msgid "survey1Question2Answer2"
+msgstr "S"
+
+#: 16480354963456
+msgid "survey1Question2Answer3"
+msgstr "Slepeni"
+
+#: 16583924912128
+msgid "survey1Question3"
+msgstr "Kāpēc tu esi šeit?"
+
+#: 16952520347648
+msgid "survey1Question3Answer1"
+msgstr "Skraidīt apkārt un Laupījums"
+
+#: 17065502314496
+msgid "survey1Question3Answer2"
+msgstr "Izgatavot un pārdot"
+
+#: 17147127664640
+msgid "survey1Question3Answer3"
+msgstr "Uzlabojumi un progresēšana"
+
+#: 17285803937792
+msgid "survey1Question3Answer4"
+msgstr "Tikai noskaņas…"
+
+#: 17383480889344
+msgid "survey1Question4"
+msgstr "Kas trūkst, lai tu neaizietu?"
+
+#: 17980544258048
+msgid "survey1Question4Answer1"
+msgstr "Vairāk stāsta"
+
+#: 18049771245568
+msgid "survey1Question4Answer2"
+msgstr "Jaunas briesmas, klintis un dārgumi"
+
+#: 18206881484800
+msgid "survey1Question4Answer3"
+msgstr "Jauni priekšmeti"
+
+#: 18275869396992
+msgid "survey1Question4Answer4"
+msgstr "Jaunas atrašanās vietas"
+
+#: 18730255126528
+msgid "survey1Question4Answer5"
+msgstr "Sasniegumi un balvas"
+
+#: 19109206298624
+msgid "survey1Question5"
+msgstr "Kas jālabo vispirms?"
+
+#: 19176772341760
+msgid "survey1Question5Answer1"
+msgstr "Dialogs"
+
+#: 19256145350656
+msgid "survey1Question5Answer2"
+msgstr "Balvas"
+
+#: 19311245922304
+msgid "survey1Question5Answer3"
+msgstr "Receptes grūtības pakāpe"
+
+#: 19403713548288
+msgid "survey1Question5Answer4"
+msgstr "Kartes blīvums"
+
+#: 19475515838464
+msgid "survey1Question5Answer5"
+msgstr "Viss ir lieliski"
+
+#: 27306583396352
+msgid "surveyDialogTitle"
+msgstr "Ātrā aptauja"
+
+#: 28690401726464
+msgid "startSurvey"
+msgstr "Sākt"
+
+#: 30707396382720
+msgid "claimReward"
+msgstr "Saņemt atlīdzību"

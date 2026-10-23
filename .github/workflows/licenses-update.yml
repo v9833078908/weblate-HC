@@ -1,0 +1,35 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: licenses update
+
+on:
+  push:
+    branches:
+    - renovate/**
+    - dependabot/**
+    - main
+    paths:
+    - .github/workflows/licenses-update.yml
+    - scripts/generate-license-data.py
+    - scripts/spdx-license-list
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  licenses-update:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        persist-credentials: false
+        submodules: true
+    - uses: ./.github/actions/pre-commit-setup
+    - run: ./scripts/generate-license-data.py
+
+    - name: Prepare maintenance patch
+      uses: ./.github/actions/auto-commit

@@ -1,0 +1,1599 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-22 09:53+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Russian <http://l10n.herocraft.com/projects/need-for-greed/ui/"
+"ru/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: ru\n"
+"Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
+
+msgid "vibration"
+msgstr "Вибрация"
+
+msgid "loading"
+msgstr "Загрузка"
+
+msgid "adsNotReady"
+msgstr "Реклама не готова. Попробуйте позже."
+
+msgid "amount"
+msgstr "{value}"
+
+msgid "reviewTitle"
+msgstr "Нам важно твое мнение!"
+
+msgid "reviewDescription"
+msgstr "Вам нравится наша игра?"
+
+msgid "reviewConfirm"
+msgstr "Да, конечно!"
+
+msgid "no"
+msgstr "Нет"
+
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+msgid "leaders"
+msgstr "Лидеры"
+
+msgid "leaderboardAuth"
+msgstr ""
+"Таблица лидеров доступна только авторизованным пользователям. \n"
+"Войдите в свой аккаунт в настройках."
+
+msgid "softCurrency"
+msgstr "Серебряные монеты"
+
+msgid "gems"
+msgstr "Камни"
+
+msgid "day_N"
+msgstr "День {value}"
+
+msgid "dailyRewards"
+msgstr "Ежедневная награда"
+
+msgid "dailyRewardsDescription"
+msgstr ""
+"Заходите в игру каждый день\n"
+"и получай награды."
+
+msgid "tapToStart"
+msgstr "Нажмите, чтобы начать"
+
+msgid "settings"
+msgstr "Настройки"
+
+msgid "sound"
+msgstr "Эффекты"
+
+msgid "music"
+msgstr "Музыка"
+
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}ч. |}{minutes:cond:>0?{minutes}м. |}{seconds:cond:>=0?"
+"{seconds}с.|} "
+
+msgid "sell"
+msgstr "Продать"
+
+msgid "trading"
+msgstr "Торги"
+
+msgid "selectAmount"
+msgstr ""
+"Выберите количество камней <size=56><color=#fff>({value}/{total})</color></"
+"size>"
+
+msgid "apply"
+msgstr "Применить"
+
+msgid "exit"
+msgstr "Выход"
+
+msgid "loot"
+msgstr "Добыча"
+
+msgid "inventory"
+msgstr "Инвентарь"
+
+msgid "add_amount"
+msgstr "+{value}"
+
+msgid "upgradeCharacterHealthStat"
+msgstr "Подкрути здоровье!"
+
+msgid "Pick"
+msgstr "Кирка"
+
+msgid "unload"
+msgstr "Выгрузить"
+
+msgid "continue"
+msgstr "Продолжить"
+
+msgid "continueWithoutTheBird"
+msgstr "Продолжить без птицы"
+
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+msgid "make"
+msgstr "Создать"
+
+msgid "in_progress"
+msgstr "Создается сокровище..."
+
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+msgid "lvl_x"
+msgstr "ур. {value}"
+
+msgid "take"
+msgstr "Забрать"
+
+msgid "tradeDescription"
+msgstr "Перетащите сюда предметы для продажи"
+
+msgid "storage"
+msgstr "Склад"
+
+msgid "backpack"
+msgstr "Рюкзак"
+
+msgid "upgradeCharacterResistanceStat"
+msgstr "Устойчивость"
+
+msgid "completed"
+msgstr "Завершено"
+
+msgid "upgradeCharacterSpeedStat"
+msgstr "Увеличь скорость!"
+
+msgid "detectionRadius"
+msgstr "Радиус обнаружения ловушек"
+
+msgid "upgrade"
+msgstr "Улучшить"
+
+msgid "upgradeCharacterTitle"
+msgstr "Искатель ур. {value}"
+
+msgid "upgradeToolTitle"
+msgstr "Инструмент ур. {value}"
+
+msgid "bird"
+msgstr "Птица"
+
+msgid "craft"
+msgstr "Крафт"
+
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Больше клювов в поиске"
+
+msgid "upgradeToolSpeedStat"
+msgstr "Разгони кирку!"
+
+msgid "upgradeToolDamageStat"
+msgstr "Сила в ударе"
+
+msgid "terrain1Title"
+msgstr "Фенмарская топь"
+
+msgid "terrain2Title"
+msgstr "Белоземье"
+
+msgid "start"
+msgstr "Начать"
+
+msgid "terrain1Description"
+msgstr ""
+"Топь как топь, только с золотыми самородками и гигантским червём, который "
+"реагирует на любой «дзынь». Местные говорят: хочешь золота — не звени, как "
+"посудная лавка."
+
+msgid "howToOpenBiome"
+msgstr ""
+"Новые места.\n"
+"Выполняй заказы — и местные жители покажут,\n"
+"где искать дальше."
+
+msgid "revivalTitle"
+msgstr "Это провал!"
+
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Предметов в рюкзаке: {value} / {total}"
+
+msgid "exitAndLoseItems"
+msgstr "Выйти и потерять предметы"
+
+msgid "noBirdEnergy"
+msgstr "Нет птиц — нет разведки"
+
+msgid "noDetectorEnergy"
+msgstr "Детектор сокровищ"
+
+msgid "yes_leave"
+msgstr "Да, выйти"
+
+msgid "no_stay"
+msgstr "Нет, остаться"
+
+msgid "leave_location_confirmation"
+msgstr "Хочешь покинуть локацию?"
+
+msgid "percentAmount"
+msgstr "{value}%"
+
+msgid "pointsAmount"
+msgstr "{value} <size=70%>ед.</size>"
+
+msgid "close"
+msgstr "Закрыть"
+
+msgid "selectTheShape"
+msgstr "Выбери форму сокровища"
+
+msgid "speedUp"
+msgstr "Ускорить"
+
+msgid "tutorial"
+msgstr "Обучение"
+
+msgid "terrainPickLootTitle"
+msgstr "Бери все, что влезет в сумку и на склад"
+
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+msgid "takeToStorageXofY"
+msgstr "Забрать {value}/{total}"
+
+msgid "upgradeBag"
+msgstr "Улучшить сумку"
+
+msgid "dealerWillBuyTheRest"
+msgstr "Скупщик заплатит за всё остальное"
+
+msgid "information"
+msgstr "Информация"
+
+msgid "weightInformation"
+msgstr ""
+"Вместимость сумки лошади – важный показатель.\n"
+"Вес найденных предметов влияет на их перевозку.\n"
+"Улучшай сумку, чтобы твоя лошадь унесла больше добра!"
+
+msgid "rank_x"
+msgstr "Ранг {value}"
+
+msgid "weight"
+msgstr "Вес:"
+
+msgid "vehicleUpgradeDescription"
+msgstr ""
+"Улучши сумку и твоя скакуха унесёт не только грузы, но и твои амбиции\n"
+"(в пределах грузопдъемности, конечно)."
+
+msgid "capacity"
+msgstr "Вместительность"
+
+msgid "horseCargoBag"
+msgstr "Сумка для лошади"
+
+msgid "hardCurrency"
+msgstr "Золотые монеты"
+
+msgid "confirmation"
+msgstr "Подтверждение"
+
+msgid "attention!"
+msgstr "Внимание!"
+
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Уходя сейчас, ты <color=#E01114>продаёшь всё найденное скупщику</color> "
+"дешевле обычного."
+
+msgid "bayerDescription"
+msgstr "Хочешь заработать больше? Куплю остатки с бонусом."
+
+msgid "bestProfit"
+msgstr "Лучшая прибыль"
+
+msgid "goodProfit"
+msgstr "Хорошая прибыль"
+
+msgid "badProfit"
+msgstr "Плохая прибыль"
+
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+msgid "yourProfit"
+msgstr "Твоя прибыль:"
+
+msgid "eliteSlot"
+msgstr "Элитная ячейка"
+
+msgid "tradingShopLevel"
+msgstr "Торговая лавка ур. {value}"
+
+msgid "rent"
+msgstr "Аренда"
+
+msgid "slot"
+msgstr "Ячейка"
+
+msgid "selectItem"
+msgstr "Добавь предмет"
+
+msgid "checkOffer"
+msgstr "Торговать"
+
+msgid "shopLevel"
+msgstr "Лавка ур. {value}"
+
+msgid "tradeOpenEliteSlotDialog"
+msgstr ""
+"Хватит прятать сокровища!\n"
+"<color=#E01114>Здесь за них платят щедро и без колебаний.</color>"
+
+msgid "getASlot"
+msgstr "Получить"
+
+msgid "customerWillArriveIn"
+msgstr "Клиент прибудет через:"
+
+msgid "speedUpBy"
+msgstr "Ускорить на"
+
+msgid "decline?"
+msgstr "Отказать?"
+
+msgid "tradeDeclineClientInfo"
+msgstr "До прибытия следующего искателя:"
+
+msgid "tradingShop"
+msgstr "Торговая лавка"
+
+msgid "newSlot"
+msgstr "Новая ячейка"
+
+msgid "tradeUpgradeDescription"
+msgstr ""
+"Больше ячеек для продажи!\n"
+"Хватит складывать сокровища в одну корзину, пора торговать с размахом!"
+
+msgid "tradingShopShort"
+msgstr "Лавка"
+
+msgid "level_x"
+msgstr "Уровень {value}"
+
+msgid "buyersOffer"
+msgstr "Покупает за:"
+
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+msgid "common"
+msgstr "Обычный"
+
+msgid "uncommon"
+msgstr "Необычный"
+
+msgid "rare"
+msgstr "Редкий"
+
+msgid "epic"
+msgstr "Эпический"
+
+msgid "legendary"
+msgstr "Легендарный"
+
+msgid "mythic"
+msgstr "Мифический"
+
+msgid "tradeSelectItemTitle"
+msgstr "Выбери товар на продажу"
+
+msgid "basePrice"
+msgstr "Ценность:"
+
+msgid "map"
+msgstr "Карта"
+
+msgid "wiseNotes"
+msgstr "Мудрые записи"
+
+msgid "emptyPickedItems"
+msgstr "Уйти ни с чем?"
+
+msgid "settingsDescription"
+msgstr "Ковыряйся здесь, настрой мир под себя!"
+
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Улучшай торговую лавку, чтобы открыть новые ячейки для продажи. Чем больше "
+"полок, тем щедрее кошель!"
+
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}"
+
+msgid "craftSlot"
+msgstr "Плавильня"
+
+msgid "superSlot"
+msgstr "Супер слот"
+
+msgid "forge"
+msgstr "Кузница"
+
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Создавай сокровища, вскрывай сундуки и волшебные яйца — кто знает, что там "
+"внутри!"
+
+msgid "chestSlot"
+msgstr "Взлом"
+
+msgid "incubator"
+msgstr "Инкубатор"
+
+msgid "craftOpenEliteSlotLabel"
+msgstr "Открой максимум возможностей!"
+
+msgid "cancel"
+msgstr "Отмена"
+
+msgid "openChest"
+msgstr "Вскрыть сундук"
+
+msgid "timeToOpen:"
+msgstr "Вскрытие:"
+
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Нет сундука на складе"
+
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Найдёшь — тащи в Крафт и вскрывай\n"
+"(только не топором, ага)."
+
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+msgid "craftSelectEggTitle"
+msgstr "Выберите яйцо для вскрытия"
+
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Нет яйца на складе"
+
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "Вперёд за яйцом — не куриным, а волшебным!"
+
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Броди по миру, найди редкое яйцо и тащи его в Крафт. Кто знает, может внутри "
+"— не омлет, а настоящее чудо?"
+
+msgid "openEgg"
+msgstr "Вскрыть яйцо"
+
+msgid "craftSelectRecipeTitle"
+msgstr "Выбери компоненты для крафта"
+
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Склад пуст!"
+
+msgid "craftItem"
+msgstr "Создать предмет"
+
+msgid "crafting:"
+msgstr "Изготовление:"
+
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Эти предметы еще не найдены"
+
+msgid "recipe"
+msgstr "Рецепт"
+
+msgid "craftClosedRecipeTitle"
+msgstr "Кузница слишком слаба!"
+
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Недостаточный уровень Кузницы\n"
+"\n"
+"С каждым улучшением ты сможешь крафтить всё более редкие и дорогие "
+"сокровища. Пора превратить эту печку в кузню легенд!"
+
+msgid "craftClosedSlotTitle"
+msgstr "Слот заперт!"
+
+msgid "craftClosedSlotDescription"
+msgstr "Твои крафт умения недостаточно сильны. Нужно прокачать их."
+
+msgid "or"
+msgstr "или"
+
+msgid "craftSpeedUpTitle"
+msgstr "Добавить угля в топку!"
+
+msgid "craftSpeedUpDescription"
+msgstr "Изготовление пойдёт быстрее, будто гномы выпили двойной эспрессо."
+
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Открыте нового слота для крафта.\r\n"
+"Печка плавит металл, превращая в украшения. Тут можно создавать "
+"драгоценности из природных материалов."
+
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Время - золото: украшения создаются ещё быстрее"
+
+msgid "upgradeCraftRarityStatDescription"
+msgstr ""
+"Повышает шанс сотворить вещь, \n"
+"достойную легенд."
+
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"Мудрые свитки шепчут тебе формулы — \n"
+"Теперь ты можешь создавать гораздо более сложные, изысканные и дорогие "
+"украшения."
+
+msgid "craftStockFullTitle"
+msgstr "Сокровищу негде лежать!"
+
+msgid "craftStockFullDescription"
+msgstr ""
+"Склад переполнен до последней щепки.\r\n"
+"Продай лишнее в торговой лавке или улучши склад — и забери свой блестящий "
+"трофей!"
+
+msgid "allItems"
+msgstr "Все предметы"
+
+msgid "stockLevel"
+msgstr "Склад ур. {value}"
+
+msgid "storageUpgradeDescription"
+msgstr ""
+"Каждое улучшение даёт <color=#E01114>больше места</color> для найденных и "
+"выкованных сокровищ. Больше золота, меньше страданий!"
+
+msgid "revivalDescription"
+msgstr "Возродись — или забудь о луте."
+
+msgid "noBirdEnergyDescription"
+msgstr "Привела к сокровищам и улетела отдыхать."
+
+msgid "callTheBird"
+msgstr "Вернуть сейчас"
+
+msgid "noDetectorEnergyDescription"
+msgstr "Хочешь ещё один?"
+
+msgid "oreSeeker"
+msgstr "Искатель руды"
+
+msgid "gemSeeker"
+msgstr "Искатель самоцветов"
+
+msgid "respawn"
+msgstr "Возродить"
+
+msgid "deathExit"
+msgstr "Выйти без лута"
+
+msgid "terrain0Title"
+msgstr "Тихолесье"
+
+msgid "terrain2Description"
+msgstr ""
+"Суровая северная глушь, скованная вечным холодом. Среди ледяных лабиринтов "
+"легко заблудиться, а после заката - ещё и замёрзнуть. В таком порядке или "
+"наоборот."
+
+msgid "terrain0Description"
+msgstr ""
+"Все герои где-то начинают!\n"
+"Здесь зарыты первые богатства и первые проблемы. Тут ты научишься добывать, "
+"плавить, хвастаться и выживать."
+
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Собери симпатии, \n"
+"и новый город распахнёт свои ворота."
+
+msgid "upgradeToolNoiseStat"
+msgstr "Тихая кирка"
+
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr "Прокачай защиту — и не дрогнешь, когда мир станет враждебным!"
+
+msgid "upgradeCharacterHealthStatDescription"
+msgstr "Больше жизней — меньше шансов стать легендой… посмертно."
+
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr "Быстрее ноги — меньше шансов стать ужином для местной фауны!"
+
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr "Добавляет запускать дополнительную канарейку для поиска кладов."
+
+msgid "upgradeToolSpeedStatDescription"
+msgstr "Чем быстрее удар, тем ближе умопомрачительное богатство!"
+
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Каждый удар киркой сильнее раскалывает скалы, но громкость ударов не "
+"повышется!"
+
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Твоя кирка издает меньше шума - а значит, ты дольше можешь бить скалы не "
+"привлекая внимания."
+
+msgid "resistanceStatLevel"
+msgstr "Устойчивость ур. {value}"
+
+msgid "healthStatLevel"
+msgstr "Здоровье ур. {value}"
+
+msgid "speedStatLevel"
+msgstr "Скорость ур. {value}"
+
+msgid "upgradeBirdTitle"
+msgstr "Птица ур. {value}"
+
+msgid "amountPcs"
+msgstr "{value} шт."
+
+msgid "maxLevel"
+msgstr "Максимальный уровень"
+
+msgid "treasureDetector"
+msgstr "Детектор сокровищ"
+
+msgid "amountSec"
+msgstr "{value} сек."
+
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Искатель руды"
+
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Этот волшебный прибор чует жилы золота лучше, чем гном чует бесплатный обед!"
+
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Искатель самоцветов"
+
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr "Устройство с нюхом сильнее жадности купца. Самоцветы не спрячутся!"
+
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Больше времени на руду"
+
+msgid "upgradeDetectorDurationStatDescription"
+msgstr ""
+"Работает дольше, ищет лучше, бухтит меньше. Больше времени — больше находок!"
+
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} шт."
+
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} сек."
+
+msgid "gold"
+msgstr "Золото"
+
+msgid "chests"
+msgstr "Сундуки"
+
+msgid "eggs"
+msgstr "Яйца"
+
+msgid "treasures"
+msgstr "Украшения"
+
+msgid "artifacts"
+msgstr "Артефакты"
+
+msgid "deathTitle"
+msgstr "Смерть щедра. Заберёт всё!"
+
+msgid "deathDescription"
+msgstr "Твой лут теперь легенда."
+
+msgid "tradeEmptyStorageMessage"
+msgstr "Нет товаров для продажи"
+
+msgid "craftNoEggs"
+msgstr "Нет яиц для инкубатора"
+
+msgid "craftNoChests"
+msgstr "Нет сундуков для вскрытия"
+
+msgid "craftNoItems"
+msgstr "Нет ингредиентов для крафта"
+
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Больше времени на самоцветы"
+
+msgid "newLocationAvailableTitle"
+msgstr "Новая локация доступна!"
+
+msgid "newLocationAvailableDescription"
+msgstr "Жители признали: ты достоин большего."
+
+msgid "upgradeStock"
+msgstr "Улучшить склад"
+
+msgid "storageOverflowedDesctiption"
+msgstr "Складу тесно от богатств. Улучши склад!"
+
+msgid "throwAway"
+msgstr "Выбросить"
+
+msgid "upgradeCraftCostStatDescription"
+msgstr ""
+"Теперь ты создаешь более изысканные предметы - а потому они стоят дороже!"
+
+msgid "upgradeVehicleWeightStat"
+msgstr "Большая сумка"
+
+msgid "upgradeVehicleWeightStatDescription"
+msgstr ""
+"Лошадь теперь может нести больший вес. Чем больший вес несет лошадь, тем "
+"больше находок ты сможешь забрать с собой!"
+
+msgid "upgradeVehicleTitle"
+msgstr "Лошадь ур. {value}"
+
+msgid "amountKg"
+msgstr "{value} кг."
+
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} кг."
+
+msgid "upgradeStorageWeightStat"
+msgstr "Вместимость"
+
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Теперь ещё больше места, чтобы не выбрасывать абсолютно ненужное!"
+
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Щедрые покупатели"
+
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr ""
+"Ты привлекаешь нового постоянного покупателя - гораздо более щедрого, чем "
+"предыдущие!"
+
+msgid "upgradeTradeTitle"
+msgstr "Торговая лавка ур. {value}"
+
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Ты пахнешь богатством"
+
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"Твои услуги полюбились богачам - самые щедрые покупатели заглядывают к тебе "
+"намного чаще!"
+
+msgid "upgradeTradeSlotsStat"
+msgstr "Новый прилавок"
+
+msgid "upgradeTradeSlotsStatDescription"
+msgstr ""
+"Открыт дополнительный торговый слот. \n"
+"Больше прилавков - меньше очередей!"
+
+msgid "upgradeCraftTimeStat"
+msgstr "Ювелирный спринт"
+
+msgid "upgradeCraftTitle"
+msgstr "Крафт ур. {value}"
+
+msgid "upgradeCraftRarityStat"
+msgstr "Редкость"
+
+msgid "upgradeCraftRecipesStat"
+msgstr "Книга рецептов"
+
+msgid "upgradeCraftCostStat"
+msgstr "Золотая жила"
+
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Плавильня"
+
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Взлом"
+
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Открыте нового слота для крафта.\r\n"
+"Сундуки и другие запертые штуки можно вскрыть тут. Даже то, что явно не с "
+"этой планеты."
+
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Инкубатор"
+
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Открытие нового слота для крафта.\r\n"
+"Не думай, что КоКо годится только для яиц. Если нужно растопить лёд, "
+"разогреть что-нибудь или помочь с другими делами - она всегда при деле. А "
+"яйца открывает вообще без вопросов."
+
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Открыте нового слота для крафта.\r\n"
+"Главный инструмент мастера.\r\n"
+"Может всё: обработать, восстановить, отполировать, вскрыть и переделать."
+
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Супер слот"
+
+msgid "tradeLockedState"
+msgstr "Торговая лавка слишком мала!"
+
+msgid "upgradeDetectorTitle"
+msgstr "Детектор сокровищ ур. {value}"
+
+msgid "upgradeStorageTitle"
+msgstr "Склад ур. {value}"
+
+msgid "selectTrashTitle"
+msgstr "Барахло для скупщика"
+
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Щедрые на лайки!"
+
+msgid "upgradeTradeMoreLikesDescription"
+msgstr ""
+"Это и есть сила любви! Ты получаешь больше лайков от клиентов - а значит "
+"быстрее откроешь новые земли!"
+
+msgid "metals"
+msgstr "Металлы"
+
+msgid "craftSelectRoughTitle"
+msgstr "Выбери предмет для огранки"
+
+msgid "craftNoRough"
+msgstr "Нет предметов для огранки"
+
+msgid "curseRemovalSlot"
+msgstr "Алтарь"
+
+msgid "inlaySlot"
+msgstr "Вставка"
+
+msgid "polishingSlot"
+msgstr "Полировка"
+
+msgid "rough"
+msgstr "Необработанные"
+
+msgid "cursedItems"
+msgstr "Проклятые"
+
+msgid "storageDescription"
+msgstr ""
+"Здесь хранятся все найденные предметы.\n"
+"Место ограничено - склад не резиновый.\n"
+"Прокачивай склад, чтобы жадность не упиралась в стены."
+
+msgid "traderName"
+msgstr "Скупщик Златович"
+
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Ничегошеньки"
+
+msgid "geodes"
+msgstr "Геоды"
+
+msgid "unknownItems"
+msgstr "Неизвестные"
+
+msgid "selectItems"
+msgstr "Выбери предметы"
+
+msgid "proceed"
+msgstr "Приступить"
+
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Полировка"
+
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Открыте нового слота для крафта.\r\n"
+"Чинит, шлифует и наводит лоск. Тут можно открыть любой геод, отшлифовать "
+"дикий самоцвет и восстановить древнее сокровище."
+
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Вставка"
+
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Открыте нового слота для крафта.\r\n"
+"Идолы и древние сокровища станут ценнее, если украсить их самоцветами. Этот "
+"странный механизм создан именно для этого."
+
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Алтарь"
+
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Открыте нового слота для крафта.\r\n"
+"Снимает порчу и магические печати с проклятых предметов. Иногда - с "
+"сюрпризами."
+
+msgid "craftInfoDescription"
+msgstr ""
+"Здесь решается судьба найденного.\n"
+"Плавь, вставляй, ограняй, вскрывай и выращивай — каждый слот делает с "
+"предметами что-то подозрительно полезное.\n"
+"Найденные вещи превращаются в украшения, сокровища и странные шедевры, "
+"которые кто-то обязательно купит."
+
+msgid "superSlotDescription"
+msgstr ""
+"Особый слот для всего странного и блестящего.\n"
+"Он плавит металл, точит камни, снимает порчу, лечит сокровища, раскалывает "
+"геоды, вскрывает сундуки и даже трогает инопланетные штуковины (по взаимному "
+"согласию)."
+
+msgid "chestSlotDescription"
+msgstr ""
+"Сундук?\n"
+"Кидай сюда — слот сам разберётся.\n"
+"\n"
+"Что выпадет — знает только он.\n"
+"Иногда он пугающе радуется результату."
+
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Проклятый предмет? Бросай сюда!\n"
+"Алтарь высосет из него всю магическую бяку, попыхтит, покряхтит — и вернёт "
+"уже не шипящее.\n"
+"\n"
+"Иногда он даже спасибо говорит… но это нормально."
+
+msgid "eggSlotDescription"
+msgstr ""
+"Выбирай любое яйцо — курочка КоКо присядет на него, погладит, покудахчет…\n"
+"И выведет что-нибудь интересное. Даже слишком."
+
+msgid "inlaySlotDescription"
+msgstr ""
+"Выбери украшение и забей в него все драгоценные камни — пустые слоты не "
+"прокатят!\n"
+"На выходе получишь полноценную блестяшку, от которой покупатели взвизгивают "
+"от счастья."
+
+msgid "craftSlotDescription"
+msgstr ""
+"Кидай внутрь всё металлическое — печка расплавит, перемешает и слепит "
+"новенькое украшение.\n"
+"Говорят, она делает это на вдохновении… которого у неё нет. Но работает!"
+
+msgid "polishingSlotDescription"
+msgstr ""
+"Выбери любой геод, грубый камень или даже испорченное древнее сокровище —\n"
+"станок всё отшлифует, починит и доведёт до блеска.\n"
+"На выходе получишь то, что можно вставлять, крафтить или выгодно толкнуть."
+
+msgid "unknownSlot"
+msgstr "Оценка"
+
+msgid "unknownSlotTitle"
+msgstr "Выбери предмет для оценки"
+
+msgid "craftNoUnknown"
+msgstr "Нет предметов для оценки"
+
+msgid "craftNoCursed"
+msgstr "Нет проклятых предметов"
+
+msgid "craftNoInlay"
+msgstr "Нет предметов для вставки"
+
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Продавай украшения и любые находки, смотри их стоимость и заключай сделки.\n"
+"Улучшай лавку — открывай новые слоты и продавай ещё больше добра."
+
+msgid "tradingShopInfoTitle"
+msgstr "Торговая лавка Златовича"
+
+msgid "tradeSpeedUp"
+msgstr "Привлечь покупателя"
+
+msgid "nextCustomer"
+msgstr "Следующий"
+
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Оценка"
+
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Открывает доступ к новому слоту в лавке: торговец Златович оценивает только "
+"самые необычные вещи. Это очень долго - и ооочень выгодно для тебя!"
+
+msgid "timeToMoveOut"
+msgstr "Пора уносить ноги!"
+
+msgid "metal"
+msgstr "Металл"
+
+msgid "gem"
+msgstr "Камень"
+
+msgid "treasure"
+msgstr "Украшение"
+
+msgid "chest"
+msgstr "Сундук"
+
+msgid "trash"
+msgstr "Хлам"
+
+msgid "egg"
+msgstr "Яйцо"
+
+msgid "artifact"
+msgstr "Артефакт"
+
+msgid "geode"
+msgstr "Геод"
+
+msgid "unknown"
+msgstr "Неизвестный"
+
+msgid "cursed"
+msgstr "Проклято"
+
+msgid "orders"
+msgstr "Заказы"
+
+msgid "giveItem"
+msgstr "Отдать"
+
+msgid "ordersInfoDescription"
+msgstr ""
+"Выполняй заказы — и покупатели покажут, где искать дальше. Новые места, "
+"ресурсы и украшения уже ждут."
+
+msgid "hearthCurrency"
+msgstr "Лайки"
+
+msgid "reward"
+msgstr "Награда"
+
+msgid "claim"
+msgstr "Получить"
+
+msgid "terrain0Biome1Title"
+msgstr "Пустошь"
+
+msgid "ordersClaimBiomeTitle"
+msgstr "Путь к новой локации открыт"
+
+msgid "ordersClaimBiomeDescription"
+msgstr "Новые находки доступны"
+
+msgid "terrain1Biome1Title"
+msgstr "Могилы"
+
+msgid "toTrade"
+msgstr "Торговать"
+
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Да, уйти"
+
+msgid "skipSelectionTreasuresCancel"
+msgstr "Нет, к выбору"
+
+msgid "soldToDealer"
+msgstr "Продано!"
+
+msgid "craftSelectBlockedWrongType"
+msgstr "Этот предмет не подходит для данного типа слота"
+
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Уже выбрано достаточно предметов из этой группы"
+
+msgid "lockedTerrain0Tooltip"
+msgstr "Тропа заросла. Здесь ты уже всё освоил — дальше только дело."
+
+msgid "terrain0Biome0Title"
+msgstr "Пустошь"
+
+msgid "terrain1Biome0Title"
+msgstr "Топь"
+
+msgid "terrain1Biome2Title"
+msgstr "Звездопад"
+
+msgid "goldUsedIn"
+msgstr ""
+"Можно <color=#E3BA59>продать</color> у торговца, использовать в "
+"<color=#E3BA59>Плавильне</color> или <color=#E3BA59>Супер слоте</color>."
+
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Можно <color=#E3BA59>продать</color> у торговца, использовать в "
+"<color=#E3BA59>Плавильне</color> или <color=#E3BA59>Супер слоте</color>."
+
+msgid "silverUsedIn"
+msgstr ""
+"Можно <color=#E3BA59>продать</color> у торговца, использовать в "
+"<color=#E3BA59>Плавильне</color> или <color=#E3BA59>Супер слоте</color>."
+
+msgid "gemUsedIn"
+msgstr ""
+"Можно <color=#E3BA59>продать</color> у торговца, использовать в "
+"<color=#E3BA59>Плавильне</color> или <color=#E3BA59>Супер слоте</color>, а "
+"так же <color=#E3BA59>Вставить</color> в сокровище."
+
+msgid "gemRoughUsedIn"
+msgstr ""
+"Можно обработать в <color=#E3BA59>Полировке</color> или <color=#E3BA59>Супер "
+"слоте</color>, чтобы раскрыть ценность."
+
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Можно <color=#E3BA59>продать</color> у торговца или вставить камни в "
+"<color=#E3BA59>Вставке</color> или <color=#E3BA59>Супер слоте</color>, чтобы "
+"повысить ценность."
+
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Можно починить в <color=#E3BA59>Полировке или в <color=#E3BA59>Супер слоте</"
+"color>."
+
+msgid "chestUsedIn"
+msgstr ""
+"Можно вскрыть в <color=#E3BA59>Взломе</color> или в <color=#E3BA59>Супер "
+"Слоте</color>."
+
+msgid "trashUsedIn"
+msgstr "Можно только <color=#E3BA59>продать</color> скупщику."
+
+msgid "eggUsedIn"
+msgstr ""
+"Можно вскрыть в <color=#E3BA59>Инкубаторе</color> или в <color=#E3BA59>Супер "
+"Слоте</color>."
+
+msgid "artifactUsedIn"
+msgstr "Можно только <color=#E3BA59>продать</color> у торговца."
+
+msgid "geodeUsedIn"
+msgstr ""
+"Можно вскрыть в <color=#E3BA59>Полировке</color> или в <color=#E3BA59>Супер "
+"слоте</color>."
+
+msgid "unknownUsedIn"
+msgstr ""
+"Можно отнести на <color=#E3BA59>Оценку</color> торговцу, чтобы узнать "
+"ценность."
+
+msgid "cursedUsedIn"
+msgstr ""
+"Можно снять проклятие в <color=#E3BA59>Алтаре</color> или <color=#E3BA59>"
+"Супер слоте</color>."
+
+msgid "terrain2Biome0Title"
+msgstr "Лесопилка"
+
+msgid "perfect"
+msgstr "Отлично"
+
+msgid "decline"
+msgstr "Отказать"
+
+msgid "putUpForSale"
+msgstr "Выставить на продажу"
+
+msgid "newLocationAvailable"
+msgstr "Появилось новое место!"
+
+msgid "retargetingTitle1"
+msgstr ":monocle: Интересный вопрос…"
+
+msgid "retargetingDescription1"
+msgstr "Как далеко ты сможешь зайти?"
+
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Пора продолжить"
+
+msgid "retargetingDescription2"
+msgstr "Твой прогресс никуда не делся."
+
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Готов вернуться?"
+
+msgid "retargetingDescription3"
+msgstr "Продолжи с того места, где остановился."
+
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Крафт завершён!"
+
+msgid "notificationCraftCompletedDescription"
+msgstr "Проверь, что получилось."
+
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Есть покупатель!"
+
+msgid "notificationTradeCompletedDescription"
+msgstr "Твой товар нашёл покупателя."
+
+msgid "tradeSelectBlockedWrongType"
+msgstr "Этот предмет нельзя продать."
+
+msgid "skip"
+msgstr "Пропустить"
+
+msgid "daily"
+msgstr "Ежедневные"
+
+msgid "available"
+msgstr "Доступна"
+
+msgid "availableIn"
+msgstr "Доступна через:"
+
+msgid "dailyRewardClaimTitle"
+msgstr "Забери с выгодой"
+
+msgid "dailyRewardClaimDescription"
+msgstr "Посмотри ролик - получи Х2 награды"
+
+msgid "withoutBonus"
+msgstr "Без бонуса"
+
+msgid "claimWithBonus"
+msgstr "Забрать с бонусом"
+
+msgid "x2Reward"
+msgstr "X2 награда"
+
+msgid "dailyRewardAlreadyReceived"
+msgstr "Награда уже получена!"
+
+msgid "missedDailyReward"
+msgstr "Эта награда уже упущена!"
+
+msgid "futureDailyReward"
+msgstr "Вернись за наградой позже!"
+
+msgid "rateUs"
+msgstr "Оценить нас"
+
+msgid "rateUsTitle"
+msgstr "Отблагодари звездами"
+
+msgid "rateUsDescription"
+msgstr "Оцените игру и помогите нам стать лучше."
+
+msgid "specialOffers"
+msgstr "Особые предложения"
+
+msgid "quickStart"
+msgstr "Быстрый старт!"
+
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+msgid "forever"
+msgstr "Навсегда"
+
+msgid "starterPack"
+msgstr "Набор новичка"
+
+msgid "allInOneSupply"
+msgstr "Запас на все"
+
+msgid "dealOfTheDay"
+msgstr "Сделка дня"
+
+msgid "xAmount"
+msgstr "X{value}"
+
+msgid "free!"
+msgstr "Бесплатно!"
+
+msgid "watch"
+msgstr "Смотреть"
+
+msgid "coins"
+msgstr "Монеты"
+
+msgid "mostPopular"
+msgstr "Самое популярное"
+
+msgid "bestPrice"
+msgstr "Лучшая цена"
+
+msgid "store"
+msgstr "Магазин"
+
+msgid "dealOfTheDayDescription"
+msgstr "Новые предложения станут доступны через"
+
+msgid "health"
+msgstr "Здоровье"
+
+msgid "notificationDealOfTheDayTitle"
+msgstr "Кобыла требует шопинга :sunglasses:"
+
+msgid "notificationDealOfTheDayDescription"
+msgstr "Осталось только зайти и забрать своё."
+
+msgid "notificationCoinsReadyTitle"
+msgstr "Магазин раздаёт добро :heart-eyes:"
+
+msgid "notificationCoinsReadyDescription"
+msgstr "Забегай в магазин и забирай халяву."
+
+msgid "wantReceipt"
+msgstr "Хочу чек (отправим на эл. почту)"
+
+msgid "submit"
+msgstr "Подтвердить"
+
+msgid "receiptEmaitTitle"
+msgstr "Ввод Эл. Почты"
+
+msgid "receiptEmailDescription"
+msgstr ""
+"Хочешь получать чек? \n"
+"Введи e-mail, и мы отправим его после покупки."
+
+msgid "buy"
+msgstr "Купить"
+
+msgid "starterPackHeadline"
+msgstr "Успей забрать!"
+
+msgid "specialOfferHeadline"
+msgstr "Навсегда больше!"
+
+msgid "open"
+msgstr "Открыть"
+
+msgid "maximumResources"
+msgstr "Максимум ресурсов"
+
+msgid "exchangeCurrencyTitle"
+msgstr "Не хватает серебряных монет"
+
+msgid "exchangeCurrencyDescription"
+msgstr "Не хватает совсем чуть-чуть."
+
+msgid "exchangeCurrencyQuestion"
+msgstr "Докупить?"
+
+msgid "bankingAwaitingTitle"
+msgstr "Монеты в пути"
+
+msgid "bankingAwaitingDescription"
+msgstr "Золото грузят в повозку… Начисление может занять несколько минут."
+
+msgid "deleteItemConfirmationTitle"
+msgstr "Выбросить вещь?"
+
+msgid "deleteItemConfirmationDescription"
+msgstr "Предмет исчезнет навсегда.  Это действие нельзя отменить."
+
+msgid "noKeepIt"
+msgstr "Нет, оставить"
+
+msgid "allRegionsAvailable"
+msgstr "Все регионы доступны"
+
+msgid "terrainProgressLabel"
+msgstr "До следующей локации"
+
+msgid "terrainClosedLabel"
+msgstr "Локация не доступна"
+
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Твоя главная цель - любовь!</color>\n"
+"Продавай свои творения местным жителям, чтобы понравиться им. "
+
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Не останавливайся, пока они не будут\n"
+"<color=#E3BA59>ОБОЖАТЬ тебя</color> - и тогда ты будешь готов \n"
+"к покорению новых земель."
+
+msgid "cryolisUsedIn"
+msgstr ""
+"Можно <color=#E3BA59>продать</color> у торговца, использовать в "
+"<color=#E3BA59>Плавильне</color> или <color=#E3BA59>Супер слоте</color>."
+
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Этот предмет не подходит для выбранного рецепта"
+
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Уже выбран другой предмет из данной группы."
+
+msgid "failedPurchase"
+msgstr "Кобыла грустит. Покупка не удалась. Стоит попробовать еще раз."
+
+msgid "frozenUsedIn"
+msgstr ""
+"Можно отогреть в <color=#E3BA59>Инкубаторе</color> или в <color=#E3BA59>"
+"Супер Слоте</color>."
+
+msgid "frozen"
+msgstr "Замороженный"
+
+msgid "frozens"
+msgstr "Замороженные"
+
+msgid "language"
+msgstr "Язык"
+
+msgid "termsOfUse"
+msgstr "Условия использования"
+
+msgid "privacyPolicy"
+msgstr "Политика конфиденциальности"
+
+msgid "deleteData"
+msgstr "Удалить данные"
+
+msgid "signInWithGoogle Play"
+msgstr "Войти с помощью Google Play"
+
+msgid "notLinked"
+msgstr "Не подключено"
+
+msgid "linked"
+msgstr "Подключено"
+
+msgid "switchGooglePlay"
+msgstr "Сменить аккаунт Google Play"
+
+msgid "resetProgressDescription"
+msgstr ""
+"Ты действительно хочешь удалить прогресс? Это действие нельзя будет отменить!"
+
+msgid "resetProgressConfirm"
+msgstr "Да, удалить"
+
+msgid "terrainInDevelopmentDescription"
+msgstr "Простите. Локация находится в разработке."
+
+msgid "terrain2Biome1Title"
+msgstr "Мёрзлая Верфь"
+
+msgid "terrain2Biome2Title"
+msgstr "Светоч"
+
+msgid "terrain2Biome3Title"
+msgstr "Заблудье"
+
+msgid "collectAll"
+msgstr "Собрать все"
+
+msgid "healthStatReward"
+msgstr "Здоровье +{value}"
+
+msgid "storageStatReward"
+msgstr "Место на складе +{value}"
+
+msgid "itemsLeft_x"
+msgstr "Осталось: {value}"
+
+msgid "storageStatRewardSummary"
+msgstr "Склад навседа"
+
+msgid "healthStatRewardSummary"
+msgstr "Здоровье навсегда"
+
+msgid "prospectors"
+msgstr "Старатели"
+
+msgid "storeStockFullDescription"
+msgstr "Склад переполнен до последней щепки."
+
+msgid "terrain3Title"
+msgstr "Гримдаль"
+
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Открой настройки телефона\r\n"
+"2. Google - Все сервисы - Play Games \r\n"
+"3. \"Аккаунт для входа\" - \"Изменить\" (Рядом с игрой)\r\n"
+"4. Перезапусти игру"
+
+msgid "versionAlertMessage"
+msgstr "Вышла новая версия игры. Пора обновиться!"
+
+msgid "treasureUsedIn"
+msgstr "Можно только <color=#E3BA59>продать</color> у торговца."
+
+msgid "noInternetConnectionBlocking"
+msgstr ""
+"Без интернета\n"
+"приключение не начинается"
+
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Возвращаем связь...\n"
+"{value}"
+
+msgid "newsAndCommunication"
+msgstr "Новости и общение"
+
+msgid "statEffectAccumulationFreeze"
+msgstr "Обморожение"
+
+msgid "statEffectHeal"
+msgstr "Регенерация"
+
+msgid "statEffectMovementSpeedNegative"
+msgstr "Замедление"
+
+msgid "statEffectMovementSpeedPositive"
+msgstr "Ускорение"
+
+msgid "statEffectDamageCurse"
+msgstr "Истощение"
+
+msgid "statEffectDamageBleed"
+msgstr "Кровотечение"
+
+msgid "statEffectToolNoiseNegative"
+msgstr "Шумный инструмент"
+
+msgid "statEffectToolNoisePositive"
+msgstr "Тихий инструмент"
+
+msgid "statEffectToolSpeedNegative"
+msgstr "Усталость"
+
+msgid "statEffectToolSpeedPositive"
+msgstr "Сноровка"
+
+msgid "pause"
+msgstr "Пауза"
+
+msgid "pauseDescription"
+msgstr "Эффекты, заказы и настройки - всё здесь."
+
+msgid "effects"
+msgstr "Состояние персонажа"
+
+msgid "settingsDialogTitle"
+msgstr "Свиток управления"
+
+msgid "russianPlaymentsBanner"
+msgstr "Для жителей России доступны платежи!"

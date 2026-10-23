@@ -1,0 +1,81 @@
+US controls compliance
+======================
+
+.. include:: /snippets/compliance-warning.rst
+
+ITAR and other export controls
+------------------------------
+
+Weblate can be run within your own datacenter or virtual private cloud. As
+such, it can be used to store ITAR or other export-controlled information,
+however, end users are responsible for ensuring such compliance.
+
+The Hosted Weblate service has not been audited for compliance with ITAR or
+other export controls, and does not currently offer the ability to restrict
+translations access by country.
+
+US encryption controls
+----------------------
+
+Weblate does not contain any cryptographic code, but might be subject
+to export controls as it uses third party components utilizing cryptography
+for authentication, data-integrity and -confidentiality.
+
+Weblate and all its dependencies have publicly available source code meaning
+it can usually be exported and reexported without restriction.
+
+Export control classification number
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Weblate has not received a Commodity Classification Automated Tracking System
+(CCATS) determination from the Bureau of Industry and Security (BIS). Based on
+the cryptographic functionality used through its dependencies, Weblate should
+generally be treated as encryption software under ECCN ``5D002.c.1``. A
+mass-market distribution can instead be classified as ECCN ``5D992.c`` after
+the applicable BIS classification or self-classification process.
+
+Weblate source code and release artifacts are publicly available. Under BIS
+guidance and 15 CFR 742.15(b), publicly available encryption source code
+classified under ECCN ``5D002`` is not subject to the EAR when the applicable
+conditions are met, and corresponding object code can also be outside the EAR.
+Custom builds, hosted services, bundled distributions, and downstream
+deployments should be evaluated as a whole by the exporting party.
+
+.. seealso::
+
+   * `BIS encryption controls <https://www.bis.gov/learn-support/encryption-controls>`_
+   * `Encryption items not subject to the EAR
+     <https://www.bis.gov/learn-support/encryption-controls/encryption-items-not-subject-to-ear>`_
+   * `BIS mass market guidance
+     <https://www.bis.gov/learn-support/encryption-controls/mass-market>`_
+   * `15 CFR 742.15
+     <https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-742/section-742.15>`_
+
+Cryptographic functionality
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Software components used by Weblate (listing only components related to
+cryptographic function):
+
+* `Python <https://www.python.org/>`_
+* `Cryptography <https://cryptography.io/>`_
+* `GnuPG <https://www.gnupg.org/>`_
+* `Git <https://git-scm.com/>`_
+* `curl <https://curl.se/>`_
+* `OpenSSL <https://www.openssl.org/>`_
+
+The strength of encryption keys depends on the configuration of Weblate and
+the third party components it interacts with, but in any decent setup it will
+include all export restricted cryptographic functions:
+
+- In excess of 56 bits for a symmetric algorithm
+- Factorisation of integers in excess of 512 bits for an asymmetric algorithm
+- Computation of discrete logarithms in a multiplicative group of a finite field of size greater than 512 bits for an asymmetric algorithm
+- Discrete logarithms in a group different than above in excess of 112 bits for an asymmetric algorithm
+
+Weblate doesn't have any cryptographic activation feature, but it can be
+configured in a way where no cryptography code would be involved. The
+cryptographic features include:
+
+- Accessing remote servers using secure protocols (HTTPS)
+- Generating signatures for code commits (PGP)

@@ -1,0 +1,1320 @@
+{
+  "project": "anvil-saga",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-10",
+  "components": [
+    "anvil-saga-glossary",
+    "locale_v1-02-import-explained-3"
+  ],
+  "glossary_components": [
+    "anvil-saga-glossary"
+  ],
+  "languages": [
+    "zh_Hans",
+    "zh_Hant",
+    "en",
+    "fr",
+    "ja",
+    "ko",
+    "ru"
+  ],
+  "units_fetched": 58180,
+  "target_units_compared": 48504,
+  "repeated_source_groups": 4449,
+  "folds": {
+    "strict": {
+      "diverging_groups": 858,
+      "distinct_sources": 317,
+      "per_language": {
+        "ja": 220,
+        "ko": 205,
+        "zh_Hans": 171,
+        "zh_Hant": 170,
+        "en": 92
+      },
+      "scope": {
+        "intra_component": 858,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 54,
+        "regular_only": 804
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 857,
+      "distinct_sources": 317,
+      "per_language": {
+        "ja": 220,
+        "ko": 205,
+        "zh_Hans": 171,
+        "zh_Hant": 170,
+        "en": 91
+      },
+      "scope": {
+        "intra_component": 857,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 54,
+        "regular_only": 803
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 856,
+      "distinct_sources": 316,
+      "per_language": {
+        "ja": 220,
+        "ko": 205,
+        "zh_Hans": 170,
+        "zh_Hant": 170,
+        "en": 91
+      },
+      "scope": {
+        "intra_component": 856,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 54,
+        "regular_only": 802
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 812,
+      "distinct_sources": 306,
+      "per_language": {
+        "ja": 210,
+        "ko": 197,
+        "zh_Hans": 166,
+        "zh_Hant": 166,
+        "en": 73
+      },
+      "scope": {
+        "intra_component": 812,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 54,
+        "regular_only": 758
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": [
+    {
+      "language": "ja",
+      "source": "Пришлось ехать с минимальным набором инструментов.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareFirstFailReward",
+          "target": "アーサーは小さな道具セットで満足するしかなかった。",
+          "unit": 476532
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareSecondFailReward",
+          "target": "アーサーが作業に使える道具がほとんどない。",
+          "unit": 476536
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareThirdFailReward",
+          "target": "アーサーは最低限の道具だけ持って行くしかなかった。",
+          "unit": 476540
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareFirstFailReward",
+          "target": "アーサーは小さな道具セットで満足しなければならなかった。",
+          "unit": 478041
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareSecondFailReward",
+          "target": "アーサーが作業に使える道具があまりない。",
+          "unit": 478045
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareThirdFailReward",
+          "target": "アーサーは最小限の道具だけを持って行かなければならなかった。",
+          "unit": 478049
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareFirstFailReward",
+          "target": "アーサーは小さな道具セットで満足するしかなかった。",
+          "unit": 473457
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareSecondFailReward",
+          "target": "アーサーが作業に使える道具がほとんどない。",
+          "unit": 473461
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareThirdFailReward",
+          "target": "アーサーは最小限の道具だけを持っていくことができる。",
+          "unit": 473465
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Лучше бы книги читали!",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderCelebration3",
+          "target": "사람들이 독서나 했으면 좋겠어요!",
+          "unit": 484928
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderChristmas3",
+          "target": "사람들이 이럴 시간에",
+          "unit": 484934
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderContest5",
+          "target": "춤출 시간에 독서나 할 것이지...",
+          "unit": 484918
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFools3",
+          "target": "이럴 시간에 책이나 읽을 것이지!",
+          "unit": 484910
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHalloween3",
+          "target": "사람들이 독서나 많이 했으면 좋겠다",
+          "unit": 484946
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHunt5",
+          "target": "춤출 시간에 독서나 할 것이지...",
+          "unit": 484924
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderLocalfights1",
+          "target": "사람들이 책이나 읽으며 시간을 보내면 좋겠는데!",
+          "unit": 484860
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderValentine3",
+          "target": "사람들이 독서나 많이 했으면 좋겠다",
+          "unit": 484952
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderWine3",
+          "target": "사람들이 독서나 많이 했으면 좋겠다",
+          "unit": 484940
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "И что они празднуют каждый раз?",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "AristocracyCelebration2",
+          "target": "이번에는 또 무슨 축제지?",
+          "unit": 486152
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "AristocracyFeast1",
+          "target": "이번에는 무엇을 축하하고 있지?",
+          "unit": 486103
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "AristocracyHoliday2",
+          "target": "이번엔 또 무슨 축제지?",
+          "unit": 486200
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderCelebration1",
+          "target": "이번엔 또 무슨 축제를 하는 거지?",
+          "unit": 484926
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFeast1",
+          "target": "이번엔 또 무슨 축제를 하는 거지?",
+          "unit": 484878
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHoliday1",
+          "target": "이번엔 무엇을 축하하고 있나요?",
+          "unit": 486044
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Учились бы вместо того, чтоб плясать.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderCelebration4",
+          "target": "춤출 시간에 독서나 할 것이지...",
+          "unit": 484929
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderChristmas4",
+          "target": "사람들이 독서나 많이 하면 좋겠는데!",
+          "unit": 484935
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFeast2",
+          "target": "춤출 시간에 공부나 할 것이지.",
+          "unit": 484879
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFools4",
+          "target": "춤출 시간에 공부나 할 것이지...",
+          "unit": 484911
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHalloween4",
+          "target": "춤출 시간에 공부나 할 것이지.",
+          "unit": 484947
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHoliday2",
+          "target": "춤출 시간에 공부를 할 수 있었을 텐데요.",
+          "unit": 486045
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderWine4",
+          "target": "춤출 시간에 공부나 할 것이지.",
+          "unit": 484941
+        }
+      ]
+    },
+    {
+      "language": "ja",
+      "source": "И что они празднуют каждый раз?",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "AristocracyCelebration2",
+          "target": "今度はまた何の祭りだ？",
+          "unit": 476670
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "AristocracyFeast1",
+          "target": "今度は何を祝っているんだ？",
+          "unit": 476621
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "AristocracyHoliday2",
+          "target": "今度はまた何の祭りだ？",
+          "unit": 476718
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderCelebration1",
+          "target": "今度はまた何の祭りをするのだ？",
+          "unit": 475444
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFeast1",
+          "target": "今度はまた何の祭りをするのだ？",
+          "unit": 475396
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHoliday1",
+          "target": "今度は何を祝っていますか？",
+          "unit": 476562
+        }
+      ]
+    },
+    {
+      "language": "ja",
+      "source": "Согласиться",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "BanditsBagFirst",
+          "target": "引き受ける",
+          "unit": 474633
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3BaronOrderAccept",
+          "target": "同意する",
+          "unit": 477062
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3BaronSixthFirst",
+          "target": "同意する",
+          "unit": 477958
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3ImposterSecondFirst",
+          "target": "同意する",
+          "unit": 477919
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3JeanFirstFirst",
+          "target": "同意する。",
+          "unit": 477226
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinFifthFirstChoice",
+          "target": "同意する",
+          "unit": 475791
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinThirdFirstChoice",
+          "target": "同意する",
+          "unit": 473055
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "JoanFourthFirstChoice",
+          "target": "同意する",
+          "unit": 475619
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "MonkWitchFirstChoice",
+          "target": "受け入れる",
+          "unit": 473367
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "RagnarSecondFirstChoice",
+          "target": "同意する",
+          "unit": 475929
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "RagnarThirdFirstChoice",
+          "target": "同意する",
+          "unit": 475967
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Готовы клетки, кузнец?",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EclipseFinish1",
+          "target": "우리들은 준비되었나, 대장장이?",
+          "unit": 483568
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EclipseQueenFinish1",
+          "target": "우리들은 준비 되었나, 대장장이?",
+          "unit": 483586
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EclipseSantaFinish1",
+          "target": "우리들은 준비됐니, 대장장이?",
+          "unit": 483575
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OrderKrampusComplete1",
+          "target": "우리는 준비됐나, 대장장이?",
+          "unit": 480729
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Какой шум подняли - думать трудно!",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "AristocracyContest6",
+          "target": "하도 소란스러워서 생각을 할 수가 없군!",
+          "unit": 486144
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "AristocracyHunt6",
+          "target": "하도 소란스러워서 생각을 할 수가 없군!",
+          "unit": 486150
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderCelebration6",
+          "target": "하도 시끄러워서 생각도 제대로 못 하겠네!",
+          "unit": 484931
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderChristmas6",
+          "target": "하도 시끄러워서 생각도 제대로 못 하겠네!",
+          "unit": 484937
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderContest6",
+          "target": "하도 시끄러워서 생각도 제대로 못 하겠네!",
+          "unit": 484919
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFeast5",
+          "target": "엄청 시끄러워! 생각도 제대로 못 하겠네!",
+          "unit": 484882
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFools6",
+          "target": "하도 시끄러워서 생각도 제대로 못 하겠네!",
+          "unit": 484913
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHalloween6",
+          "target": "하도 시끄러워서 생각도 제대로 못 하겠네!",
+          "unit": 484949
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHoliday5",
+          "target": "너무 시끄럽네요! 내 생각조차 들리지 않아요!",
+          "unit": 486048
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHunt6",
+          "target": "하도 시끄러워서 생각도 제대로 못 하겠네!",
+          "unit": 484925
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderValentine6",
+          "target": "하도 시끄러워서 생각도 제대로 못 하겠네!",
+          "unit": 484955
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderWine6",
+          "target": "하도 시끄러워서 생각도 제대로 못 하겠네!",
+          "unit": 484943
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Лесная братва",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinContestTitle",
+          "target": "숲 패거리",
+          "unit": 482577
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinFifthOrderDeclined",
+          "target": "숲의 갱단",
+          "unit": 485288
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinFifthQuest",
+          "target": "숲의 갱단",
+          "unit": 485287
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinFirstQuest",
+          "target": "숲 패거리",
+          "unit": 482510
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinFourthOrderRefused",
+          "target": "숲의 패거리들",
+          "unit": 483331
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinSecondQuest",
+          "target": "숲 패거리",
+          "unit": 482553
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinSeventhOrderFirst",
+          "target": "산적",
+          "unit": 485351
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinSeventhOrderSecond",
+          "target": "산적",
+          "unit": 485355
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinSeventhOrderThird",
+          "target": "산적",
+          "unit": 485359
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinSeventhQuestFirst",
+          "target": "산적",
+          "unit": 485345
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinSeventhQuestSecond",
+          "target": "산적",
+          "unit": 485347
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinThirdQuest",
+          "target": "숲 패거리",
+          "unit": 482555
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Не сидится людям дома.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderCelebration2",
+          "target": "왜 이 사람들은 그냥 집에 있질 않는 거지?",
+          "unit": 484927
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderChristmas2",
+          "target": "왜 이 사람들은 그냥 집에 있질 않는 거지?",
+          "unit": 484933
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderContest4",
+          "target": "왜 이 사람들은 그냥 집에 있질 않지?",
+          "unit": 484917
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFeast4",
+          "target": "왜 이 사람들은 그냥 집에 있을 수 없는 거지?",
+          "unit": 484881
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderFools2",
+          "target": "왜 이 사람들은 그냥 집에 있질 않지?",
+          "unit": 484909
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHalloween2",
+          "target": "왜 이 사람들은 그냥 집에 있질 않는 거지?",
+          "unit": 484945
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHoliday4",
+          "target": "왜 이 사람들은 그냥 집에 있지 못할까요?",
+          "unit": 486047
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderHunt4",
+          "target": "왜 이 사람들은 그냥 집에 있질 않지?",
+          "unit": 484923
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ReaderValentine2",
+          "target": "왜 이 사람들은 그냥 집에 있질 않는 거지?",
+          "unit": 484951
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Отношения с Англией значительно ухудшились.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3MonthomeryFailReward",
+          "target": "아서는 잉글랜드와의 관계가 심각하게 악화되었다.",
+          "unit": 486490
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EnglishDeclinedChapterOneReward",
+          "target": "아서와 잉글랜드의 관계가 심각하게 악화되었다.",
+          "unit": 481609
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EnglishDeclinedChapterTwoReward",
+          "target": "아서와 잉글랜드군의 관계가 크게 악화되었다.",
+          "unit": 483828
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EnglishFailureChapterOneReward",
+          "target": "아서와 잉글랜드의 관계가 심각하게 악화되었다.",
+          "unit": 481627
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EnglishFailureChapterTwoReward",
+          "target": "아서와 잉글랜드군과의 관계가 크게 악화되었다.",
+          "unit": 483836
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Отношения с Францией значительно ухудшились.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3DelakurFailReward",
+          "target": "아서는 프랑스와의 관계가 심각하게 악화되었다.",
+          "unit": 486488
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FrenchDeclinedChapterOneReward",
+          "target": "아서와 프랑스의 관계가 심각하게 악화되었다.",
+          "unit": 481605
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FrenchDeclinedChapterTwoReward",
+          "target": "아서와 프랑스군의 관계가 심각하게 악화되었다.",
+          "unit": 483789
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FrenchFailureChapterOneReward",
+          "target": "아서와 프랑스의 관계가 심각하게 악화되었다.",
+          "unit": 481624
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FrenchFailureChapterTwoReward",
+          "target": "아서와 프랑스군과의 관계가 심각하게 악화되었다.",
+          "unit": 483797
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Пришлось ехать с минимальным набором инструментов.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareFirstFailReward",
+          "target": "아서는 작은 도구 세트로 만족해야만 했다.",
+          "unit": 486014
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareSecondFailReward",
+          "target": "아서가 작업에 쓸 수 있는 도구가 얼마 없다.",
+          "unit": 486018
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareThirdFailReward",
+          "target": "아서는 최소한의 도구만을 가지고 가야 했다.",
+          "unit": 486022
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareFirstFailReward",
+          "target": "아서는 작은 도구 세트로 만족해야만 했다.",
+          "unit": 487523
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareSecondFailReward",
+          "target": "아서가 작업에 쓸 수 있는 도구가 얼마 없다.",
+          "unit": 487527
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareThirdFailReward",
+          "target": "아서는 최소한의 도구만을 가지고 가야 했다.",
+          "unit": 487531
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareFirstFailReward",
+          "target": "아서는 작은 도구 세트로 만족해야만 했다.",
+          "unit": 482939
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareSecondFailReward",
+          "target": "아서가 작업에 쓸 수 있는 도구가 얼마 없다.",
+          "unit": 482943
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareThirdFailReward",
+          "target": "아서는 최소한의 도구만을 가지고 가야 한다.",
+          "unit": 482947
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Согласиться",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "BanditsBagFirst",
+          "target": "수락한다",
+          "unit": 484115
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3BaronOrderAccept",
+          "target": "동의한다",
+          "unit": 486544
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3BaronSixthFirst",
+          "target": "동의한다",
+          "unit": 487440
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3ImposterSecondFirst",
+          "target": "동의한다",
+          "unit": 487401
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3JeanFirstFirst",
+          "target": "동의한다.",
+          "unit": 486708
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinFifthFirstChoice",
+          "target": "동의한다",
+          "unit": 485273
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "HobinThirdFirstChoice",
+          "target": "동의한다",
+          "unit": 482537
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "JoanFourthFirstChoice",
+          "target": "동의한다",
+          "unit": 485101
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "MonkWitchFirstChoice",
+          "target": "받아들인다",
+          "unit": 482849
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "RagnarSecondFirstChoice",
+          "target": "동의한다.",
+          "unit": 485411
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "RagnarThirdFirstChoice",
+          "target": "동의한다.",
+          "unit": 485449
+        }
+      ]
+    },
+    {
+      "language": "zh_Hans",
+      "source": "Лезвие",
+      "members": [
+        {
+          "component": "anvil-saga-glossary",
+          "context": "[\"\",\"Лезвие\"]",
+          "target": "刀",
+          "unit": 449079
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Blade",
+          "target": "刀",
+          "unit": 490308
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "BloodborneBlade",
+          "target": "刀片",
+          "unit": 491822
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "DanteGuitarSecond",
+          "target": "刀片",
+          "unit": 491784
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "GowGrip",
+          "target": "刀刃",
+          "unit": 492700
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "NitcherBlade",
+          "target": "刀刃",
+          "unit": 492792
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "TugsThird",
+          "target": "剑刃",
+          "unit": 494182
+        }
+      ]
+    },
+    {
+      "language": "zh_Hans",
+      "source": "Ничего",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3GuessingThreeFifthThirdChoice",
+          "target": "什么也没做",
+          "unit": 497443
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3GuessingThreeFourthThirdChoice",
+          "target": "我啥也没做",
+          "unit": 497439
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3GuessingThreeTenthThirdChoice",
+          "target": "我什么都没做",
+          "unit": 497466
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3GuessingTwoNinethThirdChoice",
+          "target": "我什么也没做",
+          "unit": 497380
+        }
+      ]
+    },
+    {
+      "language": "zh_Hans",
+      "source": "Отношения с Оливией ухудшились.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaFirstFailureReward",
+          "target": "亚瑟和奥莉薇娅的关系恶化了。",
+          "unit": 496065
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaFirstRefuseReward",
+          "target": "亚瑟和奥莉薇娅的关系恶化了。",
+          "unit": 496057
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaSecondFailedReward",
+          "target": "亚瑟和奥莉薇娅的关系恶化了",
+          "unit": 496708
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaOrderChapterOneDeclinedReward",
+          "target": "亚瑟与奥莉薇娅的关系恶化。",
+          "unit": 491165
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaSecondDeclinedChapterTwoReward",
+          "target": "亚瑟与奥莉薇娅的关系恶化了。",
+          "unit": 493682
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaThirdDeclinedChapterTwoReward",
+          "target": "亚瑟与奥莉薇娅的关系恶化了。",
+          "unit": 493743
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaThirdFailedChapterTwoReward",
+          "target": "亚瑟与奥莉薇娅的关系恶化了。",
+          "unit": 493746
+        }
+      ]
+    },
+    {
+      "language": "zh_Hant",
+      "source": "Лезвие",
+      "members": [
+        {
+          "component": "anvil-saga-glossary",
+          "context": "[\"\",\"Лезвие\"]",
+          "target": "刀",
+          "unit": 449263
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Blade",
+          "target": "刀",
+          "unit": 499790
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "BloodborneBlade",
+          "target": "刀片",
+          "unit": 501304
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "DanteGuitarSecond",
+          "target": "刀片",
+          "unit": 501266
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "GowGrip",
+          "target": "刀刃",
+          "unit": 502182
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "NitcherBlade",
+          "target": "刀刃",
+          "unit": 502274
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "TugsThird",
+          "target": "劍刃",
+          "unit": 503664
+        }
+      ]
+    },
+    {
+      "language": "zh_Hant",
+      "source": "Ничего",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3GuessingThreeFifthThirdChoice",
+          "target": "什麼也沒做",
+          "unit": 506925
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3GuessingThreeFourthThirdChoice",
+          "target": "我啥也沒做",
+          "unit": 506921
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3GuessingThreeTenthThirdChoice",
+          "target": "我什麼都沒做",
+          "unit": 506948
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3GuessingTwoNinethThirdChoice",
+          "target": "我什麼也沒做",
+          "unit": 506862
+        }
+      ]
+    },
+    {
+      "language": "zh_Hant",
+      "source": "Отношения с Оливией ухудшились.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaFirstFailureReward",
+          "target": "亞瑟和奧莉薇婭的關係惡化了。",
+          "unit": 505547
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaFirstRefuseReward",
+          "target": "亞瑟和奧莉薇婭的關係惡化了。",
+          "unit": 505539
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaSecondFailedReward",
+          "target": "亞瑟和奧莉薇婭的關係惡化了",
+          "unit": 506190
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaOrderChapterOneDeclinedReward",
+          "target": "亞瑟與奧莉薇婭的關係惡化。",
+          "unit": 500647
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaSecondDeclinedChapterTwoReward",
+          "target": "亞瑟與奧莉薇婭的關係惡化了。",
+          "unit": 503164
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaThirdDeclinedChapterTwoReward",
+          "target": "亞瑟與奧莉薇婭的關係惡化了。",
+          "unit": 503225
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaThirdFailedChapterTwoReward",
+          "target": "亞瑟與奧莉薇婭的關係惡化了。",
+          "unit": 503228
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Отношения с Оливией ухудшились.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaFirstFailureReward",
+          "target": "Arthur's relationship with Olivia has deteriorated.",
+          "unit": 467619
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaFirstRefuseReward",
+          "target": "Arthur's relationship with Olivia has deteriorated.",
+          "unit": 467611
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Chapter3OliviaSecondFailedReward",
+          "target": "Arthur's relationship with Olivia has deteriorated.",
+          "unit": 468262
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaOrderChapterOneDeclinedReward",
+          "target": "Arthur’s standing with Olivia has deteriorated.",
+          "unit": 462719
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaSecondDeclinedChapterTwoReward",
+          "target": "Arthur’s relationship with Olivia has deteriorated.",
+          "unit": 465236
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaThirdDeclinedChapterTwoReward",
+          "target": "Arthur’s relationship with Olivia has deteriorated.",
+          "unit": 465297
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OliviaThirdFailedChapterTwoReward",
+          "target": "Arthur’s relationship with Olivia has deteriorated.",
+          "unit": 465300
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Пришлось ехать с минимальным набором инструментов.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareFirstFailReward",
+          "target": "He had to settle with a small set of tools.",
+          "unit": 467050
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareSecondFailReward",
+          "target": "Arthur will only have a few tools to work with.",
+          "unit": 467054
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareThirdFailReward",
+          "target": "He had to go with a minimum set of tools.",
+          "unit": 467058
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareFirstFailReward",
+          "target": "He had to settle with a small set of tools.",
+          "unit": 468559
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareSecondFailReward",
+          "target": "Arthur will only have a few tools to work with.",
+          "unit": 468563
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareThirdFailReward",
+          "target": "He had to go with a minimum set of tools.",
+          "unit": 468567
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareFirstFailReward",
+          "target": "He had to settle with a small set of tools.",
+          "unit": 463975
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareSecondFailReward",
+          "target": "Arthur will only have a few tools to work with.",
+          "unit": 463979
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareThirdFailReward",
+          "target": "He had to go with a minimum set of tools.",
+          "unit": 463983
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Рад стараться!",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "ChapterTwoBanditComplete2",
+          "target": "Happy to be of service!",
+          "unit": 464954
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EclipseQueenResult2",
+          "target": "You are welcome!",
+          "unit": 464626
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "EclipseSantaResult2",
+          "target": "You are welcome!",
+          "unit": 464615
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "OrderSanta2",
+          "target": "Happy to be of service, Santa!",
+          "unit": 461690
+        }
+      ]
+    },
+    {
+      "language": "ja",
+      "source": "Артур неплохо подготовился к ярмарке.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareSecondCompleteResult",
+          "target": "アーサーは祭りの準備をちゃんとした。",
+          "unit": 476533
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareSecondCompleteResult",
+          "target": "アーサーは祭りの準備がよくできた。",
+          "unit": 478042
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareSecondCompleteResult",
+          "target": "アーサーは祭りの準備をしっかりした。",
+          "unit": 473458
+        }
+      ]
+    },
+    {
+      "language": "ja",
+      "source": "Артур подготовился к ярмарке на славу.",
+      "members": [
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair2PrepareThirdCompleteResult",
+          "target": "アーサーは祭りの準備がちゃんとできている。",
+          "unit": 476537
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "Fair3PrepareThirdCompleteResult",
+          "target": "アーサーは祭りの準備ができている。",
+          "unit": 478046
+        },
+        {
+          "component": "locale_v1-02-import-explained-3",
+          "context": "FairPrepareThirdCompleteResult",
+          "target": "アーサーは祭りの準備をしっかりした。",
+          "unit": 473462
+        }
+      ]
+    }
+  ]
+}

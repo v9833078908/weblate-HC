@@ -1,0 +1,473 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Hungarian <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/hu/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: hu\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Több aranyra van szükségünk!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Hozz nekem 3 aranyrögöt."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Kiváló – ezek a rögök szépen kiegészítik a gyűjteményemet."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Hajnalfény"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Hozz nekem egy aranyrögöt bármely aranytartalmú kőzetből."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Az aranyban benne van a hajnal csillogása – ha nem is látom, legalább "
+"érezhetem..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Kiváló munka!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Köszönöm a segítséget! Megosztok veled egy különös helyet."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Egy új szemüveg"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Hozz nekem 2 gyémántot. Gyakran esnek ki kristályos kőzetekből."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Lássuk, készen állok-e arra, hogy megszokjam ezt a földet..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Megszokni a földet"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr ""
+"Hozz nekem egy kis geódát. Ezeket közönséges sziklákban lehet megtalálni."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Lássuk, készen állok-e megszokni ezt a földet..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Holt ember ládája"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Hozz nekem egy ládát. Egy kanári segíthet megtalálni egyet."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Szóval ott hagytam a cuccaimat..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Ezüst edzéshez"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Hozz nekem 3 darab ezüstöt. Ezeket geódákban és közönséges sziklákban lehet "
+"megtalálni."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Kiváló munka!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Ez az ezüst kellemesen csípi a tenyeret..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Köszönöm! Ugorjon be hozzám valamikor – itt a cím."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Ősi pénz"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Hozz nekem 4 ősi érmét. Gyakran megtalálhatók ősi edényekben és vázákban."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Most végre tudok visszaadni az ősöknek!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Golyóhenger"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Hozz nekem egy Arany skarabeuszt. Ezek nagy bogarak, amelyek a bokrokban "
+"mászkálnak."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Ez a bogár egy nagy golyóhenger!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Kő bowling"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Hozz nekem egy Közepes Geódát. Néha megjelenik a közönséges sziklákban."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Most végre guríthatok néhány golyót!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Arany omlett"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Hozz nekem egy Arany Tojást. Keresd meg a bokrok között az ilyen tojásokat "
+"tartalmazó fészket."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Na, ez egy királyi reggeli!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Oroszlán vére"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Hozz nekem egy Oroszlán Rubint. Vörös kristályokkal rendelkező Geódákban "
+"található."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Most bátor leszek, mint egy oroszlán!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Égi kegyelem"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Hozz nekem egy Égi Zafírt. Kék kristályokkal rendelkező Geódákban található."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Maga a menny is mellettem áll!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Arany WC"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Hozz nekem 9 Arany rögöt bármilyen aranytartalmú kőzetből."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Végre meg tudom javíttatni a mosdót!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Ha kívánni akarsz – ismerek egy helyet, ahol állandóan hullanak a csillagok."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Kiváló munka!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Kiváló munka!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "A jég a Nagymamámra emlékeztet... Ugorj be az ő kunyhójába is!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Hozz nekem 2 Fagyott tárgyat a fagyott sziklákból"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Jégkockák"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Tökéletes a koktéljaimhoz!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Kiváló munka!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Úgy tűnik, a rákok kapcsolatban állnak a Nap kultusszal – tudom, hol vannak "
+"a templomromjaik!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Fogj egy jég rákot – a páncélja Kriolisz-ból van."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Rákfém"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ó, exofém! Imádom a természet rejtélyeit!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Kiváló munka!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"A Nap kultusz legértékesebb kincsei mélyen a Labirintusban rejtőznek – "
+"megmutatom, hol!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Gyújts meg 3 fáklyát a Szentélyben, és lopd el a Napgömböt!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Legjobb fűtőtest"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Igen, ez már egy rendes bemelegítés!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Keress 2 ezüst rögöt jégkockákban, és melegítsd fel őket."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Fagyos ezüst"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Olyan, mint a jég fóliában... de fordítva..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Fagyos arany"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "A téli arany nagyon különleges... ragyogást kap..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Keress 2 arany rögöt jégkockákban, és melegítsd fel őket."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Láthatatlan drágakő"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Tiszta a tisztában, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Olvassz fel egy közepes gyémántot. A fagyott gyémántok gyakran megtalálhatók "
+"minden kőzetben."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Földi asztrológia"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Hozz nekem 2 csillagvasat. Csillaghullás idején találhatók a mocsarakban."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Az asztrofém minden tudós álma!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Kozmikus betolakodó"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Találj egy Átkozott Meteor magot egy Csillaghullás idején, és űzd el az "
+"átkot."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Egy meteor egy gép, nem csak egy égitest! Elképesztő!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Rák melegség"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Gyűjts 5 Kriolisz szilánkot a jégrákok páncéljából."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Te is halálra vágysz, hogy megtudd, hogyan élnek a rákok a hóban?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Új érzékelők"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr "Hozz nekem 9 ezüstdarabot. Geódákban és egyszerű sziklákban találhatók."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Kutatási eszközeim végre nem fognak többé hibázni!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Rák melegkabát"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Gyűjts össze 8 Kriolisz-szilánkot a jégrákok páncéljából."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Most végre megértem, hogyan élik túl a telet!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Nagyban gondolkodva"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr "Hozz nekem egy nagy gyémántot. Minden fagyott sziklában megtalálható."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Ó, istenem, akkora, mint egy fej! De kinek a..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Fehérföldi kincs"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr ""
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr "Add ide a Jarl ládát. A Kanári segít megtalálni a Fehérföldeken."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Nagyapámra emlékeztet..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "A láng esszenciája"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Vonj ki egy Bálvány szikrát a Napgömbből."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Micsoda forró kő..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Irrizáló kő"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Hozz nekem egy Opált. Ritka lelet a fagyott sziklákban."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Nézd, milyen gyönyörűen csillog..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Utódokat hagyott!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Vonj ki egy Bagolyfiókát a Napgömbből."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "A Nagy Bagoly hozza a hideget... Miért olyan forró a fióka?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Nagy üzlet"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Hozz nekem 5 Arany rögöt. Elég közönségesek a fagyott sziklákban."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Most én leszek a legnagyobb ember a városban."

@@ -1,0 +1,86 @@
+{# requires 'autoform', 'object' in context #}
+
+{% load crispy_forms_tags i18n translations %}
+
+<form action="{% url 'auto_translation' path=object.get_url_path %}"
+      method="post"
+      enctype="multipart/form-data"
+      data-persist="auto-translation"
+      data-auto-preview-url="{% url 'auto_translation_preview' path=object.get_url_path %}">
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">
+        {% documentation_icon 'user/translating' 'auto-translation' right=True %}
+        {% if autoform.proposal_only %}
+          {% translate "Judge check" %}
+        {% else %}
+          {% translate "Automatic translation" %}
+        {% endif %}
+      </h4>
+    </div>
+    <div class="card-body">
+      {% if autoform.proposal_only %}
+        <p>{% translate "The judge checks the matching strings and records verdicts. String states are not changed and no replacement translations are generated." %}</p>
+        {% if repeat_comparison_follows %}
+          <p>{% translate "After the check, the model compares the variants of repeat groups where the judge accepts at least one variant or flags every variant. This comparison is also paid and starts automatically when the check completes." %}</p>
+        {% endif %}
+      {% elif workspace and object == workspace %}
+        <p>
+          {% translate "Automatic translation takes existing translations in this workspace and applies them to matching strings." %}
+        </p>
+        <p>
+          {% translate "Automatic translation via machine translation uses active machine translation engines to get the best possible translations and applies them in this workspace." %}
+        </p>
+      {% else %}
+        <p>
+          {% translate "Automatic translation takes existing translations in this project and applies them to the current component. It can be used to push translations to a different branch, to fix inconsistent translations or to translate a new component using translation memory." %}
+        </p>
+        <p>
+          {% translate "Automatic translation via machine translation uses active machine translation engines to get the best possible translations and applies them in this project." %}
+        </p>
+      {% endif %}
+      {% if judge_row_count is not None %}
+        <p class="text-muted" id="id_auto_row_count">
+          {% blocktranslate count counter=judge_row_count trimmed %}
+            The current filter matches {{ counter }} string.
+          {% plural %}
+            The current filter matches {{ counter }} strings.
+          {% endblocktranslate %}
+        </p>
+        {% if judge_request_estimate is not None %}
+          <p class="text-muted" id="id_auto_request_estimate">
+            {% if autoform.proposal_only %}
+              {% blocktranslate with requests=judge_request_estimate trimmed %}
+                A judge check plans up to {{ requests }} LLM requests (batches × judges × rounds); a refused batch is retried once.
+              {% endblocktranslate %}
+            {% else %}
+              {% blocktranslate with requests=judge_request_estimate trimmed %}
+                A judge run plans up to {{ requests }} LLM requests (batches × judges × rounds); a refused batch is retried once. Empty strings additionally cost machine translation.
+              {% endblocktranslate %}
+            {% endif %}
+          </p>
+        {% endif %}
+        <p class="text-muted" id="id_auto_duration_estimate">
+          {% translate "A judge run holds an automatic translation slot for tens of minutes per few hundred strings, so other projects may wait." %}
+        </p>
+      {% endif %}
+      {% if judge_verdicts_exist and not autoform.proposal_only %}
+        <div class="alert alert-warning" role="alert" id="judge-verdicts-exist">
+          {% translate "This translation already has judge verdicts. Running translate or approved modes with a broad filter will overwrite judge-approved strings." %}
+        </div>
+      {% endif %}
+      {% if producer_runs %}
+        {% include "snippets/producer-runs-menu.html" with runs=producer_runs current_path=request.path %}
+      {% endif %}
+      <p class="d-none" id="id_auto_run_preview" aria-live="polite"></p>
+      {% crispy autoform %}
+      {{ autoform.next }}
+    </div>
+    <div class="card-footer">
+      <input id="id_auto_apply"
+             type="submit"
+             value="{% if autoform.proposal_only %}{% translate "Run judge check" %}{% else %}{% translate "Apply" %}{% endif %}"
+             class="btn btn-primary" />
+    </div>
+  </div>
+</form>

@@ -1,0 +1,954 @@
+# Импорт лок-китов: кит → Weblate (разовый онбординг-сев)
+
+Как один раз перенести лок-кит игры Hero Craft из Excel/CSV/TSV в Weblate.
+Два равноправных входа: универсальная загрузка в UI («Отправить файлы
+перевода» принимает сам кит) и CLI `python -m loc_kit_ingest`. Оба выводят
+профиль из заголовка кита, создают совместимые с Weblate артефакты и передают
+источник правды Weblate.
+
+План реализации: `docs/product/plans/2026-08-06-loc-kit-ingest.md`.
+
+Проверено как вход: `Temple.csv` (диалоги), `Terms.csv` (глоссарий/лор) и
+`UI.xlsx` (UI-строки). Реальные киты не попадают в тестовые фикстуры. Смежные
+конвенции форка: `docs/product/guides/continuous-localization-loop.md` (git ↔ Weblate,
+игровой Id → location), `weblate_customization/` (`game-markup`-check и
+Routed LLM).
+
+## Контекст и границы
+
+- **Weblate - источник истины; таблица - одноразовый seed.** После начала
+  перевода правки и переводы живут в Weblate + git. Обратной записи в таблицу,
+  слияния и повторного импорта нет.
+- **Точка невозврата** - первый начатый перевод. До неё неверный seed исправляют
+  удалением компонента, исправлением таблицы/профиля и повторным импортом. После
+  неё пересев запрещён.
+- **Импортёр не угадывает при парсинге.** Разбор всегда идёт по строгому
+  профилю с закрытой схемой. Профиль выводится из заголовка кита один раз,
+  до разбора, письменно: каждое решение попадает в отчёт, документ
+  сохраняется в выход (`profile.loc-ingest.json`) и может быть поправлен и
+  передан через `--profile`. `--source-lang` переопределяет язык-источник.
+- **Атомарность важнее частичного результата.** Структурная ошибка в любом листе,
+  при записи формата или ZIP не публикует ни одного файла и не меняет ранее
+  существующий каталог назначения.
+- **Формат зависит от назначения.** Диалоги и UI используют монолингвальный PO;
+  Terms использует двуязычный TBX по целевому языку, потому что только TBX
+  сохраняет source/target explanations глоссария для LLM.
+
+Не поддерживаем на старте (первичное создание компонента) Google Sheets API,
+экспорт обратно в формат движка, двустороннюю синхронизацию и повторный/
+idempotent import через тот же онбординг-поток. Полная loc-kit таблица
+**для уже существующего** строкового компонента - отдельный, обратный, явно
+идемпотентный поток; см. «Полное обновление существующего строкового
+компонента» ниже.
+
+## Вход и профиль: выводится из заголовка, рукописный - опционален
+
+Поддерживаются `.xlsx`, `.csv` и `.tsv`: `openpyxl` для XLSX и стандартный
+`csv` для UTF-8/UTF-8-BOM CSV/TSV. CSV/TSV имеет один лист с именем stem файла;
+XLSX использует имена листов без переименования.
+
+Для `.csv` импортёр выбирает между запятой, точкой с запятой и tab тем
+разделителем, при котором в верхних строках впервые распознаётся заголовок с
+кодами языков. Ничья и файл без языкового заголовка остаются запятой, как в
+прежнем поведении. Это устойчивость чтения, а не новая эвристика парсера:
+после чтения парсер по-прежнему принимает только явно объявленную структуру и
+не использует длину текста для угадывания полей.
+
+Профиль **выводится автоматически** из заголовка кита (`loc_kit_ingest/infer.py`):
+строка заголовка находится по первому распознанному коду языка (баннеры вроде
+`UI,,,` отсеиваются), ключ - колонка 1, языковые колонки распознаются по кодам
+(`ru`, `en`) и подписям (`English(en)`), строки-подписи (`id-ignore`, имена
+языков) уходят в `skip_rows`. Колонка с языковым заголовком, но числовым
+содержимым (`Id`) становится location-ссылкой; текстовая неязыковая колонка
+(`Character`) - комментарием переводчику. Языковая колонка, заполненная меньше
+чем на 5% (`--min-fill`), исключается как случайный мусор с перечислением строк
+(`--include-lang` возвращает её). Язык-источник - первая заполненная языковая
+колонка (`--source-lang` переопределяет). Выведенный профиль проходит тот же
+строгий загрузчик, что и рукописный, и записывается в выходной каталог
+(`profile.loc-ingest.json`) как свидетельство; отчёт перечисляет каждое решение.
+
+**Keyless-киты.** Колонка 0 (ключ PO) сама становится языковой, если её
+заголовок резолвится в код языка, не входит в `_KEY_HEADER_DENYLIST = {"id"}`
+(коды вроде `id` остаются строковым Id, а не индонезийским языком) и содержит
+непустые нечисловые данные. Колонка 0 при этом остаётся ключом PO, поэтому key
+и исходный текст совпадают - в отчёт попадает заметка "column 1 is both the PO
+key and a language column". Так кит без отдельной латинской key-колонки
+(`ru,en,ja` с терминами в `ru`) выводится как монолингвальный PO с `ru` в
+качестве источника. Для подлинно неоднозначной первой колонки остаётся
+`--profile`.
+
+**Коды, которыми игры называют языки.** Заголовок распознаётся через
+`loc_kit_ingest/langcode.py`, где кроме реестра Translate Toolkit лежит карта
+алиасов для кодов, которых в реестре нет: `ch`, `ch-s`, `cn` → `zh_Hans`,
+`ch-t`, `zh-TC` → `zh_Hant`, `jp` → `ja`, `kr` → `ko`. Код, который сам по себе
+является языком, не переписывается: `pt` остаётся португальским, а решение
+«в этом проекте pt значит pt-BR» - это `language_aliases` проекта Weblate
+(`weblate/trans/models/project.py`), а не свойство кита.
+
+Заголовок, похожий на код языка, но не опознанный (`chn`), по-прежнему
+становится комментарием разработчика, и заметка это прямо говорит: иначе целый
+язык бесшумно превращается в комментарий к каждой строке.
+
+```sh
+# профиль выводится сам
+uv run python -m loc_kit_ingest "/path/Temple.csv" --out /tmp/seed --zip
+# рукописный профиль для нестандартных китов
+uv run python -m loc_kit_ingest "/path/Temple.csv" \
+  --profile "/path/Temple.loc-ingest.json" --out /tmp/seed --zip
+```
+
+### Универсальная загрузка в UI
+
+Вкладка «Отправить файлы перевода» мастера создания компонента принимает ZIP
+(исторический путь: файлы с кодами локалей) **и киты CSV/TSV/XLSX напрямую**
+(`weblate/utils/views.py:create_component_from_kit`). Таблица конвертируется в
+монолингвальные PO на месте, discovery пропускается - create-форма приходит
+уже заполненной (`po-mono`, `*.po`, шаблон и язык-источник из кита), отчёт
+конверсии показывается сообщениями интерфейса. Ошибки (дубликаты ключей -
+с номерами обеих строк) блокируют загрузку до исправления таблицы. Расширение
+на новые форматы = суффикс в `KIT_TABLE_SUFFIXES` + поддержка в `reader.py`.
+
+**Explanation из той же загрузки.** Схема v3 (`schema_version: 3`, только
+`kind: "po"`) добавляет два необязательных scalar-поля component:
+`explanation` и `flags`, каждое с `column`/`header`/`name`. Узкий закрытый
+набор заголовков `explanation`, `explanations`, `пояснение`, `пояснения`
+распознаётся до fallback в `comments`; `comment`, `comments`, `note`,
+`context`, `description` и их текущие локализованные варианты остаются
+developer comment и уходят в `#.` только в PO языка-источника. Explanation
+никогда не попадает в файл: `StringUnit.explanation` доступен только вызывающему
+коду. Если хотя бы одна строка кита несёт непустой Explanation и оператор
+обладает `source.edit` на проекте, разобранные значения сохраняются в сессии
+браузера (`LOC_KIT_PENDING_EXPLANATIONS_KEY` в `weblate/trans/views/create.py`)
+между шагом конвертации и шагом подтверждения создания. После успешной
+загрузки переводов (`create_translations` или отложенный после lock timeout
+`perform_load`) `Component.apply_loc_kit_explanations` идемпотентно
+применяет значения через `weblate.trans.loc_kit.apply_kit_explanations` -
+source/target, состояние и флаги существующих ключей не меняются. Отложенный
+`perform_load` несёт тот же server-side map, поэтому Explanation не теряются
+из-за retry загрузки. Сам перенос между экраном конвертации и confirm
+ограничен той же HTTP-сессией: если она потеряна между двумя POST-ами
+визарда (истечение сессии, другая вкладка), Explanation молча не
+применяется, а компонент создаётся как обычно - тот же кит можно затем
+провести через `loc-kit-strings-update` (ниже), который ставит Explanation
+без ограничения по сессии.
+
+### Глоссарий через UI: явный «Use as glossary»
+
+Тот же кит CSV/TSV/XLSX становится TBX-глоссарием только когда оператор явно
+отметит галку **Use as glossary** при загрузке. Это единственный сигнал
+намерения: без неё обычный PO-кит остаётся локальным и никогда не уходит в LLM.
+Анализ детерминированного маппинга запускается сразу после выбора листа (или
+автоматически для одностраничных файлов, см. ниже); OpenRouter - только
+запасной путь.
+
+1. **Выбор листа.** Для многолистового XLSX показывается форма выбора одного
+   листа (имена и размеры как radio-варианты). Один выбранный лист создаёт один
+   глоссарий-компонент; листы не объединяются и не батчатся. CSV/TSV и
+   однолистовой XLSX пропускают этот экран: лист фиксируется автоматически и
+   сразу выполняется шаг 2 (сетевой вызов внутри этого POST недопустим, поэтому
+   здесь пробуется только детерминированный путь).
+2. **Детерминированный вывод (первым, локально, бесплатно).** Из заголовка
+   листа выводится профиль schema v2 `record-map`: языковые колонки
+   распознаются по кодам/подписям, самая левая - источник, целевые - колонки,
+   заполненные в каждой строке-**термина**. Не более одной заполненной
+   колонки может нести примечание к термину: заголовок сравнивается точно
+   (`header.strip().casefold()`) с закрытым списком `_NOTE_HEADERS` (`note`,
+   `description`, `comment`, `explanation`, `context` и их русские аналоги);
+   её текст входит в `grammar.notes` как `scope: "source"`, `row_offset: 0`
+   и становится Explanation термина, который автоматические сервисы
+   подсказок получают как контекст. Пустая распознанная колонка исключается
+   с предупреждением и не конкурирует с единственной заполненной; две
+   заполненные распознанные колонки - отказ. Любая другая заполненная
+   не-языковая колонка отклоняется (`InferenceError`) - парсер не угадывает
+   назначение колонки. Каждый непрерывный блок строк классифицируется отдельно:
+   чередование «короткая строка / длинный текст» даёт `record_stride: 2`
+   (термин и его описание, описания уходят в `grammar.notes` с
+   `row_offset: 1`), нечётный блок с таким чередованием объявляет первую
+   строку `section_row`, отсутствие длинных строк - `record_stride: 1`.
+   Длинные строки без чередования читаются как термины с предупреждением.
+   Все блоки листа обязаны получить одну раскладку: `notes` и
+   `term_row_offset` - поля грамматики, а не региона. Порог «длинного» текста
+   (80 символов и вчетверо больше медианы терминов) - это предложение
+   кандидата, а не семантика разбора: профиль всё равно проходит полный гейт,
+   а человек видит термины до создания компонента. Успех сразу даёт локально
+   валидированный превью (шаг 4); отказ переходит к шагу 3.
+   An exact, case-insensitive `flags` header declares glossary flags. Each
+   non-empty cell is a comma-separated set containing only `read-only`,
+   `forbidden`, and `exact`; unknown, parameterized, or orphaned values are
+   rejected before preview. `read-only` and `forbidden` are inherited from the
+   source term. `exact` applies only to each non-empty imported target: an
+   absent or blank target, and a language added later, do not receive it.
+3. **Кандидат-профиль (опционально, fallback).** Если детерминированный вывод
+   отказал и site-wide анализатор включён и настроен, из выбранного листа
+   строится детерминированный структурный сэмпл и отправляется одним POST в
+   фиксированный OpenRouter endpoint. Модель лишь *предлагает* профиль v2; её
+   ответ не исполняет код и не создаёт компонент. При выключенном/недоступном
+   анализаторе или слишком большом сэмпле предлагается ручная загрузка профиля
+   вместо fallback на PO-вывод.
+4. **Локальная валидация (обязательна).** Кандидат-профиль (детерминированный
+   или LLM) или загруженный вручную `.loc-ingest.json` проходит локальный
+   конвейер: `parse_profile` → точная проверка заголовков → `parse_component` →
+   рендер TBX → parse-back. Один TBX-компонент для выбранного листа; имя
+   компонента генерирует сервер, а не LLM и не исправленный профиль. Предпросмотр
+   (источник, целевые языки, число терминов, предупреждения, bounded-сэмпл
+   терминов и скачиваемый профиль) появляется только при нулевых ошибках.
+5. **Исправление профиля.** Предпросмотр отдаёт профиль JSON как скачиваемый
+   файл и принимает исправленный `.loc-ingest.json` взамен; исправление
+   повторно валидируется против того же черновика и листа, без нового вызова
+   LLM.
+5a. **Переключение раскладки.** Если детекция ошиблась, оператор
+   переключает раскладку на превью двумя кнопками («Каждая строка - термин» /
+   «Термин, описание на следующей строке»). Вывод перезапускается локально с
+   явной раскладкой и проходит тот же гейт; значение вне
+   `{flat, pairs}` - 404. Это заменяет ручную правку JSON в самом частом
+   случае ошибки.
+6. **Обязательный parse-back до создания.** Рендер TBX и parse-back выполняются
+   до создания компонента - это ворота публикации, а не пост-проверка. Только
+   после успеха оператор подтверждает создание, которое донастраивает
+   `file_format="tbx"`, `filemask="tbx/*.tbx"`, пустой template, профильный
+   язык-источник и `is_glossary=True`; эти поля неизменяемы в финальной форме.
+   Imported terms are marked as terminology, so they also appear in glossary
+   languages added later. They do not inherit `exact`.
+
+**Canonical producer template:**
+
+```csv
+en,ru,definition,flags
+HeroCraft,HeroCraft,company name,read-only
+Vessel,Судно,never use this wording; use Ship,forbidden
+```
+
+The leftmost language is the source. Other language headers must be Weblate
+language codes. `definition` is a source explanation; any exact header from
+`_NOTE_HEADERS` is accepted. `flags` is optional and carries `read-only`,
+`forbidden`, and `exact`, separated by commas. `exact` is limited to the
+non-empty targets on its row; the shared column cannot express an exact rule
+for just one language. Weblate shows normalized flags in the preview, writes
+them into TBX, and adds `terminology` automatically. `forbidden` takes
+precedence over `exact`; `read-only` takes precedence over `exact`. Glossary
+matching remains case-insensitive.
+
+7. **Временный черновик.** Загруженный файл хранится в session-bound,
+   owner-bound временном черновике не дольше одного часа; он удаляется при
+   создании, отмене или периодической очистке Celery. Чужой владелец, другая
+   сессия, истёкший или consumed-токен ведут себя как отсутствующий.
+
+**LLM data minimization.** Only a bounded structural sample leaves Weblate:
+sheet metadata, fill rates, headers and capped cell excerpts, never the whole
+file. Glossary flags are parsed and validated locally and are not sent to the
+profile analyzer as executable instructions. Source-only imports remain
+unsupported: one source and at least one target language are required.
+
+### Пополнение существующего глоссария: append-only
+
+Отдельный от создания поток: оператор добавляет новую партию терминов в уже
+существующий TBX-глоссарий, ничего в нём не перезаписывая.
+
+1. **Вход.** В меню «Files» компонента-глоссария (видно при `upload.perform`
+   на компонент и `object.is_glossary`) появляется пункт «Add new glossary
+   terms from a loc-kit table», ведущий на форму загрузки таблицы,
+   привязанной к этому конкретному компоненту (`target_component`), а не к
+   мастеру создания. Черновик для такой загрузки гейтится тем же
+   `upload.perform` на целевой глоссарий, а не project-level правом на
+   создание компонента: `translation.add` намеренно не требуется здесь -
+   без него оператор всё ещё может пополнить языки, которые уже существуют.
+2. **Тот же превью-конвейер.** Выбор листа, детерминированный вывод,
+   LLM-fallback, ручная коррекция профиля и parse-back-валидация не
+   отличаются от создания. По нажатию **Add new terms** сервер заново читает
+   лист черновика и заново вызывает `validate_glossary_profile` с
+   `component_name=component.slug` - preview JSON, показанный оператору,
+   никогда не становится входом применения напрямую.
+3. **Identity - `(context, source)`.** Так же, как при первичном импорте,
+   термин считается тем же самым, если совпадает пара «контекст, source».
+   Совпадение по identity - старый термин: его target, notes и флаги
+   игнорируются, что бы ни лежало в этой строке таблицы.
+4. **Существующие термины не меняются.** Target, explanation (source и
+   target) и extra flags уже существующего термина остаются как есть даже
+   если таблица несёт другое значение для того же identity.
+5. **Blank-ячейки и отсутствующие колонки - частичный success, не ошибка.**
+   Пустая ячейка target для нового термина не создаёт unit и учитывается в
+   `blank`; язык глоссария, у которого в таблице вовсе нет колонки, отмечен
+   `absent`. Ни то ни другое не блокирует остальные языки того же apply.
+6. **Отсутствующий target-язык создаётся автоматически**, если хотя бы одна
+   непустая ячейка нового термина требует его: чек прав идентичен
+   стандартной форме Weblate (`translation.add` на проект,
+   `translation.add_more` снимает `filter_for_add`, `glossary.add` -
+   отдельно). Без нужных прав или без права `unit.add` на существующий
+   translation язык считается `unavailable` с причиной для оператора; это
+   никогда не отменяет применение остальных языков того же apply.
+7. **Результат - per-language, без ложной полноты.** Ответ на apply
+   перечисляет `added`/`existing`/`blank`/`absent`/`unavailable` для каждого
+   языка отдельно; общее сообщение не утверждает, что таблица применена
+   полностью, если хотя бы один язык остался недоступен.
+8. **Notes нового термина сохраняются.** Source explanation и explanation
+   на каждом добавленном target реально попадают в БД тем же путём, что и
+   при первичном импорте (`Unit.update_explanation`); отсутствие notes не
+   блокирует добавление термина.
+   `read-only` and `forbidden` values are merged with the automatic
+   `terminology` flag on the source. `exact` is stored only on each new,
+   non-empty target unit. Existing terms keep their current flags.
+9. **Apply блокируется целиком, если:** source language таблицы не
+   совпадает с source language компонента, или один и тот же source
+   встречается под другим context, чем уже существующий в глоссарии
+   (`GlossaryAppendCollisionError`) - либо между таблицей и глоссарием, либо
+   между двумя новыми строками таблицы. В обоих случаях черновик и
+   загруженный файл сохраняются, ничего не пишется в БД, и оператор
+   возвращается на тот же preview с объяснением конфликта.
+10. **Terminology sync.** Каждый новый source term помечается флагом
+    `terminology`, как и при первичном импорте, поэтому фоновая
+    `sync_terminology` подхватывает его в языках, добавленных позже -
+    структурной пустой парой, не меняя уже переведённые target.
+
+### Полное обновление существующего строкового компонента: `loc-kit-strings-update`
+
+Отдельный от глоссария и от мастера создания поток: **весь** файл (без
+нарезки на delta-таблицы) применяется к уже существующему обычному
+(не-глоссарному) монолингвальному компоненту, повторно и безопасно, сколько
+угодно раз. Основной сценарий - игровой JSON-компонент: строгий JSON не несёт
+developer comments, поэтому DB-only `Unit.explanation` - его единственный
+носитель попометного контекста для редактора, LLM MT и judge.
+
+План: `docs/product/plans/2026-09-11-loc-kit-full-table-update.md`.
+
+1. **Вход.** Пункт меню компонента «Update from a loc-kit table» виден, когда
+   компонент не glossary, не заблокирован, монолингвальный
+   (`has_template()`), и у оператора есть `upload.perform` **или**
+   `source.edit` на исходный translation (шаблон `component.html`). Сам
+   `LocKitStringsUpdateStartView` перепроверяет точнее и пускает дальше, если
+   доступна хотя бы одна из двух мутаций: добавление строк (`upload.perform`
+   **и** `unit.add` на исходный translation) или простановка Explanation
+   (`source.edit` на него); ни одна не подразумевает другую.
+2. **Подготовка - фоновая задача, не HTTP-запрос, с durable-доставкой.**
+   Загрузка сохраняет `LocKitImportDraft` (`kind=STRING`, `target_component`,
+   owner- и session-bound) в состоянии `PREPARING`. Та же транзакция, что
+   фиксирует `prepare_task_id`, сохраняет dispatch-ledger intent
+   (`dispatch_task_id`/`dispatch_phase`); `on_commit` публикует
+   `prepare_loc_kit_string_update` немедленно тем же producer-протоколом, что
+   и остальные пользовательские задачи (`INTERACTIVE_TASK_PRIORITY`,
+   детерминированный `task_id`, task liveness), а периодический drain (раз в
+   минуту) переотправляет ровно тот же UUID, если процесс упал между
+   коммитом и публикацией. Повторная доставка одного и того же UUID безопасна:
+   ни одна задача не публикуется мимо этого dispatcher, а атомарность порции
+   (п. 4) и финализация (п. 7) делают дубликат не более чем избыточной
+   проверкой fencing token. Исчерпание ограниченного числа неудачных попыток
+   публикации (брокер недоступен) переводит черновик в тот же retryable
+   `FAILED`, что и любая другая ошибка подготовки - без traceback или деталей
+   брокера, видимых оператору. Таблица читается через ту же schema v3
+   `infer_profile`/`parse_component`, что и универсальная загрузка при
+   создании; лист должен резолвиться ровно в один `kind: "po"` компонент с
+   тем же source language, что и у целевого компонента, и без
+   ERROR-диагностик. Результат - checksum-верифицированный canonical packet
+   в private storage (`prepared_payload`); оригинальный upload удаляется
+   сразу после успешной подготовки, retry читает только packet.
+3. **Preview.** Показывает число строк, новых и уже существующих ключей,
+   отдельную таблицу **«Changed sources»** - ключи, чей source в таблице
+   расходится с уже сохранённым (`key`/`old_source`/`new_source` и явный
+   счётчик), и разбивку Explanation по исходам общего сервиса
+   (`set`/`unchanged`/`blank`/`missing_key`/`would_overwrite`/
+   `already_in_note`/**`source_changed`**). Строка с расходящимся source
+   никогда не переписывает уже сохранённый source (существующий ключ вообще
+   не трогается на этой оси - см. п. 5), и её Explanation не применяется
+   автоматически: контекст мог с тех пор начать относиться к другому
+   исходнику. Чекбокс «перезаписать существующие, непустые Explanation»
+   виден только при непустом `would_overwrite`.
+4. **Confirm запускает фоновую задачу порциями, каждая - одна атомарная
+   транзакция.** `apply_loc_kit_string_update_draft` обрабатывает
+   подготовленный packet порциями по `LOC_KIT_STRING_UPDATE_PORTION_SIZE`
+   (25) строк. Каждая порция - один вызов
+   `weblate.trans.loc_kit.apply_loc_kit_portion`: он берёт локи
+   `repository -> Component -> draft` именно в этом порядке внутри ОДНОЙ
+   транзакции, перепроверяет fencing token (`state == APPLYING`,
+   `apply_task_id`) и durable-курсор (`next_row`) до первой мутации юнита, и
+   коммитит вместе добавление строк, Explanation, метку владения
+   pending-изменений, курсор, счётчики и heartbeat. Обе оси остаются
+   независимыми успехами внутри одной порции:
+   - новые ключи - `append_translation_strings`: существующий ключ никогда не
+     трогает свои source/targets/flags; для нового ключа исходный юнит
+     создаётся через `Translation.add_unit(..., is_batch_update=True)`,
+     непустые targets записываются по языкам кита, затем на исходный юнит
+     накладываются провалидированные `weblate.checks.flags.Flags` - именно в
+     этом порядке, потому что `read-only` иначе заблокировал бы запись
+     targets; отсутствующий язык создаётся только при `translation.add`,
+     иначе помечается `unavailable_languages` без остановки остальных. Для
+     форматов, способных нести флаги в самом файле (`file_format_cls.
+     supports_flags`, например gettext PO), входной `extra_flags` новой
+     строки снимается в metadata её исходного pending-изменения и переносится
+     runtime pending writer в backing-файл до сериализации (`settypecomment`,
+     тот же механизм, что использует PO-экспортёр) - файл получает
+     `#, read-only` и подобные комментарии, а не только DB-поле
+     `Unit.extra_flags`. Флаги уже существующего ключа никогда не снимаются
+     и не трогаются;
+   - Explanation - общий `apply_kit_explanations`; без `source.edit` эта ось
+     становится `unavailable`, но разрешённые новые строки всё равно
+     добавляются, и наоборот. Строка с расходящимся source классифицируется
+     как `source_changed` и никогда не применяется, даже если её проверил и
+     показал preview: гейт живёт внутри `apply_kit_explanations`, под тем же
+     локом, что и запись, поэтому источник, изменившийся между preview и
+     confirm, ловится заново на самом применении, а не только в устаревшем
+     снимке preview.
+   Обе оси теперь выполняются в ОДНОЙ транзакции порции, а не в двух
+   независимых: operational exception на любой оси откатывает ВСЮ порцию
+   целиком - ни один новый ключ, ни одна помеченная pending-строка и ни
+   продвижение курсора не переживают операционную ошибку без своего парного
+   исхода. Retry (п. 6) повторяет всю порцию заново - для этой попытки это
+   первое успешное применение, поэтому такие строки корректно считаются
+   `added`, а не `existing`. Устаревший UUID, замененный Retry пока его
+   delivery была приостановлена перед локом, не может записать ничего:
+   fencing-проверка внутри лока видит несовпадающий `apply_task_id` или уже
+   продвинутый курсор и возвращает управление без единой видимой снаружи
+   мутации. Повторная доставка одного и того же UUID (at-least-once broker
+   delivery, см. п. 2) по той же причине коммитит не больше одной порции:
+   вторая доставка видит курсор, уже продвинутый первой, и не мутирует ничего.
+5. **Durable progress, resumable across delivery.** `LocKitImportDraft.progress`
+   и `next_row` сохраняются после каждой порции; редоставленная задача
+   (тот же `apply_task_id`, ack потерян, worker перезапущен) продолжает с
+   сохранённого курсора и складывает счётчики новой доставки к уже
+   накопленным - completed summary отражает каждую применённую порцию по
+   всем доставкам, а не только последнюю.
+6. **Retry - новый `apply_task_id`, тот же курсор, снова через dispatch
+   ledger.** Упавшая задача (`WeblateLockTimeoutError`,
+   `ValidationError`/`ValueError` или иная ошибка) переводит черновик в
+   `FAILED` с `retry_phase` (`prepare`/`apply`/`finalize`) и сохраняет
+   `next_row`/`progress` как есть. Кнопка Retry на preview резервирует новый
+   `task_id`: та же транзакция, что переводит черновик обратно в
+   `PREPARING`/`APPLYING`, сохраняет свежий dispatch-ledger intent (п. 2),
+   публикуемый `on_commit` или периодическим drain - курсор и накопленные
+   счётчики не трогаются. `action=cancel` до начала применения удаляет
+   черновик без изменений в компоненте; после первой успешно применённой
+   порции cancel недоступен - остановить может только сама фоновая задача.
+7. **Finalizing - один git commit на весь batch, под repository lock, с
+   recovery от краха между commit и удалением pending-строк.** После
+   последней порции финализатор (`_flush_loc_kit_pending_changes`) входит в
+   `Component.locked_for_update()` раньше лока строки черновика - тот же
+   порядок `repository -> Component -> draft`, что и порция (п. 4) - так что
+   финализация сериализуется против любого другого писателя компонента:
+   ручной правки, другого импорта или дублирующей доставки того же UUID.
+   Владение pending-изменениями каждый раз заново выводится из
+   `PendingUnitChange.metadata["loc_kit_draft_id"]`, а не берётся из
+   сохранённого `pending_change_ids` - это поле остаётся только
+   аудит/recovery данными. `commit_pending_subset` коммитит ровно эти
+   строки одним git commit, не весь `commit_pending()` компонента.
+   Крах между успешным git commit и удалением его pending-строк (узкое окно
+   между `commit_files()` и коммитом обёртывающей DB-транзакции) не создаёт
+   второй commit при retry: PO-header пишется с детерминированной меткой
+   времени - максимум `timestamp` среди коммитируемых pending-изменений, а
+   не `timezone.now()` на каждый вызов - поэтому повторный `update_units` с
+   теми же ещё не удалёнными pending-строками воспроизводит byte-identical
+   содержимое независимо от того, сколько реального времени прошло.
+   `commit_pending_subset` распознаёт отсутствие diff как already-applied
+   replay, удаляет проверенные строки и возвращает success без нового
+   commit/push.
+8. **Durable result, discoverable after leaving the page.** Закрытие вкладки
+   и возврат позже (та же сессия) не теряет результат: страница компонента
+   несёт баннер «View status» на активный или завершённый черновик без
+   повторного посещения preview URL; `COMPLETED`/`FAILED` хранятся час для
+   просмотра/повтора после завершения.
+9. **Character/note переживает pending flush и restart.** Комментарии
+   парсера (`Character` и подобные) становятся source `note`/`location`
+   через расширенный `PendingUnitChange.metadata`; поддержка объявляется
+   явно поддерживающими форматами (default - unsupported), не тихой потерей.
+10. **Никакого статического потолка размера.** Ограничения - только
+
+    `TRANSLATION_UPLOAD_MAX_SIZE` (50 МБ) на сам upload/packet и ZIP-подобная
+    защита XLSX-as-ZIP при чтении; порционная обработка и durable-курсор
+    существуют именно для того, чтобы не требовать разбиения кита на
+    маленькие таблицы. Проверено на изолированном одноразовом тестовом стенде
+    (не production): реальный кит
+    `localization.xlsx` (963 строки, source `ru`, 9 языковых колонок,
+    serialized packet ≈ 561 КБ) применился целиком за один confirm (~4 мин
+    на первую загрузку, повтор того же файла - 0 новых ключей за секунды);
+    синтетический кит с 600 строками × 9 колонок (5 400 новых language
+    cells) применился за ~2 мин; воркер держал ~300 МБ RSS во время активного
+    применения. Ручная блокировка компонента между порциями и последующий
+    Retry на реальном многопорционном ките подтверждают идемпотентный
+    resume без дублей и без потери строк.
+11. **Бюджет доставки, ограниченный lock-retry и предел 24 часа.** Один
+    delivery расходует не больше половины broker visibility timeout, после
+    чего резервирует новый `apply_task_id` и ставит продолжение с
+    interactive priority через тот же dispatch ledger, что confirm и Retry
+    (пп. 2, 6) - сообщение никогда не переживает свой visibility timeout в
+    невидимом `unacked`, а падение процесса между резервированием и
+    публикацией переотправляется периодическим drain. `WeblateLockTimeoutError`
+    повторяется ограниченно (Celery `countdown` 1…128 с, до 8 попыток),
+    освобождая воркер между попытками. Суммарный предел применения - 24 часа
+    от первого confirm (`apply_started_at`): он завершает уже записанные
+    порции их subset commit и отдаёт partial report; это терминальное
+    состояние без Retry - нужна повторная загрузка. После 30 минут без
+    heartbeat черновик в `APPLYING` предлагает fenced retry с новым UUID;
+    поздняя задача с прежним UUID уже не может записать ни курсор, ни
+    счётчики.
+12. **Один лимит размера на HTTP и на фоновый парсер.** Форма загрузки
+    (`LocKitStringsUpdateForm`) проверяет `TRANSLATION_UPLOAD_MAX_SIZE`
+    (`validate_translation_upload_size`) - тот же лимит, что применяет
+    `prepare_loc_kit_string_update` при чтении таблицы, а не отдельный,
+    обычно больший `COMPONENT_ZIP_UPLOAD_MAX_SIZE` для ZIP-компонентов.
+    Таблица, которая всё равно не прошла бы фоновый разбор по размеру,
+    отклоняется синхронно на HTTP-уровне - до создания `LocKitImportDraft`,
+    записи файла в private storage и резервирования задачи.
+
+### Рукописный профиль
+
+Профиль имеет `schema_version` 1 (PO и `term-description-pairs`) или 2
+(`record-map` глоссарий). Загрузчик отклоняет неизвестные поля,
+несовпадающую версию, неверные типы, дубликаты языков/компонентов, небезопасные
+имена компонентов, отсутствующий `source_lang`, несуществующие листы и колонки,
+а также несовпадение заданных заголовков. Все номера строк и колонок в профиле
+**1-based**, как в таблице.
+
+Минимальная форма профиля:
+
+```json
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "sheet": "Temple",
+      "component": "Temple",
+      "kind": "po",
+      "source_lang": "ru",
+      "header_row": 1,
+      "first_data_row": 3,
+      "languages": [
+        {"code": "ru", "xml_lang": "ru", "column": 3, "header": "ru"},
+        {"code": "en", "xml_lang": "en", "column": 4, "header": "en"}
+      ],
+      "key": {"column": 1, "header": "id"},
+      "comments": [{"column": 2, "name": "Character", "header": ""}],
+      "grammar": {
+        "type": "keyed",
+        "skip_rows": [2],
+        "allow_blank_rows": true
+      }
+    },
+    {
+      "sheet": "Terms",
+      "component": "Terms",
+      "kind": "tbx",
+      "source_lang": "ru",
+      "header_row": 1,
+      "languages": [
+        {"code": "ru", "xml_lang": "ru", "column": 1, "header": "ru"},
+        {"code": "en", "xml_lang": "en", "column": 2, "header": "en"},
+        {"code": "ja", "xml_lang": "ja", "column": 6, "header": "ja"}
+      ],
+      "grammar": {
+        "type": "term-description-pairs",
+        "skip_rows": [2, 18],
+        "regions": [
+          {"section_row": 3, "first_term_row": 4, "last_description_row": 17},
+          {"section_row": 19, "first_term_row": 20, "last_description_row": 29}
+        ]
+      },
+      "key_language": "en",
+      "initial_target_languages": ["en", "ja"]
+    }
+  ]
+}
+```
+
+Пример профиля v2 `record-map` для табличного глоссария с одной строкой на
+термин и per-record колонкой домена:
+
+```json
+{
+  "schema_version": 2,
+  "components": [
+    {
+      "sheet": "Glossary",
+      "component": "CoL4-Glossary",
+      "kind": "tbx",
+      "source_lang": "ru",
+      "header_row": 1,
+      "languages": [
+        {"code": "ru", "xml_lang": "ru", "column": 2, "header": "ru"},
+        {"code": "en", "xml_lang": "en", "column": 3, "header": "en"}
+      ],
+      "grammar": {
+        "type": "record-map",
+        "skip_rows": [],
+        "regions": [
+          {"first_record_row": 2, "last_record_row": 7, "record_stride": 1}
+        ],
+        "term_row_offset": 0,
+        "section_field": {"column": 1, "header": "domain", "row_offset": 0},
+        "notes": [
+          {"scope": "source", "column": 4, "header": "note_ru", "row_offset": 0},
+          {"scope": "target", "language": "en", "column": 5, "header": "note_en", "row_offset": 0}
+        ]
+      },
+      "initial_target_languages": ["en"]
+    }
+  ]
+}
+```
+
+`record_stride: 2` представляет чередующийся кит term/description; вместо
+`section_field` регион тогда задаёт `section_row`+`section_column` как
+ячейку-заголовок над блоком.
+
+Это пример структуры, не профиль реального содержимого. `header` проверяется
+как ровно та ячейка строки заголовка, а `name` комментария - явная подпись, а не
+выведенное из следующей строки предположение. `component` - безопасный
+идентификатор `[A-Za-z0-9][A-Za-z0-9_-]*`, не имя листа; это исключает path
+traversal, регистронезависимые коллизии и внезапные имена файлов.
+
+Пустая строка - допустимое значение `header` для любой колонки, включая
+`section_field` и `notes`: профиль тем самым требует, чтобы ячейка строки
+заголовка была пустой. Это обычная форма таблиц, где первая колонка содержит
+описание термина и не подписана.
+
+### Закрытая схема v1, v2 и v3
+
+Поддерживаются три версии схемы. `schema_version: 1` сохраняет свою точную
+интерпретацию: PO-киты и `term-description-pairs` TBX. `schema_version: 2`
+добавляет аддитивно и только один TBX-грамматику `record-map`; для
+документированных простых раскладок (одна строка на термин, term/description-
+пары, опциональная колонка примечания) она выводится локально из заголовка
+кита. `schema_version: 3` добавляет аддитивно и только к `kind: "po"`
+два необязательных scalar-поля component - `explanation` и `flags` - тем же
+`MetadataColumn`, что уже несут `comments`/`references`; ни один TBX-объект
+ни в v2, ни в v3 их не допускает. Для любой формы листа, не покрытой
+детерминированным выводом, профиль поставляет либо оператор вручную, либо
+OpenRouter-кандидат с последующей локальной валидацией. Документ читается
+ровно как заявленная версия и не переинтерпретируется как другая. Все
+объекты всех трёх версий закрыты: поле, не перечисленное ниже, является
+`profile.unknown_field`, а не запасным источником данных.
+
+| Объект | Разрешённые поля | Обязательные поля |
+|---|---|---|
+| Корень | `schema_version`, `components` | оба |
+| Общий component | `sheet`, `component`, `kind`, `source_lang`, `header_row`, `languages`, `grammar` | все |
+| PO component | common + `first_data_row`, `key`, `comments`, `references` | `first_data_row`, `key`; массивы необязательны, default `[]` |
+| TBX component | common + `key_language`, `initial_target_languages` | оба |
+| Языковая колонка | `code`, `xml_lang`, `column`, `header` | все |
+| Key/metadata column | `column`, `header`, `name` | key: `column`, `header`; metadata: все |
+| Keyed grammar | `type`, `skip_rows`, `allow_blank_rows` | `type`; пропущенные `skip_rows` = `[]`, `allow_blank_rows` = `false` |
+| Pair grammar | `type`, `skip_rows`, `regions` | `type`, `regions`; пропущенные `skip_rows` = `[]` |
+| Pair region | `section_row`, `first_term_row`, `last_description_row` | все |
+| TBX v2 component | common + `initial_target_languages` (без `key_language`) | `initial_target_languages` |
+| PO component (schema v3) | v1 PO fields + `explanation`, `flags` | как в v1; `explanation`, `flags` необязательны |
+| Record-map grammar (v2) | `type`, `skip_rows`, `regions`, `term_row_offset`, `section_field`, `notes`, `source_flags` | `type`, `regions`, `term_row_offset`; `section_field`, `notes` and `source_flags` are optional |
+| Record region | `first_record_row`, `last_record_row`, `record_stride`, `section_row`, `section_column` | `first_record_row`, `last_record_row`, `record_stride`; `section_row`+`section_column` идут вместе и опциональны |
+| Section field | `column`, `header`, `row_offset` | все |
+| Note field | `scope`, `column`, `header`, `row_offset`, `language` | `scope`, `column`, `header`, `row_offset`; `language` обязателен для `scope: "target"`, запрещён для `scope: "source"` |
+| Source flags field | `column`, `header`, `row_offset` | all |
+
+`comments` и `references` используют объект metadata-column; `explanation` и
+`flags` (только v3, только PO) - тот же объект. `key` использует
+key-column object, поэтому у него нет `name`. `first_data_row`, `key`,
+`comments`, `references`, `explanation` и `flags` запрещены для TBX;
+`key_language` и `initial_target_languages` запрещены для PO. Это запрещает
+полукейсовую или полупарную интерпретацию до открытия workbook.
+
+Для v2 `key_language` отсутствует (он не нужен: context строится Unicode-безопасно
+из `(section, term)`, а не из латинской key-колонки); v1 сохраняет `key_language`
+только для совместимости схемы. `record_stride` - положительное целое; каждый
+`row_offset` лежит в `[0, record_stride)`. Диапазон региона должен делиться на
+`record_stride` нацело; регионы, строки секций и skip-строки не пересекаются.
+Компонент объявляет либо `grammar.section_field`, либо region-ячейки секции, но
+никогда оба (`profile.section_conflict`). `section_row` и `section_column` идут
+вместе и проверяются по диапазону. Колонка `section_field` не должна совпадать с
+языковой или note-колонкой. target-note обязан назвать один из
+`initial_target_languages`; source-note не имеет поля `language`. Заголовки
+языков, `section_field` и заметок проверяются на точное равенство со строкой
+заголовка листа.
+
+### Детерминированная грамматика
+
+`kind: "po"` поддерживает только `grammar.type: "keyed"`: после
+`first_data_row` разрешены явные `skip_rows` и пустые строки (если
+`allow_blank_rows`); каждая иная строка обязана иметь ключ и source value.
+`comments` и `references` берутся только из колонок профиля.
+
+`kind: "tbx"` поддерживает только `grammar.type: "term-description-pairs"`.
+Каждый region задаёт строку секции и чётный непрерывный диапазон
+`term, description, term, description, ...`. Все непустые строки после
+заголовка должны быть либо явно skipped, либо принадлежать ровно одному region.
+Описание без термина, термин без описания, пересекающиеся/дырявые ranges и
+неожиданная строка являются error, а не эвристикой "длиннее 200 символов".
+
+### Record-map (v2): глоссарий как повторяющиеся группы строк
+
+`schema_version: 2` вводит единственную новую TBX-грамматику
+`grammar.type: "record-map"`. Это обобщённый движок для табличного глоссария с
+фиксированным повторяющимся макетом, а не специализированный парсер конкретного
+кита. Запись (record) - это повторяющаяся группа из `record_stride` строк.
+Термины языков читаются на смещении `term_row_offset`, а каждое note-поле - на
+своём `row_offset` и в своей `column`. Таким образом таблица с одной строкой на
+термин имеет `stride: 1`, а чередующийся кит term/description - `stride: 2`.
+
+Секция записи (домен) берётся ровно из одного из двух источников, никогда из
+обоих:
+
+- `grammar.section_field` - колонка, читаемая один раз для каждой записи. Это
+  предпочтительная форма: плоская таблица, где каждая строка несёт свой домен.
+  Пустая ячейка `section_field` означает "без секции" - это не ошибка, и секция
+  не наследуется от предыдущей записи.
+- `region.section_row` + `region.section_column` - ячейка-заголовок над блоком
+  записей. Поддерживает таблицы, группирующие термины под заголовками, а не
+  повторяющие домен в каждой строке. Ячейка-заголовок может дублировать
+  перевод названия секции в объявленных языковых колонках - это метаданные
+  секции, они никогда не становятся терминами; любая иная заполненная ячейка на
+  строке-заголовке не учтена полем и падает как `tbx.unmapped_cell`.
+
+Компонент без обоих источников имеет записи без секции. Для каждой записи: термины
+источника и всех целевых языков читаются из объявленных языковых колонок;
+заметки читаются в порядке объявления, source-заметки и target-заметки (по
+целевому языку) группируются отдельно и объединяются переносами строки с
+отбрасыванием пустых. Все объявленные ячейки term/section/note помечаются как
+потреблённые. Заполненная ячейка данных внутри записи, которую не читает ни одно
+объявленное поле, падает как `tbx.unmapped_cell` - данные никогда не
+отбрасываются молча. Сохраняется защита `grammar.uncovered_row` для любой
+непустой строки после заголовка, не покрытой регионом, строкой секции или явным
+skip.
+
+`grammar.ignored_columns` перечисляет технические колонки как пары
+`column`/`header`. Заголовок каждой такой колонки обязан совпасть с листом,
+иначе profile отклоняется. Заполненная ячейка допустима без
+`tbx.unmapped_cell` только в объявленной ignored-колонке; неизвестная
+заполненная колонка остаётся error. `grammar.allow_empty_targets: true`
+разрешает пустой term в целевом языке record-map. Сгенерированный профиль
+ставит этот флаг только если target-язык содержит хотя бы один term, но имеет
+пропуски; иначе `tbx.missing_target_term` остаётся error.
+
+**Context identity.** Стабильный collision-free context термина - это каноническая
+сериализация пары `(section, source_term)`:
+`json.dumps([section, source_term], ensure_ascii=False, separators=(",",":"))` -
+например `["Персонажи","Герой"]`. JSON-quoting делает её collision-free: секция
+или термин, содержащие разделитель, не могут подделать чужой ключ. Weblate хранит
+`Unit.context` в `TextField`, поэтому Unicode (кириллица, CJK) сохраняется
+целиком и глоссарию больше не нужна латинская key-колонка. Коллизия context -
+error. Поле v1 `key_language` больше не определяет context: v1-профили
+сохраняют его только для совместимости схемы, а их runtime-context теперь
+считается тем же Unicode-безопасным помощником; v2 не имеет `key_language`
+вовсе. Для PO значения ячеек не trim'ятся: пробелы по краям, tab, `\r\n`,
+переносы, XML/Unity-разметка и entities передаются дальше как данные. Для TBX
+также сохраняются внутренние пробелы, переносы, разметка и entities, а
+leading/trailing whitespace обрезается с диагностикой
+`tbx.trimmed_outer_whitespace` (warning) - одинаково у **term** и у
+**description/note**. Translate Toolkit всё равно trim'ит значение при записи
+`<term>`/`<descrip>`/`<note>`, поэтому импортёр обрезает его сам, сообщает об
+этом в превью и сохраняет parse-back точным. Отказ был бы строже данных:
+хвостовой пробел в имени термина не несёт смысла, а кит с ним стал бы
+неимпортируемым навсегда. Обрезанный термин участвует и в context записи,
+поэтому идентичность совпадает с тем, что реально попадёт в TBX. `strip()`
+допустим только для проверки пустой ячейки, контроля структуры, этого явного
+TBX validation и этой нормализации.
+
+`code` - код Weblate, использующийся в имени PO/TBX файла. `xml_lang` - явный
+BCP-47 тег в `xml:lang`: например, `pt_PT` → `pt-PT`, `zh_Hans` → `zh-Hans`,
+`zh_Hant` → `zh-Hant`. Нельзя неявно использовать код Weblate как XML-тег.
+`code` должен соответствовать `[A-Za-z][A-Za-z0-9_]*`; коды уникальны после
+`casefold()` внутри компонента, потому что входят в имена файлов на
+регистронезависимой файловой системе. `xml_lang` должен соответствовать
+`[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*` и также передаётся только как явное
+значение профиля.
+
+## Нормализованная модель и диагностика
+
+После чтения каждый компонент становится одним из двух типов:
+
+- `StringUnit`: key, значения по языкам, developer comments, references и
+  физическая строка источника;
+- `GlossaryTerm`: context, значения терминов по языкам, `source_explanation`
+  (объединённые source-заметки), `target_explanations` (заметки по каждому
+  целевому языку), section и физические строки термина и заметок (`term_row`,
+  `note_rows`).
+
+Вторая модель хранит объяснения как детерминированную конкатенацию объявленных
+заметок. `source_explanation` - объединение source-заметок в порядке объявления;
+`target_explanations` ставит в соответствие каждому целевому языку объединение
+его target-заметок. Пустые ячейки заметок опускаются, непустые соединяются
+переводом строки. Описание исходного языка, разметка и примечания целевого
+языка не превращаются в отдельный термин или безымянный PO comment; `note_rows`
+фиксирует физические строки заметок для диагностики.
+
+Единый `Diagnostic` имеет `severity`, стабильный `code`, компонент, лист,
+физическую строку и сообщение. `error` блокирует publish; `warning` остаётся в
+отчёте, но не меняет текст и не блокирует чистый seed.
+
+| Severity | Примеры |
+|---|---|
+| `error` | profile/schema/header/column/sheet mismatch, duplicate component/path/key/context, ключ без текста хоть на одном языке (`po.key_without_content`), missing source term в глоссарии, missing target term without `allow_empty_targets`, неизвестная строка, orphan term/description, unmapped cell (`tbx.unmapped_cell`), нечитабельный файл, ошибка записи/ZIP/contract validation |
+| `warning` | target equals source, подозрительный алфавит в языковой колонке, пустой target в PO, ключ без исходной строки (`po.missing_source`), заметка вместо перевода, явно пропущенная пустая строка |
+
+### Ключ без исходной строки
+
+Кит регулярно приносит ключ, переведённый только на неисходный язык: фича
+в разработке, текст пишут сразу на языке команды. Такой ключ импортируется:
+`po.missing_source` - warning, исходная строка остаётся пустой, переводы
+сохраняются. В Weblate это юнит с `source == ""`, который в переводе исходного
+языка виден как непереведённая строка - там его и дописывают.
+
+Ключ, у которого пусты и источник, и все целевые ячейки, - это `error`
+(`po.key_without_content`): пустая строка-ключ иначе завела бы пустой юнит в
+шаблон и во все языковые файлы, не породив ни одного другого диагностического
+сообщения (предупреждения о пустом target подавлены пустым источником).
+
+Строка-баннер секции - другое дело: во всех языковых колонках пусто, а ключа
+либо нет вовсе (текст стоит в колонке комментария: `,МЕНЮ,,`), либо он сам
+является маркером (`# Юниты`). Переводить в ней нечего, поэтому инференс
+заносит её в `grammar.skip_rows` и исключает из знаменателя fill-share, а
+заметка профиля перечисляет номера таких строк. Ключ, который назван, но
+нигде не заполнен, баннером не считается и остаётся `error`: это дырка в ките.
+
+Отчёт и форма загрузки печатают число таких ключей отдельной строкой, потому
+что в ките с тысячами warning его иначе не видно.
+
+Следствие для проверок: у юнита с пустым источником нечего сравнивать, поэтому
+`game-markup` срабатывает на всех переведённых языках такого ключа, а
+автоперевод по нему давал бы мусор. И то и другое исчезает, когда источник
+дописан.
+
+Отчёт содержит число юнитов, typed skipped rows и все diagnostics с адресом
+`component:sheet!row`. При error он идёт в stderr, CLI возвращает nonzero и
+`report.txt` не создаётся. При success `report.txt` публикуется внутри output и
+дублируется в stdout.
+
+## Артефакты и импорт в Weblate
+
+### Temple и UI: монолингвальный PO
+
+```text
+out/
+  Temple/
+    ru.po                 # source template
+    en.po
+    ...
+  UI/
+    en.po                 # source template
+    ru.po
+```
+
+Для PO: `msgid` = key/context, `msgstr` = значение соответствующего языка;
+source PO содержит исходные строки. `#.` хранит developer comments, `#:` -
+числовые Id. Это сохраняет `Character` для Temple и Id для UI. Игровая разметка
+остаётся внутри `msgstr`; `game-markup` сравнивает её после загрузки в Weblate.
+
+Weblate component для Temple/UI:
+
+| Поле | Значение |
+|---|---|
+| File mask | `*.po` внутри ZIP компонента |
+| Monolingual base language file | `<source_lang>.po` |
+| File format | `gettext PO file (monolingual)` |
+| Source language | `source_lang` из profile |
+
+### Terms: двуязычный TBX по целевому языку
+
+```text
+out/
+  Terms/
+    tbx/
+      en.tbx              # ru source + en target
+      ja.tbx              # ru source + ja target
+```
+
+У Terms **нет** `ru.tbx`: Weblate уже хранит source language и воспринимает
+файл с её именем как duplicate language. Для каждого
+`initial_target_languages` writer создаёт отдельный bilingual TBX с двумя
+`langSet`: source и target. Каждый выбранный target обязан иметь непустой term
+во всех Terms entries; иначе import блокируется до publish.
+
+TBX хранит source explanation в `<descrip>`, target explanation в
+`<note from="translator">`. Это ровно то, что читает `TBXUnit` и передаёт
+`weblate.glossary.models.build_glossary_prompt_entry` как
+`source_explanation` и `target_explanation`.
+
+Weblate glossary component для Terms:
+
+| Поле | Значение |
+|---|---|
+| File mask | `tbx/*.tbx` |
+| Monolingual base language file | Empty |
+| Template for new translations | Empty |
+| File format | `TermBase eXchange file` |
+| Source language | `source_lang` из profile |
+| Use as glossary | включить |
+
+Weblate сопоставляет target glossary language с именем TBX файла, даже если TBX
+содержит более двух языков. Поэтому multilanguage TBX не используется.
+
+## Атомарный CLI
+
+```text
+profile + kit
+  -> strict profile and input validation
+  -> deterministic per-kind parsing
+  -> diagnostics
+  -> errors? ----yes----> stderr + exit 2; no output mutation
+       |
+       no
+       v
+  -> sibling staging directory
+  -> PO/TBX render + parse-back validation + ZIP + report
+  -> errors? ----yes----> remove staging + exit 2; output unchanged
+       |
+       no
+       v
+  -> atomic rename staging -> requested output
+  -> stdout report + exit 0
+```
+
+`--out` must not exist. The parent directory must exist and staging is created
+under it, so `os.replace()` is an atomic same-filesystem publish. ZIP files and
+`report.txt` are created in staging and move in the same rename. A previous
+output tree is never merged, overwritten or deleted. A successful `--zip`
+creates one archive per component with the component's files at the ZIP root:
+`Temple.zip` contains `ru.po`, `en.po`, ...; `Terms.zip` contains `tbx/en.tbx`,
+`tbx/ja.tbx`, ... .
+
+CLI остаётся детерминированным и офлайн: `--profile` - единственный вход для
+v2 `record-map` глоссария, и его справка упоминает это. В CLI нет `--terms`,
+`--suggest-profile` и никакой сетевой зависимости или вызова OpenRouter;
+кандидат-профиль и весь UI-воркфлоун живут только в Weblate.
+
+## UI-сценарии
+
+- **C1 - строковый компонент из кита (основной путь):** проект → «Добавить
+  компонент» → вкладка «Отправить файлы перевода» → выбрать сам CSV/TSV/XLSX.
+  Create-форма приходит заполненной (`po-mono`, `*.po`, шаблон и язык-источник
+  из кита), отчёт конверсии - сообщениями интерфейса. Проверить число строк,
+  key/context, `Character` developer comment, UI Id location и разметку.
+  CLI-вариант того же: `Temple.zip` через ту же вкладку (ZIP идёт историческим
+  путём с Discover).
+- **C2 - ошибки до go-live:** дубликаты ключей блокируют загрузку со списком
+  строк («first seen at row N») - починить таблицу и загрузить заново;
+  предупреждения (wrong script, пустые target) видимы, но не блокируют.
+  Warnings are visible evidence, not silent data repair.
+- **C3 - Terms glossary:** upload `Terms.zip`, configure `tbx/*.tbx`, empty
+  base/template, source language and glossary checkbox. Check a term's source
+  and target explanations in glossary UI.
+- **C4 - glossary before LLM:** translate and review Terms first. An empty target
+  glossary term is intentionally omitted by LLM payload construction. Then run
+  Routed LLM for a regular component per target language.
+- **C5 - post-import:** add target languages, attach `openrouter` machinery,
+  enable `game-markup` through `WEBLATE_ADD_CHECK`, and configure PO formatting
+  before the first VCS commit when needed.
+- **C6 - глоссарий из таблицы (v2 `record-map`):** загрузить CSV/TSV/XLSX с
+  отмеченной **Use as glossary**, выбрать лист, проверить предложенный профиль
+  (источник и цели, термины, заметки, скачиваемый JSON), при желании
+  исправить `.loc-ingest.json` и перезагрузить. Локальная валидация
+  (render → parse-back) обязана пройти до создания компонента. После создания
+  проверить `file_format="tbx"`, `filemask="tbx/*.tbx"`, пустой template,
+  `is_glossary=True`, source/target explanations, source flags and
+  Unicode-context in the real TBX and the glossary panel of a component with
+  the same source language. Source-only import is unsupported.
+
+## Verification contract
+
+1. Fast standalone tests use anonymized fixtures and exercise strict profile,
+   header inference, reader, both parsers, diagnostics, renderers, atomic
+   failure matrix and ZIP contents. No Django database is loaded.
+2. Weblate contract tests run under the repository test settings and load the
+   generated PO/TBX through Weblate's actual formats/components, plus drive the
+   universal upload view end to end (CSV in, live component out: N languages,
+   context=key, developer comments). They assert key/context/source/target,
+   comments/references, TBX explanation fields and LLM glossary payload
+   structure.
+3. A live LLM smoke is opt-in (`LOC_INGEST_LIVE_LLM=1`) and reads the
+   `openrouter` machinery configuration from the live database; it spends
+   exactly one real request through `download_multiple_translations`.
+   Verified passing on 2026-08-06.
+4. The manual smoke uploads a real kit CSV through the UI at `localhost:3001`
+   and verifies C1-C2 on a live component (performed on `heart-abyss/temple`).

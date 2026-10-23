@@ -1,0 +1,449 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Czech <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/cs/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: cs\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+
+#: 75765772134387712
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Tak co, kobylko, cítíš to? Zlato! Je to někde poblíž… A láska… v té skále "
+"tamhle!"
+
+#: 75765971959418880
+msgid "DialogueIntroHorse1"
+msgstr "Frrr!"
+
+#: 75766215002558464
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"Cože, „jestli tam ještě jednou uslyším ženskou, shodíš mě“? Někdo tam byl "
+"určitě osamělý."
+
+#: 75766376147718144
+msgid "DialogueIntroHorse2"
+msgstr "Neeigh! Grr-ha!"
+
+#: 75766594431881216
+msgid "DialogueIntroCharacter3"
+msgstr "Dobře, dobře! Byla to jen ozvěna… mé velikosti!"
+
+#: 75766733204623360
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Skála! Božská! Jako Afroditino stehno! Něco se tam určitě třpytí, játra se "
+"mi právě zachvěla!"
+
+#: 75766977115983872
+msgid "DialogueMineFoundHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 75767084016209920
+msgid "DialogueMineFoundCharacter2"
+msgstr "No tak promiň, že mé tělo reaguje na krásu!"
+
+#: 75768133359767552
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Neeigh!"
+
+#: 75768214897037312
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Cože? Už západ slunce?"
+
+#: 75768748328620032
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 75769024796168192
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Komáři… Zase oni! Ano-ano, pamatuji si, že jsi ten zelený domeček, už jdu! "
+"Jen neuteč!"
+
+#: 75769959874301952
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Hej! Příliš mnoho Kořisti. Do vaku Koně se to všechno nevejde."
+
+#: 75770225956753408
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Vyberte si to nejlepší, co můžete odnést do Skladu."
+
+#: 76060126094823424
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr "Teď… Teď stvořím mistrovské dílo! Kus Šperků, který ji přiměje litovat!"
+
+#: 76060331171123200
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Brrr-r-r."
+
+#: 76061423992836096
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "PODÍVEJ, KŮŇ! Svítí to jako mé oči, než jsem potkal svou ex!"
+
+#: 76061521736896512
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Frrr!"
+
+#: 76061738473361408
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Tohle… tohle je božské světlo mé pomsty!"
+
+#: 76061830932598784
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 76061898951626752
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Jen žárlíš – nemáš prsty, abys nosil takovou nádheru. Zbývá jen najít "
+"Kupujícího s prsty!"
+
+#: 76062368449433600
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Tohle jsi vyrobil sám? Krásné, beru to."
+
+#: 76062530391511040
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"On… on rozuměl! Uvnitř Šperků – jsem já. Uvnitř mě – Zlato. Uvnitř Zlata – "
+"bůh."
+
+#: 76062825645346816
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Frrr! Hýýý!"
+
+#: 76062978284457984
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Máš pravdu, Koni. Nejsou připraveni na pravdu…"
+
+#: 76063254827503616
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Frrr!"
+
+#: 76063498000666624
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr "Peníze? Já? Víš, co se stane, když Ona zjistí, že jsem bohatý?"
+
+#: 76063745632374784
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Grrr-hrr!"
+
+#: 76063937093963776
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr "Dobře, investuji do sebe – ale jen proto, abys mě přestal otravovat!"
+
+#: 76064239725580288
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr ""
+"Stal jsem se rychlejším, silnějším a levnějším na výrobu! To by se jí líbilo."
+
+#: 76064347783434240
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Grrr-hrr!"
+
+#: 76064479283253248
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr "No, nebylo třeba trvat na svém! Máš své vlastní fetiše – kopyta a oves."
+
+#: 76065879857827840
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Vidíš, kobylko? Milují mě!"
+
+#: 76066013412855808
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 76066107042304000
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "Máš pravdu! To je jen začátek! Brzy budou všichni mými fanoušky…"
+
+#: 76344321220284416
+msgid "character"
+msgstr "Postava"
+
+#: 76344471367979008
+msgid "horse"
+msgstr "Kůň"
+
+#: 76344680219152384
+msgid "trader"
+msgstr "Obchodník"
+
+#: 76344756748423168
+msgid "buyer"
+msgstr "Kupující"
+
+#: 131220345145528320
+msgid "terrainDispenserFound"
+msgstr "Páni! Kořist!"
+
+#: 131220694531051520
+msgid "terrainDispenserCollecting"
+msgstr "Pojď! Rozbij to!"
+
+#: 131220939017031680
+msgid "exitDoorDescription"
+msgstr "Zelená – je to Kůň?"
+
+#: 131221107242176512
+msgid "exitDoorDescription2"
+msgstr "Zelená? Je jí… špatně?"
+
+#: 137323318787444736
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Klepnutím na předměty je vložíte do vaku Koně."
+
+#: 137351439217594368
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "To je vše, co se vešlo? Klisna potřebuje větší vak!"
+
+#: 137381643633823744
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr "Nebojte! Zbytek koupím. Dokonce přidám i něco navíc."
+
+#: 137616255752605696
+msgid "terrainWantMoreItems"
+msgstr "Chci více Zlata!"
+
+#: 137629488379072512
+msgid "terrainRoadIsClue"
+msgstr "Stezka vede k bohatství"
+
+#: 138087561421918208
+msgid "DialogueOrdersIntroBuyer1"
+msgstr "Ach, nová tvář! Mám pro tebe objednávku. Pomůžeš mi doplnit mou sbírku?"
+
+#: 138088926181330944
+msgid "DialogueOrdersIntroCharacter1"
+msgstr "Podívej, klisno, bez mé pomoci nevydrží ani den!"
+
+#: 138089230444531712
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Frrrr!"
+
+#: 138089454202261504
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Ano, ano, ani bez tvého."
+
+#: 138110517984366592
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Velmi jsi mi pomohl a já ti pomůžu – označil jsem místo, kde kameny zvoní "
+"hlasitěji než obvykle."
+
+#: 138111196928937984
+msgid "DialogueOrdersThanksCharacter1"
+msgstr "TAK MOC MĚ MILUJÍ, ŽE JSOU OCHOTNI SE VZDÁT SVÝCH MYŠLENEK!"
+
+#: 138111354584436736
+msgid "DialogueOrdersThanksCharacter2"
+msgstr "Ne, peníze si do kapsy strčit nemůžeš, ale vědomosti – ty rozhodně ano!"
+
+#: 138111433626095616
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Hý!"
+
+#: 139150891347611648
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Ten podivný chlapík označil toto místo na Mapě. Je to jiné než kdekoli, kde "
+"jsme byli – a už cítím POKLAD!"
+
+#: 139151218457186304
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Frrr!"
+
+#: 139151464675414016
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Klec na zádech? To je Kanárek Hledač pokladů! Teď se podíváme, kde je "
+"zakopaný pes."
+
+#: 139160840467386368
+msgid "DialogueUseBirdCharacter1"
+msgstr "Teď jdeme po stopě peří a poklad je můj!"
+
+#: 139178592703877120
+msgid "DialogueAfterChestCharacter1"
+msgstr "VIDĚL JSI TO, KONI!"
+
+#: 139178671472906240
+msgid "DialogueAfterChestCharacter2"
+msgstr "Budeš muset táhnout nejen mě, ale i tuhle truhlu."
+
+#: 139178702909214720
+msgid "DialogueAfterChestHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 139180374293221376
+msgid "chestCollecting"
+msgstr "POKLAD!"
+
+#: 139496544913330176
+msgid "DialogueClaimedChestHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139496773167353856
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Ano, truhla je tady, ale není tu klíč – ale zapomněla jsi na kouzelnou "
+"kovárnu, kobylko! Ta dokáže cokoli s čímkoli."
+
+#: 139512809946091520
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "TO JE JACKPOT! Musíme to rychle prodat!"
+
+#: 139537206085947392
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr ""
+"ANO! Byl jsem rozpoznán. DNES TATO BAŽINA, ZÍTRA CELÝ SVĚT! VPŘED, KONI!"
+
+#: 139537401876058112
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ha-ha – zdá se, že všichni místní nosí tvé lesklé věci. Koneckonců, jsem tu "
+"jediný, kdo tu žije, Ha-ha-ha."
+
+#: 139766416519991296
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Brrr-r-r!"
+
+#: 139766737396830208
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Cítím… kouř?"
+
+#: 139767066540642304
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 139767291636355072
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Chceš říct, že jsem uhlí shodil na střechu skladu?"
+
+#: 139767459110719488
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Grrr-hrr!"
+
+#: 139767686714626048
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "Ach… Možná bychom se neměli vracet."
+
+#: 139772805363535872
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Jiný terén. Rozmočená zem. Fuj, vzduch páchne smyslem!"
+
+#: 139772978911252480
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139773239633383424
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Dobře, rychle sebereme cennosti a utečeme."
+
+#: 140259502945734656
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Jaká zvučná skála! Jako by mi sama příroda tleskala!"
+
+#: 140260138097577984
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "Co to bylo?!"
+
+#: 140260175347191808
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Grrr-hrr!"
+
+#: 140260548501835776
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "Ach ne… Byla to… ona?"
+
+#: 140262190995476480
+msgid "DialogueWormAppearHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 140262312860979200
+msgid "DialogueWormAppearCharacter1"
+msgstr "Můj Bože. Zase jsem probudil smrt."
+
+#: 140263122399399936
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "ŘEKNĚTE JÍ, ŽE JSEM TOHO LITOVAl!!!"
+
+#: 140263995359891456
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Je tohle nebe? Tak proč to tak smrdí…"
+
+#: 140264148288409600
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Aha. Nejsem mrtvý. Ještě horší – živý!"
+
+#: 140264664699506688
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Bylo to těsné, ale teď jsem připraven na cokoli! Zkusím se se sekerou ohánět "
+"trochu tišeji…"
+
+#: 142736080803991552
+msgid "tip1"
+msgstr "Můžete posunout vázu. Posuňte ji dvakrát, abyste ji rozbili."
+
+#: 142736223703928832
+msgid "tip2"
+msgstr "Červ vás nebude následovat do vody nebo Bažiny."
+
+#: 142736293392289792
+msgid "tip3"
+msgstr "Rozdrťte brouky – padají z nich Mince."
+
+#: 142736344843816960
+msgid "tip4"
+msgstr "Některé keře skrývají ptáky, kteří snášejí zlatá Vejce."
+
+#: 142736408026812416
+msgid "tip5"
+msgstr "Hluk přitahuje nebezpečné nepřátele."
+
+#: 142736477400600576
+msgid "tip6"
+msgstr "Cesty vedou k zajímavým místům."
+
+#: 142736521784725504
+msgid "tip7"
+msgstr "Prodejce od vás koupí přebytečné předměty z vaší tašky."
+
+#: 142736594941775872
+msgid "tip8"
+msgstr "Dokončete objednávky, abyste odemkli nové lokace."
+
+#: 142736659890573312
+msgid "tip9"
+msgstr "Vylepšete Kovárnu, abyste odemkli nové recepty na Šperky."
+
+#: 142736729293721600
+msgid "tip10"
+msgstr "Odstraňte kletby u Oltáře nebo v Super slotu."
+
+#: 142736813704089600
+msgid "tip11"
+msgstr "Předměty označené „?“ může ocenit Obchodník."
+
+#: 142736907266428928
+msgid "tip12"
+msgstr "Vylepšete svůj Sklad, abyste mohli pojmout více Kořisti."
+
+#: 201164984023257088
+msgid "tip13"
+msgstr "Během pauzy si vždy můžete zkontrolovat objednávky a efekty."
+
+#: 201320091704627200
+msgid "tip14"
+msgstr "Elitní slot zaručuje nejlepšího Kupujícího."

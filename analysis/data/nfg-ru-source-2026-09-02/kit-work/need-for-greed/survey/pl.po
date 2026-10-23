@@ -1,0 +1,166 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Polish <http://l10n.herocraft.com/projects/need-for-greed/"
+"survey/pl/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: pl\n"
+"Plural-Forms: nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
+"|| n%100>=20) ? 1 : 2;\n"
+
+#: 294040899584
+msgid "survey1Intro"
+msgstr ""
+"Hej! Koń chce coś wyjaśnić.\n"
+"\n"
+"Tylko kilka szybkich pytań, żeby dowiedzieć się, z kim ma do czynienia.\n"
+"Nie zajmie to więcej niż minutę."
+
+#: 384566562816
+msgid "survey1Final"
+msgstr ""
+"Wygląda na to, że… zdałeś test!\n"
+"\n"
+"Pamiętała twoje odpowiedzi.\n"
+"I najwyraźniej postanowiła cię nie porzucać."
+
+#: 5159299321856
+msgid "survey1AcceptDescription"
+msgstr "Dostaniesz nagrodę."
+
+#: 5354862940160
+msgid "survey1DeclineDescription"
+msgstr ""
+"Przeżyje…\n"
+"prawdopodobnie."
+
+#: 5940509413376
+msgid "survey1Question1"
+msgstr ""
+"Ile masz lat?\n"
+"Nie kłam. Ona to wyczuje."
+
+#: 15613778202624
+msgid "survey1Question1Answer1"
+msgstr "Poniżej 15"
+
+#: 15721877999616
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+#: 15806955261952
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+#: 15875448246272
+msgid "survey1Question1Answer4"
+msgstr "30 - 40"
+
+#: 15939973419008
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+#: 16047045611520
+msgid "survey1Question2"
+msgstr ""
+"Kim jesteś?\n"
+"Nie potrzeba zbyt wielu szczegółów."
+
+#: 16356262285312
+msgid "survey1Question2Answer1"
+msgstr "M"
+
+#: 16421546627072
+msgid "survey1Question2Answer2"
+msgstr "K"
+
+#: 16480354963456
+msgid "survey1Question2Answer3"
+msgstr "Tajemnica"
+
+#: 16583924912128
+msgid "survey1Question3"
+msgstr "Po co tu jesteś?"
+
+#: 16952520347648
+msgid "survey1Question3Answer1"
+msgstr "Biegać i zbierać Łup"
+
+#: 17065502314496
+msgid "survey1Question3Answer2"
+msgstr "Wytwarzać i sprzedawać"
+
+#: 17147127664640
+msgid "survey1Question3Answer3"
+msgstr "Ulepszenia i progresja"
+
+#: 17285803937792
+msgid "survey1Question3Answer4"
+msgstr "Po prostu klimat…"
+
+#: 17383480889344
+msgid "survey1Question4"
+msgstr "Czego brakuje, żebyś nie odszedł?"
+
+#: 17980544258048
+msgid "survey1Question4Answer1"
+msgstr "Więcej historii"
+
+#: 18049771245568
+msgid "survey1Question4Answer2"
+msgstr "Nowe zagrożenia, skały i skarby"
+
+#: 18206881484800
+msgid "survey1Question4Answer3"
+msgstr "Nowe przedmioty"
+
+#: 18275869396992
+msgid "survey1Question4Answer4"
+msgstr "Nowe lokacje"
+
+#: 18730255126528
+msgid "survey1Question4Answer5"
+msgstr "Osiągnięcia i nagrody"
+
+#: 19109206298624
+msgid "survey1Question5"
+msgstr "Co należy naprawić w pierwszej kolejności?"
+
+#: 19176772341760
+msgid "survey1Question5Answer1"
+msgstr "Dialogi"
+
+#: 19256145350656
+msgid "survey1Question5Answer2"
+msgstr "Nagrody"
+
+#: 19311245922304
+msgid "survey1Question5Answer3"
+msgstr "Trudność Przepisu"
+
+#: 19403713548288
+msgid "survey1Question5Answer4"
+msgstr "Gęstość Mapy"
+
+#: 19475515838464
+msgid "survey1Question5Answer5"
+msgstr "Wszystko wspaniale"
+
+#: 27306583396352
+msgid "surveyDialogTitle"
+msgstr "Szybka ankieta"
+
+#: 28690401726464
+msgid "startSurvey"
+msgstr "Start"
+
+#: 30707396382720
+msgid "claimReward"
+msgstr "Odbierz nagrodę"

@@ -1,0 +1,457 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Polish <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/pl/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: pl\n"
+"Plural-Forms: nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
+"|| n%100>=20) ? 1 : 2;\n"
+
+#: 75765772134387712
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Więc, klaczy, czujesz to? Złoto! Jest gdzieś blisko… I miłość… w tej skale "
+"tam!"
+
+#: 75765971959418880
+msgid "DialogueIntroHorse1"
+msgstr "Frrr!"
+
+#: 75766215002558464
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"Co masz na myśli, mówiąc „jeśli znowu usłyszę tam kobietę, zrzucisz mnie”? "
+"Ktoś tam na pewno był samotny."
+
+#: 75766376147718144
+msgid "DialogueIntroHorse2"
+msgstr "Ihaaa! Grr-ha!"
+
+#: 75766594431881216
+msgid "DialogueIntroCharacter3"
+msgstr "No dobrze, dobrze! To było tylko echo… mojej wielkości!"
+
+#: 75766733204623360
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Skała! Boska! Jak udo Afrodyty! Coś tam na pewno błyszczy, aż mi wątroba "
+"zadrżała!"
+
+#: 75766977115983872
+msgid "DialogueMineFoundHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 75767084016209920
+msgid "DialogueMineFoundCharacter2"
+msgstr "Cóż, przepraszam, że moje ciało reaguje na piękno!"
+
+#: 75768133359767552
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Ihaaa!"
+
+#: 75768214897037312
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Co? Już zachód słońca?"
+
+#: 75768748328620032
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Hh-hh! Iiii-ha!"
+
+#: 75769024796168192
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Komary… Znowu one! Tak-tak, pamiętam, że jesteś zielonym domkiem, już idę! "
+"Tylko nie uciekaj!"
+
+#: 75769959874301952
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Hej! Za dużo Łupu. Torba Konia nie pomieści tego wszystkiego."
+
+#: 75770225956753408
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Wybierz najlepsze z tego, co możesz zanieść do Magazynu."
+
+#: 76060126094823424
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr ""
+"Teraz… Teraz stworzę arcydzieło! Biżuterię, która sprawi, że Ona pożałuje!"
+
+#: 76060331171123200
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Brrr-r-r."
+
+#: 76061423992836096
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "PATRZ, KOŃ! Błyszczy jak moje oczy, zanim poznałem moją byłą!"
+
+#: 76061521736896512
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Frrr!"
+
+#: 76061738473361408
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "To… to jest boskie światło mojej zemsty!"
+
+#: 76061830932598784
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 76061898951626752
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Jesteś po prostu zazdrosny — nie masz palców, żeby nosić taką wspaniałość. "
+"Pozostaje tylko znaleźć Kupującego z palcami!"
+
+#: 76062368449433600
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Sam to zrobiłeś? Piękne, biorę."
+
+#: 76062530391511040
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"On… on zrozumiał! Wewnątrz Biżuterii — jestem ja. We mnie — Złoto. W Złocie "
+"— bóg."
+
+#: 76062825645346816
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Frrr! Iihaaa!"
+
+#: 76062978284457984
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Masz rację, Koniu. Nie są gotowi na prawdę…"
+
+#: 76063254827503616
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Frrr!"
+
+#: 76063498000666624
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr ""
+"Pieniądze? Ja? Czy wiesz, co się stanie, jeśli Ona dowie się, że jestem "
+"bogaty?"
+
+#: 76063745632374784
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Grrr-hrr!"
+
+#: 76063937093963776
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr ""
+"Dobrze, zainwestuję w siebie — ale tylko po to, żebyś przestał mi marudzić!"
+
+#: 76064239725580288
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr ""
+"Stałem się szybszy, silniejszy i tańszy w produkcji! Jej by się to spodobało."
+
+#: 76064347783434240
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Grrr-hrr!"
+
+#: 76064479283253248
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr "Cóż, nie było potrzeby nalegać! Masz swoje fetysze — kopyta i owies."
+
+#: 76065879857827840
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Widzisz, klaczy? Oni mnie kochają!"
+
+#: 76066013412855808
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 76066107042304000
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "Masz rację! To dopiero początek! Wkrótce wszyscy będą moimi fanami…"
+
+#: 76344321220284416
+msgid "character"
+msgstr "Postać"
+
+#: 76344471367979008
+msgid "horse"
+msgstr "Koń"
+
+#: 76344680219152384
+msgid "trader"
+msgstr "Handlarz"
+
+#: 76344756748423168
+msgid "buyer"
+msgstr "Kupujący"
+
+#: 131220345145528320
+msgid "terrainDispenserFound"
+msgstr "Wow! Ofiara!"
+
+#: 131220694531051520
+msgid "terrainDispenserCollecting"
+msgstr "Dalej! Zniszcz to!"
+
+#: 131220939017031680
+msgid "exitDoorDescription"
+msgstr "Zielony — czy to Koń?"
+
+#: 131221107242176512
+msgid "exitDoorDescription2"
+msgstr "Zielona? Czy ona… źle się czuje?"
+
+#: 137323318787444736
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Dotknij przedmiotów, aby włożyć je do torby Konia."
+
+#: 137351439217594368
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Tylko tyle się zmieściło? Klacz potrzebuje większej torby!"
+
+#: 137381643633823744
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr "Nie martw się! Kupię resztę. Dorzucę nawet coś ekstra."
+
+#: 137616255752605696
+msgid "terrainWantMoreItems"
+msgstr "Chcę więcej Złota!"
+
+#: 137629488379072512
+msgid "terrainRoadIsClue"
+msgstr "Szlak prowadzi do bogactw"
+
+#: 138087561421918208
+msgid "DialogueOrdersIntroBuyer1"
+msgstr ""
+"Och, nowa twarz! Mam dla ciebie zamówienie. Pomożesz uzupełnić moją kolekcję?"
+
+#: 138088926181330944
+msgid "DialogueOrdersIntroCharacter1"
+msgstr ""
+"Spójrz, klaczy, oni nie mogą obejść się bez mojej pomocy ani jednego dnia!"
+
+#: 138089230444531712
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Frrrr!"
+
+#: 138089454202261504
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Tak, tak, bez twojego też."
+
+#: 138110517984366592
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Bardzo mi pomogłeś, a ja pomogę tobie — zaznaczyłem miejsce, gdzie skały "
+"dzwonią głośniej niż zwykle."
+
+#: 138111196928937984
+msgid "DialogueOrdersThanksCharacter1"
+msgstr "KOCHAJĄ MNIE TAK BARDZO, ŻE SĄ GOTOWI ODDAĆ SWOJE MYŚLI!"
+
+#: 138111354584436736
+msgid "DialogueOrdersThanksCharacter2"
+msgstr ""
+"Nie, nie możesz schować pieniędzy do kieszeni, ale wiedzę — absolutnie tak!"
+
+#: 138111433626095616
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Iha!"
+
+#: 139150891347611648
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Ten dziwny facet zaznaczył to miejsce na Mapie. To nie jest jak żadne "
+"miejsce, w którym byliśmy — a ja już czuję zapach SKARBU!"
+
+#: 139151218457186304
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Frrr!"
+
+#: 139151464675414016
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Klatka na moich plecach? To poszukiwacz skarbów Kanarek! Zobaczmy teraz, "
+"gdzie jest zakopany pies."
+
+#: 139160840467386368
+msgid "DialogueUseBirdCharacter1"
+msgstr "Teraz podążamy śladem piór, a skarb jest mój!"
+
+#: 139178592703877120
+msgid "DialogueAfterChestCharacter1"
+msgstr "WIDZIAŁEŚ TO, KOŃ!"
+
+#: 139178671472906240
+msgid "DialogueAfterChestCharacter2"
+msgstr "Będziesz musiał ciągnąć nie tylko mnie, ale i tę Skrzynię."
+
+#: 139178702909214720
+msgid "DialogueAfterChestHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 139180374293221376
+msgid "chestCollecting"
+msgstr "SKARB!"
+
+#: 139496544913330176
+msgid "DialogueClaimedChestHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139496773167353856
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Tak, Skrzynia jest tutaj, ale nie ma klucza — ale zapomniałaś o magicznej "
+"Kuźni, klaczy! Ona potrafi zrobić wszystko ze wszystkim."
+
+#: 139512809946091520
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "TO JEST JACKPOT! Musimy to szybko sprzedać!"
+
+#: 139537206085947392
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr ""
+"TAK! Zostałem rozpoznany. DZIŚ TO BAGNO, JUTRO CAŁY ŚWIAT! NAPRZÓD, KOŃ!"
+
+#: 139537401876058112
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ha-ha — wygląda na to, że wszyscy miejscowi noszą twoje błyskotki. W końcu "
+"tylko ja tu mieszkam, Ha-ha-ha."
+
+#: 139766416519991296
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Brrr-r-r!"
+
+#: 139766737396830208
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Pachnie… dymem?"
+
+#: 139767066540642304
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 139767291636355072
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Mówisz, że upuściłem węgle na dach magazynu?"
+
+#: 139767459110719488
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Grrr-hrr!"
+
+#: 139767686714626048
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "Och… Może nie powinniśmy wracać."
+
+#: 139772805363535872
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Inny teren. Podmokła ziemia. Ugh, powietrze śmierdzi znaczeniem!"
+
+#: 139772978911252480
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139773239633383424
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Dobrze, szybko bierzemy kosztowności i uciekamy."
+
+#: 140259502945734656
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Co za dzwoniąca skała! Jakby sama natura mi oklaskiwała!"
+
+#: 140260138097577984
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "Co to było?!"
+
+#: 140260175347191808
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Grrr-hrr!"
+
+#: 140260548501835776
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "O nie… Czy to była… ona?"
+
+#: 140262190995476480
+msgid "DialogueWormAppearHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 140262312860979200
+msgid "DialogueWormAppearCharacter1"
+msgstr "Mój Boże. Znowu obudziłem śmierć."
+
+#: 140263122399399936
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "POWIEDZCIE JEJ, ŻE TEGO ŻAŁOWAŁEM!!!"
+
+#: 140263995359891456
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Czy to niebo? Dlaczego tak źle pachnie…"
+
+#: 140264148288409600
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Rozumiem. Nie umarłem. Co gorsza — żyję!"
+
+#: 140264664699506688
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Było blisko, ale teraz jestem gotowy na wszystko! Spróbuję machać kilofem "
+"trochę ciszej…"
+
+#: 142736080803991552
+msgid "tip1"
+msgstr "Możesz pchnąć wazę. Pchnij ją dwa razy, aby ją rozbić."
+
+#: 142736223703928832
+msgid "tip2"
+msgstr "Robak nie podąży za tobą do wody ani na Bagno."
+
+#: 142736293392289792
+msgid "tip3"
+msgstr "Miażdż robaki — upuszczają Monety."
+
+#: 142736344843816960
+msgid "tip4"
+msgstr "Niektóre krzaki ukrywają ptaki, które znoszą złote Jajka."
+
+#: 142736408026812416
+msgid "tip5"
+msgstr "Hałas przyciąga niebezpiecznych wrogów."
+
+#: 142736477400600576
+msgid "tip6"
+msgstr "Ścieżki prowadzą do interesujących miejsc."
+
+#: 142736521784725504
+msgid "tip7"
+msgstr "Sprzedawca kupi dodatkowe przedmioty z twojej torby."
+
+#: 142736594941775872
+msgid "tip8"
+msgstr "Realizuj zamówienia, aby odblokować nowe lokalizacje."
+
+#: 142736659890573312
+msgid "tip9"
+msgstr "Ulepsz Kuźnię, aby odblokować nowe przepisy na Biżuterię."
+
+#: 142736729293721600
+msgid "tip10"
+msgstr "Usuwaj klątwy przy Ołtarzu lub w Super slocie."
+
+#: 142736813704089600
+msgid "tip11"
+msgstr "Przedmioty oznaczone „?” mogą zostać wycenione przez Handlarza."
+
+#: 142736907266428928
+msgid "tip12"
+msgstr "Ulepsz swój Magazyn, aby pomieścić więcej Łupu."
+
+#: 201164984023257088
+msgid "tip13"
+msgstr "Wstrzymując grę, zawsze możesz sprawdzić zamówienia i efekty."
+
+#: 201320091704627200
+msgid "tip14"
+msgstr "Miejsce elitarne gwarantuje najlepszego Kupującego."

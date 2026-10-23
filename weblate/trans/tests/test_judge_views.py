@@ -1,0 +1,4925 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import uuid
+from datetime import timedelta
+from decimal import Decimal
+from types import SimpleNamespace
+from unittest import mock
+
+from django.core.cache import cache
+from django.db import connection
+from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+from django.utils import timezone, translation
+from lxml import html
+
+from weblate.auth.data import SELECTION_ALL
+from weblate.auth.models import Group, Permission, Role
+from weblate.machinery.base import MachineTranslation
+from weblate.trans.actions import ActionEvents
+from weblate.trans.judge import JUDGE_SEATS, JudgeError
+from weblate.trans.judge_loop import (
+    _generation_lock_key,
+    build_request,
+    queue_judge_recheck,
+    recheck_query,
+)
+from weblate.trans.models import Category, Component, Project, Translation
+from weblate.trans.models.change import Change
+from weblate.trans.models.judge import (
+    JudgeRunUnit,
+    JudgeVerdict,
+    ProducerRun,
+    compute_context_hash,
+    compute_target_hash,
+    compute_target_storage_hash,
+    resolve_verdict,
+)
+from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.suggestion import Suggestion
+from weblate.trans.models.unit import Unit
+from weblate.trans.tasks import (
+    PRODUCER_RUN_DISPATCH_MAX_ATTEMPTS,
+    generate_judge_candidate,
+    publish_producer_run_dispatch,
+)
+from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.views.basic import _judge_hand_off_blocked
+from weblate.trans.views.judge import recent_producer_runs
+from weblate.utils.state import (
+    STATE_APPROVED,
+    STATE_FUZZY,
+    STATE_NEEDS_CHECKING,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
+from weblate.utils.stats import ProjectLanguage
+from weblate.workspaces.models import Workspace
+
+
+def judge_context_hash(unit) -> str:
+    request = build_request(unit)
+    return compute_context_hash(
+        source=request.source,
+        note=request.note,
+        explanation=request.explanation,
+        glossary_terms=request.glossary_terms,
+    )
+
+
+def stamp_candidate_evidence(suggestion, *, context_hash: str) -> None:
+    """
+    Back a hand-crafted candidate fixture with completed verification evidence.
+
+    ``accept_judge_candidate`` only applies a candidate once every seat has
+    verified it (Task 3, B2); a fixture built directly through
+    ``Suggestion.objects.add`` has no such evidence unless it is added here.
+    """
+    candidate_hash = compute_target_hash(suggestion.target_list)
+    # A fresh run id: the live verdict's own (unit, run_id, attempt,
+    # request_round, seat) key is already taken by ``verdict`` itself.
+    candidate_run_id = uuid.uuid4()
+    for seat in JUDGE_SEATS:
+        JudgeVerdict.objects.create(
+            unit=suggestion.unit,
+            subject=JudgeVerdict.Subject.CANDIDATE,
+            candidate_target_hash=candidate_hash,
+            target_hash=candidate_hash,
+            context_hash=context_hash,
+            run_id=candidate_run_id,
+            seat=seat,
+            judge_model=f"vendor-{seat}/model",
+            model_verdict=JudgeVerdict.Verdict.PASS,
+            max_severity=JudgeVerdict.Severity.NONE,
+        )
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeAutoTranslateViewTest(ViewTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.machinery_settings = {"weblate": {}}
+        self.component.project.save(
+            update_fields=["translation_review", "machinery_settings"]
+        )
+
+    def make_reject(self, unit):
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="critical",
+            model_verdict="reject",
+            judge_model="vendor/model-a",
+            seat=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=judge_context_hash(unit),
+        )
+        unit.run_checks()
+
+    def test_judge_mode_requires_review_permission_at_the_view(self) -> None:
+        # The view must refuse the mode even when a crafted POST asks
+        # for it while the form would hide it (permission gate).
+        self.user.is_superuser = False
+        self.user.save()
+        url = reverse("auto_translation", kwargs=self.kw_translation)
+        response = self.client.post(
+            url,
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+            },
+        )
+        # Refused at the permission gate: 403, no run started.
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(JudgeVerdict.objects.count(), 0)
+
+    def test_old_readiness_card_is_absent(self) -> None:
+        response = self.client.get(self.component.get_absolute_url())
+
+        self.assertNotContains(response, "Release readiness")
+        self.assertNotContains(response, "Delivery")
+        self.assertNotContains(response, "Primary action")
+        self.assertNotContains(response, "No blocking action")
+
+    @override_settings(
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_accepts_a_project_scope(self) -> None:
+        url = reverse(
+            "auto_translation_preview", kwargs={"path": self.project.get_url_path()}
+        )
+        response = self.client.get(
+            f"{url}?mode=judge&q=state%3Aempty&auto_source=mt&engines=weblate&threshold=80"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("matched", response.json())
+
+    def test_post_accepts_a_project_scope_and_queues_a_run(self) -> None:
+        response = self.client.post(
+            reverse("auto_translation", kwargs={"path": self.project.get_url_path()}),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": ["weblate"],
+                "threshold": 80,
+            },
+        )
+        self.assertRedirects(response, self.project.get_absolute_url())
+
+    @override_settings(
+        CELERY_TASK_ALWAYS_EAGER=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_project_scope_task_runs_in_eager_mode(self) -> None:
+        response = self.client.post(
+            reverse("auto_translation", kwargs={"path": self.project.get_url_path()}),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "others",
+                "engines": [],
+                "threshold": 80,
+            },
+        )
+        self.assertRedirects(response, self.project.get_absolute_url())
+        run = ProducerRun.objects.filter(
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(self.project.pk),
+        ).latest("created")
+        self.assertEqual(run.execution_version, 1)
+        self.assertEqual(run.scope_cursor, 0)
+
+    def test_translation_estimate_uses_the_judge_default_query(self) -> None:
+        translation = self.get_translation()
+        unit = translation.unit_set.first()
+        assert unit is not None
+        unit.translate(self.user, ["Needs editing"], STATE_FUZZY)
+        expected = (
+            translation.unit_set.exclude(state=STATE_READONLY)
+            .search("state:empty", parser="unit")
+            .count()
+        )
+
+        response = self.client.get(translation.get_absolute_url())
+
+        self.assertEqual(response.context["judge_row_count"], expected)
+
+    @override_settings(
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_reports_the_capped_execution_scope(self) -> None:
+        response = self.client.get(
+            reverse("auto_translation_preview", kwargs=self.kw_translation),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": ["weblate"],
+                "threshold": 80,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(response.json()),
+            {
+                "matched",
+                "processed",
+                "remaining",
+                "writable",
+                "judge_calls_initial",
+                "judge_calls_worst_case",
+                "judge_cost",
+                "pretranslation_cost",
+                "preparation",
+            },
+        )
+        # The judge preview prices the mandatory MT volume separately from
+        # the judge counts; with no routed engine configured the blockers
+        # say so before any dispatch or paid probe.
+        preparation = response.json()["preparation"]
+        self.assertGreater(preparation["missing"], 0)
+        self.assertEqual(
+            sum(preparation["per_language"].values()), preparation["missing"]
+        )
+        self.assertEqual(preparation["engine"], None)
+        # Every language with missing strings is named as a blocker; the
+        # count must not depend on the language the warning is written in.
+        self.assertEqual(len(preparation["blockers"]), len(preparation["per_language"]))
+
+    def test_preparation_blockers_survive_a_translated_warning(self) -> None:
+        # The estimate, the preview and the pre-flight refusal read the
+        # batch's structured blocker list. Matching the localized warning
+        # text instead used to lose every blocker in a non-English
+        # interface: the preview showed none and the run was dispatched only
+        # to fail inside the worker.
+        real_gettext = translation.gettext
+
+        def translated_gettext(message: str) -> str:
+            if "missing strings cannot be prepared" in message:
+                return (
+                    "Для языка %(language)s не настроен движок машинного "
+                    "перевода: отсутствующие строки нельзя подготовить."
+                )
+            return real_gettext(message)
+
+        with mock.patch(
+            "weblate.trans.autotranslate.gettext", side_effect=translated_gettext
+        ):
+            response = self.client.get(
+                reverse("auto_translation_preview", kwargs=self.kw_translation),
+                {
+                    "mode": "judge",
+                    "q": "state:empty",
+                    "auto_source": "mt",
+                    "engines": ["weblate"],
+                    "threshold": 80,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response.json()["preparation"]["blockers"],
+            "a translated warning must not hide the preparation blocker",
+        )
+
+    @override_settings(
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_uses_observed_judge_costs(self) -> None:
+        for model, cost in (("vendor-a/model", "0.01"), ("vendor-b/model", "0.02")):
+            for _ in range(5):
+                LLMUsageLog.objects.create(
+                    model=model,
+                    service="openrouter",
+                    project_id_snapshot=self.component.project_id,
+                    project_slug=self.component.project.slug,
+                    operation=LLMUsageLog.Operation.JUDGE,
+                    cost_usd=cost,
+                    unit_count=1,
+                )
+            for project_id_snapshot, service in (
+                (self.component.project_id + 1, "openrouter"),
+                (self.component.project_id, "litellm"),
+            ):
+                for _ in range(5):
+                    LLMUsageLog.objects.create(
+                        model=model,
+                        service=service,
+                        project_id_snapshot=project_id_snapshot,
+                        project_slug=self.component.project.slug,
+                        operation=LLMUsageLog.Operation.JUDGE,
+                        cost_usd=9,
+                        unit_count=1,
+                    )
+        response = self.client.get(
+            reverse("auto_translation_preview", kwargs=self.kw_translation),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": ["weblate"],
+                "threshold": 80,
+            },
+        )
+
+        cost = response.json()["judge_cost"]
+        self.assertTrue(cost["available"])
+        self.assertEqual(cost["min"], "0.12")
+        self.assertEqual(cost["max"], "0.24")
+
+    def test_form_shows_how_many_strings_a_run_would_touch(self) -> None:
+        response = self.client.get(self.translation_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "id_auto_row_count")
+
+    def test_form_estimates_requests_from_batches_not_strings(self) -> None:
+        with override_settings(JUDGE_BATCH_SIZE=2):
+            response = self.client.get(self.translation_url)
+        self.assertEqual(response.status_code, 200)
+        rows = response.context["judge_row_count"]
+        self.assertGreater(rows, 2)
+        batched = ((rows + 1) // 2) * 2 * 2
+        per_string = rows * 2 * 2
+        self.assertContains(response, f"plans up to {batched} LLM requests")
+        self.assertNotContains(response, f"plans up to {per_string} LLM requests")
+
+    def test_form_estimate_never_floors_a_partial_batch_to_zero(self) -> None:
+        with override_settings(JUDGE_BATCH_SIZE=1000):
+            response = self.client.get(self.translation_url)
+        self.assertContains(response, "plans up to 4 LLM requests")
+
+    def test_form_explains_judge_duration_contention(self) -> None:
+        response = self.client.get(self.translation_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "id_auto_duration_estimate")
+
+    def test_overwrite_warning_shown_when_judge_verdicts_exist(self) -> None:
+        self.make_reject(self.get_unit())
+        response = self.client.get(self.translation_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "judge-verdicts-exist")
+
+
+class JudgeCheckVisibilityTest(ViewTestCase):
+    def make_reject(self, unit):
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="critical",
+            model_verdict="reject",
+            judge_model="vendor/model-a",
+            seat=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=judge_context_hash(unit),
+        )
+        unit.run_checks()
+
+    def test_judge_check_is_absent_from_things_to_check(self) -> None:
+        # translate.html's card uses unit.deterministic_checks for both
+        # its visibility gate and its loop (task 4/10); test that surface
+        # directly rather than scraping HTML across unrelated page regions
+        # (e.g. the nearby-units status tooltip, out of this task's scope).
+        unit = self.get_unit()
+        unit.translate(self.user, ["Hello, world!\n"], STATE_TRANSLATED)  # "same"
+        self.make_reject(unit)
+        names = {check.name for check in unit.deterministic_checks}
+        self.assertIn("same", names)
+        self.assertNotIn("judge-reject", names)
+
+    def test_judge_check_still_reaches_navigation_and_filters(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit)
+        self.assertIn("judge-reject", unit.all_checks_names)
+
+    def test_card_is_hidden_when_only_a_judge_check_remains(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Things to check")
+
+    def test_a_judge_check_cannot_be_enforced(self) -> None:
+        # A7: judge-reject in enforced_checks must not push state 11.
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        self.make_reject(unit)
+        component = unit.translation.component
+        component.enforced_checks = ["judge-reject"]
+        component.save(update_fields=["enforced_checks"])
+        unit.translate(self.user, ["Ahoj upraveno"], STATE_TRANSLATED)
+        refreshed = self.get_unit()
+        self.assertNotEqual(
+            refreshed.state, 11, "enforced judge-reject must not set needs-rewriting"
+        )
+
+    def test_deterministic_check_still_renders(self) -> None:
+        unit = self.get_unit()
+        # Translating to the same text triggers the deterministic "same"
+        # check via run_checks; it must still render in the card.
+        unit.translate(self.user, ["Hello, world!\n"], STATE_TRANSLATED)
+        unit.run_checks()
+        unit.clear_checks_cache()
+        self.assertIn("same", unit.all_checks_names)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Unchanged translation")
+
+
+class JudgeVerdictCardTest(ViewTestCase):
+    def make(self, unit, max_severity, *, unparsed=False, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", "c")
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        JudgeVerdict.objects.create(
+            unit=unit, max_severity=max_severity, unparsed=unparsed, **kwargs
+        )
+        unit.run_checks()
+
+    def make_reject(self, unit, **kw):
+        self.make(unit, "critical", **kw)
+
+    def make_flag(self, unit, **kw):
+        self.make(unit, "major", **kw)
+
+    def make_unparsed(self, unit, **kw):
+        self.make(unit, "none", unparsed=True, **kw)
+
+    def make_round(self, unit, *, seat1, seat2):
+        run_id = uuid.uuid4()
+        errors1 = (
+            []
+            if seat1 == "none"
+            else [
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": seat1,
+                    "description": "seat one's objection",
+                }
+            ]
+        )
+        errors2 = (
+            []
+            if seat2 == "none"
+            else [
+                {
+                    "span": "y",
+                    "category": "fluency",
+                    "severity": seat2,
+                    "description": "seat two's objection",
+                }
+            ]
+        )
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=seat1,
+            seat=1,
+            run_id=run_id,
+            errors=errors1,
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=judge_context_hash(unit),
+        )
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=seat2,
+            seat=2,
+            run_id=run_id,
+            errors=errors2,
+            judge_model="vendor/model-b",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=judge_context_hash(unit),
+        )
+        unit.run_checks()
+
+    def test_card_shows_the_verdict_and_the_model(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "vendor/model-a")
+
+    def test_card_never_shows_a_score(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "id_judge_card")
+        self.assertNotContains(response, "confidence")
+
+    def test_card_shows_seat_disagreement(self) -> None:
+        unit = self.get_unit()
+        self.make_round(unit, seat1="critical", seat2="none")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "id_judge_card")
+        self.assertContains(response, "seat one&#x27;s objection")
+
+    def test_stale_verdict_is_marked_not_hidden(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit, target_hash="stale-hash-matches-nothing")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "previous version")
+
+    def test_unparsed_is_not_shown_as_a_verdict(self) -> None:
+        unit = self.get_unit()
+        self.make_unparsed(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "rejected")
+
+    def test_current_unparsed_round_is_marked_even_with_historical_verdict(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        context_hash = judge_context_hash(unit)
+        self.make_reject(unit, context_hash=context_hash)
+        self.make_unparsed(unit, context_hash=context_hash)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "latest judge answer was not parsed")
+        self.assertContains(response, "historical evidence")
+        self.assertContains(response, "Rejected")
+        self.assertContains(response, "Will not ship")
+
+    def test_no_verdict_means_no_card(self) -> None:
+        response = self.client.get(self.get_unit().get_absolute_url())
+        self.assertNotContains(response, "id_judge_card")
+
+    def test_context_changed_is_marked(self) -> None:
+        # Q3: glossary/note changed since judging -> flag it.
+        unit = self.get_unit()
+        self.make_reject(unit, context_hash="stale-context-hash")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "context changed")
+
+    def test_major_card_shows_a_ships_badge(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Ships with evidence")
+
+    def test_critical_card_shows_a_will_not_ship_badge(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Will not ship")
+        self.assertNotContains(response, "Ships with evidence")
+
+    def test_current_context_round_beats_newer_context_stale_evidence(self) -> None:
+        unit = self.get_unit()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        current_context = judge_context_hash(unit)
+        first = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            seat=1,
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "major",
+                    "description": "current context",
+                }
+            ],
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=current_context,
+        )
+        newer = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="critical",
+            seat=1,
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "changed context",
+                }
+            ],
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="changed-context",
+        )
+        JudgeVerdict.objects.filter(pk=newer.pk).update(
+            timestamp=first.timestamp + timedelta(seconds=1)
+        )
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertContains(response, "current context")
+        self.assertNotContains(response, "changed context")
+        self.assertContains(response, "id_judge_resolution_form")
+
+    def test_pass_card_renders_minor_errors(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "minor",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "fluency",
+                    "severity": "minor",
+                    "description": "a minor style note",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "a minor style note")
+
+    def test_pass_card_omits_error_list_for_none(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "none",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "fluency",
+                    "severity": "none",
+                    "description": "should never render",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "id_judge_card")
+        self.assertNotContains(response, "should never render")
+
+
+class JudgeRepairEvidenceTest(ViewTestCase):
+    def make_round(self, unit, *, run_id, attempt, severity, when, tag):
+        """Judge the CURRENT stored text with both seats."""
+        target_hash = compute_target_hash(unit.get_target_plurals())
+        errors = (
+            []
+            if severity == "none"
+            else [
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": severity,
+                    "description": f"{tag} objection",
+                }
+            ]
+        )
+        rows = [
+            JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity=severity,
+                seat=seat,
+                run_id=run_id,
+                attempt=attempt,
+                errors=errors,
+                judge_model=f"vendor/model-{seat}",
+                target_hash=target_hash,
+                context_hash="c",
+            )
+            for seat in (1, 2)
+        ]
+        JudgeVerdict.objects.filter(pk__in=[row.pk for row in rows]).update(
+            timestamp=when
+        )
+        unit.run_checks()
+        return rows
+
+    def make_change(self, unit, *, old, target, when):
+        change = Change.objects.create(
+            unit=unit,
+            action=ActionEvents.CHANGE,
+            user=self.user,
+            author=self.user,
+            old=old,
+            target=target,
+        )
+        Change.objects.filter(pk=change.pk).update(timestamp=when)
+        return change
+
+    def test_exact_match_renders_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["Fixed sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertContains(response, "original objection")
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Broken")
+        # Regression: value/diff must not be swapped, or the comparison
+        # shows the fixed wording as removed and the broken wording as
+        # added - exactly backwards from what a producer needs to trust.
+        # A plain substring assertion on "Broken" alone would pass either
+        # way (the unit's own change-history section elsewhere on the same
+        # page independently renders the identical Broken->Fixed diff the
+        # correct way round, which would make an unscoped assertion pass
+        # even if THIS block's tags were swapped) - so this locates the
+        # "Text before the repair:" block specifically and only inspects
+        # the few hundred bytes right after it.
+        label = b"Text before the repair:"
+        idx = response.content.index(label)
+        evidence_html = response.content[idx : idx + len(label) + 300]
+        self.assertIn(b"<del>Broken", evidence_html)
+        self.assertIn(b"<ins>Fixed", evidence_html)
+
+    def test_second_repair_shows_the_text_before_that_repair(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["First repair"], STATE_FUZZY)
+        unit = self.get_unit()
+        first_change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=first_change.pk).update(
+            timestamp=now + timedelta(seconds=1)
+        )
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="major",
+            when=now + timedelta(seconds=2),
+            tag="first repair",
+        )
+        unit.translate(self.user, ["Final repair"], STATE_FUZZY)
+        unit = self.get_unit()
+        second_change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=second_change.pk).update(
+            timestamp=now + timedelta(seconds=3)
+        )
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=2,
+            severity="none",
+            when=now + timedelta(seconds=4),
+            tag="final repair",
+        )
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertContains(response, "Text before the repair:")
+        label = b"Text before the repair:"
+        idx = response.content.index(label)
+        evidence_html = response.content[idx : idx + len(label) + 300]
+        self.assertIn(b"<ins>nal</ins> repair", evidence_html)
+        self.assertNotIn(b"Broken", evidence_html)
+
+    def test_missing_change_omits_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # The repair happened without going through translate(), so no
+        # Change row exists in the window at all.
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertContains(response, "original objection")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_purged_change_omits_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # A Change matched "Fixed sentence" inside the window once, but a
+        # later edit (outside this narrative's window) moved the current
+        # text on to "Fixed sentence v2" - the earlier Change no longer
+        # describes the text that is actually current.
+        self.make_change(
+            unit,
+            old="Broken sentence",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1),
+        )
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence v2")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_ambiguous_changes_omit_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # Two Change rows both land in the window with the repaired
+        # target: neither may be trusted as THE previous text.
+        self.make_change(
+            unit,
+            old="Broken sentence",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1),
+        )
+        self.make_change(
+            unit,
+            old="Broken sentence take two",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1, milliseconds=500),
+        )
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_plural_unit_shows_every_form(self) -> None:
+        unit = self.get_unit("Orangutan")
+        unit.translate(
+            self.user,
+            ["Puvodni jedna", "Puvodni dva", "Puvodni pet"],
+            STATE_TRANSLATED,
+        )
+        unit = self.get_unit("Orangutan")
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(
+            self.user,
+            ["Opraveno jedna", "Opraveno dva", "Opraveno pet"],
+            STATE_FUZZY,
+        )
+        unit = self.get_unit("Orangutan")
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Puvodni jedna")
+        self.assertContains(response, "Puvodni dva")
+        self.assertContains(response, "Puvodni pet")
+
+    def test_unresolved_repair_still_shows_evidence(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=0,
+            severity="critical",
+            when=now,
+            tag="original",
+        )
+        unit.translate(self.user, ["Still broken sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="critical",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Will not ship")
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Broken sentence")
+
+    def test_first_pass_renders_nothing(self) -> None:
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=uuid.uuid4(),
+            attempt=0,
+            severity="major",
+            when=timezone.now(),
+            tag="original",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_stale_active_round_renders_nothing(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["Fixed sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        # A further manual edit invalidates every recorded round.
+        Unit.objects.filter(pk=unit.pk).update(target="Edited again by a human")
+        unit = self.get_unit()
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "previous version")
+        self.assertNotContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+
+class JudgeBackTranslationTest(ViewTestCase):
+    def make_flag(self, unit, *, back_translation, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", "c")
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            model_verdict="flag",
+            back_translation=back_translation,
+            **kwargs,
+        )
+        unit.run_checks()
+
+    def test_back_translation_renders_next_to_the_string(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit, back_translation="The door is blocked by the DOORS")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "The door is blocked by the DOORS")
+
+    def test_back_translation_is_labelled_as_a_reconstruction(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit, back_translation="Whatever")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Approximate reconstruction")
+
+    def test_stale_verdict_does_not_render_its_back_translation(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(
+            unit,
+            back_translation="Outdated",
+            target_hash="stale-hash-matches-nothing",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Outdated")
+
+    def test_back_translation_shows_without_secondary_languages(self) -> None:
+        # Q6: the block must live outside {% if secondary %}.
+        unit = self.get_unit()  # this test project has no secondary languages
+        self.make_flag(unit, back_translation="Visible anyway")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Visible anyway")
+
+    def test_empty_back_translation_renders_nothing(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit, back_translation="")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Approximate reconstruction")
+
+
+class JudgeResolutionViewTest(ViewTestCase):
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def resolve_url(self, verdict) -> str:
+        return reverse("resolve-judge-verdict", kwargs={"pk": verdict.pk})
+
+    def test_escalating_a_critical_keeps_it_held(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "needs a second look"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_FUZZY)
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution, "escalated")
+
+    def test_accepting_a_held_verdict_ships_it(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "accepted_as_is", "reason": "acceptable in context"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Ships with override")
+        self.assertNotContains(response, "Will not ship")
+
+    def test_escalating_a_major_holds_it_for_review(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "wants a second opinion"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_NEEDS_CHECKING)
+
+    def test_resolve_requires_review_permission(self) -> None:
+        # PermissionDenied is converted to a real 403 by Django's own
+        # exception handling before it would ever reach the test client
+        # as a raised exception (same pattern as ignore_check_source's
+        # own permission test in test_edit.py).
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "needs a look"},
+        )
+        self.assertEqual(response.status_code, 403)
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution, "")
+
+    def test_invalid_transition_shows_an_error_without_a_crash(self) -> None:
+        # A fresh FLAG can be accepted as-is directly since Task 7; a
+        # *terminal* accepted_as_is re-requesting escalated is still the
+        # invalid transition this view must reject cleanly.
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+            reason="already ships",
+        )
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "second thoughts"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "does not apply")
+
+    def test_card_offers_the_resolution_form_when_reviewer(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "id_judge_resolution_form")
+        self.assertContains(response, self.resolve_url(verdict))
+
+    def test_card_hides_the_resolution_form_without_permission(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "id_judge_resolution_form")
+
+    def test_card_shows_the_recorded_decision(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "flagged for a human"},
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Sent back to queue")
+        self.assertContains(response, "flagged for a human")
+
+    # -- Task 8: auto-advance only after success ---------------------------
+
+    def _next_urls(self, unit):
+        page = self.client.get(unit.get_absolute_url())
+        return page.context["this_unit_url"], page.context["next_unit_url"]
+
+    def test_successful_resolution_advances_to_the_next_unit(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "accepted_as_is",
+                "reason": "acceptable in context",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        self.assertRedirects(response, next_unit_url, fetch_redirect_response=False)
+
+    def test_keep_as_is_one_click(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "accepted_as_is",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        self.assertRedirects(response, next_unit_url, fetch_redirect_response=False)
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+
+    def test_keep_as_is_with_reason(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "accepted_as_is", "reason": "acceptable in context"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution_reason, "acceptable in context")
+
+    def test_stale_verdict_stays_on_the_current_unit(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "accepted_as_is",
+                "reason": "acceptable in context",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        # Second, stale request for the already-resolved verdict.
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "escalated",
+                "reason": "changed my mind",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    def test_invalid_form_stays_on_the_current_unit(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "not-a-real-choice",
+                "reason": "acceptable in context",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    def test_success_next_is_sanitized_like_next(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, _next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "accepted_as_is",
+                "reason": "acceptable in context",
+                "next": this_unit_url,
+                "success_next": "http://evil.example.com/",
+            },
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeQueueStripViewTest(ViewTestCase):
+    """The producer queue strip on component/project pages (Task 4)."""
+
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        kwargs.setdefault("run_id", uuid.uuid4())
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        self.refresh_stats(unit.translation)
+        return verdict
+
+    def resolve_url(self, verdict) -> str:
+        return reverse("resolve-judge-verdict", kwargs={"pk": verdict.pk})
+
+    def refresh_stats(self, translation) -> None:
+        with self.captureOnCommitCallbacks(execute=True):
+            translation.invalidate_cache()
+
+    # -- Visibility gates --------------------------------------------------
+
+    @override_settings(JUDGE_ENABLED=False)
+    def test_strip_hidden_when_configuration_incomplete(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_hidden_without_permission(self) -> None:
+        # Default test user has no translation.auto/unit.review grant.
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_hidden_for_glossary(self) -> None:
+        self.enable_review()
+        self.component.create_glossary()
+        glossary = self.project.component_set.get(is_glossary=True)
+        response = self.client.get(glossary.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_visible_when_ready(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+
+    # -- Counts --------------------------------------------------------
+
+    def test_unresolved_critical_counts_as_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+        self.assertContains(response, "needs a human")
+
+    def test_accepted_as_is_removes_critical_from_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "accepted_as_is", "reason": "acceptable in context"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+    def test_same_state_resolution_invalidates_judge_stats(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        translation = unit.translation
+        self.refresh_stats(translation)
+        self.assertEqual(translation.stats.judge_resolved, 0)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "accepted_as_is", "reason": "ships as-is"},
+            )
+
+        translation.stats.force_load()
+        self.assertEqual(translation.stats.judge_resolved, 1)
+
+    def test_escalated_major_counts_as_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "escalated", "reason": "wants a second opinion"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+    def test_rejudging_drops_a_stale_resolution_from_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "escalated", "reason": "wants a second opinion"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+        # A fresh round supersedes the escalated round; the new verdict is
+        # unresolved and not critical, so it no longer needs a human.
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "none",
+            run_id=uuid.uuid4(),
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+    def test_unparsed_attempt_counts_separately(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "none", unparsed=True)
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["unparsed"], 1)
+
+    def test_source_unit_is_excluded_from_counts(self) -> None:
+        self.enable_review()
+        source_translation = self.component.source_translation
+        source_unit = source_translation.unit_set.get(
+            source__startswith="Hello, world!"
+        )
+        self.make_verdict(source_unit, "critical", context_hash="source-context")
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["needs_human"], 0)
+
+    def test_every_number_matches_its_direct_query_count(self) -> None:
+        self.enable_review()
+        units = list(
+            self.get_translation().unit_set.order_by("pk").exclude(state=STATE_READONLY)
+        )
+        # Unresolved critical.
+        self.make_verdict(units[0], "critical")
+        # Escalated major.
+        escalated = self.make_verdict(units[1], "major")
+        escalated.resolution = "escalated"
+        escalated.save(update_fields=["resolution"])
+        # Unparsed attempt.
+        self.make_verdict(units[2], "none", unparsed=True)
+        # Left untouched: still "not reviewed".
+
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+
+        component_units = Unit.objects.filter(
+            translation__component=self.component
+        ).exclude(translation=self.component.source_translation)
+
+        self.assertEqual(
+            counts["needs_human"],
+            component_units.search(
+                "(judge:reject AND NOT judge:resolved) OR judge:escalated"
+            ).count(),
+        )
+        self.assertEqual(
+            counts["not_reviewed"],
+            component_units.search("NOT has:judge AND NOT state:read-only").count(),
+        )
+        self.assertEqual(
+            counts["unparsed"],
+            component_units.search("judge:unparsed").count(),
+        )
+
+    # -- Project scope: controls only -----------------------------------
+
+    def test_project_shows_controls_without_counts(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+        self.assertIsNone(response.context["judge_queue"]["counts"])
+        self.assertNotContains(response, "needs a human")
+
+    # -- Workspace scope: controls only -----------------------------------
+
+    def attach_workspace(self) -> Workspace:
+        workspace = Workspace.objects.create(name="Judge queue workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        return workspace
+
+    def test_workspace_shows_controls_without_counts(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+        self.assertIsNone(response.context["judge_queue"]["counts"])
+        self.assertNotContains(response, "needs a human")
+
+    def test_workspace_strip_hidden_without_permission(self) -> None:
+        # Default test user has no translation.auto/unit.review grant on any
+        # project in the workspace.
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        workspace = self.attach_workspace()
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    @override_settings(JUDGE_ENABLED=False)
+    def test_workspace_strip_hidden_when_configuration_incomplete(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    # -- Prefilled launchers ------------------------------------------
+
+    def test_component_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        response = self.client.get(
+            self.component.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+        self.assertEqual(response.context["autoform"].initial.get("q"), "NOT has:judge")
+
+    def test_project_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        response = self.client.get(
+            self.project.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+
+    def test_workspace_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        response = self.client.get(
+            workspace.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+        self.assertEqual(response.context["autoform"].initial.get("q"), "NOT has:judge")
+
+    def test_run_url_targets_the_not_reviewed_queue(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        run_url = response.context["judge_queue"]["run_url"]
+        self.assertIn("mode=judge", run_url)
+        self.assertIn("q=NOT+has%3Ajudge", run_url)
+
+    # -- Last run --------------------------------------------------------
+
+    def test_last_run_link_hidden_without_a_run(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertIsNone(response.context["judge_queue"]["last_run"])
+        self.assertNotContains(response, "Last run")
+
+    def test_last_run_link_shown_for_the_exact_component_scope(self) -> None:
+        self.enable_review()
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=ProducerRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["last_run"].pk, run.pk)
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_latest_report_is_a_newer_run_launched_by_someone_else(self) -> None:
+        # The run menu lists every actor's runs (confirmed decision 2): on a
+        # shared component, "someone judged this after me" is exactly what a
+        # producer returning to the page came for, so another actor's newer
+        # run is the latest report whoever launched it. The rows are data:
+        # the newest run is the button, the middle row is the other actor's
+        # and therefore names them, the oldest is the viewer's own and does
+        # not. Every ``created`` is forced via a queryset update (bypassing
+        # auto_now_add): order_by("-created") has no tie-breaker, so relying
+        # on sequential auto_now_add timestamps alone would make the
+        # comparison this test exists to prove non-deterministic.
+        self.enable_review()
+        other_user = self.anotheruser
+        now = timezone.now()
+        own_run = self.make_judge_run(self.user)
+        other_run = self.make_judge_run(other_user)
+        earlier_other_run = self.make_judge_run(other_user)
+        ProducerRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=2)
+        )
+        ProducerRun.objects.filter(pk=other_run.pk).update(created=now)
+        ProducerRun.objects.filter(pk=earlier_other_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        judge_queue = response.context["judge_queue"]
+        self.assertEqual(judge_queue["last_run"].pk, other_run.pk)
+        self.assertEqual(
+            [run.pk for run in judge_queue["runs"]],
+            [other_run.pk, earlier_other_run.pk, own_run.pk],
+        )
+        tree = html.fromstring(response.content)
+        (menu,) = tree.xpath(
+            '//section[@aria-labelledby="judge-queue-heading"]'
+            '//ul[contains(@class, "dropdown-menu")]'
+        )
+        menu_markup = html.tostring(menu, encoding="unicode")
+        self.assertIn(other_user.profile.get_user_name(), menu_markup)
+        self.assertNotIn(self.user.profile.get_user_name(), menu_markup)
+
+    def make_judge_run(
+        self,
+        actor,
+        scope=None,
+        status=ProducerRun.Status.COMPLETED,
+        mode: str = "judge",
+    ) -> ProducerRun:
+        if scope is None:
+            scope = self.component
+        scope_types = {
+            Translation: ProducerRun.ScopeType.TRANSLATION,
+            Component: ProducerRun.ScopeType.COMPONENT,
+            Category: ProducerRun.ScopeType.CATEGORY,
+            Project: ProducerRun.ScopeType.PROJECT,
+            ProjectLanguage: ProducerRun.ScopeType.PROJECT_LANGUAGE,
+            Workspace: ProducerRun.ScopeType.WORKSPACE,
+        }
+        return ProducerRun.objects.create(
+            actor=actor,
+            scope_type=scope_types[type(scope)],
+            scope_id=str(scope.pk),
+            scope_label=str(scope),
+            scope_path=scope.get_absolute_url(),
+            requested_mode=mode,
+            cap=10,
+            status=status,
+        )
+
+    def test_a_run_launched_by_someone_else_is_listed(self) -> None:
+        # The superseded rule hid another actor's run from the page
+        # entirely; the new contract lists it, newest first, with the
+        # author named on the rows that are not the viewer's own. One run
+        # is the button alone, so the naming rides on the other rewrite.
+        self.enable_review()
+        other_user = self.anotheruser
+        other_run = self.make_judge_run(other_user)
+        own_run = self.make_judge_run(self.user)
+        now = timezone.now()
+        ProducerRun.objects.filter(pk=other_run.pk).update(created=now)
+        ProducerRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        judge_queue = response.context["judge_queue"]
+        self.assertEqual(judge_queue["last_run"].pk, other_run.pk)
+        self.assertEqual(
+            [run.pk for run in judge_queue["runs"]],
+            [other_run.pk, own_run.pk],
+        )
+
+    # -- Run menu (the judge run navigation) ------------------------------
+
+    RUN_MENU_XPATH = (
+        '//section[@aria-labelledby="judge-queue-heading"]'
+        '//ul[contains(@class, "dropdown-menu")]'
+    )
+
+    def run_menu_markup(self, response) -> str:
+        # Decode explicitly: lxml's fromstring sniffs bytes without a
+        # declaration and reads the em dash of a scope label as cp1252.
+        (menu,) = html.fromstring(response.content.decode("utf-8")).xpath(
+            self.RUN_MENU_XPATH
+        )
+        return html.tostring(menu, encoding="unicode")
+
+    def run_menu_rows(self, response) -> dict[str, list[tuple[str, str]]]:
+        # Row structure by target URL: each entry is the row's own spans in
+        # document order, as (class, text). The lead span is the row's
+        # hierarchy, so the tests read it instead of matching substrings.
+        (menu,) = html.fromstring(response.content.decode("utf-8")).xpath(
+            self.RUN_MENU_XPATH
+        )
+        return {
+            row.get("href"): [
+                (span.get("class"), span.text_content().strip())
+                for span in row.xpath("./span")
+            ]
+            for row in menu.xpath('.//a[contains(@class, "dropdown-item")]')
+        }
+
+    def test_translation_scoped_run_surfaces_on_every_ancestor_page(self) -> None:
+        # A run's scope is matched against the page's subtree, so a
+        # translation-scoped launch is reachable from its component, its
+        # project and the workspace above both - the surfaces a producer
+        # returns to (the workspace strip comes from
+        # weblate/workspaces/views.py:309, whose attach_workspace()
+        # scaffolding lives in this file).
+        self.enable_review()
+        translation = self.get_unit().translation
+        run = self.make_judge_run(self.user, scope=translation)
+        run_url = reverse("judge-run", kwargs={"pk": run.pk})
+        # The translation page carries the runs in its own context key
+        # (producer_runs, the list itself); component and project pages reach
+        # them through the strip's judge_queue.
+        for page_url, runs_key in (
+            (translation.get_absolute_url(), "producer_runs"),
+            (self.component.get_absolute_url(), "judge_queue"),
+            (self.project.get_absolute_url(), "judge_queue"),
+        ):
+            response = self.client.get(page_url)
+            runs = (
+                response.context[runs_key]
+                if runs_key == "producer_runs"
+                else response.context[runs_key]["runs"]
+            )
+            self.assertEqual(runs[0].pk, run.pk)
+            self.assertContains(response, run_url)
+
+    def test_workspace_page_lists_a_translation_scoped_run(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        translation = self.get_unit().translation
+        run = self.make_judge_run(self.user, scope=translation)
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["runs"][0].pk, run.pk)
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_runs_order_newest_first_across_components(self) -> None:
+        # order_by("-created") has no tie-breaker, so sequential
+        # auto_now_add timestamps would make newest-first
+        # non-deterministic: every ``created`` is forced via a queryset
+        # update, the pattern the Task 6 rewrites use.
+        self.enable_review()
+        other_component = self.create_json_mono(
+            name="Other component", project=self.project
+        )
+        sibling_translation = other_component.translation_set.all()[0]
+        older = self.make_judge_run(self.user, scope=sibling_translation)
+        newer = self.make_judge_run(self.user)
+        now = timezone.now()
+        ProducerRun.objects.filter(pk=older.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        ProducerRun.objects.filter(pk=newer.pk).update(created=now)
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_queue"]["runs"]],
+            [newer.pk, older.pk],
+        )
+
+    def test_a_run_in_another_project_does_not_leak(self) -> None:
+        self.enable_review()
+        other_project = Project.objects.create(
+            name="Judge run other project", slug="judge-run-other-project"
+        )
+        run = self.make_judge_run(self.user, scope=other_project)
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["runs"], [])
+        self.assertNotContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_single_run_renders_no_dropdown(self) -> None:
+        self.enable_review()
+        run = self.make_judge_run(self.user)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+        (card,) = html.fromstring(response.content).xpath(
+            '//section[@aria-labelledby="judge-queue-heading"]'
+        )
+        self.assertNotIn("dropdown-toggle", html.tostring(card, encoding="unicode"))
+
+    def test_single_queued_run_labels_its_status_after_the_report_link(self) -> None:
+        # The one place a failed newest run is visible without opening a
+        # menu: with one run the button is the newest run regardless of
+        # status, and its status word follows the label, muted.
+        self.enable_review()
+        run = self.make_judge_run(self.user, status=ProducerRun.Status.QUEUED)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+        self.assertContains(response, "Queued")
+
+    def test_menu_row_for_a_non_completed_run_carries_its_status_word(self) -> None:
+        self.enable_review()
+        completed = self.make_judge_run(self.user)
+        failed = self.make_judge_run(self.user)
+        now = timezone.now()
+        ProducerRun.objects.filter(pk=completed.pk).update(created=now)
+        ProducerRun.objects.filter(pk=failed.pk).update(
+            status=ProducerRun.Status.FAILED, created=now - timedelta(minutes=1)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        menu_markup = self.run_menu_markup(response)
+        self.assertIn(reverse("judge-run", kwargs={"pk": failed.pk}), menu_markup)
+        self.assertIn("Failed", menu_markup)
+        # The button stays blind by design: with two or more runs its label
+        # carries no status word, the rows own the statuses.
+        self.assertNotIn(reverse("judge-run", kwargs={"pk": completed.pk}), menu_markup)
+
+    def test_a_run_whose_actor_was_deleted_renders_without_an_author(self) -> None:
+        # JudgeRun.actor is SET_NULL and the menu lists every actor's runs,
+        # so a run whose launcher has since been deleted reaches the menu
+        # with actor=None. The row must then drop the whole author segment:
+        # rendering the separator against a silently empty
+        # run.actor.profile would leave a dangling "·" at the row's end.
+        # One separator remains by design, the one before the launch mode.
+        self.enable_review()
+        own_run = self.make_judge_run(self.user)
+        deleted_run = self.make_judge_run(None)
+        now = timezone.now()
+        ProducerRun.objects.filter(pk=own_run.pk).update(created=now)
+        ProducerRun.objects.filter(pk=deleted_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        rows = self.run_menu_rows(response)
+        lead = rows[reverse("judge-run", kwargs={"pk": deleted_run.pk})][0][1]
+        self.assertTrue(lead.endswith("Judge run"), lead)
+        self.assertEqual(lead.count("·"), 1)
+        self.assertNotIn(self.anotheruser.username, lead)
+
+    def test_menu_rows_name_the_launch_mode(self) -> None:
+        # A judge launch and an automatic translation of the same scope are
+        # otherwise indistinguishable: same timestamp shape, same actor,
+        # same scope label.
+        self.enable_review()
+        judge_run = self.make_judge_run(self.user)
+        mt_run = self.make_judge_run(self.user, mode="translate")
+        newest = self.make_judge_run(self.user, mode="suggest")
+        now = timezone.now()
+        for offset, run in enumerate((newest, judge_run, mt_run)):
+            ProducerRun.objects.filter(pk=run.pk).update(
+                created=now - timedelta(minutes=offset)
+            )
+        rows = self.run_menu_rows(self.client.get(self.component.get_absolute_url()))
+        self.assertIn(
+            "Judge run", rows[reverse("judge-run", kwargs={"pk": judge_run.pk})][0][1]
+        )
+        self.assertIn(
+            "Automatic translation run",
+            rows[reverse("judge-run", kwargs={"pk": mt_run.pk})][0][1],
+        )
+
+    def test_category_scoped_run_surfaces_on_the_project(self) -> None:
+        # A category launch is one of the six supported scopes, so its
+        # receipt must be reachable from the pages above it.
+        self.enable_review()
+        category = Category.objects.create(
+            name="Judge run category", slug="judge-run-category", project=self.project
+        )
+        run = self.make_judge_run(self.user, scope=category, mode="translate")
+        self.assertEqual(
+            [found.pk for found in recent_producer_runs(self.project, user=self.user)],
+            [run.pk],
+        )
+        self.assertEqual(
+            [found.pk for found in recent_producer_runs(category, user=self.user)],
+            [run.pk],
+        )
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_project_language_scoped_run_surfaces_on_the_project(self) -> None:
+        self.enable_review()
+        scope = ProjectLanguage(self.project, self.get_translation().language)
+        run = self.make_judge_run(self.user, scope=scope, mode="translate")
+        self.assertEqual(
+            [found.pk for found in recent_producer_runs(self.project, user=self.user)],
+            [run.pk],
+        )
+        self.assertEqual(
+            [found.pk for found in recent_producer_runs(scope, user=self.user)],
+            [run.pk],
+        )
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_another_projects_language_run_does_not_leak(self) -> None:
+        # ProjectLanguage ids are "<project>-<language>", matched by prefix:
+        # project 1 must not swallow project 11's runs.
+        self.enable_review()
+        other_project = Project.objects.create(
+            name="Judge run prefix project", slug="judge-run-prefix-project"
+        )
+        scope = ProjectLanguage(other_project, self.get_translation().language)
+        self.make_judge_run(self.user, scope=scope, mode="translate")
+        self.assertEqual(recent_producer_runs(self.project, user=self.user), [])
+
+    def test_project_page_rows_lead_with_the_timestamp(self) -> None:
+        # Amendment F7: every row leads with its timestamp, and a row whose
+        # scope is not the page adds that scope as a muted second line. A
+        # scope-led row repeated one label four times out of five on the
+        # measured project page and buried the only differentiator. The
+        # newest run is the button alone, so both hierarchy rows need a
+        # third run behind them.
+        self.enable_review()
+        translation = self.get_unit().translation
+        newest = self.make_judge_run(self.user)
+        project_run = self.make_judge_run(self.user, scope=self.project)
+        child_run = self.make_judge_run(self.user, scope=translation)
+        now = timezone.now()
+        ProducerRun.objects.filter(pk=newest.pk).update(created=now)
+        ProducerRun.objects.filter(pk=project_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        ProducerRun.objects.filter(pk=child_run.pk).update(
+            created=now - timedelta(minutes=2)
+        )
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_queue"]["runs"]],
+            [newest.pk, project_run.pk, child_run.pk],
+        )
+        rows = self.run_menu_rows(response)
+        child_row = rows[reverse("judge-run", kwargs={"pk": child_run.pk})]
+        own_row = rows[reverse("judge-run", kwargs={"pk": project_run.pk})]
+        self.assertEqual(child_row[0][0], "d-block")
+        self.assertNotIn(str(translation), child_row[0][1])
+        self.assertEqual(child_row[1], ("d-block text-muted", str(translation)))
+        # The project's own row carries no scope line: its scope is the page.
+        self.assertEqual([css for css, _ in own_row], ["d-block"])
+
+    def test_component_page_own_scope_row_carries_no_scope_line(self) -> None:
+        # The component's own run carries a timestamp line only, while a
+        # child scope's row adds the muted scope line beneath its own
+        # timestamp.
+        self.enable_review()
+        translation = self.get_unit().translation
+        child_run = self.make_judge_run(self.user, scope=translation)
+        own_run = self.make_judge_run(self.user)
+        newest = self.make_judge_run(self.user, scope=translation)
+        now = timezone.now()
+        ProducerRun.objects.filter(pk=newest.pk).update(created=now)
+        ProducerRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        ProducerRun.objects.filter(pk=child_run.pk).update(
+            created=now - timedelta(minutes=2)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_queue"]["runs"]],
+            [newest.pk, own_run.pk, child_run.pk],
+        )
+        rows = self.run_menu_rows(response)
+        child_row = rows[reverse("judge-run", kwargs={"pk": child_run.pk})]
+        own_row = rows[reverse("judge-run", kwargs={"pk": own_run.pk})]
+        self.assertEqual(child_row[1], ("d-block text-muted", str(translation)))
+        self.assertEqual([css for css, _ in own_row], ["d-block"])
+
+    def test_run_menu_ceiling_is_ten_rows(self) -> None:
+        # Older runs stay unreachable, which is the honest limit of a menu
+        # and the point where a paginated per-scope history page earns its
+        # own plan.
+        self.enable_review()
+        for index in range(12):
+            run = self.make_judge_run(self.user)
+            ProducerRun.objects.filter(pk=run.pk).update(
+                created=timezone.now() - timedelta(minutes=12 - index)
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        runs = response.context["judge_queue"]["runs"]
+        self.assertEqual(len(runs), 10)
+        # Count parsed rows, not occurrences of an exact class attribute:
+        # the row carries spacing utilities beside dropdown-item.
+        self.assertEqual(
+            len(
+                html.fromstring(self.run_menu_markup(response)).xpath(
+                    '//a[contains(@class, "dropdown-item")]'
+                )
+            ),
+            9,
+        )
+
+    def test_editor_recheck_and_drain_runs_stay_out_of_the_history(self) -> None:
+        # A one-string editor re-check and the deferred-retry drain pass are
+        # JudgeRun rows, but neither is a launch a producer comes back to a
+        # scope page to find. Listing them let the cheapest action in the
+        # product evict the most expensive one: on production ten
+        # ``id:<unit>`` re-checks filled the whole ten-row window and put a
+        # 462-string launch out of reach. Both excluded runs are newer than
+        # the launch here, so an unfiltered menu would show them first.
+        self.enable_review()
+        launch = self.make_judge_run(self.user)
+        now = timezone.now()
+        ProducerRun.objects.filter(pk=launch.pk).update(
+            created=now - timedelta(minutes=5)
+        )
+        excluded = [
+            self.make_judge_run(self.user, scope=self.translation, mode="recheck"),
+            # The drain pass runs without an actor, as in production.
+            self.make_judge_run(None, scope=self.translation, mode="drain"),
+        ]
+        for offset, run in enumerate(excluded, start=1):
+            ProducerRun.objects.filter(pk=run.pk).update(
+                created=now + timedelta(minutes=offset)
+            )
+
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_queue"]["runs"]], [launch.pk]
+        )
+        self.assertEqual(response.context["judge_queue"]["last_run"].pk, launch.pk)
+        for run in excluded:
+            report_url = reverse("judge-run", kwargs={"pk": run.pk})
+            self.assertNotContains(response, report_url)
+            # Kept out of the menu, never orphaned: the report itself still
+            # opens by URL, and the outcome is read on the string's card.
+            self.assertEqual(self.client.get(report_url).status_code, 200)
+
+    def test_translation_page_history_lists_launches_only(self) -> None:
+        # A re-check is translation-scoped, so the translation page is where
+        # it competes most directly with that translation's own launches.
+        self.enable_review()
+        launch = self.make_judge_run(self.user, scope=self.translation)
+        recheck = self.make_judge_run(self.user, scope=self.translation, mode="recheck")
+        now = timezone.now()
+        ProducerRun.objects.filter(pk=launch.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        ProducerRun.objects.filter(pk=recheck.pk).update(created=now)
+
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["producer_runs"]], [launch.pk]
+        )
+        self.assertEqual(response.context["producer_last_run"].pk, launch.pk)
+        self.assertNotContains(
+            response, reverse("judge-run", kwargs={"pk": recheck.pk})
+        )
+
+    def test_breakdown_button_only_with_zero_runs(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, "Breakdown by check")
+        run = self.make_judge_run(self.user)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, "Breakdown by check")
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_project_page_query_count_is_unchanged_by_menu_runs(self) -> None:
+        # ``runs`` is materialized once and ``last_run`` is its first
+        # element, so the menu's LIMIT 10 fills the query slot the old
+        # ``LIMIT 1`` last-run lookup already paid for: a project page with
+        # N runs issues the same number of queries as with zero runs. The
+        # existing pins compare within one run, in the relative
+        # CaptureQueriesContext style of
+        # test_hand_off_query_count_stays_bounded; both captures sit on a
+        # page that renders the menu.
+        self.enable_review()
+        translation = self.get_unit().translation
+        self.client.get(self.project.get_absolute_url())
+        with CaptureQueriesContext(connection) as empty:
+            self.client.get(self.project.get_absolute_url())
+        self.make_judge_run(self.user, scope=translation)
+        self.make_judge_run(self.user, scope=self.component)
+        self.client.get(self.project.get_absolute_url())
+        with CaptureQueriesContext(connection) as with_runs:
+            self.client.get(self.project.get_absolute_url())
+        self.assertTrue(with_runs.captured_queries)
+        self.assertEqual(len(empty), len(with_runs))
+
+    def test_last_run_does_not_leak_across_components(self) -> None:
+        self.enable_review()
+        other = self.create_json_mono(name="Other component", project=self.project)
+        ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id=str(other.pk),
+            scope_label=str(other),
+            scope_path=other.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=ProducerRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertIsNone(response.context["judge_queue"]["last_run"])
+
+    def test_translation_page_shows_its_own_last_run(self) -> None:
+        # Reload after completion has no durable path through the ephemeral
+        # task message (a finished task is forgotten immediately) or the
+        # component/project/workspace-only queue strip for a
+        # translation-scoped launch, so the translation page carries its
+        # own last-run link instead.
+        self.enable_review()
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=ProducerRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertEqual(response.context["producer_last_run"].pk, run.pk)
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_translation_page_hides_last_run_without_permission(self) -> None:
+        # Default test user has no translation.auto/unit.review grant.
+        ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=ProducerRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertIsNone(response.context["producer_last_run"])
+
+    def test_translation_last_run_does_not_leak_from_another_translation(
+        self,
+    ) -> None:
+        self.enable_review()
+        other = self.component.translation_set.exclude(pk=self.translation.pk).first()
+        if other is None:
+            self.skipTest("fixture has only one target translation")
+        ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(other.pk),
+            scope_label=str(other),
+            scope_path=other.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=ProducerRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertIsNone(response.context["producer_last_run"])
+
+    def test_translation_last_run_includes_another_actors_launch(self) -> None:
+        # The translation page carries the same contract as the card
+        # (confirmed decision 2): every actor's runs are listed, so a run
+        # launched by someone else is the latest report here too. The
+        # superseded rule hid it from the page entirely.
+        self.enable_review()
+        other_run = self.make_judge_run(self.anotheruser, scope=self.translation)
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertEqual(response.context["producer_last_run"].pk, other_run.pk)
+        self.assertEqual(
+            [run.pk for run in response.context["producer_runs"]], [other_run.pk]
+        )
+
+    def test_translation_last_run_is_the_newest_launch_whoever_made_it(self) -> None:
+        # Same ordering discipline as the component-scope equivalent above:
+        # every ``created`` is forced via a queryset update (bypassing
+        # auto_now_add), since order_by("-created") has no tie-breaker for
+        # equal timestamps.
+        self.enable_review()
+        now = timezone.now()
+        own_run = self.make_judge_run(self.user, scope=self.translation)
+        other_run = self.make_judge_run(self.anotheruser, scope=self.translation)
+        ProducerRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        ProducerRun.objects.filter(pk=other_run.pk).update(created=now)
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertEqual(response.context["producer_last_run"].pk, other_run.pk)
+        self.assertEqual(
+            [run.pk for run in response.context["producer_runs"]],
+            [other_run.pk, own_run.pk],
+        )
+
+    # -- Task 9: conservative hand-off readiness ---------------------------
+
+    def judge_all_units(self, severity="none") -> None:
+        """Give every non-source, non-readonly unit a fresh PASS verdict."""
+        for component_translation in self.component.translation_set.all():
+            if component_translation.is_source:
+                continue
+            for unit in component_translation.unit_set.exclude(state=STATE_READONLY):
+                self.make_verdict(unit, severity)
+
+    def test_hand_off_absent_with_zero_history(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+        self.assertNotContains(response, "ready to hand off")
+
+    def test_hand_off_absent_with_partial_coverage(self) -> None:
+        self.enable_review()
+        # Only one of several units judged: not_reviewed stays above zero.
+        self.make_verdict(self.get_unit(), "none")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertGreater(response.context["judge_queue"]["counts"]["not_reviewed"], 0)
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_absent_with_unresolved_critical(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        self.make_verdict(self.get_unit(), "critical")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_absent_with_escalated_major(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        verdict.resolution = "escalated"
+        verdict.save(update_fields=["resolution"])
+        self.refresh_stats(unit.translation)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_absent_with_stale_target(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Drifted away"], STATE_TRANSLATED)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_absent_with_unparsed_attempt(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        self.make_verdict(self.get_unit(), "none", unparsed=True)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_visible_when_fully_clean(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["needs_human"], 0)
+        self.assertEqual(counts["not_reviewed"], 0)
+        self.assertEqual(counts["unparsed"], 0)
+        self.assertTrue(response.context["judge_queue"]["hand_off_ready"])
+        self.assertContains(response, "ready to hand off")
+        self.assertContains(response, response.context["judge_queue"]["download_url"])
+
+    def test_candidate_presence_never_clears_critical(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        Suggestion.objects.add(
+            unit,
+            ["A repaired translation"],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_context_drift_blocks_even_when_cache_reads_clean(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        unit = self.get_unit()
+        # Same target hash (still current), but a context hash the unit's
+        # live source/note/explanation/glossary no longer produce: the
+        # cache never tracks this, so every cached count stays zero.
+        JudgeVerdict.objects.filter(unit=unit).update(context_hash="0" * 64)
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["needs_human"], 0)
+        self.assertEqual(counts["not_reviewed"], 0)
+        self.assertEqual(counts["unparsed"], 0)
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_the_authoritative_check_sees_an_unjudged_unit(self) -> None:
+        # The cached ``not_reviewed`` counter is the only other guard against
+        # a never-judged string, and stats lag. The authoritative pass must
+        # therefore detect missing coverage on its own, independently of any
+        # cached count the caller gates on.
+        self.enable_review()
+        self.judge_all_units()
+        translations = [
+            translation
+            for translation in self.component.translation_set.all()
+            if not translation.is_source
+        ]
+        self.assertFalse(_judge_hand_off_blocked(translations))
+        JudgeVerdict.objects.filter(unit=self.get_unit()).delete()
+        self.assertTrue(_judge_hand_off_blocked(translations))
+
+    def test_hand_off_query_count_stays_bounded(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        with CaptureQueriesContext(connection) as clean:
+            self.client.get(self.component.get_absolute_url())
+        self.assertTrue(clean.captured_queries)
+
+        # A blocking critical short-circuits before the expensive per-unit
+        # context pass ever runs: strictly fewer queries than the clean
+        # scope, which must run that pass to confirm readiness.
+        self.make_verdict(self.get_unit(), "critical")
+        with CaptureQueriesContext(connection) as blocked:
+            self.client.get(self.component.get_absolute_url())
+        self.assertLess(len(blocked.captured_queries), len(clean.captured_queries))
+
+    def test_download_url_targets_the_component(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(
+            response.context["judge_queue"]["download_url"],
+            reverse("download", kwargs={"path": self.component.get_url_path()}),
+        )
+
+
+@override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="sk-test")
+class JudgeRunReportViewTest(ViewTestCase):
+    """The durable judge run report page (Task 2)."""
+
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def create_run(
+        self,
+        scope=None,
+        *,
+        status=ProducerRun.Status.COMPLETED,
+        scope_type=ProducerRun.ScopeType.COMPONENT,
+        requested_mode="judge",
+    ) -> ProducerRun:
+        scope = scope or self.component
+        return ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=scope_type,
+            scope_id=str(scope.pk),
+            scope_label=str(scope),
+            scope_path=scope.get_absolute_url(),
+            requested_query="state:empty",
+            requested_mode=requested_mode,
+            cap=1000,
+            status=status,
+            started=timezone.now() - timedelta(minutes=5),
+            finished=(
+                timezone.now()
+                if status in {ProducerRun.Status.COMPLETED, ProducerRun.Status.FAILED}
+                else None
+            ),
+        )
+
+    def test_coverage_separates_results_from_skip_reasons(self) -> None:
+        run = self.create_run()
+        unit = self.get_unit()
+        run.scope_snapshot = [unit.id, 999]
+        run.summary = {"cap_remainder": 1}
+        run.save(update_fields=["scope_snapshot", "summary"])
+        self.add_row(run, unit, cached=True)
+        self.add_row(
+            run,
+            unit_id_snapshot=999,
+            outcome=JudgeRunUnit.Outcome.SKIPPED,
+            skip_reason=JudgeRunUnit.SkipReason.CAP,
+        )
+
+        coverage = run.get_coverage()
+
+        self.assertEqual(coverage["recorded"], 2)
+        self.assertEqual(coverage["with_result"], 1)
+        self.assertEqual(coverage["without_result"], 1)
+        self.assertEqual(coverage["without_result_by_outcome"], {"skipped": 1})
+        self.assertEqual(coverage["skip_reasons"], {"cap": 1})
+        self.assertEqual(coverage["cached"], 1)
+        self.assertFalse(coverage["scope_complete"])
+        self.enable_review()
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.context["coverage"], coverage)
+        self.assertContains(response, "Coverage incomplete")
+
+    def test_report_uses_the_producer_run_template(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        response = self.client.get(self.report_url(run))
+        self.assertTemplateUsed(response, "producer-run.html")
+
+    def test_report_explains_an_untranslated_skip(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run,
+            self.get_unit(),
+            outcome=JudgeRunUnit.Outcome.SKIPPED,
+            skip_reason=JudgeRunUnit.SkipReason.UNTRANSLATED,
+        )
+
+        response = self.client.get(f"{self.report_url(run)}?outcome=skipped")
+
+        self.assertContains(response, "This string had no translation to judge.")
+
+    def test_translation_run_needs_only_the_launch_permission(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        run = self.create_run(requested_mode="translate")
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 200)
+
+    def test_judge_run_still_needs_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        run = self.create_run(requested_mode="judge")
+        self.component.project.translation_review = False
+        self.component.project.save(update_fields=["translation_review"])
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 404)
+
+    def test_report_restores_category_and_project_language_scopes(self) -> None:
+        self.enable_review()
+        category = self.create_category(project=self.project)
+        project_language = ProjectLanguage(self.project, self.translation.language)
+        for scope, scope_type in (
+            (category, ProducerRun.ScopeType.CATEGORY),
+            (project_language, ProducerRun.ScopeType.PROJECT_LANGUAGE),
+        ):
+            with self.subTest(scope=scope):
+                scope_id = (
+                    f"{scope.project.pk}-{scope.language.pk}"
+                    if isinstance(scope, ProjectLanguage)
+                    else str(scope.pk)
+                )
+                run = ProducerRun.objects.create(
+                    actor=self.user,
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    scope_label=str(scope),
+                    scope_path=scope.get_absolute_url(),
+                    requested_mode="judge",
+                    cap=100,
+                )
+                response = self.client.get(self.report_url(run))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["scope"].pk, scope.pk)
+
+    def add_row(
+        self,
+        run: ProducerRun,
+        unit=None,
+        *,
+        unit_id_snapshot: int | None = None,
+        outcome=JudgeRunUnit.Outcome.PASSED,
+        **overrides,
+    ) -> JudgeRunUnit:
+        if unit is not None:
+            unit_id_snapshot = unit.id
+            overrides.setdefault("translation_id", unit.translation_id)
+            overrides.setdefault("component_id", unit.translation.component_id)
+            overrides.setdefault("project_id", unit.translation.component.project_id)
+            overrides.setdefault("input_target", unit.get_target_plurals())
+            overrides.setdefault(
+                "input_target_hash", compute_target_hash(unit.get_target_plurals())
+            )
+            overrides.setdefault("context_hash", judge_context_hash(unit))
+        else:
+            assert unit_id_snapshot is not None
+            overrides.setdefault("translation_id", self.translation.pk)
+            overrides.setdefault("component_id", self.component.pk)
+            overrides.setdefault("project_id", self.project.pk)
+            overrides.setdefault("input_target", [])
+            overrides.setdefault("input_target_hash", compute_target_hash([]))
+            overrides.setdefault("context_hash", "x")
+        return JudgeRunUnit.objects.create(
+            run=run,
+            unit=unit,
+            unit_id_snapshot=unit_id_snapshot,
+            outcome=outcome,
+            before_target=overrides.get("input_target", []),
+            after_target=overrides.get("input_target", []),
+            **overrides,
+        )
+
+    def report_url(self, run: ProducerRun) -> str:
+        return reverse("judge-run", kwargs={"pk": run.pk})
+
+    def make_verdict(self, unit, *, resolution: str = "") -> JudgeVerdict:
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            model_verdict=JudgeVerdict.Verdict.FLAG,
+            judge_model="vendor/model-a",
+            seat=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
+            context_hash=judge_context_hash(unit),
+            resolution=resolution,
+        )
+
+    def make_verdict_with_error(
+        self, unit, *, severity: str, category: str, seat: int = 1
+    ) -> JudgeVerdict:
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=severity,
+            model_verdict=(
+                JudgeVerdict.Verdict.REJECT
+                if severity == "critical"
+                else JudgeVerdict.Verdict.FLAG
+            ),
+            judge_model="vendor/model-a",
+            seat=seat,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
+            context_hash=judge_context_hash(unit),
+            errors=[
+                {
+                    "span": "x",
+                    "category": category,
+                    "severity": severity,
+                    "description": f"{category} problem",
+                }
+            ],
+        )
+
+    # -- Counts --------------------------------------------------------
+
+    def test_every_outcome_count_equals_its_report_local_row_count(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        escalated_verdict = self.make_verdict(
+            unit, resolution=JudgeVerdict.Resolution.ESCALATED
+        )
+        self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.MAJOR,
+            verdict=escalated_verdict,
+            repair_status=JudgeRunUnit.RepairStatus.ROLLED_BACK,
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900001,
+            outcome=JudgeRunUnit.Outcome.MINOR,
+            cached=True,
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900002,
+            outcome=JudgeRunUnit.Outcome.SKIPPED,
+            skip_reason=JudgeRunUnit.SkipReason.CAP,
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900003,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+            repair_status=JudgeRunUnit.RepairStatus.APPLIED,
+        )
+
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 200)
+        stats = {key: count for key, _label, count in response.context["stats"]}
+        for key, expected in stats.items():
+            filtered = self.client.get(self.report_url(run), {"outcome": key})
+            self.assertEqual(
+                filtered.context["page_obj"].paginator.count,
+                expected,
+                f"outcome={key}",
+            )
+        self.assertEqual(stats["matched"], 4)
+        self.assertEqual(stats["skipped"], 1)
+        self.assertEqual(stats["checked"], 3)
+        self.assertEqual(stats["cached"], 1)
+        self.assertEqual(stats["major"], 1)
+        self.assertEqual(stats["minor"], 1)
+        self.assertEqual(stats["rolled-back"], 1)
+        self.assertEqual(stats["repaired"], 1)
+        self.assertEqual(stats["escalated"], 1)
+        self.assertEqual(stats["accepted-as-is"], 0)
+        self.assertEqual(stats["changed-since-run"], 0)
+
+    def test_changed_since_run_is_an_overlay_not_a_fixed_outcome(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        critical_unit, passed_unit = list(self.translation.unit_set.all()[:2])
+
+        critical_verdict = self.make_verdict_with_error(
+            critical_unit, severity="critical", category="mistranslation"
+        )
+        passed_verdict = JudgeVerdict.objects.create(
+            unit=passed_unit,
+            max_severity=JudgeVerdict.Severity.NONE,
+            model_verdict=JudgeVerdict.Verdict.PASS,
+            judge_model="vendor/model-a",
+            seat=1,
+            target_hash=compute_target_hash(passed_unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(passed_unit.target),
+            context_hash=judge_context_hash(passed_unit),
+        )
+        critical_row = self.add_row(
+            run,
+            critical_unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=critical_verdict,
+        )
+        passed_row = self.add_row(
+            run,
+            passed_unit,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+            verdict=passed_verdict,
+        )
+        Unit.objects.filter(pk__in=[critical_unit.pk, passed_unit.pk]).update(
+            target="text changed after this report"
+        )
+
+        default = self.client.get(self.report_url(run))
+        self.assertEqual(default.context["counts"]["critical"], 1)
+        self.assertEqual(default.context["counts"]["passed"], 1)
+        self.assertEqual(default.context["counts"]["actionable"], 1)
+        self.assertEqual(default.context["triage"]["blocking"], 1)
+        self.assertEqual(default.context["counts"]["changed-since-run"], 2)
+        self.assertEqual(
+            [row.pk for row in default.context["page_obj"]], [critical_row.pk]
+        )
+
+        changed = self.client.get(
+            self.report_url(run), {"outcome": "changed-since-run"}
+        )
+        self.assertCountEqual(
+            [row.pk for row in changed.context["page_obj"]],
+            [critical_row.pk, passed_row.pk],
+        )
+
+    def test_hashless_verdict_is_not_classified_as_changed(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        row = self.add_row(
+            run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict
+        )
+        JudgeVerdict.objects.filter(pk=row.verdict_id).update(target_storage_hash=None)
+        Unit.objects.filter(pk=unit.pk).update(target="different but unknown")
+
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.context["counts"]["critical"], 1)
+        self.assertEqual(response.context["counts"]["changed-since-run"], 0)
+
+    def test_changed_since_run_disappears_when_the_target_is_restored(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        original = unit.target
+        Unit.objects.filter(pk=unit.pk).update(target="later text")
+        self.assertEqual(
+            self.client.get(self.report_url(run)).context["counts"][
+                "changed-since-run"
+            ],
+            1,
+        )
+        Unit.objects.filter(pk=unit.pk).update(target=original)
+        self.assertEqual(
+            self.client.get(self.report_url(run)).context["counts"][
+                "changed-since-run"
+            ],
+            0,
+        )
+
+    def test_cached_evidence_appears_once_and_is_labeled_cached(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.PASSED, cached=True)
+        response = self.client.get(self.report_url(run), {"outcome": "cached"})
+        self.assertEqual(response.context["page_obj"].paginator.count, 1)
+        self.assertContains(response, "cached")
+
+    def test_no_engine_for_language_warning_renders_once_for_many_strings(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        run.warnings = [
+            (
+                "No repair engine is configured for ru; strings needing a repair "
+                "candidate in this language were left without one."
+            )
+        ]
+        run.save(update_fields=["warnings"])
+        # Real units: the "Action" cell is rendered only for a row whose
+        # unit still exists, since a deleted one has nothing to act on.
+        units = list(self.translation.unit_set.all()[:3])
+        self.assertEqual(len(units), 3)
+        for unit in units:
+            self.add_row(
+                run,
+                unit,
+                outcome=JudgeRunUnit.Outcome.CRITICAL,
+                repair_status=JudgeRunUnit.RepairStatus.NO_ENGINE_FOR_LANGUAGE,
+            )
+
+        response = self.client.get(self.report_url(run))
+
+        # The configuration problem is stated once for the whole run, not
+        # repeated per string. Each affected row still refuses to promise a
+        # fix that no engine can produce.
+        self.assertContains(response, "No repair engine is configured for ru", count=1)
+        self.assertContains(response, "Fix by hand", count=3)
+        self.assertNotContains(response, "Review the suggested fix")
+
+    def test_refused_run_shows_the_refusal_and_no_unparsed_row(self) -> None:
+        self.enable_review()
+        run = self.create_run(status=ProducerRun.Status.FAILED)
+        run.failure = "The LLM judge endpoint refused the request (HTTP 400)."
+        run.save(update_fields=["failure"])
+        response = self.client.get(self.report_url(run))
+        self.assertContains(response, "refused the request (HTTP 400)")
+        stats = {key: count for key, _label, count in response.context["stats"]}
+        self.assertEqual(
+            stats["unparsed"],
+            0,
+            "a refused run must not report fake unparsed opinions",
+        )
+
+    def test_unit_in_older_and_newer_run_appears_only_in_requested_report(
+        self,
+    ) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        older = self.create_run()
+        newer = self.create_run()
+        self.add_row(older, unit, outcome=JudgeRunUnit.Outcome.MAJOR)
+        self.add_row(newer, unit, outcome=JudgeRunUnit.Outcome.PASSED)
+
+        older_response = self.client.get(self.report_url(older))
+        [older_row] = list(older_response.context["page_obj"])
+        self.assertEqual(older_row.outcome, JudgeRunUnit.Outcome.MAJOR)
+
+        # The default bucket is "actionable"; PASSED rows need an explicit
+        # filter to prove the newer run's own report still finds them.
+        newer_response = self.client.get(self.report_url(newer), {"outcome": "matched"})
+        [newer_row] = list(newer_response.context["page_obj"])
+        self.assertEqual(newer_row.outcome, JudgeRunUnit.Outcome.PASSED)
+
+    def test_current_and_stale_and_deleted_units_render_safely(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        current_unit = self.get_unit()
+        self.add_row(run, current_unit, outcome=JudgeRunUnit.Outcome.PASSED)
+
+        stale_unit = self.get_unit(source="Thank you for using Weblate.")
+        self.add_row(
+            run,
+            stale_unit,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+            input_target=["a stored snapshot no longer on the unit"],
+        )
+
+        gone = self.add_row(
+            run, unit_id_snapshot=900010, outcome=JudgeRunUnit.Outcome.MAJOR
+        )
+        # "matched" (every row) so the drifted PASSED rows are visible too:
+        # the default "actionable" bucket would hide them.
+        response = self.client.get(self.report_url(run), {"outcome": "matched"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "900010")
+        self.assertContains(response, "current text changed since this run")
+        self.assertIsNone(JudgeRunUnit.objects.get(pk=gone.pk).unit)
+
+    def test_empty_queued_running_completed_failed_runs_render_explicit_states(
+        self,
+    ) -> None:
+        self.enable_review()
+        for status in ProducerRun.Status.values:
+            with self.subTest(status=status):
+                run = self.create_run(status=status)
+                response = self.client.get(self.report_url(run))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, run.get_status_display())
+                if status in {ProducerRun.Status.QUEUED, ProducerRun.Status.RUNNING}:
+                    self.assertContains(response, "still in progress")
+                if status == ProducerRun.Status.FAILED:
+                    self.assertContains(response, "failed")
+                if status == ProducerRun.Status.CANCEL_REQUESTED:
+                    self.assertContains(response, "Cancellation has been requested")
+                if status == ProducerRun.Status.CANCELLED:
+                    self.assertContains(response, "cancelled before any string")
+                if status == ProducerRun.Status.PARTIAL:
+                    self.assertContains(response, "results below are partial")
+                self.assertContains(response, "No strings in this outcome.")
+
+    def test_unauthorized_private_scope_returns_404_with_no_count_leakage(
+        self,
+    ) -> None:
+        # Default test user has no translation.auto/unit.review grant.
+        run = self.create_run()
+        self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.CRITICAL)
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, "Critical held", status_code=404)
+        self.assertNotContains(response, run.scope_label, status_code=404)
+
+    def test_missing_scope_returns_404(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        component_pk = self.component.pk
+        run2 = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id="999999999",
+            scope_label="gone",
+            scope_path="/",
+            requested_mode="judge",
+            cap=10,
+            status=ProducerRun.Status.COMPLETED,
+        )
+        self.assertNotEqual(run2.scope_id, str(component_pk))
+        response = self.client.get(self.report_url(run2))
+        self.assertEqual(response.status_code, 404)
+        # A real, currently accessible run still renders normally.
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 200)
+
+    def test_pagination_and_outcome_filter_remain_bounded_on_large_fixtures(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        for offset in range(60):
+            self.add_row(
+                run,
+                unit_id_snapshot=910000 + offset,
+                outcome=JudgeRunUnit.Outcome.MINOR,
+            )
+        first_page = self.client.get(self.report_url(run), {"outcome": "minor"})
+        self.assertEqual(len(first_page.context["page_obj"]), 50)
+        self.assertEqual(first_page.context["page_obj"].paginator.count, 60)
+        second_page = self.client.get(
+            self.report_url(run), {"outcome": "minor", "page": 2}
+        )
+        self.assertEqual(len(second_page.context["page_obj"]), 10)
+
+    def test_unknown_outcome_filter_is_rejected(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        response = self.client.get(self.report_url(run), {"outcome": "made-up"})
+        self.assertEqual(response.status_code, 404)
+
+    def test_no_query_path_still_emits_a_cost_figure(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.MAJOR)
+        for key in (
+            "",
+            "matched",
+            "major",
+            "cached",
+            "repaired",
+            "escalated",
+        ):
+            response = self.client.get(
+                self.report_url(run), {"outcome": key} if key else {}
+            )
+            content = response.content.decode().lower()
+            self.assertIn("cost", content)
+            self.assertIn("$", content)
+
+    def test_report_page_query_count_does_not_grow_with_row_count(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        for offset in range(5):
+            self.add_row(
+                run,
+                unit_id_snapshot=920000 + offset,
+                outcome=JudgeRunUnit.Outcome.MINOR,
+            )
+        run2 = self.create_run()
+        for offset in range(45):
+            self.add_row(
+                run2,
+                unit_id_snapshot=930000 + offset,
+                outcome=JudgeRunUnit.Outcome.MINOR,
+            )
+        # Warm permission/content-type caches identically before either
+        # capture: an uncached first request is not comparable to a second.
+        self.client.get(self.report_url(run))
+        self.client.get(self.report_url(run2))
+
+        with CaptureQueriesContext(connection) as small:
+            self.client.get(self.report_url(run))
+        with CaptureQueriesContext(connection) as large:
+            self.client.get(self.report_url(run2))
+
+        self.assertEqual(len(small), len(large))
+
+    # -- Task 9: triage, categories, review URLs, actions --------------
+
+    def test_actionable_is_the_default_bucket_and_matches_its_own_count(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL)
+        self.add_row(run, unit_id_snapshot=900200, outcome=JudgeRunUnit.Outcome.MAJOR)
+        self.add_row(run, unit_id_snapshot=900201, outcome=JudgeRunUnit.Outcome.MINOR)
+        self.add_row(
+            run, unit_id_snapshot=900202, outcome=JudgeRunUnit.Outcome.UNPARSED
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900203,
+            outcome=JudgeRunUnit.Outcome.STALE_CONFLICT,
+        )
+        self.add_row(run, unit_id_snapshot=900204, outcome=JudgeRunUnit.Outcome.PASSED)
+
+        default_response = self.client.get(self.report_url(run))
+        self.assertEqual(default_response.context["outcome"], "")
+        self.assertEqual(default_response.context["bucket"], "actionable")
+        self.assertEqual(default_response.context["page_obj"].paginator.count, 5)
+
+        explicit_response = self.client.get(
+            self.report_url(run), {"outcome": "actionable"}
+        )
+        self.assertEqual(
+            explicit_response.context["page_obj"].paginator.count,
+            default_response.context["page_obj"].paginator.count,
+        )
+
+    def test_zero_count_buckets_render_no_button_and_technical_trio_is_text(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run, unit_id_snapshot=900210, outcome=JudgeRunUnit.Outcome.CRITICAL
+        )
+        response = self.client.get(self.report_url(run))
+        # "Repaired" has zero rows in this run: no filter button for it.
+        self.assertNotContains(response, "outcome=repaired")
+        # matched/checked/cached never render as buttons, even though their
+        # counts are non-zero: they move to the plain-text technical line.
+        self.assertNotContains(response, "outcome=matched")
+        self.assertNotContains(response, "outcome=checked")
+        self.assertNotContains(response, "outcome=cached")
+        self.assertContains(response, "Matched 1")
+
+    def test_blocking_excludes_critical_rows_accepted_as_is(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        accepted_verdict = self.make_verdict(
+            unit, resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS
+        )
+        self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=accepted_verdict,
+        )
+        self.add_row(
+            run, unit_id_snapshot=900230, outcome=JudgeRunUnit.Outcome.CRITICAL
+        )
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.context["triage"]["blocking"], 1)
+        self.assertEqual(response.context["counts"]["critical"], 2)
+
+    def test_category_list_is_ordered_by_count_with_worst_severity(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict_a = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900240,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=verdict_a,
+        )
+        verdict_b = self.make_verdict_with_error(
+            unit, severity="major", category="mistranslation"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900241,
+            outcome=JudgeRunUnit.Outcome.MAJOR,
+            verdict=verdict_b,
+        )
+        verdict_c = self.make_verdict_with_error(
+            unit, severity="minor", category="omission"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900242,
+            outcome=JudgeRunUnit.Outcome.MINOR,
+            verdict=verdict_c,
+        )
+
+        response = self.client.get(self.report_url(run))
+        categories = response.context["categories"]
+        self.assertEqual(
+            [entry["category"] for entry in categories],
+            ["mistranslation", "omission"],
+        )
+        self.assertEqual(categories[0]["count"], 2)
+        self.assertEqual(categories[0]["worst"], "critical")
+        self.assertTrue(categories[0]["review_url"])
+        self.assertEqual(categories[1]["count"], 1)
+        self.assertEqual(categories[1]["worst"], "minor")
+
+    def test_review_urls_are_scope_correct_for_translation_and_component(
+        self,
+    ) -> None:
+        self.enable_review()
+        component_run = self.create_run()
+        self.add_row(
+            component_run,
+            unit_id_snapshot=900250,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+        )
+        component_response = self.client.get(self.report_url(component_run))
+        self.assertIn("/search/", component_response.context["blocking_review_url"])
+
+        translation_run = self.create_run(
+            self.translation, scope_type=ProducerRun.ScopeType.TRANSLATION
+        )
+        self.add_row(
+            translation_run,
+            unit_id_snapshot=900251,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+        )
+        translation_response = self.client.get(self.report_url(translation_run))
+        blocking_url = translation_response.context["blocking_review_url"]
+        self.assertIn("/translate/", blocking_url)
+        self.assertNotIn("/search/", blocking_url)
+        # The translate view canonicalizes to an explicit offset (302).
+        resolved = self.client.get(blocking_url, follow=True)
+        self.assertEqual(resolved.status_code, 200)
+
+    def test_candidate_stored_row_shows_review_the_suggested_fix_action(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            repair_status=JudgeRunUnit.RepairStatus.CANDIDATE_STORED,
+        )
+        response = self.client.get(self.report_url(run), {"outcome": "candidates"})
+        self.assertContains(response, "Review the suggested fix")
+
+    def test_row_without_verdict_renders_an_explicit_sentence(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run, unit_id_snapshot=900260, outcome=JudgeRunUnit.Outcome.UNPARSED
+        )
+        response = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertContains(
+            response, "The judge reply for this string could not be used."
+        )
+
+    def test_row_marker_compares_with_the_verdict_target(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        Unit.objects.filter(pk=unit.pk).update(target="changed after judgement")
+
+        response = self.client.get(
+            self.report_url(run), {"outcome": "changed-since-run"}
+        )
+        [row] = response.context["page_obj"]
+        self.assertFalse(row.current_target_matches)
+        self.assertEqual(str(row.action), "Check the current verdict")
+        self.assertContains(response, "current text changed since this run")
+        self.assertNotContains(response, "Fix and re-check")
+
+    def test_hashless_marker_compares_with_the_final_run_snapshot(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        row = self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.UNPARSED,
+            input_target=["before automatic processing"],
+        )
+        # The run itself finished with the current text. A start-of-run comparison
+        # would mark this clean row stale; the final snapshot must not.
+        JudgeRunUnit.objects.filter(pk=row.pk).update(
+            after_target=unit.get_target_plurals()
+        )
+        clean = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertTrue(clean.context["page_obj"][0].current_target_matches)
+        self.assertNotContains(clean, "current text changed since this run")
+
+        Unit.objects.filter(pk=unit.pk).update(target="changed after completion")
+        changed = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertFalse(changed.context["page_obj"][0].current_target_matches)
+        self.assertContains(changed, "current text changed since this run")
+
+    def test_hero_card_separates_historical_and_changed_counts(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        Unit.objects.filter(pk=unit.pk).update(target="later target")
+
+        response = self.client.get(self.report_url(run))
+        self.assertContains(
+            response,
+            "1 critical outcome from this run still needs a producer decision.",
+        )
+        self.assertContains(response, "Open currently blocking strings")
+        self.assertContains(response, "1 string has changed since this run.")
+        self.assertContains(response, "?outcome=changed-since-run")
+        self.assertNotContains(response, "Fixed since this run")
+        self.assertNotContains(response, "needs a fix before release")
+
+    def test_static_outcome_labels_do_not_claim_current_state(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.MAJOR)
+        response = self.client.get(self.report_url(run))
+        self.assertContains(response, "Run outcomes needing attention: 1")
+        self.assertContains(response, "Major in this run: 1")
+        self.assertNotContains(response, "Major not fixed")
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeProducerTriageViewTest(ViewTestCase):
+    """Producer one-unit re-check and candidate-generation endpoints."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        # unit.review is gated on review being enabled for the language:
+        # without it every denial comes from the feature switch, not the
+        # permission the tests are about.
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant(self, codenames) -> None:
+        # Two custom roles mirror the built-in split the form gate relies
+        # on: review on the unit, automatic translation on the language.
+        # Drop superuser: otherwise the denial tests would pass through
+        # the backstop rather than the role being probed.
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        role = Role.objects.create(name="Producer triage")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(
+            name="Producer triagers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
+        )
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    # -- permissions ------------------------------------------------------
+
+    def test_recheck_denied_without_permissions(self) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        unit = self.get_unit()
+        response = self.client.post(
+            reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_recheck_denied_with_review_only(self) -> None:
+        self.grant(["unit.review"])
+        unit = self.get_unit()
+        response = self.client.post(
+            reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_generate_denied_with_auto_only(self) -> None:
+        self.grant(["translation.auto"])
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    # -- re-check queueing -------------------------------------------------
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_two_rapid_posts_queue_one_run(self) -> None:
+        unit = self.get_unit()
+        url = reverse("judge-recheck", kwargs={"pk": unit.pk})
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.apply_async",
+                return_value=SimpleNamespace(id="task-1"),
+            ) as apply_async,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            first = self.client.post(url, follow=True)
+            second = self.client.post(url, follow=True)
+        runs = ProducerRun.objects.filter(requested_mode="recheck")
+        self.assertEqual(runs.count(), 1)
+        run = runs.get()
+        self.assertEqual(run.status, ProducerRun.Status.QUEUED)
+        self.assertEqual(run.requested_query, recheck_query(unit.pk))
+        self.assertEqual(run.cap, 1)
+        # The dispatch uses the run's own pre-reserved task id (durable
+        # ledger, Task 5a), not a broker-assigned one.
+        self.assertEqual(run.task_id, str(run.dispatch_task_id))
+        self.assertIsNotNone(run.dispatch_published_at)
+        self.assertEqual(apply_async.call_count, 1)
+        self.assertContains(first, "re-check has been queued", status_code=200)
+        self.assertContains(second, "already running", status_code=200)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_recheck_after_a_finished_run_queues_a_new_one(self) -> None:
+        unit = self.get_unit()
+        run = self._completed_recheck(unit)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-2"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(
+                reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
+            )
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 2
+        )
+        self.assertNotEqual(
+            ProducerRun.objects.exclude(pk=run.pk).get().status,
+            ProducerRun.Status.COMPLETED,
+        )
+
+    def _completed_recheck(self, unit) -> ProducerRun:
+        translation = unit.translation
+        return ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=recheck_query(unit.pk),
+            requested_mode="recheck",
+            cap=1,
+            status=ProducerRun.Status.COMPLETED,
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_single_broker_failure_keeps_the_run_queued_for_retry(self) -> None:
+        # A transient broker hiccup is not terminal: the durable ledger
+        # (Task 5a) leaves the run QUEUED for the periodic drain to retry,
+        # mirroring the loc-kit dispatch pattern.
+        unit = self.get_unit()
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.apply_async",
+                side_effect=RuntimeError("broker down"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
+            )
+        run = ProducerRun.objects.get(requested_mode="recheck")
+        self.assertEqual(run.status, ProducerRun.Status.QUEUED)
+        self.assertEqual(run.dispatch_attempts, 1)
+        self.assertTrue(run.dispatch_error)
+        self.assertIsNone(run.dispatch_published_at)
+        self.assertContains(response, "re-check has been queued", status_code=200)
+
+    def test_broker_failure_exhausted_after_max_attempts_fails_the_run(self) -> None:
+        # The periodic drain (`drain_producer_run_dispatches`) retries a
+        # QUEUED, unpublished intent; exhausting the bound fails the run
+        # outright instead of retrying it forever.
+        unit = self.get_unit()
+        translation = unit.translation
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            dispatch_task_id=uuid.uuid4(),
+            dispatch_phase="judge-recheck",
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=f"id:{unit.pk}",
+            requested_mode="recheck",
+            cap=1,
+        )
+        with mock.patch(
+            "weblate.trans.tasks.auto_translate.apply_async",
+            side_effect=RuntimeError("broker down"),
+        ):
+            for _ in range(PRODUCER_RUN_DISPATCH_MAX_ATTEMPTS):
+                self.assertFalse(publish_producer_run_dispatch(run_id=run.pk))
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertEqual(run.dispatch_attempts, PRODUCER_RUN_DISPATCH_MAX_ATTEMPTS)
+        self.assertTrue(run.failure)
+        self.assertIsNotNone(run.finished)
+
+    def test_recheck_get_is_rejected(self) -> None:
+        unit = self.get_unit()
+        response = self.client.get(reverse("judge-recheck", kwargs={"pk": unit.pk}))
+        self.assertEqual(response.status_code, 405)
+
+    # -- unit-page badge context ------------------------------------------
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_unit_page_reports_a_pending_recheck(self) -> None:
+        unit = self.get_unit()
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertIsNone(response.context["judge_recheck_pending"])
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-3"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(reverse("judge-recheck", kwargs={"pk": unit.pk}))
+        response = self.client.get(unit.get_absolute_url())
+        run = response.context["judge_recheck_pending"]
+        self.assertIsNotNone(run)
+        self.assertEqual(run.requested_mode, "recheck")
+
+    def test_unit_page_exposes_the_active_candidate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertIsNone(response.context["judge_candidate"])
+        Suggestion.objects.add(
+            unit,
+            ["better text"],
+            request=self.get_request(),
+            vote=False,
+            user=self.user,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        unit = self.get_unit()
+        response = self.client.get(unit.get_absolute_url())
+        candidate = response.context["judge_candidate"]
+        self.assertIsNotNone(candidate)
+        self.assertEqual(candidate.target.strip(), "better text")
+        self.assertFalse(response.context["judge_generation_pending"])
+
+    def test_candidate_disappears_with_a_stale_target_hash(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        Suggestion.objects.add(
+            unit,
+            ["better text"],
+            request=self.get_request(),
+            vote=False,
+            user=self.user,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": "0" * 64,
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        response = self.client.get(self.get_unit().get_absolute_url())
+        self.assertIsNone(response.context["judge_candidate"])
+
+    # -- candidate generation ---------------------------------------------
+
+    def test_generate_pass_verdict_is_refused(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "none")
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate"
+        ) as generate:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        generate.assert_not_called()
+        self.assertContains(response, "no longer expects a candidate", status_code=200)
+
+    def test_generate_resolved_verdict_is_refused(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        verdict.resolution = JudgeVerdict.Resolution.ESCALATED
+        verdict.save(update_fields=["resolution"])
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate"
+        ) as generate:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        generate.assert_not_called()
+        self.assertContains(response, "no longer expects a candidate", status_code=200)
+
+    def test_generate_pending_lock_reports_busy(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate"
+        ) as generate:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        generate.assert_not_called()
+        self.assertContains(response, "already being generated", status_code=200)
+
+    def test_generate_eager_success_reports_stored(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate",
+            return_value="generated",
+        ) as generate:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        generate.assert_called_once_with(
+            unit_id=unit.pk, verdict_id=verdict.pk, user_id=self.user.pk, replace=False
+        )
+        self.assertContains(response, "candidate has been stored", status_code=200)
+
+    def test_generate_eager_failure_keeps_previous_candidate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate",
+            return_value="failed",
+        ):
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        self.assertContains(response, "previous candidate remains", status_code=200)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_generate_non_eager_dispatches_with_kwargs(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate.delay"
+        ) as delay:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                {"replace": "1"},
+                follow=True,
+            )
+        delay.assert_called_once_with(
+            unit_id=unit.pk, verdict_id=verdict.pk, user_id=self.user.pk, replace=True
+        )
+        self.assertContains(response, "generation has been queued", status_code=200)
+
+    def test_unit_page_shows_the_failure_line_after_an_async_failure(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.component.project.machinery_settings = {}
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            outcome = generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict.pk,
+                user_id=self.user.pk,
+                replace=False,
+            )
+        repair.assert_not_called()
+        self.assertEqual(outcome, "no-engine")
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertContains(
+            response, "No repair engine is configured for this language."
+        )
+        self.assertIsNone(response.context["judge_candidate"])
+        self.assertFalse(response.context["judge_generation_pending"])
+        self.assertNotContains(response, 'data-judge-pending="1"')
+
+    def test_unit_page_shows_no_outcome_line_after_a_successful_generation(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch(
+            "weblate.trans.judge_loop.repair_targets",
+            return_value={unit.pk: ["better translation"]},
+        ):
+            outcome = generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict.pk,
+                user_id=self.user.pk,
+                replace=False,
+            )
+        self.assertEqual(outcome, "generated")
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertIsNotNone(response.context["judge_candidate"])
+        self.assertEqual(response.context["judge_generation_outcome"], "")
+        self.assertNotContains(response, "did not return a usable fix")
+        self.assertNotContains(response, "not configured for this language")
+
+    def test_unit_page_shows_busy_as_pending_not_as_a_failure(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            outcome = generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict.pk,
+                user_id=self.user.pk,
+                replace=False,
+            )
+        repair.assert_not_called()
+        self.assertEqual(outcome, "busy")
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertEqual(response.context["judge_generation_outcome"], "busy")
+        self.assertTrue(response.context["judge_generation_pending"])
+        self.assertContains(response, "Generating a suggested fix")
+        self.assertNotContains(response, "did not return a usable fix")
+
+    def test_generate_replace_bypasses_the_pending_gate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate",
+            return_value="generated",
+        ) as generate:
+            self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                {"replace": "1"},
+            )
+        self.assertTrue(generate.call_args.kwargs["replace"])
+
+    # -- candidate acceptance ----------------------------------------------
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        context_hash = judge_context_hash(unit)
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": context_hash,
+                "engine": "openrouter",
+            },
+        )
+        stamp_candidate_evidence(suggestion, context_hash=context_hash)
+        return suggestion
+
+    def test_accept_denied_without_permissions(self) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_denied_with_review_only(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        self.grant(["unit.review"])
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_accept_denied_with_auto_only(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        self.grant(["translation.auto"])
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_accept_missing_suggestion_is_404(self) -> None:
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": 999999}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_accept_get_is_rejected(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        response = self.client.get(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk})
+        )
+        self.assertEqual(response.status_code, 405)
+
+    def test_accept_success_translates_and_redirects_without_a_recheck(self) -> None:
+        # Task 10: the candidate was already verified by both judge seats
+        # before it was ever stored (Task 3), so accepting it must not
+        # queue a second paid re-check of text the judge already cleared.
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertContains(response, "suggested fix has been applied", status_code=200)
+        self.assertNotContains(response, "re-check has been queued")
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 0
+        )
+
+    def test_unit_page_renders_the_candidate_row_in_server_html(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        rows = tree.xpath(
+            '//tbody[@id="machinery-translations"]/tr[@data-judge-candidate="1"]'
+        )
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(len(row.xpath("./td")), 9)
+        forms = row.xpath(
+            f'.//form[@action="{reverse("judge-accept-candidate", kwargs={"pk": candidate.pk})}"]'
+        )
+        self.assertEqual(len(forms), 1)
+        self.assertEqual(
+            row.xpath('.//*[contains(@class, "js-copy-save-machinery")]'), []
+        )
+        self.assertEqual(row.xpath('.//*[contains(@class, "js-copy-machinery")]'), [])
+        self.assertContains(response, "Use suggested fix")
+
+    def test_candidate_row_absent_in_four_gated_scenarios(self) -> None:
+        # No stored candidate at all.
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+        # A candidate whose target hash no longer matches the live text.
+        second = self.get_unit(source="Thank you for using Weblate.")
+        second_verdict = self.make_verdict(second, "critical")
+        self.make_candidate(second, second_verdict)
+        second.translate(self.user, ["Drifted away"], STATE_TRANSLATED)
+        response = self.client.get(
+            self.get_unit(source="Thank you for using Weblate.").get_absolute_url()
+        )
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+        # A queued re-check on a unit that still has a fresh candidate.
+        third = self.get_unit(source="Hello, world!\n", language="de")
+        third_verdict = self.make_verdict(third, "critical")
+        self.make_candidate(third, third_verdict)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.apply_async",
+                return_value=SimpleNamespace(id="task-recheck"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(reverse("judge-recheck", kwargs={"pk": third.pk}))
+        response = self.client.get(third.get_absolute_url())
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+        # The unit is on the deterministic max-length path.
+        fourth = self.get_unit(source="Hello, world!\n", language="it")
+        fourth.translate(self.user, ["A longer translated target"], STATE_TRANSLATED)
+        fourth = Unit.objects.get(pk=fourth.pk)
+        fourth.extra_flags = "max-length:5"
+        fourth.save(update_fields=["extra_flags"])
+        fourth.run_checks()
+        fourth_verdict = self.make_verdict(fourth, "critical")
+        self.make_candidate(fourth, fourth_verdict)
+        response = self.client.get(fourth.get_absolute_url())
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+    def test_candidate_row_absent_without_machinery_view_but_card_accept_still_works(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        self.user.groups.clear()
+        role = Role.objects.create(name="Card-only triage")
+        for codename in ("unit.review", "translation.auto"):
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(
+            name="Card-only triagers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
+        )
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, 'data-load="machinery"')
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+        accept_response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertContains(
+            accept_response, "suggested fix has been applied", status_code=200
+        )
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+
+    def test_accept_stale_target_shows_error_and_keeps_candidate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        unit.translate(self.user, ["Drifted away"], STATE_TRANSLATED)
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertContains(
+            response, "no longer matches the current text", status_code=200
+        )
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertEqual(self.get_unit().target, "Drifted away\n")
+
+    # -- Task 8: auto-advance only after success ---------------------------
+
+    def _next_urls(self, unit):
+        page = self.client.get(unit.get_absolute_url())
+        return page.context["this_unit_url"], page.context["next_unit_url"]
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_successful_accept_advances_to_the_next_unit(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+                {"next": this_unit_url, "success_next": next_unit_url},
+            )
+        self.assertRedirects(response, next_unit_url, fetch_redirect_response=False)
+
+    def test_failed_accept_stays_on_the_current_unit(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        unit.translate(self.user, ["Drifted away"], STATE_TRANSLATED)
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            {"next": this_unit_url, "success_next": next_unit_url},
+        )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_generate_never_advances_even_on_success(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate",
+            return_value="generated",
+        ):
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                # A generate form never submits success_next, but even a
+                # crafted request carrying one must not advance: queued
+                # work is not a completed decision.
+                {"next": this_unit_url, "success_next": next_unit_url},
+            )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_recheck_never_advances_even_when_queued(self) -> None:
+        unit = self.get_unit()
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                reverse("judge-recheck", kwargs={"pk": unit.pk}),
+                {"next": this_unit_url, "success_next": next_unit_url},
+            )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeManualSaveTest(ViewTestCase):
+    """Task 3: review radios hidden for a judged string, automatic re-check."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant_only(self, codenames) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        self.user.groups.clear()
+        role = Role.objects.create(name="Manual save permissions")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(
+            name="Manual save testers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
+        )
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def test_review_radios_hidden_when_judged(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        self.project.commit_policy = 20  # WITHOUT_NEEDS_EDITING
+        self.project.save(update_fields=["commit_policy"])
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(tree.xpath('//div[contains(@class, "review_radio")]'), [])
+        inputs = tree.xpath('//input[@name="review"]')
+        self.assertEqual(len(inputs), 1)
+        self.assertEqual(inputs[0].get("type"), "hidden")
+        self.assertEqual(inputs[0].get("value"), str(STATE_TRANSLATED))
+        self.assertNotContains(response, "not written to the translation file")
+
+    def test_review_hidden_field_keeps_a_held_state(self) -> None:
+        """The hidden field posts the state the judge left, not a promotion."""
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        inputs = tree.xpath('//input[@name="review"]')
+        self.assertEqual(len(inputs), 1)
+        self.assertEqual(inputs[0].get("value"), str(STATE_FUZZY))
+
+    def test_review_radios_shown_when_not_judged(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        self.project.commit_policy = 20
+        self.project.save(update_fields=["commit_policy"])
+        unit = self.get_unit("Thank you for using Weblate.")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "review_radio")
+        self.assertContains(response, "not written to the translation file")
+
+    def test_review_hidden_keeps_approved_on_unchanged_save(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_APPROVED)
+        self.make_verdict(unit, "critical")
+        # The stored target carries the source trailing newline, and that is
+        # what the textarea posts back for an unchanged string.
+        self.edit_unit("Hello, world!\n", "Ahoj\n", review=str(STATE_APPROVED))
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_APPROVED)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 0
+        )
+
+    def test_unchanged_save_keeps_a_held_fuzzy_string(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        self.edit_unit("Hello, world!\n", "Ahoj\n", review=str(STATE_FUZZY))
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 0
+        )
+
+    def test_manual_save_of_changed_text_lifts_a_held_string(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        self.edit_unit("Hello, world!\n", "Nový cíl po opravě", review=str(STATE_FUZZY))
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
+        )
+
+    def test_crlf_target_is_not_mistaken_for_an_edit(self) -> None:
+        """A stored CRLF must not make an identical save look like a fix."""
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj\r\nsvete"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj\r\nsvete"], STATE_APPROVED)
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_APPROVED)
+        self.assertEqual(unit.get_target_plurals(), ["Ahoj\r\nsvete\n"])
+        self.make_verdict(unit, "critical")
+        self.edit_unit("Hello, world!\n", "Ahoj\nsvete\n", review=str(STATE_APPROVED))
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_APPROVED)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 0
+        )
+
+    def test_manual_save_of_changed_text_recheck(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        with mock.patch(
+            "weblate.trans.views.edit.queue_judge_recheck",
+            autospec=True,
+            wraps=queue_judge_recheck,
+        ) as queued:
+            response = self.edit_unit("Hello, world!\n", "Nový cíl po opravě")
+        self.assertEqual(queued.call_count, 1)
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        runs = ProducerRun.objects.filter(requested_mode="recheck")
+        self.assertEqual(runs.count(), 1)
+        self.assertEqual(runs.get().requested_query, recheck_query(unit.pk))
+        self.assert_redirects_offset(response, unit.translation.get_translate_url(), 2)
+
+    def test_manual_save_of_approved_changed_text_demotes_to_translated(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_APPROVED)
+        self.make_verdict(unit, "critical")
+        response = self.edit_unit(
+            "Hello, world!\n", "Nový cíl po opravě", review=str(STATE_APPROVED)
+        )
+        self.assertEqual(response.status_code, 302)
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
+        )
+
+    def test_manual_save_unjudged_string_no_recheck(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        with mock.patch(
+            "weblate.trans.views.edit.queue_judge_recheck",
+            autospec=True,
+            wraps=queue_judge_recheck,
+        ) as queued:
+            self.edit_unit("Thank you for using Weblate.", "Děkuji za Use Weblate")
+        self.assertEqual(queued.call_count, 0)
+        self.assertEqual(ProducerRun.objects.count(), 0)
+        unit = self.get_unit("Thank you for using Weblate.")
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+
+    def test_manual_save_without_translation_auto_no_recheck(self) -> None:
+        self.grant_only(["unit.edit", "unit.review"])
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.edit_unit("Hello, world!\n", "Nový cíl po opravě", follow=True)
+        self.assertContains(response, "awaits a judge re-check")
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+        self.assertEqual(ProducerRun.objects.count(), 0)
+
+    def test_manual_save_recheck_configuration_error(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        with mock.patch(
+            "weblate.trans.views.edit.validate_judge_configuration",
+            side_effect=JudgeError("The judge is not configured."),
+        ):
+            response = self.edit_unit(
+                "Hello, world!\n", "Nový cíl po opravě", follow=True
+            )
+        self.assertContains(response, "The judge is not configured.")
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+        self.assertEqual(ProducerRun.objects.count(), 0)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeVerdictCardRenderTest(ViewTestCase):
+    """Task 5: the embedded triage states the verdict card renders."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant_only(self, codenames) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        # Clear default/baseline group membership too: otherwise a
+        # basic-tier permission such as machinery.view leaks in from the
+        # user's normal "Users" group and this helper can no longer prove
+        # a permission's absence, only its presence.
+        self.user.groups.clear()
+        role = Role.objects.create(name="Card render permissions")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        # project_selection/language_selection default to SELECTION_MANUAL
+        # (applies to nothing until projects/languages are added
+        # explicitly); SELECTION_ALL makes the grant apply everywhere,
+        # which is what a scopeless test role needs.
+        group = Group.objects.create(
+            name="Card render testers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
+        )
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        context_hash = judge_context_hash(unit)
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": context_hash,
+                "engine": "openrouter",
+            },
+        )
+        stamp_candidate_evidence(suggestion, context_hash=context_hash)
+        return suggestion
+
+    def _completed_recheck(self, unit) -> ProducerRun:
+        translation = unit.translation
+        return ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=recheck_query(unit.pk),
+            requested_mode="recheck",
+            cap=1,
+            status=ProducerRun.Status.QUEUED,
+        )
+
+    def test_stale_shows_only_recheck(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        unit.translate(self.user, ["Manually edited away"], STATE_TRANSLATED)
+        response = self.client.get(self.get_unit().get_absolute_url())
+        self.assertContains(response, "Re-check this string")
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+        self.assertNotContains(response, "Keep as is")
+        self.assertNotContains(response, "Send back to queue")
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertNotIn("<details", html.tostring(card, encoding="unicode"))
+
+    def test_queued_recheck_shows_status_not_button(self) -> None:
+        unit = self.get_unit()
+        # A recheck-pending state needs the card itself to render, which
+        # needs at least one existing verdict/round.
+        self.make_verdict(unit, "critical")
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Re-checking this string")
+        self.assertNotContains(response, "Re-check this string<")
+
+    def test_a_pending_recheck_suppresses_every_candidate_action(self) -> None:
+        # The re-check decides what the card may offer next; applying or
+        # regenerating a candidate while it is in flight races that answer.
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Re-checking this string")
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate another")
+        self.assertNotContains(response, "Generate suggested fix")
+        # Position, not just presence: the pending status sits directly
+        # under the status heading, before any resolution controls.
+        content = response.content.decode()
+        self.assertLess(
+            content.index("Re-checking this string"), content.index("Keep as is")
+        )
+
+    def test_a_pending_generation_replaces_the_generate_another_button(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        cache.set(_generation_lock_key(unit.pk, verdict.pk), "1", 60)
+        self.addCleanup(cache.delete, _generation_lock_key(unit.pk, verdict.pk))
+        response = self.client.get(unit.get_absolute_url())
+        # The preview stays usable, but a second paid generation must not be
+        # offered while one is already running.
+        self.assertContains(response, "Use suggested fix")
+        self.assertContains(response, "Generating a suggested fix")
+        self.assertNotContains(response, "Generate another")
+
+    def test_current_candidate_shows_diff_provenance_and_actions(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict, target="A much better translation")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Suggested fix")
+        self.assertContains(response, "A much better translation")
+        self.assertContains(response, "Use suggested fix")
+        self.assertContains(response, "Generate another")
+        # normal editor access is untouched
+        self.assertContains(response, 'name="target_0"')
+
+    def test_no_candidate_offers_no_paid_generation(self) -> None:
+        # The on-demand paid generate button was removed: on a no-candidate
+        # string the producer accepts a variant from the Automatic
+        # suggestions tab instead, so the card only carries the decision.
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        card_html = html.tostring(card, encoding="unicode")
+        self.assertNotIn("Generate suggested fix", card_html)
+        self.assertNotIn("judge-generate-candidate", card_html)
+        self.assertIn("Keep as is", card_html)
+        self.assertNotIn("Use suggested fix", card_html)
+        self.assertLess(card_html.index("Keep as is"), card_html.index("More actions"))
+        # The card no longer links to the machinery tab in any state; the
+        # automatic suggestions entry lives under the More dropdown instead.
+        self.assertNotIn("Computer-aided translation suggestions", card_html)
+
+    # -- Task 15 revisited: the paid-request hint was removed from the UI --
+
+    def test_no_button_carries_a_paid_request_hint(self) -> None:
+        """No judge-card button advertises itself as a paid model request."""
+
+        def assert_free(tree, text: str) -> None:
+            button = tree.xpath(f'//button[normalize-space(text())="{text}"]')[0]
+            self.assertIsNone(button.get("title"))
+            small = button.getnext()
+            self.assertFalse(
+                small is not None
+                and small.tag == "small"
+                and small.text == "Paid model request"
+            )
+
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Paid model request")
+        assert_free(html.fromstring(response.content), "Keep as is")
+
+        self.make_candidate(unit, verdict)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Paid model request")
+        tree = html.fromstring(response.content)
+        assert_free(tree, "Generate another")
+        assert_free(tree, "Re-check this string")
+        assert_free(tree, "Use suggested fix")
+
+    def test_shortcut_targets_present(self) -> None:
+        """The three triage forms carry stable ids for the JS shortcuts."""
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertTrue(tree.xpath('//form[@id="id_judge_accept_form"]'))
+        self.assertTrue(tree.xpath('//form[@id="id_judge_keep_form"]'))
+        self.assertTrue(tree.xpath('//form[@id="id_judge_recheck_form"]'))
+
+    def test_shortcuts_dialog_lists_judge_triage_rows(self) -> None:
+        unit = self.get_unit()
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Apply the suggested judge fix.")
+        self.assertContains(response, "Keep the current text as is.")
+        self.assertContains(response, "Re-check this string with the judge.")
+
+    def test_automatic_suggestions_fallback_needs_machinery_permission(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        self.grant_only(["unit.review", "translation.auto"])
+        self.assertFalse(self.user.has_perm("machinery.view", unit.translation))
+        response = self.client.get(unit.get_absolute_url())
+        # Without machinery.view neither the card nor the More dropdown
+        # offers the automatic suggestions entry - and the card no longer
+        # offers a paid generate button as a substitute either.
+        self.assertNotContains(response, "Computer-aided translation suggestions")
+        self.assertNotContains(response, "Generate suggested fix")
+
+    def test_generation_pending_still_reports_itself(self) -> None:
+        # A generation started elsewhere (backfill, or a replace from More
+        # actions) is the only way this state is reached now, but it must
+        # still say so instead of leaving the card silent.
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        self.addCleanup(cache.delete, _generation_lock_key(unit.pk, verdict.pk))
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Generating a suggested fix")
+        self.assertNotContains(response, "Generate suggested fix<")
+
+    def test_resolved_verdict_never_shows_candidate_controls(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="needs a human look",
+        )
+        response = self.client.get(self.get_unit().get_absolute_url())
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+        self.assertContains(response, "Sent back to queue")
+
+    def test_minor_never_shows_candidate_controls(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "minor")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+
+    def test_flag_renders_same_candidate_controls_as_reject(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+        self.make_candidate(unit, verdict)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Ships with evidence")
+        self.assertContains(response, "Use suggested fix")
+        self.assertContains(response, "Generate another")
+
+    def test_active_max_length_hides_candidate_and_generate(self) -> None:
+        unit = self.get_unit()
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"], same_content=True)
+        unit.translate(self.user, ["a much longer raw target"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.run_checks()
+        self.assertTrue(unit.has_check("max-length"))
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+        # Re-check and the resolution form are unrelated to the mutating
+        # path and remain available.
+        self.assertContains(response, "Re-check this string")
+
+    # -- Task 6: compressed two-seat evidence ------------------------------
+
+    def test_reject_evidence_is_collapsed_into_one_details_element(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "Wrong term used for the key item.",
+                }
+            ],
+            back_translation="This is the reverse-translated text.",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        content = response.content.decode()
+        self.assertEqual(content.count("Judge details"), 1)
+        self.assertIn("<summary>", content)
+        self.assertContains(response, "Wrong term used for the key item.")
+        self.assertContains(response, "vendor/model-a")
+        self.assertContains(response, "This is the reverse-translated text.")
+        self.assertContains(response, "Back-translation:")
+        # Severity/ship-hold badges stay outside (before) the details.
+        self.assertLess(content.index("Will not ship"), content.index("<details"))
+
+    def test_flag_evidence_also_collapses_into_one_details_element(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "major",
+            errors=[
+                {
+                    "category": "tone",
+                    "severity": "major",
+                    "description": "Overly formal register.",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        content = response.content.decode()
+        self.assertEqual(content.count("Judge details"), 1)
+        self.assertContains(response, "Overly formal register.")
+        self.assertLess(content.index("Ships with evidence"), content.index("<details"))
+
+    def test_minor_pass_evidence_also_collapses_into_one_details_element(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "minor",
+            errors=[
+                {
+                    "category": "style",
+                    "severity": "minor",
+                    "description": "Slightly awkward phrasing.",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        content = response.content.decode()
+        self.assertEqual(content.count("Judge details"), 1)
+        self.assertContains(response, "Slightly awkward phrasing.")
+
+    def test_repair_evidence_also_collapses_into_a_details_element(self) -> None:
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        # attempt 0: the originally judged (pre-repair) text and its errors.
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="critical",
+            seat=1,
+            judge_model="vendor/model-a",
+            run_id=run_id,
+            attempt=0,
+            target_hash="0" * 64,
+            target_storage_hash="x" * 32,
+            context_hash="0" * 64,
+            errors=[
+                {
+                    "category": "markup",
+                    "severity": "critical",
+                    "description": "Broken tag in the translation.",
+                }
+            ],
+        )
+        # attempt 1: the current, repaired text - matches the unit as it
+        # stands now, so it becomes the active/current verdict.
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="minor",
+            seat=1,
+            judge_model="vendor/model-a",
+            run_id=run_id,
+            attempt=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
+            context_hash=judge_context_hash(unit),
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertContains(response, "Broken tag in the translation.")
+
+    # -- Task 7: naming remaining outcomes ---------------------------------
+
+    def test_fresh_flag_offers_keep_as_is_and_escalate_directly(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Keep as is")
+        self.assertContains(response, "Send back to queue")
+        form = response.context["judge_resolution_form"]
+        choices = {value for value, _label in form.fields["resolution"].choices}
+        self.assertEqual(
+            choices,
+            {JudgeVerdict.Resolution.ESCALATED, JudgeVerdict.Resolution.ACCEPTED_AS_IS},
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+
+    def test_minor_shows_ai_variants_fallback_but_no_resolution_form(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "minor")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Computer-aided translation suggestions")
+        self.assertNotContains(response, "Keep as is")
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+
+    def test_minor_ai_variants_fallback_needs_machinery_permission(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "minor")
+        self.grant_only(["unit.review", "translation.auto"])
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Computer-aided translation suggestions")
+
+    # -- Task 4/5: one-click keep-as-is and card reordering -----------------
+
+    def test_card_renders_resolution_buttons_per_transition(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+
+        def card_html() -> str:
+            response = self.client.get(unit.get_absolute_url())
+            card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+            return html.tostring(card, encoding="unicode")
+
+        content = card_html()
+        self.assertIn("Keep as is", content)
+        self.assertIn("Send back to queue", content)
+        self.assertNotIn("<select", content)
+
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="",
+        )
+        content = card_html()
+        self.assertIn("Keep as is", content)
+        self.assertNotIn("Send back to queue", content)
+
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+            reason="",
+        )
+        content = card_html()
+        self.assertNotIn("Keep as is", content)
+        self.assertNotIn("Send back to queue", content)
+
+    def test_card_dom_order_for_current_candidate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "Wrong term for the key item.",
+                }
+            ],
+        )
+        self.make_candidate(unit, verdict, target="A much better translation")
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        content = html.tostring(card, encoding="unicode")
+        positions = [
+            content.index("Rejected"),
+            content.index("Wrong term for the key item."),
+            content.index("Judge details"),
+            content.index("A much better translation"),
+            content.index("Use suggested fix"),
+            content.index("Keep as is"),
+            content.index("More actions"),
+            content.index("Generate another"),
+            content.index("Send back to queue"),
+            content.index("Re-check this string"),
+        ]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_rejected_card_shows_primary_error_outside_details_and_both_judges_inside(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "critical",
+            seat=1,
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "Wrong term for the key item.",
+                }
+            ],
+        )
+        self.make_verdict(
+            unit,
+            "minor",
+            seat=2,
+            judge_model="vendor/model-b",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        content = html.tostring(card, encoding="unicode")
+        details_start = content.index("<details")
+        self.assertLess(content.index("Wrong term for the key item."), details_start)
+        self.assertGreater(
+            content.index("Both judges reviewed this string independently."),
+            details_start,
+        )
+
+    # -- Task 6: refresh the page while a paid action is pending ------------
+
+    def test_card_marks_pending_generation(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertEqual(card.get("data-judge-pending"), "1")
+
+    def test_card_marks_pending_recheck(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertEqual(card.get("data-judge-pending"), "1")
+
+    def test_card_not_marked_when_idle(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertIsNone(card.get("data-judge-pending"))
+
+    def test_unparsed_round_marks_pending_recheck(self) -> None:
+        """
+        An unparsed round still self-refreshes while a re-check is running.
+
+        This covers the unparsed state of the main card. The separate
+        ``{% elif judge_round %}`` card needs a round with neither a verdict
+        nor an unparsed row nor a historical fallback; it carries the same
+        attribute, unexercised here.
+        """
+        unit = self.get_unit()
+        self.make_verdict(unit, "none", unparsed=True)
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertIn("was not parsed", html.tostring(card, encoding="unicode"))
+        self.assertEqual(card.get("data-judge-pending"), "1")
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeCardLocalizationTest(ViewTestCase):
+    """Task 7: the producer verdict card renders in Russian."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.user.profile.language = "ru"
+        self.user.profile.save(update_fields=["language"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        context_hash = judge_context_hash(unit)
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": context_hash,
+                "engine": "openrouter",
+            },
+        )
+        stamp_candidate_evidence(suggestion, context_hash=context_hash)
+        return suggestion
+
+    def test_rejected_card_with_candidate_renders_in_russian(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        with translation.override("ru"):
+            response = self.client.get(unit.get_absolute_url())
+        content = response.content.decode()
+        for text in (
+            "Вердикт ИИ-судьи",
+            "Отклонено",
+            "Не публикуется",
+            "Предложенное исправление",
+            "Принять исправление",
+            "Оставить как есть",
+            "Ещё",
+            "Перепроверить строку",
+        ):
+            self.assertIn(text, content)
+
+    def test_pending_recheck_renders_in_russian(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        translation_obj = unit.translation
+        ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
+            scope_id=str(translation_obj.pk),
+            scope_label=str(translation_obj),
+            scope_path=translation_obj.get_absolute_url(),
+            requested_query=recheck_query(unit.pk),
+            requested_mode="recheck",
+            cap=1,
+            status=ProducerRun.Status.QUEUED,
+        )
+        with translation.override("ru"):
+            response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Перепроверяем строку…")
+
+    def test_escalation_button_renders_in_russian(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        with translation.override("ru"):
+            response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Вернуть в очередь")
+
+
+class CheapRouterMachinery(MachineTranslation):
+    """Service that resolves a model per target language, as the routers do."""
+
+    name = "Cheap router"
+
+    def resolve_model(self, code: str) -> str:
+        return "vendor/cheap"
+
+    def download_translations(self, *args, **kwargs):
+        return iter(())
+
+
+class DearRouterMachinery(CheapRouterMachinery):
+    name = "Dear router"
+
+    def resolve_model(self, code: str) -> str:
+        return "vendor/dear"
+
+
+@override_settings(
+    WEBLATE_MACHINERY=[
+        "weblate.trans.tests.test_judge_views.CheapRouterMachinery",
+        "weblate.trans.tests.test_judge_views.DearRouterMachinery",
+    ]
+)
+class MachineTranslationCostPreviewTest(ViewTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.machinery_settings = {
+            "cheap-router": {"key": "test"},
+            "dear-router": {"key": "test"},
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+
+    def price_history(self, service: str, model: str, per_unit: str) -> None:
+        """Five priced requests, the minimum ``recent_cost_range`` accepts."""
+        for _ in range(5):
+            LLMUsageLog.objects.create(
+                model=model,
+                service=service,
+                project_id_snapshot=self.component.project_id,
+                operation=LLMUsageLog.Operation.TRANSLATION,
+                prompt_tokens=10,
+                unit_count=2,
+                batch_size=2,
+                cost_usd=Decimal(per_unit) * 2,
+            )
+
+    def request_preview(self, engines: list[str]) -> dict:
+        response = self.client.get(
+            reverse(
+                "auto_translation_preview",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {
+                "mode": "translate",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "threshold": 80,
+                "engines": engines,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_preview_sums_every_selected_engine_for_a_string(self) -> None:
+        """Both engines are asked for every unit, so their prices add up."""
+        self.price_history("cheap-router", "vendor/cheap", "0.001")
+        self.price_history("dear-router", "vendor/dear", "0.005")
+        payload = self.request_preview(["cheap-router", "dear-router"])
+
+        cost = payload["pretranslation_cost"]
+        self.assertTrue(cost["available"])
+        writable = payload["writable"]
+        self.assertGreater(writable, 0)
+        # Every language resolves the same pair of models, so the interval
+        # collapses onto the exact per-string sum.
+        self.assertEqual(Decimal(cost["min"]), Decimal("0.006") * writable)
+        self.assertEqual(Decimal(cost["max"]), Decimal("0.006") * writable)
+
+    def test_preview_refuses_a_partial_price(self) -> None:
+        """Pricing some pairs of a run and dropping the rest is a lie."""
+        self.price_history("cheap-router", "vendor/cheap", "0.001")
+
+        cost = self.request_preview(["cheap-router", "dear-router"])[
+            "pretranslation_cost"
+        ]
+
+        self.assertFalse(cost["available"])
+
+    def test_preview_is_unavailable_without_price_history(self) -> None:
+        cost = self.request_preview(["cheap-router"])["pretranslation_cost"]
+
+        self.assertFalse(cost["available"])

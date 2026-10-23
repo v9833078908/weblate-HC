@@ -1,0 +1,474 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-25 18:39+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Italian <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/it/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: it\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Abbiamo bisogno di più oro!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Portami 3 pepite d'oro."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Eccellente — queste pepite si aggiungeranno bene alla mia collezione."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Bagliore dell'alba"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Portami una pepita d'oro da qualsiasi roccia aurifera."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"L'oro racchiude in sé il bagliore dell'alba — se non riesco a vederlo, "
+"almeno posso sentirlo..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Ottimo lavoro!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Grazie per l'aiuto! Condividerò con te un luogo curioso."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Un nuovo paio di occhiali"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Portami 2 diamanti. Cadono frequentemente dalle rocce di cristallo."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Vediamo se sono pronto ad abituarmi a questa terra..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Abituarsi alla terra"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Portami una piccola Geode. Si possono trovare nelle rocce comuni."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Vediamo se sono pronto ad abituarmi a questa terra..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Forziere del morto"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Portami un Forziere. Un canarino potrebbe aiutarti a trovarne uno."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Quindi è lì che ho lasciato le mie cose..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Argento per Tempra"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr "Portami 3 pezzi d'argento. Si possono trovare in geodi e rocce comuni."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Ottimo lavoro!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Questo argento pizzica piacevolmente i palmi..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Grazie! Passa da casa mia qualche volta — ecco l'indirizzo."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Denaro antico"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr "Portami 4 Monete antiche. Si trovano spesso in antichi vasi e anfore."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Ora posso finalmente dare il resto agli antichi!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Rullo di sfere"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Portami uno Scarabeo d'oro. Sono grandi coleotteri che si possono trovare "
+"mentre strisciano tra i cespugli."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Questo scarabeo è un vero campione nel far rotolare palline!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Bowling di pietre"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Portami un Geode medio. A volte appare nelle rocce comuni."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Ora potrò finalmente tirare qualche palla!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Omelette d'oro"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Portami un Uovo d'oro. Cerca tra i cespugli per trovare un nido contenente "
+"tali uova."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Ora, questa è una colazione da re!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Sangue di Leone"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Portami un Rubino del Leone. Si può trovare nelle Geodi con cristalli rossi."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Ora sarò coraggioso come un leone!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Grazia del Cielo"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Portami uno Zaffiro Celeste. Si può trovare nelle Geodi con cristalli blu."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "I cieli stessi sono dalla mia parte!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Toilette d'oro"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Portami una pepita d'Oro da 9 da qualsiasi roccia aurifera."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Finalmente posso far riparare il bagno!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Se vuoi esprimere desideri, conosco un posto dove le stelle cadono sempre."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Ottimo lavoro!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Ottimo lavoro!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "Il ghiaccio mi ricorda la nonna... Fai un salto anche alla sua capanna!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Portami 2 oggetti Congelato dalle rocce congelate"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Cubetti di ghiaccio"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Perfetto per i miei cocktail!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Ottimo lavoro!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Sembra che i granchi siano collegati al Culto del Sole — so dove si trovano "
+"le rovine del loro tempio!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Cattura un granchio di ghiaccio — il suo guscio è fatto di Cryolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Metallo di Granchio"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, esometallo! Adoro i misteri della natura!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Ottimo lavoro!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"I tesori più preziosi del Culto del Sole sono nascosti nelle profondità del "
+"Labirinto — ti mostrerò dove!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Accendi 3 torce al Santuario e ruba la Sfera Solare!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Miglior riscaldatore"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Sì, questo è un vero riscaldamento!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Trova 2 pepite d'argento all'interno di cubetti di ghiaccio e scaldale."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Argento ghiacciato"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "È come il ghiaccio in un foglio... ma al contrario..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Oro ghiacciato"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "L'oro invernale ha una lucentezza molto speciale..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Trova 2 pepite d'oro all'interno di cubetti di ghiaccio e scaldale."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Gemma invisibile"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Chiaro nel chiaro, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Scongela un diamante medio. I diamanti congelati si trovano spesso in tutte "
+"le rocce."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Astrologia Terrestre"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Portami 2 Ferri Stellari. Si possono trovare nelle Paludi durante una Caduta "
+"di stelle."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "L'astrometal è il sogno di ogni scienziato!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Intruso Cosmico"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Trova un Nucleo di Meteora Maledetto durante una Caduta di stelle e bandisci "
+"la maledizione."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Una meteora è una macchina, non solo un corpo celeste! Incredibile!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Calore di Granchio"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Raccogli 5 frammenti di Cryolis dai gusci dei granchi di ghiaccio."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Anche tu muori dalla voglia di sapere come vivono i granchi nella neve?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Nuovi sensori"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Portami 9 Pezzi d'Argento. Si possono trovare nelle Geodi e nelle semplici "
+"rocce."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "I miei strumenti di ricerca smetteranno finalmente di dare problemi!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Cappotto caldo di Granchio"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Raccogli 8 schegge di Cryolis dai gusci dei granchi di ghiaccio."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Ora capirò finalmente come sopravvivono all'inverno!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Andare in grande"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr "Portami un Grande Diamante. Si può trovare in tutte le rocce congelate."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Oh mio dio, è grande come una testa! Ma di chi..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Tesoro delle Terre Bianche"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr ""
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Dammi il Forziere dello Jarl. Il canarino ti aiuterà a trovarlo nelle Terre "
+"Bianche."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Mi ricorda il nonno..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Essenza di Fiamma"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Estrai una Scintilla dell'Idolo dalla Sfera Solare."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Che pietra calda..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Pietra iridescente"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Portami un Opale. È un ritrovamento Raro nelle rocce Congelato."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Guarda come luccica splendidamente..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Ha lasciato la prole!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Estrai un Pulcino di gufo dalla Sfera Solare."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Il Grande gufo porta il freddo... Perché il pulcino è così caldo?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Grande affare"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Portami 5 pezzi d'Oro. Sono piuttosto comuni nelle rocce congelate."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Ora sarò l'uomo più grande della città."

@@ -1,0 +1,406 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Tests for unitdata models."""
+
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+from django.core.cache import cache
+from django.test import SimpleTestCase
+from django.urls import reverse
+from django.utils.html import format_html
+
+from weblate.checks.base import BatchCheckMixin, TargetCheck
+from weblate.checks.consistency import ConsistencyCheck
+from weblate.checks.models import CHECKS, Check
+from weblate.checks.tasks import finalize_component_checks
+from weblate.trans.models import Project, Unit
+from weblate.trans.tasks import auto_translate
+from weblate.trans.tests.test_views import FixtureTestCase, ViewTestCase
+from weblate.trans.util import join_plural
+from weblate.utils.lock import WeblateLock
+
+
+class CheckLintTestCase(SimpleTestCase):
+    def test_check_id(self) -> None:
+        for check in CHECKS.values():
+            self.assertRegex(check.check_id, r"^[a-z][a-z0-9_-]*[a-z]$")
+            self.assertTrue(
+                check.description.endswith("."),
+                f"{check.__class__.__name__} description does not have a stop: {check.description}",
+            )
+
+
+class CheckTargetFastPathTest(SimpleTestCase):
+    def test_custom_check_target_is_called(self) -> None:
+        class CustomTargetCheck(TargetCheck):
+            check_id = "custom"
+
+            def check_target(self, sources, targets, unit) -> bool:
+                unit.check_target_called = True
+                return True
+
+            def check_target_unit(self, sources, targets, unit) -> bool:
+                msg = "check_target() override was bypassed"
+                raise AssertionError(msg)
+
+        unit: Any = SimpleNamespace(check_target_called=False)
+
+        self.assertTrue(
+            CustomTargetCheck().check_target_with_flags(
+                ["source"], ["target"], unit, set()
+            )
+        )
+        self.assertTrue(unit.check_target_called)
+
+
+class CheckModelTestCase(FixtureTestCase):
+    def create_check(self, name):
+        return Check.objects.create(unit=self.get_unit(), name=name)
+
+    def test_check(self) -> None:
+        check = self.create_check("same")
+        self.assertEqual(
+            str(check.get_description()), "Source and translation are identical."
+        )
+        self.assertTrue(check.get_doc_url().endswith("user/checks.html#check-same"))
+        self.assertEqual(str(check), "Unchanged translation")
+
+    def test_check_nonexisting(self) -> None:
+        check = self.create_check("-invalid-")
+        self.assertEqual(check.get_description(), "-invalid-")
+        self.assertEqual(check.get_doc_url(), "")
+
+    def test_check_render(self) -> None:
+        unit = self.get_unit()
+        unit.source_unit.extra_flags = "max-size:1:1"
+        unit.source_unit.save()
+        check = self.create_check("max-size")
+        url = reverse(
+            "render-check", kwargs={"check_id": check.name, "unit_id": unit.id}
+        )
+        self.assertHTMLEqual(
+            check.get_description(),
+            format_html(
+                '<a href="{0}?pos={1}" class="thumbnail img-check">'
+                '<img class="img-fluid" src="{0}?pos={1}" /></a>',
+                url,
+                0,
+            ),
+        )
+        self.assert_png(self.client.get(url))
+
+    def test_source_check_render(self) -> None:
+        unit = self.get_unit().source_unit
+        Unit.objects.filter(pk=unit.pk).update(extra_flags="max-size:1:1")
+        check = Check.objects.create(unit=unit, name="max-size")
+        url = reverse(
+            "render-check", kwargs={"check_id": check.name, "unit_id": unit.id}
+        )
+        self.assertHTMLEqual(
+            check.get_description(),
+            format_html(
+                '<a href="{0}?pos={1}" class="thumbnail img-check">'
+                '<img class="img-fluid" src="{0}?pos={1}" /></a>',
+                url,
+                0,
+            ),
+        )
+        self.assert_png(self.client.get(url))
+
+    def test_source_check_render_updates_after_source_change(self) -> None:
+        cache.clear()
+        unit = self.get_unit().source_unit
+        Unit.objects.filter(pk=unit.pk).update(
+            source="short", extra_flags="max-size:500"
+        )
+        url = reverse(
+            "render-check", kwargs={"check_id": "max-size", "unit_id": unit.id}
+        )
+
+        response = self.client.get(url)
+        self.assert_png(response)
+        original = response.content
+
+        Unit.objects.filter(pk=unit.pk).update(
+            source="long " * 50, extra_flags="max-size:500"
+        )
+        response = self.client.get(url)
+        self.assert_png(response)
+        self.assertNotEqual(original, response.content)
+
+    def test_source_check_render_later_plural_after_first_plural_failure(self) -> None:
+        cache.clear()
+        unit = self.get_unit().source_unit
+        Unit.objects.filter(pk=unit.pk).update(
+            source=join_plural(("long " * 50, "short")),
+            extra_flags="max-size:500",
+        )
+        url = reverse(
+            "render-check", kwargs={"check_id": "max-size", "unit_id": unit.id}
+        )
+
+        self.assert_png(self.client.get(f"{url}?pos=1"))
+
+    def test_source_check_run_checks(self) -> None:
+        unit = self.get_unit().source_unit
+        Check.objects.filter(unit=unit, name="max-size").delete()
+        unit.extra_flags = "max-size:500"
+        unit.source = "long " * 50
+
+        unit.run_checks()
+        self.assertTrue(Check.objects.filter(unit=unit, name="max-size").exists())
+
+        unit.source = "short"
+        unit.check_cache = {}
+        unit.run_checks()
+        self.assertFalse(Check.objects.filter(unit=unit, name="max-size").exists())
+
+    def test_check_order(self) -> None:
+        unit = self.get_unit()
+        Check.objects.filter(unit=unit).delete()
+        for name in ("same", "end_newline", "begin_newline"):
+            Check.objects.create(unit=unit, name=name)
+
+        expected = ["begin_newline", "end_newline", "same"]
+        self.assertEqual(
+            list(
+                Check.objects.filter(unit=unit).order().values_list("name", flat=True)
+            ),
+            expected,
+        )
+        self.assertEqual([check.name for check in unit.all_checks], expected)
+
+        prefetched = Unit.objects.filter(pk=unit.pk).prefetch_all_checks().get()
+        self.assertEqual([check.name for check in prefetched.all_checks], expected)
+
+
+class BatchCheckMixinTest(SimpleTestCase):
+    def test_project_checks_lock_uses_unique_file_name(self) -> None:
+        project = Project(pk=1, name="Shared", slug="shared")
+
+        with (
+            TemporaryDirectory() as temp_dir,
+            self.settings(DATA_DIR=temp_dir),
+            patch("weblate.utils.lock.is_redis_cache", return_value=False),
+        ):
+            project_lock = project.checks_lock
+            component_lock = WeblateLock(
+                scope="component:checks",
+                key=1,
+                slug=project.slug,
+                timeout=5,
+                origin=project.full_slug,
+            )
+
+        # ruff: ignore[private-member-access]
+        self.assertNotEqual(project_lock._name, component_lock._name)
+        # ruff: ignore[private-member-access]
+        self.assertEqual(Path(project_lock._name).parent, Path(temp_dir, "locks"))
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            Path(project_lock._name).name,
+            "project%3Achecks-1.lock",
+        )
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            Path(component_lock._name).name,
+            "component%3Achecks-1.lock",
+        )
+
+    def test_project_checks_lock_uses_longer_timeout(self) -> None:
+        project = Project(name="Shared", slug="shared")
+
+        with (
+            TemporaryDirectory() as lock_path,
+            patch("weblate.utils.lock.is_redis_cache", return_value=False),
+        ):
+            project.__dict__["full_path"] = lock_path
+            project_lock = project.checks_lock
+
+        # ruff: ignore[private-member-access]
+        self.assertEqual(project_lock._timeout, 30)
+
+    def test_component_checks_lock_uses_key_in_file_name(self) -> None:
+        with (
+            TemporaryDirectory() as temp_dir,
+            self.settings(DATA_DIR=temp_dir),
+            patch("weblate.utils.lock.is_redis_cache", return_value=False),
+        ):
+            first_lock = WeblateLock(
+                scope="component:checks",
+                key=1,
+                slug="shared",
+                timeout=5,
+                origin="project/shared",
+            )
+            second_lock = WeblateLock(
+                scope="component:checks",
+                key=2,
+                slug="shared",
+                timeout=5,
+                origin="project/shared",
+            )
+
+        # ruff: ignore[private-member-access]
+        self.assertNotEqual(first_lock._name, second_lock._name)
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            Path(first_lock._name).name,
+            "component%3Achecks-1.lock",
+        )
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            Path(second_lock._name).name,
+            "component%3Achecks-2.lock",
+        )
+
+    def test_project_wide_batch_uses_project_lock(self) -> None:
+        project_lock = MagicMock()
+        component: Any = SimpleNamespace(
+            allow_translation_propagation=True,
+            project=SimpleNamespace(checks_lock=project_lock),
+        )
+
+        with patch.object(ConsistencyCheck, "_perform_batch") as perform_batch:
+            ConsistencyCheck().perform_batch(component)
+
+        project_lock.__enter__.assert_called_once()
+        project_lock.__exit__.assert_called_once()
+        perform_batch.assert_called_once_with(component)
+
+    def test_perform_batch_sorts_bulk_create_by_unique_key(self) -> None:
+        class DummyBatchCheck(BatchCheckMixin):
+            check_id = "dummy"
+
+            def should_skip(self, unit) -> bool:
+                return False
+
+            def check_component(self, component):
+                return [unit_b, unit_a]
+
+        class FakeCheck:
+            objects = MagicMock()
+
+            def __init__(self, *, unit, dismissed, name):
+                self.dismissed = dismissed
+                self.name = name
+                self.unit_id = unit.pk
+
+        component: Any = SimpleNamespace(
+            id=1,
+            allow_translation_propagation=False,
+            invalidate_cache=MagicMock(),
+        )
+        unit_a = SimpleNamespace(
+            pk=2,
+            all_checks_names=set(),
+            translation=SimpleNamespace(component=component),
+        )
+        unit_b = SimpleNamespace(
+            pk=1,
+            all_checks_names=set(),
+            translation=SimpleNamespace(component=component),
+        )
+        stale_checks = MagicMock()
+        stale_checks.filter.return_value = stale_checks
+        stale_checks.delete.return_value = (0, {})
+        FakeCheck.objects.exclude.return_value = stale_checks
+
+        with patch("weblate.checks.models.Check", FakeCheck):
+            DummyBatchCheck().perform_batch(component)
+
+        self.assertIsNotNone(FakeCheck.objects.bulk_create.call_args)
+        created = FakeCheck.objects.bulk_create.call_args.args[0]
+        self.assertEqual(
+            [(check.unit_id, check.name) for check in created],
+            [(1, "dummy"), (2, "dummy")],
+        )
+
+
+class BatchUpdateTest(ViewTestCase):
+    """Test for complex manipulating translation."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.translation = self.get_translation()
+
+    def do_base(self):
+        # Single unit should have no consistency check
+        self.edit_unit("Hello, world!\n", "Nazdar svete!\n")
+        unit = self.get_unit()
+        self.assertEqual(unit.all_checks_names, set())
+
+        # Add linked project
+        other = self.create_link_existing()
+
+        # Now the inconsistent check should be there
+        unit = self.get_unit()
+        self.assertEqual(unit.all_checks_names, {"inconsistent"})
+        return other
+
+    def test_autotranslate(self) -> None:
+        other = self.do_base()
+        translation = other.translation_set.get(language_code="cs")
+        auto_translate(
+            user_id=None,
+            mode="translate",
+            q="state:<translated",
+            auto_source="others",
+            source_component_id=self.component.pk,
+            engines=[],
+            threshold=99,
+            translation_id=translation.pk,
+        )
+        unit = self.get_unit()
+        self.assertEqual(unit.all_checks_names, set())
+
+    def test_noop(self) -> None:
+        other = self.do_base()
+        # The batch update should not remove it
+        finalize_component_checks(
+            self.component.id, [], ["inconsistent"], batch_mode=True
+        )
+        finalize_component_checks(other.id, [], ["inconsistent"], batch_mode=True)
+        unit = self.get_unit()
+        self.assertEqual(unit.all_checks_names, {"inconsistent"})
+
+    def test_toggle(self) -> None:
+        other = self.do_base()
+        one_unit = self.get_unit()
+        other_unit = Unit.objects.get(
+            translation__language_code=one_unit.translation.language_code,
+            translation__component=other,
+            id_hash=one_unit.id_hash,
+        )
+        translated = one_unit.target
+
+        combinations: tuple[tuple[str, str, set[str]], ...] = (
+            (translated, "", {"inconsistent"}),
+            ("", translated, {"inconsistent"}),
+            ("", "", set()),
+            (translated, translated, set()),
+            ("", translated, {"inconsistent"}),
+        )
+        for update_one, update_other, expected in combinations:
+            Unit.objects.filter(pk=one_unit.pk).update(target=update_one)
+            Unit.objects.filter(pk=other_unit.pk).update(target=update_other)
+
+            finalize_component_checks(
+                self.component.id, [], ["inconsistent"], batch_mode=True
+            )
+            unit = self.get_unit()
+            self.assertEqual(unit.all_checks_names, expected)
+
+        for update_one, update_other, expected in combinations:
+            Unit.objects.filter(pk=one_unit.pk).update(target=update_one)
+            Unit.objects.filter(pk=other_unit.pk).update(target=update_other)
+
+            finalize_component_checks(other.id, [], ["inconsistent"], batch_mode=True)
+            unit = self.get_unit()
+            self.assertEqual(unit.all_checks_names, expected)

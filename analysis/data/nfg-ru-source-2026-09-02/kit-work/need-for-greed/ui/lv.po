@@ -1,0 +1,2071 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-28 09:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Latvian <http://l10n.herocraft.com/projects/need-for-greed/ui/"
+"lv/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lv\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 0 || n % 100 >= 11 && n % 100 <= "
+"19) ? 0 : ((n % 10 == 1 && n % 100 != 11) ? 1 : 2);\n"
+
+#: 142945292288
+msgid "vibration"
+msgstr "Vibrācija"
+
+#: 136857827676160
+msgid "loading"
+msgstr "Ielādē"
+
+#: 140450844643328
+msgid "adsNotReady"
+msgstr "Reklāma nav gatava. Mēģiniet vēlāk."
+
+#: 340188151943168
+msgid "amount"
+msgstr "{value}"
+
+#: 368875517775872
+msgid "reviewTitle"
+msgstr "Jūsu viedoklis mums ir svarīgs!"
+
+#: 368997953703936
+msgid "reviewDescription"
+msgstr "Vai jums patīk šī spēle?"
+
+#: 369514264137728
+msgid "reviewConfirm"
+msgstr "Jā, protams!"
+
+#: 369755633750016
+msgid "no"
+msgstr "Nē"
+
+#: 406497292193792
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+#: 483624632979456
+msgid "leaders"
+msgstr "Līderi"
+
+#: 483894125400064
+msgid "leaderboardAuth"
+msgstr ""
+"Līderu saraksts ir pieejams tikai autorizētiem lietotājiem. \n"
+"Pierakstieties savā kontā iestatījumos."
+
+#: 693554757505024
+msgid "softCurrency"
+msgstr "Sudraba monētas"
+
+#: 693648756051968
+msgid "gems"
+msgstr "Dārgakmeņi"
+
+#: 2338581875265536
+msgid "day_N"
+msgstr "Diena {value}"
+
+#: 2340303519617024
+msgid "dailyRewards"
+msgstr "Ikdienas balvas"
+
+#: 2340513616498688
+msgid "dailyRewardsDescription"
+msgstr ""
+"Apmeklējiet spēli katru dienu\n"
+"un saņemiet balvas."
+
+#: 2524665741578240
+msgid "tapToStart"
+msgstr "Pieskarieties, lai sāktu"
+
+#: 2534199759474688
+msgid "settings"
+msgstr "Iestatījumi"
+
+#: 2539217615065088
+msgid "sound"
+msgstr "SFX"
+
+#: 2539801025974272
+msgid "music"
+msgstr "Mūzika"
+
+#: 2606360020914176
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?"
+"{seconds}s.|} "
+
+#: 31188945265680384
+msgid "sell"
+msgstr "Pārdot"
+
+#: 39267299644215296
+msgid "trading"
+msgstr "Tirdzniecība"
+
+#: 39267930052300800
+msgid "selectAmount"
+msgstr ""
+"Izvēlieties dārgakmeņu daudzumu <size=56><color=#fff>( {value} / {total} )</"
+"color></size>"
+
+#: 39432224572248064
+msgid "apply"
+msgstr "Pielietot"
+
+#: 88927433573797888
+msgid "exit"
+msgstr "Iziet"
+
+#: 89108083400511488
+msgid "loot"
+msgstr "Laupījums"
+
+#: 89232802619592704
+msgid "inventory"
+msgstr "Inventārs"
+
+#: 89233049219502080
+msgid "add_amount"
+msgstr "+ {value}"
+
+#: 101508439312961536
+msgid "upgradeCharacterHealthStat"
+msgstr "Veselība"
+
+#: 101509164025778176
+msgid "Pick"
+msgstr "Cērte"
+
+#: 103762241726451712
+msgid "unload"
+msgstr "Izkraut"
+
+#: 105589950840573952
+msgid "continue"
+msgstr "turpināt"
+
+#: 105600782735511552
+msgid "continueWithoutTheBird"
+msgstr "Turpināt bez putna"
+
+#: 128992315220168704
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+#: 129852820621103104
+msgid "make"
+msgstr "Izveidot"
+
+#: 130612002970406912
+msgid "in_progress"
+msgstr "Procesā..."
+
+#: 132250436289957888
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+#: 132393404065910784
+msgid "lvl_x"
+msgstr "līm. {value}"
+
+#: 133085114043469824
+msgid "take"
+msgstr "Paņemt"
+
+#: 168978456979443712
+msgid "tradeDescription"
+msgstr "Velciet un nometiet priekšmetus, lai tos pārdotu šeit"
+
+#: 168979719083266048
+msgid "storage"
+msgstr "Noliktava"
+
+#: 168993254521704448
+msgid "backpack"
+msgstr "Mugursoma"
+
+#: 175428495763312640
+msgid "upgradeCharacterResistanceStat"
+msgstr "Izturība"
+
+#: 175428883866456064
+msgid "completed"
+msgstr "Pabeigts"
+
+#: 175429326734626816
+msgid "upgradeCharacterSpeedStat"
+msgstr "Ātrums"
+
+#: 175429624488267776
+msgid "detectionRadius"
+msgstr "Slazdu noteikšanas rādiuss"
+
+#: 175437389508120576
+msgid "upgrade"
+msgstr "Uzlabot"
+
+#: 175444653988122624
+msgid "upgradeCharacterTitle"
+msgstr "Tēls lvl {value}"
+
+#: 175444893063450624
+msgid "upgradeToolTitle"
+msgstr "Rīks lvl {value}"
+
+#: 175445052228898816
+msgid "bird"
+msgstr "Putns"
+
+#: 175445211058802688
+msgid "craft"
+msgstr "Izgatavot"
+
+#: 175530141390475264
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Papildu lidojumi"
+
+#: 175535881710735360
+msgid "upgradeToolSpeedStat"
+msgstr "Instrumenta trieciena ātrums"
+
+#: 175536172950622208
+msgid "upgradeToolDamageStat"
+msgstr "Instrumenta bojājumi"
+
+#: 185307831437889536
+msgid "terrain1Title"
+msgstr "Fenmaras purvs"
+
+#: 185308054407090176
+msgid "terrain2Title"
+msgstr "Belomars"
+
+#: 185645691072417792
+msgid "start"
+msgstr "Sākt"
+
+#: 185658961254682624
+msgid "terrain1Description"
+msgstr ""
+"Vienkārši purvs, kas ir purvs — izņemot zelta tīrradņus un milzu tārpu, kas "
+"reaģē uz katru “klinkšķi.”\n"
+"Vietējie saka: ja vēlaties zeltu, negrabiniet kā porcelāna veikalā."
+
+#: 185670435373060096
+msgid "howToOpenBiome"
+msgstr ""
+"Jaunas vietas.\n"
+"Izpildiet pasūtījumus — un vietējie parādīs, kur meklēt tālāk."
+
+#: 185944937449394176
+msgid "revivalTitle"
+msgstr "Tā ir pilnīga neveiksme!"
+
+#: 185946490252038144
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Vienumi Mugursoma: {value} / {total}"
+
+#: 185949125390635008
+msgid "exitAndLoseItems"
+msgstr "Iziet un zaudēt vienumus"
+
+#: 187764654040420352
+msgid "noBirdEnergy"
+msgstr "Nav putnu, nav acu"
+
+#: 187765165577736192
+msgid "noDetectorEnergy"
+msgstr "Dārgumu detektors"
+
+#: 190252961852821504
+msgid "yes_leave"
+msgstr "Jā, atstāt"
+
+#: 190253329051553792
+msgid "no_stay"
+msgstr "Nē, palikt šeit"
+
+#: 190253804719181824
+msgid "leave_location_confirmation"
+msgstr "Vai vēlaties atstāt atrašanās vietu?"
+
+#: 190609920439357440
+msgid "percentAmount"
+msgstr "{value}%"
+
+#: 190613197834948608
+msgid "pointsAmount"
+msgstr "{value} <size=70%>pt.</size>"
+
+#: 190999934906142720
+msgid "close"
+msgstr "Aizvērt"
+
+#: 191001304602251264
+msgid "selectTheShape"
+msgstr "Izvēlieties dārgumu formu"
+
+#: 191001600908857344
+msgid "speedUp"
+msgstr "Paātrināt"
+
+#: 191062612982894592
+msgid "tutorial"
+msgstr "Apmācība"
+
+#: 214456412639858688
+msgid "terrainPickLootTitle"
+msgstr "Paņemiet visu, kas ietilpst jūsu somā un Uzglabāšana"
+
+#: 214474517843808256
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+#: 215688832034803712
+msgid "takeToStorageXofY"
+msgstr "Paņemt {value}/ {total}"
+
+#: 215688944811249664
+msgid "upgradeBag"
+msgstr "Uzlabot somu"
+
+#: 216124892128743424
+msgid "dealerWillBuyTheRest"
+msgstr "Tirgotājs nopirks visu pārējo no jums"
+
+#: 216274536972423168
+msgid "information"
+msgstr "Informācija"
+
+#: 216281997183815680
+msgid "weightInformation"
+msgstr ""
+"Zirga somas ietilpība ir svarīgs rādītājs.\n"
+"Atrasto priekšmetu svars ietekmē to transportēšanu.\n"
+"Uzlabojiet savu somu, lai palielinātu tās ietilpību un pārvadātu vairāk "
+"priekšmetu."
+
+#: 216292821260570624
+msgid "rank_x"
+msgstr "Rangs {value}"
+
+#: 216295079784222720
+msgid "weight"
+msgstr "Svars:"
+
+#: 216455391749607424
+msgid "vehicleUpgradeDescription"
+msgstr "Uzlabojiet zirga kravas somas ietilpību kravu pārvadāšanai."
+
+#: 216456296213516288
+msgid "capacity"
+msgstr "Ietilpība"
+
+#: 216456449876037632
+msgid "horseCargoBag"
+msgstr "Zirga kravas soma"
+
+#: 216464394802171904
+msgid "hardCurrency"
+msgstr "Zelta monētas"
+
+#: 216827767398076416
+msgid "confirmation"
+msgstr "Apstiprinājums"
+
+#: 216836939359457280
+msgid "attention!"
+msgstr "Uzmanību!"
+
+#: 216837051221544960
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Ja aiziesiet tagad, <color=#E01114>visas atrastās preces tiks pārdotas "
+"tirgotājam</color> par zemāku cenu nekā parasti."
+
+#: 216843048690388992
+msgid "bayerDescription"
+msgstr "Vēlaties nopelnīt vairāk? Es nopirkšu atlikumus ar bonusu."
+
+#: 217004942013239296
+msgid "bestProfit"
+msgstr "Labākā peļņa"
+
+#: 217005085059977216
+msgid "goodProfit"
+msgstr "Laba peļņa"
+
+#: 217005221878173696
+msgid "badProfit"
+msgstr "Slikta peļņa"
+
+#: 217034757265166336
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+#: 217067111195086848
+msgid "yourProfit"
+msgstr "Jūsu peļņa:"
+
+#: 219330229052903424
+msgid "eliteSlot"
+msgstr "Elites slots"
+
+#: 219330557043281920
+msgid "tradingShopLevel"
+msgstr "Tirdzniecības veikals līmenis {value}"
+
+#: 219331227683131392
+msgid "rent"
+msgstr "Īre"
+
+#: 219333990236295168
+msgid "slot"
+msgstr "Slots"
+
+#: 219334107282542592
+msgid "selectItem"
+msgstr "Izvēlēties priekšmetu"
+
+#: 219569917810446336
+msgid "checkOffer"
+msgstr "Pārbaudīt"
+
+#: 221184956493467648
+msgid "shopLevel"
+msgstr "Veikala līmenis {value}"
+
+#: 221731312916238336
+msgid "tradeOpenEliteSlotDialog"
+msgstr "Šeit pircēji maksā dārgi, bez kaulēšanās."
+
+#: 221732692687065088
+msgid "getASlot"
+msgstr "Iegūt Slots"
+
+#: 221745332360581120
+msgid "customerWillArriveIn"
+msgstr "Klients ieradīsies pēc:"
+
+#: 221747748288073728
+msgid "speedUpBy"
+msgstr "Paātrināt par"
+
+#: 221752584698073088
+msgid "decline?"
+msgstr "Noraidīt?"
+
+#: 221752816395620352
+msgid "tradeDeclineClientInfo"
+msgstr "Līdz nākamā klienta ierašanās:"
+
+#: 221785455785676800
+msgid "tradingShop"
+msgstr "Tirdzniecības veikals"
+
+#: 221785885429207040
+msgid "newSlot"
+msgstr "Jauns slots"
+
+#: 221786327613706240
+msgid "tradeUpgradeDescription"
+msgstr ""
+"Uzlabojiet tirdzniecības veikalu, lai atbloķētu vairāk slotu pārdošanai."
+
+#: 221790732488544256
+msgid "tradingShopShort"
+msgstr "Veikals"
+
+#: 221791365350297600
+msgid "level_x"
+msgstr "Līmenis {value}"
+
+#: 221901028389556224
+msgid "buyersOffer"
+msgstr "Pircēja piedāvājums:"
+
+#: 221902690122469376
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+#: 223520514767065088
+msgid "common"
+msgstr "Parasts"
+
+#: 223520659910955008
+msgid "uncommon"
+msgstr "Reti sastopams"
+
+#: 223520713283473408
+msgid "rare"
+msgstr "Retais"
+
+#: 223520767448715264
+msgid "epic"
+msgstr "Episks"
+
+#: 223520826210914304
+msgid "legendary"
+msgstr "Leģendārs"
+
+#: 223520860377714688
+msgid "mythic"
+msgstr "Mītisks"
+
+#: 224246507228106752
+msgid "tradeSelectItemTitle"
+msgstr "Izvēlieties preci pārdošanai"
+
+#: 224277347911864320
+msgid "basePrice"
+msgstr "Pamata cena:"
+
+#: 226508435681972224
+msgid "map"
+msgstr "Karte"
+
+#: 226574491591118848
+msgid "wiseNotes"
+msgstr "Gudras piezīmes"
+
+#: 226576404894191616
+msgid "emptyPickedItems"
+msgstr "Aiziet tukšām rokām?"
+
+#: 226580081470083072
+msgid "settingsDescription"
+msgstr "Veidojiet pasauli savā veidā!"
+
+#: 226582087576326144
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Uzlabojiet savu tirdzniecības veikalu, lai atbloķētu vairāk pārdošanas vietu "
+"— jo vairāk plauktu pievienosiet, jo lielāka būs jūsu peļņa!"
+
+#: 226633818465112064
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00} |}{minutes:00}:{seconds:00}"
+
+#: 227954852267036672
+msgid "craftSlot"
+msgstr "Izgat. slots"
+
+#: 227959361919782912
+msgid "superSlot"
+msgstr "Super slots"
+
+#: 228232787804819456
+msgid "forge"
+msgstr "Kalve"
+
+#: 228312834624458752
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Kalve dārgumus, atver lādes un maģiskās olas — kas zina, kāds retais "
+"laupījums gaida iekšā!"
+
+#: 228318026984067072
+msgid "chestSlot"
+msgstr "Lādes slots"
+
+#: 228318447752450048
+msgid "incubator"
+msgstr "Inkubators"
+
+#: 228321113740152832
+msgid "craftOpenEliteSlotLabel"
+msgstr "Atbrīvo galīgo spēku!"
+
+#: 228357165007769600
+msgid "cancel"
+msgstr "Atcelt"
+
+#: 228360236127490048
+msgid "openChest"
+msgstr "Atvērt lādes"
+
+#: 228385218756874240
+msgid "timeToOpen:"
+msgstr "Atvēršanas laiks:"
+
+#: 228792391647367168
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Nav Lādes noliktavā"
+
+#: 228794249094893568
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Atradi vienu? Velc to uz Izgatavot un atver\n"
+"(tikai ne ar cirvi, labi?)"
+
+#: 228796285601452032
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+#: 229526591581196288
+msgid "craftSelectEggTitle"
+msgstr "Izvēlies Olu, ko atvērt"
+
+#: 229526902270070784
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Nav Olas noliktavā"
+
+#: 229528260377317376
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "Uz Olu mēs dodamies — nevis no kūts, bet dzimusi no maģijas!"
+
+#: 229528854181711872
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Izpēti valstību, atklāj Reto Olu un nogādā to uz Izgatavot. Kas slēpjas "
+"iekšpusē — tikai dzeltenums, vai kaut kas daudz lielāks?"
+
+#: 229530481219342336
+msgid "openEgg"
+msgstr "Atvērt Olu"
+
+#: 229879731472044032
+msgid "craftSelectRecipeTitle"
+msgstr "Izvēlies sastāvdaļas Izgatavošanai"
+
+#: 229880209643671552
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Nekas nav noliktavā!"
+
+#: 229881107660935168
+msgid "craftItem"
+msgstr "Izgatavot priekšmetu"
+
+#: 229881635711225856
+msgid "crafting:"
+msgstr "Izgatavošana:"
+
+#: 229882264282206208
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Šie priekšmeti vēl nav atrasti."
+
+#: 229887783071911936
+msgid "recipe"
+msgstr "Recepte"
+
+#: 230098234464538624
+msgid "craftClosedRecipeTitle"
+msgstr "Kalve ir pārāk vāja!"
+
+#: 230098538715156480
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Nepietiekams kalves līmenis\n"
+"\n"
+"Ar katru uzlabojumu jūs varēsiet izgatavot arvien retākus un vērtīgākus "
+"dārgumus. Ir pienācis laiks pārvērst šo krāsni par leģendu kalvi!"
+
+#: 230596136282624000
+msgid "craftClosedSlotTitle"
+msgstr "Slots ir bloķēts!"
+
+#: 230596696704552960
+msgid "craftClosedSlotDescription"
+msgstr ""
+"Jūsu izgatavošanas prasmes nav pietiekami spēcīgas. Jums tās ir jāuzlabo."
+
+#: 230974103273869312
+msgid "or"
+msgstr "vai"
+
+#: 231685619115626496
+msgid "craftSpeedUpTitle"
+msgstr "Iemetiet ogles!"
+
+#: 231686505602748416
+msgid "craftSpeedUpDescription"
+msgstr ""
+"Tas būs tā, it kā rūķi būtu iedzēruši espresso un ieslēguši turbo režīmu!"
+
+#: 231700678231461888
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Slots atbloķēts.\n"
+"Krāsns kausē Metālu, pārvēršot to pavisam jaunās Rotaslietās pārdošanai."
+
+#: 231701488554217472
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Laiks ir nauda, bet Rotaslietas tiek izgatavotas vēl ātrāk"
+
+#: 231702447166590976
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Palielina jūsu izredzes izveidot Leģendārs vērtu priekšmetu."
+
+#: 231703302095769600
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"Seno gudrība plūst caur jums — Kalve brīnumus, ko pasaule vēl nav redzējusi!"
+
+#: 232003352147529728
+msgid "craftStockFullTitle"
+msgstr "Nav vietas dārgumiem Uzglabāšana!"
+
+#: 232004264790331392
+msgid "craftStockFullDescription"
+msgstr ""
+"Uzglabāšana ir piepildīta līdz pēdējai šķembiņai.\n"
+"Pārdodiet lieko Tirdzniecības veikalā vai uzlabojiet Uzglabāšana — tad "
+"paņemiet savu spožo trofeju!"
+
+#: 232054830455328768
+msgid "allItems"
+msgstr "Visi priekšmeti"
+
+#: 232055567298072576
+msgid "stockLevel"
+msgstr "Uzglabāšana lvl {value}"
+
+#: 232285845522223104
+msgid "storageUpgradeDescription"
+msgstr ""
+"Katrs uzlabojums piešķir <color=#E01114>vairāk vietas</color> atrastajiem un "
+"izgatavotajiem dārgumiem. Vairāk zelta, mazāk ciešanu!"
+
+#: 238220511437656064
+msgid "revivalDescription"
+msgstr "Atdzimsti — vai atvadies no laupījuma."
+
+#: 238225411982757888
+msgid "noBirdEnergyDescription"
+msgstr "Aizveda tevi pie dārgumiem un aizlidoja atpūsties."
+
+#: 238226013823438848
+msgid "callTheBird"
+msgstr "Atgriezties tagad"
+
+#: 238228172388438016
+msgid "noDetectorEnergyDescription"
+msgstr "Domā, ka vari tikt galā ar vēl vienu?"
+
+#: 238229156124692480
+msgid "oreSeeker"
+msgstr "Rūdas meklētājs"
+
+#: 238230435035090944
+msgid "gemSeeker"
+msgstr "Dārgakmeņu meklētājs"
+
+#: 238805340126449664
+msgid "respawn"
+msgstr "Atdzimt"
+
+#: 238835918318080000
+msgid "deathExit"
+msgstr "Aizgāja tukšām rokām"
+
+#: 241685352961806336
+msgid "terrain0Title"
+msgstr "Klusais mežs"
+
+#: 241686624016273408
+msgid "terrain2Description"
+msgstr ""
+"Skauja ziemeļu tuksnesis, ieslēgts mūžīgā aukstumā. Starp ledainiem "
+"labirintiem ir viegli apmaldīties — un pēc saulrieta nosalt. Tādā secībā… "
+"vai varbūt otrādi."
+
+#: 241686676700925952
+msgid "terrain0Description"
+msgstr ""
+"Katrs varonis kaut kur sāk!\r\n"
+"Šeit apglabāti tavi pirmie dārgumi — un tavas pirmās nepatikšanas. Šeit tu "
+"iemācīsies rakt, kausēt, lielīties un izdzīvot."
+
+#: 242168130602012672
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Iegūsti ciema iedzīvotāju labvēlību,\n"
+"un jauna pilsēta atvērs tev savus vārtus!"
+
+#: 242225089728483328
+msgid "upgradeToolNoiseStat"
+msgstr "Trokšņa samazināšana"
+
+#: 243276239902871552
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr ""
+"Paaugstini savu pretestību — un tu nenodrebēsi, kad pasaule kļūs naidīga!"
+
+#: 243276804422635520
+msgid "upgradeCharacterHealthStatDescription"
+msgstr "Vairāk dzīvību — mazāk iespēju kļūt par leģendu... pēc nāves."
+
+#: 243277089148768256
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr ""
+"Ātrākas kājas — mazāk iespēju kļūt par vakariņām vietējai savvaļas dzīvnieku "
+"faunai!"
+
+#: 243277490971480064
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"Jo vairāk spalvainu skautu tev ir, jo labākas tavas izredzes atrast apraktus "
+"spīguļus!"
+
+#: 243277858065354752
+msgid "upgradeToolSpeedStatDescription"
+msgstr "Jo ātrāks sitiens, jo mazāka iespēja, ka kāds cits paņems rūdu pirmais!"
+
+#: 243278506789965824
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Jo varenāks rīks, jo paklausīgāks akmens —\r\n"
+"un pilnāka tava soma!"
+
+#: 243278882293420032
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Mazāks troksnis nozīmē mazāku iespēju, ka tevi sadzirdēs tie, kas dod "
+"priekšroku kaulu kraukšķēšanai, nevis Zelts zvana skaņai."
+
+#: 243286615193292800
+msgid "resistanceStatLevel"
+msgstr "Izturība līmenis {value}"
+
+#: 243287048297123840
+msgid "healthStatLevel"
+msgstr "Veselība līmenis {value}"
+
+#: 243287378833444864
+msgid "speedStatLevel"
+msgstr "Ātrums līmenis {value}"
+
+#: 243287648745295872
+msgid "upgradeBirdTitle"
+msgstr "Putns līmenis {value}"
+
+#: 243301960306135040
+msgid "amountPcs"
+msgstr "{value} gab."
+
+#: 246550123938844672
+msgid "maxLevel"
+msgstr "Maksimālais līmenis"
+
+#: 246920055440543744
+msgid "treasureDetector"
+msgstr "Dārgumu detektors"
+
+#: 246920748020797440
+msgid "amountSec"
+msgstr "{value} sek."
+
+#: 246921123041906688
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Rūdas meklētājs"
+
+#: 246921489389195264
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Šis maģiskais sīkrīks atrod zelta dzīslas labāk nekā rūķis jūt bezmaksas "
+"pusdienas!"
+
+#: 246922080165302272
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Dārgakmeņu meklētājs"
+
+#: 246922249237696512
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"Ierīce ar asāku degunu nekā tirgotāja alkatība. Neviens dārgakmens ilgi "
+"neslēpjas!"
+
+#: 246922743578365952
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Vairāk laika zelta medībām"
+
+#: 246922920854818816
+msgid "upgradeDetectorDurationStatDescription"
+msgstr ""
+"Darbojas ilgāk, meklē labāk, mazāk burkšķ. Vairāk laika nozīmē vairāk "
+"laupījuma!"
+
+#: 247080041558839296
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+#: 247080534393753600
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} gab."
+
+#: 247080751339933696
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} sek."
+
+#: 247452846670483456
+msgid "gold"
+msgstr "Zelts"
+
+#: 247452991940202496
+msgid "chests"
+msgstr "Lādes"
+
+#: 247453392370405376
+msgid "eggs"
+msgstr "Olas"
+
+#: 247453604342140928
+msgid "treasures"
+msgstr "Rotaslietas"
+
+#: 247453698634289152
+msgid "artifacts"
+msgstr "Artefakti"
+
+#: 249822854419582976
+msgid "deathTitle"
+msgstr "Nāve ir dāsna — tā paņem visu!"
+
+#: 249823090609229824
+msgid "deathDescription"
+msgstr "Jūsu laupījums tagad ir leģendu vērts."
+
+#: 250055490891157504
+msgid "tradeEmptyStorageMessage"
+msgstr "Pašlaik nav ko pārdot"
+
+#: 250066987813965824
+msgid "craftNoEggs"
+msgstr "Nav olu inkubatoram"
+
+#: 250067227111591936
+msgid "craftNoChests"
+msgstr "Nav lāžu, ko atvērt"
+
+#: 250067363896233984
+msgid "craftNoItems"
+msgstr "Nav ko izgatavot"
+
+#: 250187845660315648
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Vairāk laika dārgakmeņu medībām"
+
+#: 251259329547866112
+msgid "newLocationAvailableTitle"
+msgstr "Ir pieejama jauna atrašanās vieta!"
+
+#: 251259543163768832
+msgid "newLocationAvailableDescription"
+msgstr "Iedzīvotāji piekrīt: tu esi pelnījis vairāk."
+
+#: 251632108633853952
+msgid "upgradeStock"
+msgstr "Uzlabot Uzglabāšana"
+
+#: 252146625037996032
+msgid "storageOverflowedDesctiption"
+msgstr "Jūsu Uzglabāšana nevar saturēt visas jūsu bagātības. Laiks uzlabot!"
+
+#: 252147840639569920
+msgid "throwAway"
+msgstr "Izmest"
+
+#: 259586112407998464
+msgid "upgradeCraftCostStatDescription"
+msgstr "Preču pamatcena pieaug kā maize uz rauga"
+
+#: 262490762970927104
+msgid "upgradeVehicleWeightStat"
+msgstr "Liela soma"
+
+#: 262491576103866368
+msgid "upgradeVehicleWeightStatDescription"
+msgstr "Zirgs tagad spēj nest vairāk dārgumu. Vairāk nekārtības, vairāk laimes!"
+
+#: 262491999908925440
+msgid "upgradeVehicleTitle"
+msgstr "Zirgs līmenis {value}"
+
+#: 262492464646197248
+msgid "amountKg"
+msgstr "{value} kg."
+
+#: 262492710260445184
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+#: 262493129695039488
+msgid "upgradeStorageWeightStat"
+msgstr "Ietilpība"
+
+#: 262493626518736896
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Papildu vieta absolūti bezvērtīgiem dārgumiem!"
+
+#: 262495569987244032
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Dāsni pircēji"
+
+#: 262495864679043072
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Klienti cīnās par jūsu lūžņiem."
+
+#: 262496445971828736
+msgid "upgradeTradeTitle"
+msgstr "Tirdzniecības veikals līmenis {value}"
+
+#: 262497898778071040
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Jūs smaržojat pēc bagātības"
+
+#: 262498326018265088
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"Par jūsu meistarību ir izplatījušās runas — īsti staigājoši maki parādās "
+"biežāk."
+
+#: 262499250967154688
+msgid "upgradeTradeSlotsStat"
+msgstr "Jauns slots"
+
+#: 262499518630858752
+msgid "upgradeTradeSlotsStatDescription"
+msgstr "Ir atvērts papildu tirdzniecības slots. Vairāk klientu — vairāk zelta!"
+
+#: 262503656592773120
+msgid "upgradeCraftTimeStat"
+msgstr "Rotaslietu sprints"
+
+#: 262504135200608256
+msgid "upgradeCraftTitle"
+msgstr "Izgatavot lvl {value}"
+
+#: 262504539359547392
+msgid "upgradeCraftRarityStat"
+msgstr "Retums"
+
+#: 262505217075187712
+msgid "upgradeCraftRecipesStat"
+msgstr "Recepšu grāmata"
+
+#: 262506098214572032
+msgid "upgradeCraftCostStat"
+msgstr "Zelta raktuves"
+
+#: 262506924148527104
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Izgatavošanas slots"
+
+#: 262507722794340352
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Lādes slots"
+
+#: 262508574351298560
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Slots atbloķēts.\n"
+"Atver lādes un bloķētus objektus no jebkuras izcelsmes — pat tādus, kas "
+"acīmredzami nav no šīs planētas."
+
+#: 262508742647746560
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Inkubators"
+
+#: 262508816316502016
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Slots atbloķēts.\n"
+"Nedomājiet, ka Koko ir noderīga tikai olām. Ja jums ir nepieciešams izkausēt "
+"ledu, kaut ko uzsildīt vai palīdzēt ar citiem uzdevumiem — viņa vienmēr ir "
+"noderīga. Un, kad runa ir par olu sišanu, viņa pat nejautā."
+
+#: 262509279946477568
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Slots atbloķēts.\n"
+"Galvenā meistara rīks.\n"
+"Tas var visu: apstrādāt, atjaunot, pulēt, atvērt un pārstrādāt."
+
+#: 262509359629864960
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Super slots"
+
+#: 262698318934839296
+msgid "tradeLockedState"
+msgstr "Tirdzniecības veikals ir pārāk mazs!"
+
+#: 262791601379872768
+msgid "upgradeDetectorTitle"
+msgstr "Dārgumu detektors līmenis {value}"
+
+#: 262792683350921216
+msgid "upgradeStorageTitle"
+msgstr "Uzglabāšana līmenis {value}"
+
+#: 266500052736020480
+msgid "selectTrashTitle"
+msgstr "Lielapjoma atkritumi"
+
+#: 267774055178047488
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Viss par patīk!"
+
+#: 267774187718053888
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "Publika kliedz no prieka!"
+
+#: 286237360443887616
+msgid "metals"
+msgstr "Metāli"
+
+#: 289291316380307456
+msgid "craftSelectRoughTitle"
+msgstr "Izvēlieties priekšmetu pulēšanai"
+
+#: 289293923853275136
+msgid "craftNoRough"
+msgstr "Nav priekšmetu pulēšanai"
+
+#: 302325393484156928
+msgid "curseRemovalSlot"
+msgstr "Altāris"
+
+#: 302327188075843584
+msgid "inlaySlot"
+msgstr "Ievietot"
+
+#: 302327678603890688
+msgid "polishingSlot"
+msgstr "Pulēšana"
+
+#: 310688720811724800
+msgid "rough"
+msgstr "Neapstrādāts"
+
+#: 310688991746985984
+msgid "cursedItems"
+msgstr "Nolādēts"
+
+#: 310861865698988032
+msgid "storageDescription"
+msgstr ""
+"Visi atklātie priekšmeti tiek glabāti šeit.\n"
+"Vieta ir ierobežota — noliktava nav no gumijas.\n"
+"Uzlabojiet savu Uzglabāšana, lai jūsu alkatība nesasniegtu sienas."
+
+#: 311007630727581696
+msgid "traderName"
+msgstr "Zlatovičs Tirgotājs"
+
+#: 311064004203384832
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Absolūti nekas"
+
+#: 311066402032455680
+msgid "geodes"
+msgstr "Ģeodes"
+
+#: 311067011754233856
+msgid "unknownItems"
+msgstr "Nezināms"
+
+#: 311247067034161152
+msgid "selectItems"
+msgstr "Atlasīt vienumus"
+
+#: 311279184229175296
+msgid "proceed"
+msgstr "Turpināt"
+
+#: 313943879775948800
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Pulēšana"
+
+#: 313944205258133504
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Slots atbloķēts.\n"
+"Remontē, slīpē un piešķir spīdumu — pat visēnainākie atradumi atkal izskatās "
+"kā dārgumi."
+
+#: 313944426742550528
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Ievietot"
+
+#: 313944595185799168
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Slots atbloķēts.\n"
+"Ievietojiet dārgakmeņus rotaslietās un pārvērtiet neapstrādātus gabalus par "
+"pilnvērtīgiem spīdīgiem priekšmetiem, kas liek klientiem zaudēt visu "
+"gribasspēku."
+
+#: 313944710864703488
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Altāris"
+
+#: 313944844453285888
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Slots atbloķēts.\n"
+"Noņem lāstus un maģiskos zīmogus no nolādētiem priekšmetiem. Dažreiz… ar "
+"pārsteigumiem."
+
+#: 313950130396205056
+msgid "craftInfoDescription"
+msgstr ""
+"Šeit tiek izlemts jūsu atradumu liktenis.\n"
+"Kausējiet, iestipriniet, pulējiet, atveriet vai ļaujiet tam augt — katrs "
+"slots dara kaut ko aizdomīgi noderīgu jūsu priekšmetiem.\n"
+"Atrastie objekti pārvēršas rotaslietās, dārgumos un dīvainos šedevros, ko "
+"kāds noteikti nopirks."
+
+#: 313951782213783552
+msgid "superSlotDescription"
+msgstr ""
+"Īpašs slots visam dīvainajam un spīdīgajam.\n"
+"Tas kausē metālu, griež dārgakmeņus, noņem lāstus, atjauno dārgumus, atver "
+"ģeodes, atver lādes un pat apstrādā citplanētiešu artefaktus (ar savstarpēju "
+"piekrišanu)."
+
+#: 313952177879257088
+msgid "chestSlotDescription"
+msgstr ""
+"Lāde?\n"
+"Iemet to iekšā — slots to izdomās.\n"
+"\n"
+"Kas iznāks, zināms tikai tam.\n"
+"Dažreiz tas ir satraucoši apmierināts ar rezultātu."
+
+#: 313952634336972800
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Nolādēta lieta? Iemet to iekšā!\n"
+"Altāris izsūks katru tās maģijas pilienu, elsos un vaidēs — tad atdos to "
+"atpakaļ bez šņākšanas.\n"
+"\n"
+"Dažreiz tas pat saka “paldies”… kas ir pilnīgi normāli."
+
+#: 313953216909021184
+msgid "eggSlotDescription"
+msgstr ""
+"Izvēlies jebkuru olu — vista uz tās sēdēs, maigi paglaudīs un klusi kladzinās"
+"…\n"
+"tad izšķils kaut ko interesantu.\n"
+"\n"
+"Dažreiz pārāk interesantu."
+
+#: 313953702185799680
+msgid "inlaySlotDescription"
+msgstr ""
+"Izvēlies rotaslietu un piepildi to ar dārgakmeņiem — tukši slots nederēs!\n"
+"Tu iegūsi pilnībā pulētu, spīdīgu lietu, kas liek pircējiem sajūsmā "
+"spiedzienāt."
+
+#: 313954530854440960
+msgid "craftSlotDescription"
+msgstr ""
+"Iemet jebko metālisku — krāsns to izkausēs, sajauks un izkals pavisam jaunu "
+"rotaslietu.\n"
+"Saka, ka tas darbojas ar iedvesmu… kuras tam nav. Tomēr darbs tiek paveikts!"
+
+#: 313954955250896896
+msgid "polishingSlotDescription"
+msgstr ""
+"Izvēlies jebkuru ģeodi, neapstrādātu akmeni vai pat izpostītu senu dārgumu "
+"—\n"
+"darbagalds to pulēs, labos un izcels tā spīdumu.\n"
+"\n"
+"Iegūto var iestiprināt, izgatavot vai pārdot par tīru peļņu."
+
+#: 314195955441471488
+msgid "unknownSlot"
+msgstr "Novērtējums"
+
+#: 314210445310562304
+msgid "unknownSlotTitle"
+msgstr "Izvēlieties priekšmetu novērtēšanai"
+
+#: 314211470289408000
+msgid "craftNoUnknown"
+msgstr "Nav priekšmetu novērtēšanai"
+
+#: 314211918601785344
+msgid "craftNoCursed"
+msgstr "Nav nolādētu priekšmetu"
+
+#: 314214842253971456
+msgid "craftNoInlay"
+msgstr "Nav ievietojamu priekšmetu"
+
+#: 314260890229936128
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Pārdodiet rotaslietas un citus atradumus, pārbaudiet to vērtību un "
+"noslēdziet darījumus.\n"
+"Uzlabojiet veikalu — atbloķējiet jaunas vietas un pārdodiet vēl vairāk preču."
+
+#: 314261126486691840
+msgid "tradingShopInfoTitle"
+msgstr "Zlatoviča tirdzniecības veikals"
+
+#: 314274887167643648
+msgid "tradeSpeedUp"
+msgstr "Piesaistīt klientu"
+
+#: 314278745457561600
+msgid "nextCustomer"
+msgstr "Nākamais klients"
+
+#: 314297063191089152
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Novērtējums"
+
+#: 314297243575521280
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Tirgotājs Zlatovičs apskatīs jebkuru priekšmetu, domīgi noburkšķēs un "
+"nosauks cenu.\n"
+"Dažreiz… patīkamu."
+
+#: 314612693521928192
+msgid "timeToMoveOut"
+msgstr "Laiks bēgt!"
+
+#: 314914390584594432
+msgid "metal"
+msgstr "Metāls"
+
+#: 314914695741181952
+msgid "gem"
+msgstr "Dārgakmens"
+
+#: 314915117155487744
+msgid "treasure"
+msgstr "Rotaslietas"
+
+#: 314915322823184384
+msgid "chest"
+msgstr "Lāde"
+
+#: 314915636620038144
+msgid "trash"
+msgstr "Atkritumi"
+
+#: 314915781340303360
+msgid "egg"
+msgstr "Ola"
+
+#: 314915913649623040
+msgid "artifact"
+msgstr "Artefakts"
+
+#: 314916000182308864
+msgid "geode"
+msgstr "Ģeode"
+
+#: 314916165517578240
+msgid "unknown"
+msgstr "Nezināms"
+
+#: 314916328457900032
+msgid "cursed"
+msgstr "Nolādēts"
+
+#: 314925043173036032
+msgid "orders"
+msgstr "Pasūtījumi"
+
+#: 315250694291722240
+msgid "giveItem"
+msgstr "Dot"
+
+#: 316337287538675712
+msgid "ordersInfoDescription"
+msgstr ""
+"Izpildiet pasūtījumus — un klienti norādīs ceļu uz priekšu.\n"
+"Jaunas atrašanās vietas, resursi un rotaslietas jau gaida."
+
+#: 316378780114620416
+msgid "hearthCurrency"
+msgstr "Patīk"
+
+#: 316380499837980672
+msgid "reward"
+msgstr "Atlīdzība"
+
+#: 316382146563674112
+msgid "claim"
+msgstr "Pieprasīt"
+
+#: 316397921840140288
+msgid "terrain0Biome1Title"
+msgstr "Tuksnesis"
+
+#: 316402101459881984
+msgid "ordersClaimBiomeTitle"
+msgstr "Ceļš uz jaunu atrašanās vietu ir atvērts"
+
+#: 316402277297688576
+msgid "ordersClaimBiomeDescription"
+msgstr "Ir pieejami jauni atradumi"
+
+#: 317048656315551744
+msgid "terrain1Biome1Title"
+msgstr "Kapi"
+
+#: 317908391516442624
+msgid "toTrade"
+msgstr "Tirdzniecība"
+
+#: 319566851823898624
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Jā, atstāt"
+
+#: 319567663786627072
+msgid "skipSelectionTreasuresCancel"
+msgstr "Nē, atpakaļ uz izvēli"
+
+#: 320015732638486528
+msgid "soldToDealer"
+msgstr "Pārdots!"
+
+#: 321539636750192640
+msgid "craftSelectBlockedWrongType"
+msgstr "Šis priekšmets nav piemērots šāda veida slotam"
+
+#: 321540352067768320
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Jūs jau esat izvēlējies pietiekami daudz priekšmetu no šīs grupas"
+
+#: 332999660336844800
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"Taka ir aizaugusi. Jūs jau esat apguvis visu šeit — laiks ķerties pie darba."
+
+#: 333367357155315712
+msgid "terrain0Biome0Title"
+msgstr "Tuksnesis"
+
+#: 333367909771644928
+msgid "terrain1Biome0Title"
+msgstr "Purvs"
+
+#: 333368362697756672
+msgid "terrain1Biome2Title"
+msgstr "Meteoru krišana"
+
+#: 333841248503992320
+msgid "goldUsedIn"
+msgstr ""
+"Var tikt <color=#E3BA59>pārdots</color> Tirdzniecības veikalā, izmantots "
+"<color=#E3BA59>Izgatavošanas slotā</color> vai ievietots <color=#E3BA59>"
+"Super slotā</color>."
+
+#: 333841848608231424
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Var tikt <color=#E3BA59>pārdots</color> Tirdzniecības veikalā, izmantots "
+"<color=#E3BA59>Izgatavošanas slotā</color> vai ievietots <color=#E3BA59>"
+"Super slotā</color>."
+
+#: 333841973128728576
+msgid "silverUsedIn"
+msgstr ""
+"Var <color=#E3BA59>pārdot</color> Tirdzniecības veikalā, izmantot "
+"<color=#E3BA59>Izgatavošanas slotā</color> vai ievietot <color=#E3BA59>Super "
+"slotā</color>."
+
+#: 333842030875906048
+msgid "gemUsedIn"
+msgstr ""
+"Var <color=#E3BA59>pārdot</color> Tirdzniecības veikalā, izmantot "
+"<color=#E3BA59>Izgatavošanas slotā</color> vai <color=#E3BA59>Super slotā</"
+"color>, vai <color=#E3BA59>ievietot</color> dārgumā."
+
+#: 333842074681217024
+msgid "gemRoughUsedIn"
+msgstr ""
+"Var apstrādāt <color=#E3BA59>Pulēšanā</color> vai <color=#E3BA59>Super "
+"slotā</color>, lai atklātu tā patieso vērtību."
+
+#: 333842122626306048
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Var <color=#E3BA59>pārdot</color> Tirdzniecības veikalā vai iestiprināt "
+"dārgakmeņus, izmantojot <color=#E3BA59>Ievietot</color> vai <color=#E3BA59>"
+"Super slotu</color>, lai palielinātu tā vērtību."
+
+#: 333842171624165376
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Var salabot <color=#E3BA59>Pulēšanā</color> vai <color=#E3BA59>Super slotā</"
+"color>."
+
+#: 333842234089934848
+msgid "chestUsedIn"
+msgstr ""
+"Var atvērt <color=#E3BA59>Lādes slotā</color> vai <color=#E3BA59>Super "
+"slotā</color>."
+
+#: 333842279115788288
+msgid "trashUsedIn"
+msgstr "Var <color=#E3BA59>pārdot</color> tikai Tirgotājam."
+
+#: 333842322942070784
+msgid "eggUsedIn"
+msgstr ""
+"Var atvērt <color=#E3BA59>Inkubatorā</color> vai <color=#E3BA59>Super slotā</"
+"color>."
+
+#: 333842403657256960
+msgid "artifactUsedIn"
+msgstr "Var <color=#E3BA59>pārdot</color> tikai Tirdzniecības veikalā."
+
+#: 333842449953984512
+msgid "geodeUsedIn"
+msgstr ""
+"Var atvērt <color=#E3BA59>Pulēšanā</color> vai <color=#E3BA59>Super slotā</"
+"color>."
+
+#: 333842496531730432
+msgid "unknownUsedIn"
+msgstr ""
+"Var nogādāt pie Tirgotāja uz <color=#E3BA59>Novērtējumu</color>, lai "
+"noteiktu tā patieso vērtību."
+
+#: 333842548465602560
+msgid "cursedUsedIn"
+msgstr ""
+"Lāstu var noņemt pie <color=#E3BA59>Altāra</color> vai <color=#E3BA59>Super "
+"slots</color>."
+
+#: 334624695946317824
+msgid "terrain2Biome0Title"
+msgstr "Kokzāģētava"
+
+#: 334752689742417920
+msgid "perfect"
+msgstr "Perfekts"
+
+#: 334754742782922752
+msgid "decline"
+msgstr "Noraidīt"
+
+#: 334758932242501632
+msgid "putUpForSale"
+msgstr "Pārdot"
+
+#: 337073088274632704
+msgid "newLocationAvailable"
+msgstr "Parādījusies jauna vieta!"
+
+#: 338548608547950592
+msgid "retargetingTitle1"
+msgstr ":monocle: Interesants jautājums…"
+
+#: 338548710087856128
+msgid "retargetingDescription1"
+msgstr "Cik tālu vari tikt?"
+
+#: 338548825884200960
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Laiks turpināt."
+
+#: 338548974257704960
+msgid "retargetingDescription2"
+msgstr "Jūsu progress joprojām ir šeit."
+
+#: 338549087440998400
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Gatavs atgriezties?"
+
+#: 338549137776840704
+msgid "retargetingDescription3"
+msgstr "Turpiniet no vietas, kur pārtraucāt."
+
+#: 338569990488985600
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Izgatavošana pabeigta!"
+
+#: 338570100794986496
+msgid "notificationCraftCompletedDescription"
+msgstr "Apskatiet, ko esat ieguvis."
+
+#: 338570414583451648
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Jums ir Pircējs!"
+
+#: 338570498368868352
+msgid "notificationTradeCompletedDescription"
+msgstr "Jūsu preces atrada klientu."
+
+#: 339457185953353728
+msgid "tradeSelectBlockedWrongType"
+msgstr "Šo priekšmetu nevar pārdot."
+
+#: 340628273341140992
+msgid "skip"
+msgstr "Izlaist"
+
+#: 354499398722654208
+msgid "daily"
+msgstr "Ikdienas"
+
+#: 354514538620784640
+msgid "available"
+msgstr "Pieejams"
+
+#: 354514769508831232
+msgid "availableIn"
+msgstr "Pieejams"
+
+#: 355103206058233856
+msgid "dailyRewardClaimTitle"
+msgstr "Paņemiet to peļņai"
+
+#: 355103597911085056
+msgid "dailyRewardClaimDescription"
+msgstr "Noskatieties video — saņemiet X2 balvas"
+
+#: 355120760352935936
+msgid "withoutBonus"
+msgstr "Bez bonusa"
+
+#: 355145440342315008
+msgid "claimWithBonus"
+msgstr "Saņemt ar bonusu"
+
+#: 355146771715067904
+msgid "x2Reward"
+msgstr "x2 atlīdzība"
+
+#: 355255965734670336
+msgid "dailyRewardAlreadyReceived"
+msgstr "Atlīdzība jau saņemta!"
+
+#: 355256265493188608
+msgid "missedDailyReward"
+msgstr "Atlīdzība jau ir nokavēta!"
+
+#: 355256569236295680
+msgid "futureDailyReward"
+msgstr "Atgriezieties pēc šīs atlīdzības vēlāk!"
+
+#: 355276036993454080
+msgid "rateUs"
+msgstr "Novērtēt mūs"
+
+#: 355276149157531648
+msgid "rateUsTitle"
+msgstr "Novērtēt mūs ar zvaigznēm"
+
+#: 355276400991932416
+msgid "rateUsDescription"
+msgstr "Novērtējiet spēli un palīdziet mums uzlabot to."
+
+#: 356305037681758208
+msgid "specialOffers"
+msgstr "Īpašie piedāvājumi"
+
+#: 356313026543226880
+msgid "quickStart"
+msgstr "Ātrais sākums!"
+
+#: 356313363102568448
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+#: 356342200381214720
+msgid "forever"
+msgstr "Mūžīgi"
+
+#: 356345060842016768
+msgid "starterPack"
+msgstr "Sākuma komplekts"
+
+#: 356346443771154432
+msgid "allInOneSupply"
+msgstr "Viss vienā piegāde"
+
+#: 356350103481749504
+msgid "dealOfTheDay"
+msgstr "Dienas piedāvājums"
+
+#: 356354375627837440
+msgid "xAmount"
+msgstr "X{value}"
+
+#: 356354841824727040
+msgid "free!"
+msgstr "Bezmaksas!"
+
+#: 356357806572703744
+msgid "watch"
+msgstr "Skatīties"
+
+#: 356360805877551104
+msgid "coins"
+msgstr "Monētas"
+
+#: 356365108071632896
+msgid "mostPopular"
+msgstr "Populārākais"
+
+#: 356365403610681344
+msgid "bestPrice"
+msgstr "Labākā cena"
+
+#: 356519167105699840
+msgid "store"
+msgstr "Veikals"
+
+#: 357424739636219904
+msgid "dealOfTheDayDescription"
+msgstr "Jauni piedāvājumi būs pieejami pēc"
+
+#: 357607511365521408
+msgid "health"
+msgstr "Veselība"
+
+#: 357784830910664704
+msgid "notificationDealOfTheDayTitle"
+msgstr "Mare vēlas iepirkties :sunglasses:"
+
+#: 357784932224077824
+msgid "notificationDealOfTheDayDescription"
+msgstr "Viss, kas atlicis, ir iekāpt un paņemt to, kas ir tavs."
+
+#: 357785735030640640
+msgid "notificationCoinsReadyTitle"
+msgstr "Veikals dāvina labumus :heart-eyes:"
+
+#: 357785816504995840
+msgid "notificationCoinsReadyDescription"
+msgstr "Ienāc veikalā un paņem bezmaksas lietas."
+
+#: 358713136833105920
+msgid "wantReceipt"
+msgstr "Vēlos čeku (nosūtīsim to e-pastā)"
+
+#: 358722499958280192
+msgid "submit"
+msgstr "Iesniegt"
+
+#: 358723345383165952
+msgid "receiptEmaitTitle"
+msgstr "Ievadiet e-pastu"
+
+#: 358723657267417088
+msgid "receiptEmailDescription"
+msgstr ""
+"Vēlaties čeku?\n"
+"Ievadiet savu e-pastu, un mēs to nosūtīsim pēc pirkuma."
+
+#: 358900766250110976
+msgid "buy"
+msgstr "Pirkt"
+
+#: 358901413183754240
+msgid "starterPackHeadline"
+msgstr "Paņemiet to laikā!"
+
+#: 358901551423819776
+msgid "specialOfferHeadline"
+msgstr "Vairāk uz visiem laikiem!"
+
+#: 359524475709165568
+msgid "open"
+msgstr "Atvērt"
+
+#: 360153378165362688
+msgid "maximumResources"
+msgstr "Maksimālie resursi"
+
+#: 360200917140901888
+msgid "exchangeCurrencyTitle"
+msgstr "Nepietiek sudraba monētu."
+
+#: 360201095897944064
+msgid "exchangeCurrencyDescription"
+msgstr "Tikai nedaudz pietrūkst."
+
+#: 360201375158898688
+msgid "exchangeCurrencyQuestion"
+msgstr "Nopirkt atlikušo?"
+
+#: 360510317885919232
+msgid "bankingAwaitingTitle"
+msgstr "Monētas ceļā"
+
+#: 360511732461080576
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Zelts tiek iekrauts vagonā…\n"
+"Piegāde var aizņemt dažas minūtes."
+
+#: 360689578840166400
+msgid "deleteItemConfirmationTitle"
+msgstr "Izmest priekšmetu?"
+
+#: 360689668438888448
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"Priekšmets tiks pazaudēts uz visiem laikiem.\n"
+"Šo darbību nevar atsaukt."
+
+#: 360858085955473408
+msgid "noKeepIt"
+msgstr "Nē, paturēt"
+
+#: 361772904917241856
+msgid "allRegionsAvailable"
+msgstr "Visi reģioni pieejami"
+
+#: 361805221660463104
+msgid "terrainProgressLabel"
+msgstr "Uz nākamo atrašanās vietu"
+
+#: 361805489286418432
+msgid "terrainClosedLabel"
+msgstr "Atrašanās vieta nav pieejama"
+
+#: 362095342867714048
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Tavs galvenais mērķis ir mīlestība!</color>\n"
+"Pārdod savus darinājumus vietējiem, lai iekarotu viņu sirdis."
+
+#: 362097539907063808
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Neapstājies, kamēr viņi tevi <color=#E3BA59>DIEVINĀS</color> — \n"
+"tad būsi gatavs iekarot jaunas zemes."
+
+#: 362500096244584448
+msgid "cryolisUsedIn"
+msgstr ""
+"Var tikt <color=#E3BA59>pārdots</color> Tirdzniecības veikalā, izmantots "
+"<color=#E3BA59>Izgatavošanas slotā</color> vai ievietots <color=#E3BA59>"
+"Super slotā</color>."
+
+#: 362503199635279872
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Šis priekšmets nav piemērots izvēlētajai receptei."
+
+#: 362505392367079424
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Cits priekšmets no šīs grupas jau ir izvēlēts."
+
+#: 362831462727421952
+msgid "failedPurchase"
+msgstr ""
+"Ķēve ir bēdīga. Pirkums neizdevās.\n"
+"Lūdzu, mēģiniet vēlreiz."
+
+#: 363945774653116416
+msgid "frozenUsedIn"
+msgstr ""
+"Var tikt sasildīts <color=#E3BA59>Inkubatorā</color> vai <color=#E3BA59>"
+"Super slotā</color>."
+
+#: 363945781498220544
+msgid "frozen"
+msgstr "Saldēts"
+
+#: 363947917120376832
+msgid "frozens"
+msgstr "Saldēts"
+
+#: 371768236233199616
+msgid "language"
+msgstr "Valoda"
+
+#: 371825767475318784
+msgid "termsOfUse"
+msgstr "Lietošanas noteikumi"
+
+#: 371825915722993664
+msgid "privacyPolicy"
+msgstr "Privātuma politika"
+
+#: 371826077132394496
+msgid "deleteData"
+msgstr "Dzēst datus"
+
+#: 371826289473228800
+msgid "signInWithGoogle Play"
+msgstr "Pierakstīties ar Google Play"
+
+#: 371936637333278720
+msgid "notLinked"
+msgstr "Nav saistīts"
+
+#: 371936898659389440
+msgid "linked"
+msgstr "Saistīts"
+
+#: 371937387937533952
+msgid "switchGooglePlay"
+msgstr "Pārslēgt Google Play kontu"
+
+#: 372201325233180672
+msgid "resetProgressDescription"
+msgstr "Vai tiešām vēlaties dzēst savu progresu? Šo darbību nevar atsaukt!"
+
+#: 372201851437977600
+msgid "resetProgressConfirm"
+msgstr "Jā, dzēst"
+
+#: 375231950777225216
+msgid "terrainInDevelopmentDescription"
+msgstr "Atvainojiet. Šī vieta vēl tiek izstrādāta."
+
+#: 375232378373935104
+msgid "terrain2Biome1Title"
+msgstr "Saldēta kuģu būvētava"
+
+#: 375232425010401280
+msgid "terrain2Biome2Title"
+msgstr "Bāka"
+
+#: 375232475627261952
+msgid "terrain2Biome3Title"
+msgstr "Zudušais mežs"
+
+#: 376614903423963136
+msgid "collectAll"
+msgstr "Savākt visu"
+
+#: 376958824981204992
+msgid "healthStatReward"
+msgstr "Veselība +{value}"
+
+#: 376959365689905152
+msgid "storageStatReward"
+msgstr "Uzglabāšanas ietilpība +{value}"
+
+#: 376968663052587008
+msgid "itemsLeft_x"
+msgstr "Atlikušie priekšmeti: {value}"
+
+#: 376983763331321856
+msgid "storageStatRewardSummary"
+msgstr "Uzglabāšana uz visiem laikiem"
+
+#: 376983951106117632
+msgid "healthStatRewardSummary"
+msgstr "Veselība uz visiem laikiem"
+
+#: 379459050652569600
+msgid "prospectors"
+msgstr "Prospektori"
+
+#: 384582485728825344
+msgid "storeStockFullDescription"
+msgstr "Uzglabāšana ir piepildīta līdz pēdējai šķembiņai."
+
+#: 384852464931966976
+msgid "terrain3Title"
+msgstr "Grimdals"
+
+#: 387215171681259520
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Atveriet tālruņa iestatījumus\n"
+"2. Google — Visi pakalpojumi — Play spēles\n"
+"3. “Pierakstīšanās konts” — “Mainīt” (blakus spēlei)\n"
+"4. Restartējiet spēli"
+
+#: 388959282209755136
+msgid "versionAlertMessage"
+msgstr "Ir izlaista jauna spēles versija. Laiks atjaunināt!"
+
+#: 390311463999508480
+msgid "treasureUsedIn"
+msgstr "Var tikt <color=#E3BA59>pārdots</color> tikai Tirdzniecības veikalā."
+
+#: 390630593516539904
+msgid "noInternetConnectionBlocking"
+msgstr "Nav interneta — nav piedzīvojumu"
+
+#: 390630963617730560
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Atkārtota savienojuma izveide…\n"
+"{value}"
+
+#: 391415174540824576
+msgid "newsAndCommunication"
+msgstr "Jaunumi un komunikācija"
+
+#: 392040460349345792
+msgid "statEffectAccumulationFreeze"
+msgstr "Apsaldējums"
+
+#: 392040705481248768
+msgid "statEffectHeal"
+msgstr "Reģenerācija"
+
+#: 392040844430151680
+msgid "statEffectMovementSpeedNegative"
+msgstr "Palēninājums"
+
+#: 392041019248742400
+msgid "statEffectMovementSpeedPositive"
+msgstr "Ātruma palielināšana"
+
+#: 392041155999830016
+msgid "statEffectDamageCurse"
+msgstr "Nogurums"
+
+#: 392041334085783552
+msgid "statEffectDamageBleed"
+msgstr "Asiņošana"
+
+#: 392041534623846400
+msgid "statEffectToolNoiseNegative"
+msgstr "Troksmainīgs rīks"
+
+#: 392041656803921920
+msgid "statEffectToolNoisePositive"
+msgstr "Kluss rīks"
+
+#: 392041855974641664
+msgid "statEffectToolSpeedNegative"
+msgstr "Nogurums"
+
+#: 392042070265827328
+msgid "statEffectToolSpeedPositive"
+msgstr "Veiklība"
+
+#: 392090295794405376
+msgid "pause"
+msgstr "Pauze"
+
+#: 392090376618643456
+msgid "pauseDescription"
+msgstr "Efekti, pasūtījumi un iestatījumi — viss šeit."
+
+#: 392092595833278464
+msgid "effects"
+msgstr "Tēla statuss"
+
+#: 392119357174714368
+msgid "settingsDialogTitle"
+msgstr "Iestatījumi"
+
+#: 393910691879456768
+msgid "russianPlaymentsBanner"
+msgstr "Maksājumi ir pieejami spēlētājiem Krievijā."

@@ -1,0 +1,357 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-22 09:53+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Portuguese <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/pt/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: pt\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Então, égua, sente o cheiro? Ouro! Está em algum lugar próximo… E amor… "
+"naquela rocha ali!"
+
+msgid "DialogueIntroHorse1"
+msgstr "Frrr!"
+
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"O que você quer dizer com 'se eu ouvir uma mulher lá novamente, você me "
+"atira para fora'? Alguém estava definitivamente solitário lá."
+
+msgid "DialogueIntroHorse2"
+msgstr "Relincha! Grr-ha!"
+
+msgid "DialogueIntroCharacter3"
+msgstr "Tudo bem, tudo bem! Foi apenas um eco… da minha grandeza!"
+
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Uma rocha! Divina! Como a coxa de Afrodite! Algo está definitivamente "
+"brilhando ali, o meu fígado acabou de tremer!"
+
+msgid "DialogueMineFoundHorse1"
+msgstr "Frrr! Pffuuu.."
+
+msgid "DialogueMineFoundCharacter2"
+msgstr "Bem, desculpe que o meu corpo reaja à beleza!"
+
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Relincha!"
+
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "O quê? O pôr-do-sol já?"
+
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Mosquitos… Eles de novo! Sim-sim, me lembro que você é a casinha verde, já "
+"estou chegando! Só não fuja!"
+
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Ei! Demasiado saque. A sacola do cavalo não consegue levar tudo."
+
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Escolha o melhor do que você pode levar para o depósito."
+
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr ""
+"Agora… Agora vou criar uma obra-prima! Uma joia que a fará arrepender-se!"
+
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Brrr-r-r."
+
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "OLHA, CAVALO! Brilha como os meus olhos antes de conhecer a minha ex!"
+
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Frrr!"
+
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Esta… esta é a luz divina da minha vingança!"
+
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Grrr-hrr! Brrr..."
+
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Você só está com inveja — não tem dedos para usar tal magnificência. Tudo o "
+"que resta é encontrar um comprador com dedos!"
+
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Você fez isso? Lindo, eu compro."
+
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"Ele… ele entendeu! Dentro da joia — sou eu. Dentro de mim — ouro. Dentro do "
+"ouro — um deus."
+
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Frrr! Relincho!"
+
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Você está certo, cavalo. Eles não estão prontos para a verdade…"
+
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Frrr!"
+
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr ""
+"Dinheiro? Eu? Você sabe o que vai acontecer se ela descobrir que eu sou rica?"
+
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Grrr-hrr!"
+
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr ""
+"Tudo bem, vou investir em mim mesmo — mas apenas para você parar de me "
+"importunar!"
+
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr ""
+"Eu me tornei mais rápido, mais forte e mais barato de produzir! Ela teria "
+"gostado."
+
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Grrr-hrr!"
+
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr ""
+"Bem, não havia necessidade de insistir! Você tem seus próprios fetiches — "
+"cascos e aveia."
+
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Viu, égua? Eles me amam!"
+
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Frrr! Pffuuu.."
+
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "Você está certo! Isso é só o começo! Em breve todos serão meus fãs…"
+
+msgid "character"
+msgstr "Personagem"
+
+msgid "horse"
+msgstr "Cavalo"
+
+msgid "trader"
+msgstr "Comerciante"
+
+msgid "buyer"
+msgstr "Comprador"
+
+msgid "terrainDispenserFound"
+msgstr "Uau! Presa!"
+
+msgid "terrainDispenserCollecting"
+msgstr "Vamos! Parte-o!"
+
+msgid "exitDoorDescription"
+msgstr "Verde — é um cavalo?"
+
+msgid "exitDoorDescription2"
+msgstr "Verde? Ela está… doente?"
+
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Toca nos itens para os pôres no saco do cavalo."
+
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Foi só isto que coube? A égua precisa de um saco maior!"
+
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr "Não se preocupe! Compro o resto. Até dou um pouco mais."
+
+msgid "terrainWantMoreItems"
+msgstr "Quero mais ouro!"
+
+msgid "terrainRoadIsClue"
+msgstr "O caminho leva à riqueza"
+
+msgid "DialogueOrdersIntroBuyer1"
+msgstr ""
+"Oh, um rosto novo! Tenho uma encomenda para você. Vai ajudar a reabastecer a "
+"minha coleção?"
+
+msgid "DialogueOrdersIntroCharacter1"
+msgstr "Olha, égua, eles não conseguem passar um dia sem a minha ajuda!"
+
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Frrrr!"
+
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Sim, sim, sem a sua também."
+
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Ajudaste-me muito, e eu vou ajudar-te — marquei um local onde as rochas soam "
+"mais alto que o normal."
+
+msgid "DialogueOrdersThanksCharacter1"
+msgstr "ELES AMAM-ME TANTO QUE ESTÃO DISPOSTOS A PARTILHAR OS SEUS PENSAMENTOS!"
+
+msgid "DialogueOrdersThanksCharacter2"
+msgstr "Não, você não pode embolsar dinheiro, mas conhecimento — isso sim!"
+
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Relinchar!"
+
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Aquele estranho marcou este lugar no mapa. Não é como nenhum lugar onde "
+"estivemos — e já consigo sentir o cheiro do TESOURO!"
+
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Frrr!"
+
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Uma gaiola nas minhas costas? É o Canário Caçador de Tesouros! Agora vamos "
+"ver onde o cão está enterrado."
+
+msgid "DialogueUseBirdCharacter1"
+msgstr "Agora seguimos o rasto das penas e o tesouro é meu!"
+
+msgid "DialogueAfterChestCharacter1"
+msgstr "VOCÊ VIU AQUILO, CAVALO!"
+
+msgid "DialogueAfterChestCharacter2"
+msgstr "Você vai ter que carregar não só a mim, mas este baú também."
+
+msgid "DialogueAfterChestHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+msgid "chestCollecting"
+msgstr "TESOURO!"
+
+msgid "DialogueClaimedChestHorse1"
+msgstr "Grrr-hrr!"
+
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Sim, o baú está aqui, mas não tem chave — mas você esqueceu da forja mágica, "
+"égua! Ela pode fazer qualquer coisa com qualquer coisa."
+
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "ISTO É UM GRANDE ACHADO! Precisamos vendê-lo rapidamente!"
+
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr ""
+"SIM! Fui reconhecido. HOJE ESTE PÂNTANO, AMANHÃ O MUNDO TODO! AVANTE, CAVALO!"
+
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ha-ha — parece que todos os locais estão usando suas coisas brilhantes. "
+"Afinal, sou o único morando aqui, Ha-ha-ha."
+
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Brrr-r-r!"
+
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Cheira… a fumaça?"
+
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Você está dizendo que eu deixei as brasas caírem no telhado do armazém?"
+
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Grrr-hrr!"
+
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "Oh… Talvez não devêssemos voltar."
+
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Terreno diferente. Chão encharcado. Argh, o ar cheira a significado!"
+
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Grrr-hrr!"
+
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Certo, pegamos os objetos de valor rápido e corremos."
+
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Que rocha sonora! Como se a própria natureza estivesse me aplaudindo!"
+
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "O que foi aquilo?!"
+
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Grrr-hrr!"
+
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "Ah não… Será que era… ela?"
+
+msgid "DialogueWormAppearHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+msgid "DialogueWormAppearCharacter1"
+msgstr "Meu Deus. Acordei a morte. De novo."
+
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "DIGAM-LHE QUE ME ARREPENDI DISTO!!!"
+
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "É o céu? Então porque é que cheira tão mal…"
+
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Percebo. Não morto. Pior ainda — vivo!"
+
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Foi por pouco, mas agora estou pronto para tudo! Tentarei balançar a "
+"picareta um pouco mais silenciosamente…"
+
+msgid "tip1"
+msgstr "Você pode empurrar um vaso. Empurre-o duas vezes para quebrá-lo."
+
+msgid "tip2"
+msgstr "O Verme não te seguirá para a água ou pântano."
+
+msgid "tip3"
+msgstr "Esmaga insetos — eles largam moedas."
+
+msgid "tip4"
+msgstr "Alguns arbustos escondem pássaros que põem ovos de ouro."
+
+msgid "tip5"
+msgstr "O barulho atrai inimigos perigosos."
+
+msgid "tip6"
+msgstr "Caminhos levam a locais de interesse."
+
+msgid "tip7"
+msgstr "O Mercador comprará itens extras da sua sacola."
+
+msgid "tip8"
+msgstr "Completa pedidos para desbloquear novas localizações."
+
+msgid "tip9"
+msgstr "Melhora a Forja para desbloquear novas receitas de joias."
+
+msgid "tip10"
+msgstr "Remove maldições no Altar ou no Super Slot."
+
+msgid "tip11"
+msgstr "Itens marcados com “?” podem ser avaliados pelo Comerciante."
+
+msgid "tip12"
+msgstr "Melhore o seu depósito para guardar mais saque."
+
+msgid "tip13"
+msgstr "Em pausa, você sempre pode conferir pedidos e efeitos."
+
+msgid "tip14"
+msgstr "O slot elite garante o melhor comprador."

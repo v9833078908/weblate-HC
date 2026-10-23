@@ -1,0 +1,120 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Filipino <http://l10n.herocraft.com/projects/need-for-greed/"
+"characterdialogue/fil/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: fil\n"
+"Plural-Forms: nplurals=2; plural=n != 1 && n != 2 && n != 3 && (n % 10 == 4 "
+"|| n % 10 == 6 || n % 10 == 9);\n"
+
+#: 65661046784
+msgid "eggItemReceived"
+msgstr "Isang Itlog! Kailangan itong mapisa."
+
+#: 12383040049152
+msgid "cursedItemReceived"
+msgstr "Naku, isang sumpa!"
+
+#: 16277346455552
+msgid "geodeItemReceived"
+msgstr ""
+"Ay, isang Geode!\n"
+"Handa nang hiwain."
+
+#: 16667567722496
+msgid "gemItemReceived"
+msgstr "Yehey, mga kislap!"
+
+#: 17079226077184
+msgid "goldItemReceived"
+msgstr "MAHAL KO ANG GINTO!"
+
+#: 17591476424704
+msgid "silverCoinItemReceived"
+msgstr "Mmmmmm, pera…"
+
+#: 25552772927488
+msgid "wormSpawned"
+msgstr "Sumpa!"
+
+#: 26219063283712
+msgid "highNoise"
+msgstr "Halika na…"
+
+#: 42988977000448
+msgid "pileLooted"
+msgstr "Basura, pero pwede kong ibenta."
+
+#: 44098089390080
+msgid "statsEffectAppliedOnDestroy"
+msgstr "Bakit nangyayari ito sa tuwing?!"
+
+#: 50940257505280
+msgid "timeIsUp"
+msgstr "Ano, wala nang ibang guguluhin?!"
+
+#: 73606410539008
+msgid "noActions1"
+msgstr "Doo-doo-doo…"
+
+#: 73762149240832
+msgid "noActions2"
+msgstr "Sige, maghihintay kami."
+
+#: 73828930949120
+msgid "noActions3"
+msgstr "Sige, smoke break."
+
+#: 73889177931776
+msgid "noActions4"
+msgstr "Eh… kahit ano."
+
+#: 73986347372544
+msgid "noActions5"
+msgstr "Pasensya, pasensya…"
+
+#: 91507905531904
+msgid "richZoneReached1"
+msgstr "Nakakatakot… ibig sabihin, maraming kayamanan!"
+
+#: 91695428669440
+msgid "richZoneReached2"
+msgstr "Habang lumalalim tayo, mas gumaganda ang Loot!"
+
+#: 91772155072512
+msgid "richZoneReached3"
+msgstr "Amoy bundok ng kayamanan!"
+
+#: 42860303913062400
+msgid "coldNight"
+msgstr "N-n-napakalamig…"
+
+#: 42861209547182080
+msgid "frostible"
+msgstr ""
+"K-k-kailangan \n"
+"p-p-painitin!"
+
+#: 42861912688693248
+msgid "warmedUp"
+msgstr "Hooray, mainit na!"
+
+#: 42862171338838016
+msgid "frozenRockHit"
+msgstr "Kailangan tunawin ang yelo!"
+
+#: 42862467540586496
+msgid "frozenItemReceived"
+msgstr "Yelong Kayamanan!"
+
+#: 49631762726780928
+msgid "SuperRare"
+msgstr "Yesssss, Jackpot!"

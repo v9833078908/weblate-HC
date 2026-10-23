@@ -1,0 +1,35 @@
+.. _cmp-resource:
+
+Compose Multiplatform resources
+-------------------------------
+
+.. versionadded:: 5.12
+
+.. index::
+    pair: Compose Multiplatform resources; file format
+
+A variant of :doc:`/formats/android`. It differs in escaping.
+
+
+.. seealso::
+
+   * `Kotlin Compose Multiplatform Resources <https://kotlinlang.org/docs/multiplatform/compose-multiplatform-resources.html>`_
+   * :doc:`/formats/android`
+   * :doc:`tt:formats/android`
+
+.. include:: /snippets/format-features/cmp-resource-features.rst
+
+Weblate configuration
++++++++++++++++++++++
+
++-------------------------------------------------------------------------------------------+
+| Typical Weblate :ref:`component`                                                          |
++================================+==========================================================+
+| File mask                      | ``commonMain/composeResources/values-*/strings.xml``     |
++--------------------------------+----------------------------------------------------------+
+| Monolingual base language file | ``commonMain/composeResources/values/strings.xml``       |
++--------------------------------+----------------------------------------------------------+
+| Template for new translations  | `Empty`                                                  |
++--------------------------------+----------------------------------------------------------+
+| File format                    | `Compose Multiplatform Resource`                         |
++--------------------------------+----------------------------------------------------------+

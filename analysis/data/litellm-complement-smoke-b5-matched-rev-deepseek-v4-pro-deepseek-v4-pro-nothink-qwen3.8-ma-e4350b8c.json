@@ -1,0 +1,134 @@
+{
+  "kind": "smoke, n=1, not a measurement",
+  "batch_size": 5,
+  "corpus": "col4-judge-golden.json dev split",
+  "slice": {
+    "critical": 5,
+    "major": 5,
+    "clean": 5
+  },
+  "units": [
+    "mut-177682-cyrillic-fragment",
+    "mut-177701-cyrillic-fragment",
+    "mut-177708-cyrillic-fragment",
+    "mut-177723-cyrillic-fragment",
+    "mut-177755-cyrillic-fragment",
+    "clean-177682",
+    "clean-177701",
+    "clean-177708",
+    "clean-177723",
+    "clean-177755"
+  ],
+  "anchor": "deepseek-v4-pro",
+  "results": {
+    "deepseek-v4-pro": {
+      "parsed_batches": 0,
+      "of_batches": 2,
+      "flagged": [],
+      "caught": [],
+      "false_flag": [],
+      "seconds": 209.9,
+      "diagnoses": [
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "input_chars": 6819,
+          "seconds": 31.0
+        },
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "input_chars": 6731,
+          "seconds": 30.8
+        }
+      ]
+    },
+    "deepseek-v4-pro!nothink": {
+      "parsed_batches": 1,
+      "of_batches": 2,
+      "flagged": [
+        "clean-177701"
+      ],
+      "caught": [],
+      "false_flag": [
+        "clean-177701"
+      ],
+      "seconds": 170.2,
+      "diagnoses": [
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "input_chars": 6819,
+          "seconds": 30.7
+        },
+        {
+          "attempts": 2,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "input_chars": 6731,
+          "seconds": 30.9,
+          "usage": {
+            "prompt_tokens": 1959,
+            "completion_tokens": 1929,
+            "total_tokens": 3888
+          }
+        }
+      ]
+    },
+    "qwen3.8-max!nothink": {
+      "parsed_batches": 2,
+      "of_batches": 2,
+      "flagged": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177701-cyrillic-fragment",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "caught": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177701-cyrillic-fragment",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "false_flag": [],
+      "seconds": 15.4,
+      "diagnoses": [
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "input_chars": 6819,
+          "seconds": 11.3,
+          "usage": {
+            "prompt_tokens": 1766,
+            "completion_tokens": 620,
+            "total_tokens": 2386
+          }
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "input_chars": 6731,
+          "seconds": 4.1,
+          "usage": {
+            "prompt_tokens": 1734,
+            "completion_tokens": 192,
+            "total_tokens": 1926
+          }
+        }
+      ]
+    }
+  }
+}

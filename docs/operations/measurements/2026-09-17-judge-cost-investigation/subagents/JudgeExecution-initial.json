@@ -1,0 +1,31 @@
+{
+  "summary": "Read-only execution investigation completed. Clean 2-seat static estimate is 800 POSTs for 2,000 units at batch 5; actual attempts are governed by adaptive effective widths, retries/fallback/isolation, unparsed rounds, repair/rejudge recursion, and possible concurrent redelivery. No paid calls or validation commands were run.",
+  "files": [
+    {
+      "path": "weblate/trans/judge.py",
+      "description": "Seat profile resolution and overrides (around lines 450-700), profile-aware initial count (815-830), retry/fallback/isolation transport loop (1700-1948), request batching (1944-2085), and attempt observability fields (434-530 in models/judge.py)."
+    },
+    {
+      "path": "weblate/trans/judge_loop.py",
+      "description": "Two-seat barrier scheduler and per-batch persistence (1119-1238), run batching/cache/repair/rejudge orchestration (1320-1738), deferred single-seat drain (1950-1985), repair MT path (184-267)."
+    },
+    {
+      "path": "weblate/trans/autotranslate.py",
+      "description": "Per-translation scope selection and global cap fragmentation (720-902, 1240-1338), proposal-only and pretranslation controls."
+    },
+    {
+      "path": "weblate/trans/models/judge.py",
+      "description": "JudgeRequestAttempt, JudgeRunUnit, JudgeVerdict, and JudgeAdaptiveState fields for production aggregation."
+    },
+    {
+      "path": "weblate/trans/models/llm_usage.py",
+      "description": "Per-request provider token/cost and batch observability fields."
+    },
+    {
+      "path": "docs/operations/measurements/2026-09-17-anvil-saga-judge-investigation.md",
+      "description": "Existing production evidence and explicit unknowns for the two Anvil runs."
+    }
+  ],
+  "architecture": "BatchAutoTranslate partitions a project/workspace by translation (component/language), applies a global cap, and invokes AutoTranslate per translation. AutoTranslate optionally pre-translates writable rows, then run_judge_batch. run_judge_batch resolves both seats, reuses only complete two-seat cache hits, and runs both seats concurrently with same-batch acknowledgement barriers. Each seat's request_verdicts adapts batch width and invokes _run_batch, which may retry, fail over, or isolate parser failures. Repair MT is separate from JudgeRequestAttempt accounting; successful repairs can trigger additional one-unit candidate/live rejudge calls. Deferral draining intentionally selects one seat and bypasses cache.",
+  "report": "Exact clean baseline: E_initial = Σ_s ceil(U/B_s); with U=2000, B1=B2=5, E=800. Effective execution: for each request round r, seat s, batches b at adaptive width B_eff(r,s), outbound attempts are primary POST + eligible transport/transient/protocol retries (shared RetryBudget/deadline bounded) + at most one fallback POST on auth/failover; parser failures may recursively isolate to width-one calls. Add all-selected-seat unparsed retry rounds, repair mutation rounds, candidate proposal rejudges, and any concurrent redelivery duplicates. Static preview/worst-case counts do not include adaptive width collapse, fallback/isolation details, or concurrent duplicate delivery. The observed ~3000 attempts/run is therefore not explained by global batch=5; it requires measured decomposition. A useful diagnostic is average width 2*2000/3000≈1.33 if each seat-unit is judged once, but retries/duplicates invalidate that as attribution. Candidate explanations ranked by leverage: (1) adaptive budget collapse to 1–2 after deadline/transport failures (directly supported by code, current history not retained); (2) concurrent late-ack redelivery processing PENDING rows in parallel (supported as a race by orchestration, but no broker receipt proof); (3) retries/fallback/parser isolation/unparsed retry rounds (all code-supported, per-run contribution unknown); (4) repair/candidate rejudge recursion (code-supported, but Anvil summary repaired=0 does not exclude failed repair MT and does not prove candidate recursion). Production aggregation must group JudgeRequestAttempt by run, seat, attempt ordinal, batch_digest/size, provider/model/profile fingerprint, request_round via verdict joins, failure_kind, parsed, elapsed/first_byte/response bytes/status, and token fields; join LLMUsageLog by request_attempt/run for cost (null cost=unpriced), unit_count, batch_size, operation/service, outcome. Join JudgeRunUnit for cached/outcome/repair_status/attempt_count and JudgeVerdict for subject live/candidate, attempt/request_round, unparsed, profile/provider/hash identities. Also inspect current JudgeAdaptiveState batch_budget/circuit/failure streak, noting it is current state rather than historical."
+}

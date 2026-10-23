@@ -1,0 +1,452 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Latvian <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/lv/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lv\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 0 || n % 100 >= 11 && n % 100 <= "
+"19) ? 0 : ((n % 10 == 1 && n % 100 != 11) ? 1 : 2);\n"
+
+#: 75765772134387712
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Tātad, ķēve, vai tu to sajūti? Zelts! Tas ir kaut kur tuvumā… Un mīlestība… "
+"tajā klintī tur!"
+
+#: 75765971959418880
+msgid "DialogueIntroHorse1"
+msgstr "Frrr!"
+
+#: 75766215002558464
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"Ko tu domā, 'ja es tur vēlreiz dzirdēšu sievieti, tu mani nometīsi'? Tur "
+"noteikti kāds bija vientuļš."
+
+#: 75766376147718144
+msgid "DialogueIntroHorse2"
+msgstr "Neeigh! Grr-ha!"
+
+#: 75766594431881216
+msgid "DialogueIntroCharacter3"
+msgstr "Labi, labi! Tā bija tikai atbalss… manam diženumam!"
+
+#: 75766733204623360
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Klints! Dievišķa! Kā Afrodītes ciska! Tur noteikti kaut kas mirdz, manas "
+"aknas tikko nodrebēja!"
+
+#: 75766977115983872
+msgid "DialogueMineFoundHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 75767084016209920
+msgid "DialogueMineFoundCharacter2"
+msgstr "Nu, atvainojiet, ka mans ķermenis reaģē uz skaistumu!"
+
+#: 75768133359767552
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Nee!"
+
+#: 75768214897037312
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Kas? Saule jau riet?"
+
+#: 75768748328620032
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 75769024796168192
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Odi… Atkal viņi! Jā-jā, es atceros, ka tu esi zaļā mājiņa, es nāku! Tikai "
+"neaizbēdz!"
+
+#: 75769959874301952
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Hei! Pārāk daudz Laupījums. Zirgs somā viss neietilpst."
+
+#: 75770225956753408
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Cērte labāko, ko vari aiznest uz Uzglabāšana."
+
+#: 76060126094823424
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr "Tagad… Tagad es radīšu šedevru! Rotaslietas, kas liks Viņai nožēlot!"
+
+#: 76060331171123200
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Brrr-r-r."
+
+#: 76061423992836096
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "SKATIES, Zirgs! Tas spīd kā manas acis, pirms es satiku savu bijušo!"
+
+#: 76061521736896512
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Frrr!"
+
+#: 76061738473361408
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Šī… šī ir dievišķā mana atriebības gaisma!"
+
+#: 76061830932598784
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 76061898951626752
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Tu vienkārši esi greizsirdīgs — tev nav pirkstu, lai valkātu tādu krāšņumu. "
+"Atlika tikai atrast pircēju ar pirkstiem!"
+
+#: 76062368449433600
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Tu to pats uztaisīji? Skaisti, es to ņemšu."
+
+#: 76062530391511040
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"Viņš… viņš saprata! Rotaslietu iekšpusē — esmu es. Manī — Zelts. Zelta "
+"iekšpusē — dievs."
+
+#: 76062825645346816
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Frrr! Nīīī!"
+
+#: 76062978284457984
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Tev taisnība, Zirgs. Viņi nav gatavi patiesībai…"
+
+#: 76063254827503616
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Frrr!"
+
+#: 76063498000666624
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr "Nauda? Es? Vai tu zini, kas notiks, ja Viņa uzzinās, ka esmu bagāts?"
+
+#: 76063745632374784
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Grrr-hrr!"
+
+#: 76063937093963776
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr "Labi, es ieguldīšu sevī — bet tikai tāpēc, lai tu beigtu mani kaitināt!"
+
+#: 76064239725580288
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr "Es kļuvu ātrāks, stiprāks un lētāks ražošanā! Viņai tas būtu paticis."
+
+#: 76064347783434240
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Grrr-hrr!"
+
+#: 76064479283253248
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr "Nu, nebija jau jāuzstāj! Tev ir savas fetišas — nagi un auzas."
+
+#: 76065879857827840
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Redzi, ķēve? Viņi mani mīl!"
+
+#: 76066013412855808
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 76066107042304000
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "Tev taisnība! Tas ir tikai sākums! Drīz viņi visi būs mani fani…"
+
+#: 76344321220284416
+msgid "character"
+msgstr "Tēls"
+
+#: 76344471367979008
+msgid "horse"
+msgstr "Zirgs"
+
+#: 76344680219152384
+msgid "trader"
+msgstr "Tirgotājs"
+
+#: 76344756748423168
+msgid "buyer"
+msgstr "Pircējs"
+
+#: 131220345145528320
+msgid "terrainDispenserFound"
+msgstr "Oho! Medījums!"
+
+#: 131220694531051520
+msgid "terrainDispenserCollecting"
+msgstr "Aiziet! Salauzt to!"
+
+#: 131220939017031680
+msgid "exitDoorDescription"
+msgstr "Zaļš — vai tas ir Zirgs?"
+
+#: 131221107242176512
+msgid "exitDoorDescription2"
+msgstr "Zaļš? Vai viņai… slikti palicis?"
+
+#: 137323318787444736
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Pieskarieties priekšmetiem, lai tos ievietotu Zirga somā."
+
+#: 137351439217594368
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Tas ir viss, kas ietilpa? Ķēvei vajag lielāku somu!"
+
+#: 137381643633823744
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr "Neuztraucieties! Es nopirkšu pārējo. Es pat iemetīšu nedaudz papildus."
+
+#: 137616255752605696
+msgid "terrainWantMoreItems"
+msgstr "Es gribu vairāk Zelts!"
+
+#: 137629488379072512
+msgid "terrainRoadIsClue"
+msgstr "Taka ved uz bagātībām"
+
+#: 138087561421918208
+msgid "DialogueOrdersIntroBuyer1"
+msgstr ""
+"Ak, jauna seja! Man ir pasūtījums jums. Vai palīdzēsiet papildināt manu "
+"kolekciju?"
+
+#: 138088926181330944
+msgid "DialogueOrdersIntroCharacter1"
+msgstr "Redzi, ķēve, viņi nevar iztikt ne dienu bez manas palīdzības!"
+
+#: 138089230444531712
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Frrrr!"
+
+#: 138089454202261504
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Jā, jā, arī bez tavējā."
+
+#: 138110517984366592
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Tu man ļoti palīdzēji, un es palīdzēšu tev — esmu atzīmējis vietu, kur "
+"akmeņi skan skaļāk nekā parasti."
+
+#: 138111196928937984
+msgid "DialogueOrdersThanksCharacter1"
+msgstr "VIŅI MANI TIK ĻOTI MĪL, KA IR GATAVI ATDOT SAVAS DOMAS!"
+
+#: 138111354584436736
+msgid "DialogueOrdersThanksCharacter2"
+msgstr "Nē, naudu kabatā nevar iebāzt, bet zināšanas — absolūti var!"
+
+#: 138111433626095616
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Ņē!"
+
+#: 139150891347611648
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Tas dīvainais tips atzīmēja šo vietu uz Kartes. Tā nav līdzīga nevienai "
+"vietai, kur esam bijuši — un es jau jūtu DĀRGUMU smaržu!"
+
+#: 139151218457186304
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Frrr!"
+
+#: 139151464675414016
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Būris man uz muguras? Tas ir Dārgumu meklētājs Kanārijputniņš! Tagad "
+"redzēsim, kur ir aprakts suns."
+
+#: 139160840467386368
+msgid "DialogueUseBirdCharacter1"
+msgstr "Tagad mēs sekojam spalvu pēdām, un dārgums ir mans!"
+
+#: 139178592703877120
+msgid "DialogueAfterChestCharacter1"
+msgstr "VAI TU TO REDZĒJI, ZIRGS!"
+
+#: 139178671472906240
+msgid "DialogueAfterChestCharacter2"
+msgstr "Tev būs jāvelk ne tikai mani, bet arī šī lāde."
+
+#: 139178702909214720
+msgid "DialogueAfterChestHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 139180374293221376
+msgid "chestCollecting"
+msgstr "DĀRGUMI!"
+
+#: 139496544913330176
+msgid "DialogueClaimedChestHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139496773167353856
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Jā, lāde ir šeit, bet nav atslēgas — bet tu aizmirsīji par maģisko kalvi, "
+"ķēve! Tā var darīt jebko ar jebko."
+
+#: 139512809946091520
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "ŠIS IR DŽEKPOTS! Mums tas ātri jāpārdod!"
+
+#: 139537206085947392
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr ""
+"JĀ! Mani ir atpazinuši. ŠODIEN ŠIS PURVS, RĪT VISA PASAULE! UZ PRIEKŠU, "
+"ZIRGS!"
+
+#: 139537401876058112
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ha-ha — šķiet, ka visi vietējie valkā tavas spīdīgās lietas. Galu galā, esmu "
+"vienīgais, kas šeit dzīvo, Ha-ha-ha."
+
+#: 139766416519991296
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Brrr-r-r!"
+
+#: 139766737396830208
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Smaržo… pēc dūmiem?"
+
+#: 139767066540642304
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 139767291636355072
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Vai tu saki, ka es nometa ogles uz noliktavas jumta?"
+
+#: 139767459110719488
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Grrr-hrr!"
+
+#: 139767686714626048
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "Ak… Varbūt mums nevajadzētu atgriezties."
+
+#: 139772805363535872
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Cits apvidus. Mīksta zeme. Ak, gaiss smaržo pēc jēgas!"
+
+#: 139772978911252480
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139773239633383424
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Labi, mēs ātri paņemam vērtslietas un bēgam."
+
+#: 140259502945734656
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Kāda skanoša klints! It kā pati daba man aplaudētu!"
+
+#: 140260138097577984
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "Kas tas bija?!"
+
+#: 140260175347191808
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Grrr-hrr!"
+
+#: 140260548501835776
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "Ak, nē… Vai tā bija… viņa?"
+
+#: 140262190995476480
+msgid "DialogueWormAppearHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 140262312860979200
+msgid "DialogueWormAppearCharacter1"
+msgstr "Ak, Kungs. Esmu atmodinājis nāvi. Atkal."
+
+#: 140263122399399936
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "PASAKI VIŅAI, KA ES TO NOŽĒLOJU!!!"
+
+#: 140263995359891456
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Vai šīs ir debesis? Tad kāpēc tik slikti smaržo…"
+
+#: 140264148288409600
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Skaidrs. Nav miris. Vēl ļaunāk — dzīvs!"
+
+#: 140264664699506688
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Tas bija tuvu, bet tagad esmu gatavs visam! Mēģināšu šūpot cirtni nedaudz "
+"klusāk…"
+
+#: 142736080803991552
+msgid "tip1"
+msgstr "Jūs varat stumt vāzi. Stumiet to divreiz, lai salauztu."
+
+#: 142736223703928832
+msgid "tip2"
+msgstr "Tārps jums nesekos ūdenī vai Purvā."
+
+#: 142736293392289792
+msgid "tip3"
+msgstr "Saspiediet kukaiņus — tie nometīs Monētas."
+
+#: 142736344843816960
+msgid "tip4"
+msgstr "Dažos krūmos slēpjas putni, kas dēj zelta Olas."
+
+#: 142736408026812416
+msgid "tip5"
+msgstr "Trokšņi piesaista bīstamus ienaidniekus."
+
+#: 142736477400600576
+msgid "tip6"
+msgstr "Celiņi ved uz interesantām vietām."
+
+#: 142736521784725504
+msgid "tip7"
+msgstr "Tirgotājs nopirks papildu priekšmetus no jūsu somas."
+
+#: 142736594941775872
+msgid "tip8"
+msgstr "Izpildiet pasūtījumus, lai atbloķētu jaunas atrašanās vietas."
+
+#: 142736659890573312
+msgid "tip9"
+msgstr "Uzlabojiet Kalvi, lai atbloķētu jaunas Rotaslietu receptes."
+
+#: 142736729293721600
+msgid "tip10"
+msgstr "Noņemiet lāstus pie Altāra vai Super slots."
+
+#: 142736813704089600
+msgid "tip11"
+msgstr "Priekšmetus, kas apzīmēti ar “?”, var novērtēt Tirgotājs."
+
+#: 142736907266428928
+msgid "tip12"
+msgstr "Uzlabojiet savu Uzglabāšana, lai tajā ietilptu vairāk Laupījums."
+
+#: 201164984023257088
+msgid "tip13"
+msgstr "Pauzes laikā vienmēr varat pārbaudīt pasūtījumus un efektus."
+
+#: 201320091704627200
+msgid "tip14"
+msgstr "Elites slots garantē labāko Pircēju."

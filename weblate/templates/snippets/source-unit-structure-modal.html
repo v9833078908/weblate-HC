@@ -1,0 +1,51 @@
+{% load i18n %}
+
+<div class="modal fade"
+     id="source-unit-structure-modal"
+     tabindex="-1"
+     role="dialog"
+     aria-labelledby="source-unit-structure-title"
+     aria-describedby="source-unit-structure-status">
+  <div class="modal-dialog" role="document">
+    <form class="modal-content" id="source-unit-structure-form" novalidate>
+      <div class="modal-header">
+        <h4 class="modal-title" id="source-unit-structure-title"></h4>
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="{% translate "Close" %}"></button>
+      </div>
+      <div class="modal-body">
+        <p class="source-unit-structure-warning" hidden>
+          {% translate "Renaming a key does not update references in the game code." %}
+        </p>
+        <div class="mb-3">
+          <label class="form-label"
+                 for="source-unit-structure-input"
+                 id="source-unit-structure-input-label"></label>
+          <input class="form-control"
+                 id="source-unit-structure-input"
+                 required
+                 autocomplete="off" />
+        </div>
+        <div class="mb-3 source-unit-structure-placement" hidden>
+          <label class="form-label" for="source-unit-structure-placement">{% translate "Placement" %}</label>
+          <select class="form-select" id="source-unit-structure-placement">
+            <option value="before">{% translate "Before the selected key" %}</option>
+            <option value="after">{% translate "After the selected key" %}</option>
+          </select>
+        </div>
+        <div class="list-group source-unit-structure-results" hidden></div>
+        <p class="mb-0" id="source-unit-structure-status" role="status" aria-live="polite"></p>
+        <div class="source-unit-structure-preview" hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+        <button type="submit" class="btn btn-primary source-unit-structure-preview-button">{% translate "Preview" %}</button>
+        <button type="button"
+                class="btn btn-primary source-unit-structure-confirm-button"
+                hidden>{% translate "Confirm" %}</button>
+      </div>
+    </form>
+  </div>
+</div>

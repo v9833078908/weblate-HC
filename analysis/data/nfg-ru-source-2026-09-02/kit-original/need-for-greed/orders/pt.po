@@ -1,0 +1,356 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-22 10:29+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Portuguese <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/pt/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: pt\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+
+msgid "orderTerrain0.1Step1Title"
+msgstr "Precisamos de Mais Ouro!"
+
+msgid "orderTerrain0.1Step1Description"
+msgstr "Traga-me 3 Pepitas de Ouro."
+
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Ótimo — estas pepitas serão um belo acréscimo à minha coleção."
+
+msgid "orderTerrain1.1Step1Title"
+msgstr "Brilho do Amanhecer"
+
+msgid "orderTerrain1.1Step1Description"
+msgstr "Traga-me uma Pepita de Ouro de qualquer rocha aurífera."
+
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"O ouro contém o brilho do amanhecer — se não posso vê-lo, pelo menos posso "
+"senti-lo..."
+
+msgid "orderTerrain0.1Step2Title"
+msgstr "Ótimo trabalho!"
+
+msgid "orderTerrain0.1Step2Description"
+msgstr "Obrigado pela ajuda! Compartilharei um lugar curioso com você."
+
+msgid "orderTerrain1.1Step2Title"
+msgstr "Um Novo Óculos"
+
+msgid "orderTerrain1.1Step2Description"
+msgstr "Traga-me 2 Diamantes. Eles frequentemente caem de rochas de cristal."
+
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Vamos ver se estou pronto para me acostumar com esta terra..."
+
+msgid "orderTerrain1.1Step3Title"
+msgstr "Acostumando-se à Terra"
+
+msgid "orderTerrain1.1Step3Description"
+msgstr ""
+"Traga-me uma Pequena Geode. Elas podem ser encontradas em rochas comuns."
+
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Vamos ver se estou pronto para me acostumar a esta terra..."
+
+msgid "orderTerrain1.1Step4Title"
+msgstr "Baú do Homem Morto"
+
+msgid "orderTerrain1.1Step4Description"
+msgstr "Traga-me um Baú. Um canário pode ajudá-lo a encontrar um."
+
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Então, foi aqui que deixei minhas coisas..."
+
+msgid "orderTerrain1.1Step5Title"
+msgstr "Prata para Temperar"
+
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Traga-me 3 Peças de Prata. Elas podem ser encontradas em geodos e rochas "
+"comuns."
+
+msgid "orderTerrain1.1Step6Title"
+msgstr "Excelente trabalho!"
+
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Esta prata pica as palmas das mãos agradavelmente..."
+
+msgid "orderTerrain1.1Step6Description"
+msgstr "Obrigado! Apareça em minha casa algum dia — aqui está o endereço."
+
+msgid "orderTerrain1.2Step1Title"
+msgstr "Dinheiro Antigo"
+
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Traga-me 4 Moedas Antigas. Elas são frequentemente encontradas em potes e "
+"vasos antigos."
+
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Agora posso finalmente dar troco aos antigos!"
+
+msgid "orderTerrain1.2Step2Title"
+msgstr "Rola-Bolas"
+
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Traga-me um Escaravelho Dourado. São besouros grandes que podem ser "
+"encontrados rastejando nos arbustos."
+
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Este besouro é um grande rola-bolas!"
+
+msgid "orderTerrain1.2Step3Title"
+msgstr "Boliche de Pedra"
+
+msgid "orderTerrain1.2Step3Description"
+msgstr "Traga-me uma Geode Média. Às vezes aparece em rochas comuns."
+
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Agora finalmente poderei rolar algumas bolas!"
+
+msgid "orderTerrain1.2Step4Title"
+msgstr "Omelete Dourada"
+
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Traga-me um Ovo Dourado. Procure nos arbustos por um ninho que contenha tais "
+"ovos."
+
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Agora, isso sim é um café da manhã para a realeza!"
+
+msgid "orderTerrain1.2Step5Title"
+msgstr "Sangue de Leão"
+
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Traga-me um Rubi Leão. Pode ser encontrado em geodos com cristais vermelhos."
+
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Agora serei corajoso como um leão!"
+
+msgid "orderTerrain1.2Step6Title"
+msgstr "Graça Divina"
+
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Traga-me uma Safira Celestial. Pode ser encontrada em geodos com cristais "
+"azuis."
+
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Os próprios céus estão do meu lado!"
+
+msgid "orderTerrain1.2Step7Title"
+msgstr "Sanita Dourada"
+
+msgid "orderTerrain1.2Step7Description"
+msgstr "Traga-me uma Pepita de Ouro 9 de qualquer rocha aurífera."
+
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Finalmente, posso arranjar a casa de banho!"
+
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Se quiser fazer desejos — eu conheço um lugar onde as estrelas caem o tempo "
+"todo."
+
+msgid "orderTerrain1.2Step8Title"
+msgstr "Ótimo trabalho!"
+
+msgid "orderTerrain2.1Step5Title"
+msgstr "Excelente trabalho!"
+
+msgid "orderTerrain2.1Step5Description"
+msgstr "Gelo lembra-me da Avó... Passe pela cabana dela também!"
+
+msgid "orderTerrain2.1Step1Description"
+msgstr "Traga-me 2 Itens Congelados das rochas congeladas"
+
+msgid "orderTerrain2.1Step1Title"
+msgstr "Cubos de Gelo"
+
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Perfeito para os meus cocktails!"
+
+msgid "orderTerrain2.2Step7Title"
+msgstr "Excelente trabalho!"
+
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Parece que os caranguejos estão ligados ao Culto do Sol — eu sei onde estão "
+"as ruínas do templo deles!"
+
+msgid "orderTerrain2.2Step2Description"
+msgstr "Apanhe um caranguejo de gelo — a sua carapaça é feita de Criólis."
+
+msgid "orderTerrain2.2Step2Title"
+msgstr "Metal de Caranguejo"
+
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, exometal! Adoro os mistérios da natureza!"
+
+msgid "orderTerrain2.3Step8Title"
+msgstr "Excelente trabalho!"
+
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Os tesouros mais valiosos do Culto do Sol estão escondidos nas profundezas "
+"do Labirinto — eu mostro-lhe onde!"
+
+msgid "orderTerrain2.3Step2Description"
+msgstr "Acenda 3 tochas no Santuário e roube a Esfera do Sol!"
+
+msgid "orderTerrain2.3Step2Title"
+msgstr "Melhor Aquecedor"
+
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Sim, agora sim, um bom aquecimento!"
+
+msgid "orderTerrain2.1Step2Description"
+msgstr "Encontre 2 Pepitas de Prata dentro de cubos de gelo e aqueça-as."
+
+msgid "orderTerrain2.1Step2Title"
+msgstr "Prata Gelada"
+
+msgid "orderTerrain2.1Step2Thank"
+msgstr "É como gelo em papel alumínio... mas ao contrário..."
+
+msgid "orderTerrain2.1Step3Title"
+msgstr "Ouro Gelado"
+
+msgid "orderTerrain2.1Step3Thank"
+msgstr "O ouro de inverno tem um... brilho... muito especial."
+
+msgid "orderTerrain2.1Step3Description"
+msgstr "Encontre 2 Pepitas de Ouro dentro de cubos de gelo e aqueça-as."
+
+msgid "orderTerrain2.1Step4Title"
+msgstr "Gema Invisível"
+
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Transparente dentro de transparente, ahahaha!"
+
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Descongele um Diamante Médio. Diamantes congelados são frequentemente "
+"encontrados em todas as rochas."
+
+msgid "orderTerrain2.2Step1Title"
+msgstr "Astrologia Terrestre"
+
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Traga-me 2 Ferros Estelares. Eles podem ser encontrados nos Pântanos durante "
+"uma Chuva de Estrelas."
+
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Astrometal é o sonho de todo cientista!"
+
+msgid "orderTerrain2.2Step3Title"
+msgstr "Intruso Cósmico"
+
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Encontre um Núcleo de Meteoro Amaldiçoado durante uma Chuva de Estrelas e "
+"amaldiçoe a maldição."
+
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Um meteoro é uma máquina, não apenas um corpo celeste! Incrível!"
+
+msgid "orderTerrain2.2Step4Title"
+msgstr "Calor de Caranguejo"
+
+msgid "orderTerrain2.2Step4Description"
+msgstr "Colete 5 cacos de Criólis das conchas de caranguejos de gelo."
+
+msgid "orderTerrain2.2Step4Thank"
+msgstr ""
+"Você também está morrendo de vontade de saber como os caranguejos vivem na "
+"neve?"
+
+msgid "orderTerrain2.2Step5Title"
+msgstr "Novos Sensores"
+
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Traga-me 9 Peças de Prata. Elas podem ser encontradas em geodos e rochas "
+"simples."
+
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Meus instrumentos de pesquisa finalmente pararão de falhar!"
+
+msgid "orderTerrain2.2Step6Title"
+msgstr "Casaco Quente de Caranguejo"
+
+msgid "orderTerrain2.2Step6Description"
+msgstr "Colete 8 estilhaços de Criólis das conchas de caranguejos de gelo."
+
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Agora finalmente entenderei como eles sobrevivem ao inverno!"
+
+msgid "orderTerrain2.3Step1Title"
+msgstr "Indo Grande"
+
+msgid "orderTerrain2.3Step1Description"
+msgstr ""
+"Traga-me um Grande Diamante. Ele pode ser encontrado em todas as rochas "
+"congeladas."
+
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Oh meu Deus, é do tamanho de uma cabeça! Mas de quem..."
+
+msgid "orderTerrain2.3Step3Title"
+msgstr "Tesouro das Terras Brancas"
+
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Dê-me o Baú do Jarl. O canário o ajudará a encontrá-lo nas Terras Brancas."
+
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Lembra-me do Avô..."
+
+msgid "orderTerrain2.3Step4Title"
+msgstr "Essência da Chama"
+
+msgid "orderTerrain2.3Step4Description"
+msgstr "Extraia uma Faísca de Ídolo da Esfera do Sol."
+
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Que pedra quente..."
+
+msgid "orderTerrain2.3Step5Title"
+msgstr "Pedra Iridescente"
+
+msgid "orderTerrain2.3Step5Description"
+msgstr "Traga-me uma Opala. É uma descoberta rara nas rochas congeladas."
+
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Olhe como brilha lindamente..."
+
+msgid "orderTerrain2.3Step6Title"
+msgstr "Deixou Descendentes!"
+
+msgid "orderTerrain2.3Step6Description"
+msgstr "Extraia um filhote de coruja da Esfera do Sol."
+
+msgid "orderTerrain2.3Step6Thank"
+msgstr "A Grande Coruja traz o frio... Por que o filhote é tão quente?"
+
+msgid "orderTerrain2.3Step7Title"
+msgstr "Grande Negócio"
+
+msgid "orderTerrain2.3Step7Description"
+msgstr ""
+"Traga-me 5 Pedaços de Ouro. Eles são bastante comuns nas rochas congeladas."
+
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Agora serei o homem mais importante da cidade."

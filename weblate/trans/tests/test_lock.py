@@ -1,0 +1,132 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Test for locking."""
+
+from django.urls import reverse
+
+from weblate.accounts.notifications import NotificationFrequency
+from weblate.trans.models.component import Component
+from weblate.trans.tests.test_views import FixtureTestCase
+
+
+class LockTest(FixtureTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+
+        # Need extra power
+        self.user.is_superuser = True
+        self.user.save()
+
+    def assert_component_locked(self) -> None:
+        component = Component.objects.get(
+            slug=self.component.slug, project__slug=self.project.slug
+        )
+        self.assertTrue(component.locked)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(
+            response,
+            "The translation is temporarily closed for contributions due "
+            "to maintenance, please come back later.",
+        )
+
+    def assert_component_not_locked(self) -> None:
+        component = Component.objects.get(
+            slug=self.component.slug, project__slug=self.project.slug
+        )
+        self.assertFalse(component.locked)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(
+            response,
+            "The translation is temporarily closed for contributions due "
+            "to maintenance, please come back later.",
+        )
+
+    def test_component(self) -> None:
+        response = self.client.post(reverse("lock", kwargs=self.kw_component))
+        redirect_url = f"{self.component.get_absolute_url()}#repository"
+        self.assertRedirects(response, redirect_url)
+        self.assert_component_locked()
+
+        response = self.client.post(reverse("unlock", kwargs=self.kw_component))
+        self.assertRedirects(response, redirect_url)
+        self.assert_component_not_locked()
+
+    def test_project(self) -> None:
+        response = self.client.post(
+            reverse("lock", kwargs={"path": self.project.get_url_path()})
+        )
+        redirect_url = f"{self.project.get_absolute_url()}#repository"
+        self.assertRedirects(response, redirect_url)
+        self.assert_component_locked()
+
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(
+            response,
+            "The translation is temporarily closed for contributions due "
+            "to maintenance, please come back later.",
+        )
+
+        response = self.client.post(
+            reverse("unlock", kwargs={"path": self.project.get_url_path()})
+        )
+        self.assertRedirects(response, redirect_url)
+        self.assert_component_not_locked()
+
+    def test_lock_notification_subscription_button(self) -> None:
+        notify_text = "Get notified when this project is unlocked again"
+        unsubscribe_text = "Turn off this notification"
+        self.component.locked = True
+        self.component.save(update_fields=["locked"])
+
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, notify_text)
+        self.assertNotContains(response, unsubscribe_text)
+
+        response = self.client.post(
+            reverse("subscribe"),
+            {"onetime": "LockNotification", "component": self.component.pk},
+        )
+        self.assertRedirects(
+            response,
+            f"{reverse('profile')}#notifications",
+            fetch_redirect_response=False,
+        )
+        subscription = self.user.subscription_set.get(
+            notification="LockNotification",
+            project=self.project,
+            component=self.component,
+            onetime=True,
+        )
+        self.assertEqual(subscription.frequency, NotificationFrequency.FREQ_INSTANT)
+
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, notify_text)
+        self.assertContains(response, unsubscribe_text)
+        self.assertContains(response, reverse("unsubscribe"))
+
+        response = self.client.post(subscription.get_unsubscribe_url())
+        self.assertRedirects(
+            response,
+            f"{reverse('profile')}#notifications",
+            fetch_redirect_response=False,
+        )
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.frequency, NotificationFrequency.FREQ_NONE)
+
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, notify_text)
+        self.assertNotContains(response, unsubscribe_text)
+
+        response = self.client.post(
+            reverse("subscribe"),
+            {"onetime": "LockNotification", "component": self.component.pk},
+        )
+        self.assertRedirects(
+            response,
+            f"{reverse('profile')}#notifications",
+            fetch_redirect_response=False,
+        )
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.frequency, NotificationFrequency.FREQ_INSTANT)

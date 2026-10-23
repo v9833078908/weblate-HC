@@ -1,0 +1,473 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-25 18:39+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Turkish <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/tr/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: tr\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Daha Fazla Altına İhtiyacımız Var!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Bana 3 Altın Külçesi getir."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Mükemmel — bu külçeler koleksiyonuma güzel bir katkı sağlayacak."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Şafağın Parıltısı"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Bana herhangi bir altın içeren kayadan bir Altın Külçesi getir."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Altın, içinde şafağın parıltısını barındırır — eğer göremiyorsam, en azından "
+"hissedebilirim..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Mükemmel iş!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Yardımın için teşekkürler! Seninle ilginç bir yer paylaşacağım."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Yeni Bir Gözlük"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Bana 2 Elmas getir. Bunlar genellikle kristal kayalardan düşer."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Bakalım bu toprağa alışmaya hazır mıyım..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Toprağa Alışmak"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Bana küçük bir Jeot getir. Sıradan kayalarda bulunabilirler."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Bakalım bu topraklara alışmaya hazır mıyım..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Ölü Adamın Sandığı"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Bana bir Sandık getir. Bir Kanarya bulmana yardımcı olabilir."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Demek eşyalarımı oraya bırakmışım..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Sertleştirme için Gümüş"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Bana 3 Parça Gümüş getir. Jeotlarda ve sıradan kayalarda bulunabilirler."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Mükemmel iş!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Bu gümüş avuç içlerini hoş bir şekilde yakıyor..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Teşekkür ederim! Bir ara evime uğra — işte adres."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Antik Para"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Bana 4 Antik Madeni Para getir. Genellikle antik kaplarda ve vazolarda "
+"bulunurlar."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Şimdi nihayet antiklere para üstü verebilirim!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Top Yuvarlayıcı"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Bana bir Altın Skarabe getir. Bunlar çalılıklarda sürünürken bulunabilen "
+"büyük böceklerdir."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Bu böcek büyük bir top yuvarlayıcı!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Taş Bowling"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Bana Orta Boy bir Jeot getir. Bazen sıradan kayalarda ortaya çıkar."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Artık sonunda top yuvarlayabileceğim!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Altın Omlet"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Bana Altın Yumurta getir. Böyle yumurtaları içeren bir yuva bulmak için "
+"çalılıkları ara."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "İşte bu, krallara layık bir kahvaltı!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Aslan Kanı"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Bana bir Aslan Yakutu getir. Kırmızı kristalleri olan jeotlarda bulunabilir."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Artık bir aslan gibi cesur olacağım!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Cennetin Lütfu"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Bana bir Cennet Safiri getir. Mavi kristalleri olan jeotlarda bulunabilir."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Cennetin kendisi benim yanımda!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Altın tuvalet"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Bana altın içeren herhangi bir kayadan 9 Altın Külçesi getir."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Sonunda tuvaleti tamir ettirebilirim!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr "Dilek dilemek istersen — yıldızların sürekli düştüğü bir yer biliyorum."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Mükemmel iş!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Mükemmel iş!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "Buz bana Büyükannemi hatırlatıyor... Onun kulübesine de uğra!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Bana donmuş kayalardan 2 Donmuş Eşya getir"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Buz Küpleri"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Kokteyllerim için mükemmel!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Mükemmel iş!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Yengeçlerin Güneş Kültü ile bağlantılı olduğu anlaşılıyor — tapınak "
+"kalıntılarının nerede olduğunu biliyorum!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Bir buz yengeci yakala — kabuğu Cryolis'ten yapılmış."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Yengeç Metali"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, ekzometal! Doğanın gizemlerine bayılıyorum!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Mükemmel iş!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Güneş Kültü'nün en değerli hazineleri Labirent'in derinliklerinde saklı — "
+"sana nerede olduğunu göstereceğim!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Tapınak'ta 3 meşale yak ve Güneş Küresi'ni çal!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "En İyi Isıtıcı"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Evet, şimdi bu tam bir ısınma!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Buz küplerinin içindeki 2 Gümüş Külçesini bulun ve ısıtın."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Buzlu Gümüş"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Folyo içindeki buz gibi... ama tersten..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Buzlu Altın"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Kış altını çok özel bir... parlaklık kazanır..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Buz küplerinin içindeki 2 Altın Külçesini bulun ve ısıtın."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Görünmez Mücevher"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Şeffaf içinde şeffaf, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Orta Boy Donmuş Elmasın buzunu çözün. Donmuş elmaslar genellikle tüm "
+"kayalarda bulunur."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Temelli Astroloji"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Bana 2 Yıldız Demiri getir. Yıldız Düşüşü sırasında Bataklıklarda "
+"bulunabilirler."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Astrometal her bilim insanının hayalidir!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Kozmik Davetsiz Misafir"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Yıldız Düşüşü sırasında Lanetli bir Meteor Çekirdeği bul ve laneti yok et."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Bir meteor sadece bir gök cismi değil, bir makine! İnanılmaz!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Yengeç Sıcaklığı"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Buz yengeçlerinin kabuklarından 5 Cryolis parçası topla."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Yengeçlerin karda nasıl yaşadığını öğrenmek için can atmıyor musun?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Yeni Sensörler"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr "Bana 9 Parça Gümüş getir. Jeotlarda ve basit kayalarda bulunabilirler."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Araştırma araçlarım sonunda arızalanmayı bırakacak!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Yengeç Sıcak Paltosu"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Buz yengeçlerinin kabuklarından 8 Cryolis parçası topla."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Şimdi nihayet kışı nasıl atlattıklarını anlayacağım!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Büyümek"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr "Bana Büyük bir Elmas getir. Tüm donmuş kayalarda bulunabilir."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Aman Tanrım, bir kafa büyüklüğünde! Ama kimin..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Whitelands Hazinesi"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr ""
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Bana Jarl Sandığı'nı ver. Kanarya, Beyaz Topraklar'da onu bulmana yardım "
+"edecek."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Bana Büyükbabamı hatırlatıyor..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Alev Özü"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Güneş Küresi'nden bir İdol Kıvılcımı çıkarın."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Ne kadar da sıcak bir taş..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Yanardöner Taş"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Bana bir Opal getirin. Donmuş kayalarda nadir bulunan bir şeydir."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Ne kadar da güzel parlıyor..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Yavrular Bıraktı!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Güneş Küresi'nden bir Baykuş Yavrusu çıkarın."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Büyük Baykuş soğuk getirir... Yavru neden bu kadar sıcak?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Büyük Anlaşma"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Bana 5 Altın Parçası getir. Donmuş kayalarda oldukça yaygınlar."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Şimdi kasabanın en büyük adamı olacağım."

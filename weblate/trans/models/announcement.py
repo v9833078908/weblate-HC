@@ -1,0 +1,317 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Announcement model."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict
+
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Q
+from django.utils import timezone
+from django.utils.translation import gettext, gettext_lazy
+
+from weblate.lang.models import Language
+from weblate.trans.actions import ActionEvents
+
+if TYPE_CHECKING:
+    from weblate.auth.models import User
+
+
+class AnnouncementChangeKwargs(TypedDict):
+    action: int
+    project_id: int | None
+    category_id: int | None
+    component_id: int | None
+    language_id: int | None
+    announcement_id: int
+    target: str
+    user: User | None
+
+
+ANNOUNCEMENT_SEVERITY_CHOICES = (
+    ("info", gettext_lazy("Info (light blue)")),
+    ("warning", gettext_lazy("Warning (yellow)")),
+    ("danger", gettext_lazy("Danger (red)")),
+    ("success", gettext_lazy("Success (green)")),
+)
+
+
+class AnnouncementManager(models.Manager["Announcement"]):
+    @staticmethod
+    def _normalize_create_scope(kwargs) -> None:
+        has_category = (
+            kwargs.get("category") is not None or kwargs.get("category_id") is not None
+        )
+        has_component = (
+            kwargs.get("component") is not None
+            or kwargs.get("component_id") is not None
+        )
+        if has_category and not has_component:
+            kwargs.pop("project", None)
+            kwargs["project_id"] = None
+
+    @staticmethod
+    def _get_change_kwargs(
+        result, project_id: int | None, user: User | None
+    ) -> AnnouncementChangeKwargs:
+        return {
+            "action": ActionEvents.ANNOUNCEMENT,
+            "project_id": project_id,
+            "category_id": result.category_id,
+            "component_id": result.component_id,
+            "language_id": result.language_id,
+            "announcement_id": result.pk,
+            "target": result.message,
+            "user": user,
+        }
+
+    @staticmethod
+    def _category_filter(category):
+        category_ids = []
+        while category is not None:
+            category_ids.append(category.pk)
+            category = category.category
+        if not category_ids:
+            return Q(pk__in=[])
+        return Q(category_id__in=category_ids)
+
+    def context_filter(
+        self, project=None, component=None, language=None, category=None
+    ):
+        """Filter announcements by context."""
+        base = self.filter(
+            Q(expiry__isnull=True) | Q(expiry__gte=timezone.now())
+        ).order_by("id")
+
+        if language and project is None and component is None and category is None:
+            return base.filter(
+                project=None, category=None, component=None, language=language
+            )
+
+        if component:
+            category_filter = self._category_filter(component.category)
+            project_filter = (
+                Q(project=component.project)
+                & Q(category=None)
+                & Q(component=None)
+                & Q(language=None)
+            )
+            if language:
+                return base.filter(
+                    (Q(component=component) & Q(language=language))
+                    | (
+                        Q(project=None)
+                        & Q(category=None)
+                        & Q(component=None)
+                        & Q(language=language)
+                    )
+                    | (Q(component=component) & Q(language=None))
+                    | (category_filter & Q(component=None) & Q(language=None))
+                    | (category_filter & Q(component=None) & Q(language=language))
+                    | project_filter
+                    | (
+                        Q(project=component.project)
+                        & Q(category=None)
+                        & Q(component=None)
+                        & Q(language=language)
+                    )
+                )
+
+            return base.filter(
+                (Q(component=component) & Q(language=None))
+                | (category_filter & Q(component=None) & Q(language=None))
+                | project_filter
+            )
+
+        if category:
+            category_filter = self._category_filter(category)
+            return base.filter(
+                (category_filter & Q(component=None) & Q(language=None))
+                | (
+                    Q(project=category.project)
+                    & Q(category=None)
+                    & Q(component=None)
+                    & Q(language=None)
+                )
+            )
+
+        if project:
+            project_filter = (
+                Q(project=project)
+                & Q(category=None)
+                & Q(component=None)
+                & Q(language=None)
+            )
+            if language:
+                project_filter |= (
+                    Q(project=project)
+                    & Q(category=None)
+                    & Q(component=None)
+                    & Q(language=language)
+                )
+            return base.filter(project_filter)
+
+        # All are None
+        return base.filter(project=None, category=None, component=None, language=None)
+
+    def create(self, user=None, **kwargs):
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.category import Category
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.change import Change
+
+        self._normalize_create_scope(kwargs)
+
+        result = super().create(**kwargs)
+        project_id = result.project_id
+        if project_id is None and result.category_id is not None:
+            project_id = Category.objects.values_list("project_id", flat=True).get(
+                pk=result.category_id
+            )
+
+        Change.objects.create(
+            **self._get_change_kwargs(result, project_id, user),
+        )
+        return result
+
+    async def acreate(self, user=None, **kwargs):
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.category import Category
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.change import Change
+
+        self._normalize_create_scope(kwargs)
+
+        result = await super().acreate(**kwargs)
+        project_id = result.project_id
+        if project_id is None and result.category_id is not None:
+            project_id = await Category.objects.values_list(
+                "project_id", flat=True
+            ).aget(pk=result.category_id)
+
+        await Change.objects.acreate(
+            **self._get_change_kwargs(result, project_id, user),
+        )
+        return result
+
+
+class AnnouncementQuerySet(models.QuerySet["Announcement", "Announcement"]):
+    def filter_access(self, user):
+        if user.is_superuser:
+            return self
+
+        global_scope = Q(
+            project__isnull=True, category__isnull=True, component__isnull=True
+        )
+        project_scope = Q(category__isnull=True, component__isnull=True) & (
+            user.get_project_access_query("project")
+        )
+        category_scope = Q(category__isnull=False, component__isnull=True) & (
+            user.get_project_access_query("category__project")
+        )
+        component_scope = Q(component__isnull=False) & (
+            user.get_project_access_query("component__project")
+        )
+        if user.needs_component_restrictions_filter:
+            component_scope &= Q(component__restricted=False) | Q(
+                component_id__in=user.component_permissions
+            )
+
+        return self.filter(
+            global_scope | project_scope | category_scope | component_scope
+        )
+
+    def order(self):
+        return self.order_by("id")
+
+
+class Announcement(models.Model):
+    message = models.TextField(
+        verbose_name=gettext_lazy("Message"),
+        help_text=gettext_lazy("You can use Markdown and mention users by @username."),
+    )
+    project = models.ForeignKey(
+        "trans.Project",
+        verbose_name=gettext_lazy("Project"),
+        null=True,
+        blank=True,
+        on_delete=models.deletion.CASCADE,
+    )
+    category = models.ForeignKey(
+        "trans.Category",
+        verbose_name=gettext_lazy("Category"),
+        null=True,
+        blank=True,
+        on_delete=models.deletion.CASCADE,
+    )
+    component = models.ForeignKey(
+        "trans.Component",
+        verbose_name=gettext_lazy("Component"),
+        null=True,
+        blank=True,
+        on_delete=models.deletion.CASCADE,
+    )
+    language = models.ForeignKey(
+        Language,
+        verbose_name=gettext_lazy("Language"),
+        null=True,
+        blank=True,
+        on_delete=models.deletion.CASCADE,
+    )
+    severity = models.CharField(
+        max_length=25,
+        verbose_name=gettext_lazy("Severity"),
+        help_text=gettext_lazy("Severity defines color used for the message."),
+        choices=ANNOUNCEMENT_SEVERITY_CHOICES,
+        default="info",
+    )
+    expiry = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name=gettext_lazy("Expiry date"),
+        help_text=gettext_lazy(
+            "The message will be not shown after this date. "
+            "Use it to announce string freeze and translation "
+            "deadline for next release."
+        ),
+    )
+    notify = models.BooleanField(
+        blank=True,
+        default=False,
+        verbose_name=gettext_lazy("Notify users"),
+        help_text=gettext_lazy("Send notification to subscribed users."),
+    )
+
+    objects = AnnouncementManager.from_queryset(AnnouncementQuerySet)()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        app_label = "trans"
+        verbose_name = "Announcement"
+        verbose_name_plural = "Announcements"
+
+    def __str__(self) -> str:
+        return self.message
+
+    def clean(self) -> None:
+        if self.category and self.component:
+            raise ValidationError(
+                gettext("Do not specify both component and category!")
+            )
+        if self.category:
+            if self.project and self.category.project != self.project:
+                raise ValidationError(
+                    gettext("The category does not belong to the selected project.")
+                )
+            self.project = None
+        if self.project and self.component and self.component.project != self.project:
+            raise ValidationError(gettext("Do not specify both component and project!"))
+        if not self.project and self.component:
+            self.project = self.component.project

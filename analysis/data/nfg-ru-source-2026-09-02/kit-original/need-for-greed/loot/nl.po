@@ -1,0 +1,632 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Dutch <http://l10n.herocraft.com/projects/need-for-greed/loot/"
+"nl/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: nl\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Ring"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Dolk"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Ketting"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Gouden Scepter"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Armband"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Broche"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Diadeem"
+
+#: 549466071040
+msgid "casket"
+msgstr "Kistje"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Gouden Kroon"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Pure Diamant (Groot)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Pure Diamant (Middelgroot)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Pure Diamant (Klein)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Karmozijnrode Robijn (Groot)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Karmozijnrode Robijn (Middelgroot)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Karmozijnrode Robijn (Klein)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Blauwe Saffier (Groot)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Blauwe Saffier (Middelgroot)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Blauwe Saffier (Klein)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Smaragd (Groot)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Smaragd (Middelgroot)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Smaragd (Klein)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Amethist (Groot)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Amethist (middelgroot)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Amethist (klein)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Opaal (Groot)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Opaal (Middelgroot)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Opaal (klein)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Diamant (Ruw)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Amethist (ruw)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Smaragd (Ruw)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Opaal (Ruw)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Robijn (Ruw)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Saffier (Ruw)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Goudklompje (Klein)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Paradijsvogelei"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Groot goudklompje"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Goudklompje (Groot)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Afval"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Speld"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Oorbel"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Bril"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Verbindingssteen (Groot)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Verbindingssteen (Middelgroot)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Vogel edelsteen"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Geode (Middelgroot)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Wild Edelsteen (Middelgroot)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Artefact"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Sterrenijzer (Klein)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Masker"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Gouden Handschoen"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Zilverklompje (Klein)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Idool"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Oude munt (goud)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Oude munt (zilver)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Verbindingssteen (Klein)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "Eigeel van het Geluk"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Moeraslarve"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Meteoorkern"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Oude tome"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Versleten Rol"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Verbondsteen"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Vervloekt Relikwie"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Begraven Kist"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Wormei"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Geode (Klein)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Waardevolle Geode (Klein)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Waardevolle Geode (Middelgroot)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Gouden Scarabee"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Wild Edelsteen (klein)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Gebroken Dolk van Wil"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Gebroken Visage Masker"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Versplinterde Scepter"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Gebroken Kroon"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Gebarsten Handschoen"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Onbekend item"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Stralend Medaillon (Goud)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Bloeiende Tuinbroche (Goud)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Hanger van Verborgen Licht (Goud)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Verborgen Edelsteen Speld (Goud)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Ring (Goud)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Smal Stenen Armband (Goud)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "Koningszegel (Goud)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Zegelring van de Soeverein (Goud)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Zonneschijn Broche (Goud)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Gouden Dolk van Wil"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Resonerende Oorbellen (Goud)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "IJdelheidsbril (Goud)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Gouden Visage Masker"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Ring van Dubbele Lot (Goud)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Hemelse Ring"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Hemelse Ring"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Verbonden Riem (Zilver)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Maanverlichte Ring (Zilver)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Slangenring (Zilver)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Tentakelzegel (Zilver)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Naald van Eer (Zilver)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Mossige Munt"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Vervloekte Munt"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Munt van Oude Glorie"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Arme Mans Zwijn Idool"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "Idool van het Grote Zwijn"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Idool van de Geschroeide Hersenen"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Idool van de Vlammende Schedel"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Aandenken Doos"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Mystery-Crap Steen"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Floppy met Flopcoins"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Dummy drive"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Heilige Dubai Choco"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Mesttaart"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Vrijdagavondmasker"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Maandag 12e Masker"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Bron van het Oude Bloed"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Colophony Muggen"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Tand van Genghis Khan"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "Je tand?!?"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Cryolis Klompje (Klein)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Bevroren item"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Zonnesfeer"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Idoolhaard"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Vonkvleugel"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Verzameld"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Idool van de Besnorde"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "Idool van de Wijsheid"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "Kist van de Jarl"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Vermisvormd goudklompje"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Prachtig goudklompje"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Verkruimeld Goud"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Onberispelijk Goudklompje"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Dof Zilver"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Glinsterend Zilverklompje"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Afgebroken Grote Diamant"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Kolossale Diamant"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Gefacetteerde Diamant (Middelgroot)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Vlekkeloze Diamant (Middelgroot)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Troebel Opaal"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Lichtgevende Opaal"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Bruine Robijn"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Karmozijnrood-bloed Robijn"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Scheve Saffier"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Hemelsblauwe Saffier"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Bevroren Oude tome"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Bevroren Diamant (Groot)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Bevroren Diamant (Middelgroot)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Bevroren groot goudklompje"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Bevroren Goudklompje (Klein)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Bevroren Zilverklompje (Klein)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Bevroren Opaal (klein)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Bevroren Robijn (klein)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Bevroren Saffier (klein)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Bevroren Idool"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Glinsterende oorbellen"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Maanverlichte oorbellen"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "IJzige blik"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Maanverlicht meer"

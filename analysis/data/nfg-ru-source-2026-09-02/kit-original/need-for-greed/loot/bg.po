@@ -1,0 +1,631 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Bulgarian <http://l10n.herocraft.com/projects/need-for-greed/"
+"loot/bg/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: bg\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Пръстен"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Кама"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Огърлица"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Златен скиптър"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Гривна"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Брошка"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Диадема"
+
+#: 549466071040
+msgid "casket"
+msgstr "Ковчеже"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Златна корона"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Чист диамант (голям)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Чист диамант (среден)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Чист диамант (малък)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Пурпурен рубин (голям)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Пурпурен рубин (среден)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Пурпурен рубин (малък)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Син сапфир (голям)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Син сапфир (среден)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Син сапфир (малък)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Изумруд (Голям)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Изумруд (Среден)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Изумруд (Малък)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Аметист (голям)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Аметист (Среден)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Аметист (Малък)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Опал (голям)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Опал (среден)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Опал (Малък)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Диамант (груб)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Аметист (Груб)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Изумруд (Груб)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Опал (груб)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Рубин (Груб)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Сапфир (Груб)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Златен къс (малък)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Яйце от райска птица"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Голям златен къс"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Златен къс (голям)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Боклук"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Игла"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Обеца"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Очила"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Свързващ камък (голям)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Свързващ камък (среден)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Птичи скъпоценен камък"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Геода (средна)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Див скъпоценен камък (среден)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Артефакт"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Звездно желязо (малко)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Маска"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Златна ръкавица"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Сребърен къс (малък)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Идол"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Древна монета (Златна)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Древна монета (Сребърна)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Свързващ камък (малък)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "Жълтък на съдбата"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Блатна ларва"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Ядро на метеор"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Древен том"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Износен свитък"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Камък на завета"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Прокълната реликва"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Заровен сандък"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Яйце от червей"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Геода (малка)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Ценна геода (малка)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Ценна геода (средна)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Златен скарабей"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Див скъпоценен камък (малък)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Счупена кама на волята"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Маска на счупено лице"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Счупен скиптър"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Счупена корона"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Счупена ръкавица"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Неизвестен предмет"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Сияен медальон (златен)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Брошка „Цъфтяща градина“ (златна)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Медальон на скритата светлина (златен)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Скрита брошка със скъпоценен камък (златна)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Пръстен (златен)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Тясна каменна гривна (златна)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "Кралски пръстен (златен)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Суверенен пръстен (златен)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Брошка „Слънчев лъч“ (златна)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Златна кама на волята"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Резониращи обеци (златни)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Очила на суетата (златни)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Златна маска на лицето"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Пръстен на двойните съдби (златен)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Небесен пръстен"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Небесен пръстен"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Свързан колан (сребърен)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Лунна пръстен (сребърен)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Змийски пръстен (сребърен)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Пръстен с пипало (сребърен)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Игла на честта (сребърна)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Мъхеста монета"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Прокълната монета"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Монета на древната слава"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Идол на бедния човек"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "Идол на големия глиган"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Идол на обгорялата глава"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Идол на пламтящия череп"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Кутия за спомени"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Камък на мистериозните глупости"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Дискета с флопкойни"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Фалшиво устройство"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Свещен Дубайски Шоколад"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Торта от тор"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Маска за петък вечер"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Маска от 12-ти понеделник"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Източник на старата кръв"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Колофонен комар"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Зъб на Чингис хан"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "Зъбът ти?!?"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Криолисов къс (малък)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Замръзнал предмет"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Слънчева сфера"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Огнище на идола"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Искрящо крило"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Събрани"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Идол на мустакатите"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "Идол на мъдростта"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "Раклата на ярла"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Натрошено златно парче"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Великолепен златен къс"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Натрошено злато"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Непокътнат златен къс"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Тъмно сребро"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Блестящ сребърен къс"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Нащърбен голям диамант"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Колосален диамант"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Дефектен диамант (среден)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Безупречен диамант (среден)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Мътен опал"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Светещ опал"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Кафяв рубин"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Кървавочервен рубин"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Изкривен сапфир"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Небесен сапфир"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Замръзнал древен том"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Замръзнал диамант (голям)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Замръзнал диамант (среден)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Замръзнал голям златен къс"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Замръзнал златен къс (малък)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Замръзнал сребърен къс (малък)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Замръзнал опал (малък)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Замръзнал рубин (малък)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Замръзнал сапфир (малък)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Замръзнал идол"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Блестящи обеци"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Лунни обеци"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Леден поглед"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Лунно езеро"

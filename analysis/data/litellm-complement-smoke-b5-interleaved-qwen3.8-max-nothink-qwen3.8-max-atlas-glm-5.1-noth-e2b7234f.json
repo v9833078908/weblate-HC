@@ -1,0 +1,223 @@
+{
+  "kind": "smoke, n=1, not a measurement",
+  "batch_size": 5,
+  "corpus": "col4-judge-golden.json dev split",
+  "slice": {
+    "critical": 5,
+    "major": 5,
+    "clean": 5
+  },
+  "units": [
+    "mut-177682-cyrillic-fragment",
+    "mut-177682-obscenity-injected",
+    "clean-177682",
+    "mut-177701-cyrillic-fragment",
+    "mut-177701-obscenity-injected",
+    "clean-177701",
+    "mut-177708-cyrillic-fragment",
+    "mut-177701-sentence-dropped",
+    "clean-177708",
+    "mut-177723-cyrillic-fragment",
+    "mut-177723-glossary-substituted",
+    "clean-177723",
+    "mut-177755-cyrillic-fragment",
+    "mut-177723-obscenity-injected",
+    "clean-177755"
+  ],
+  "anchor": "deepseek-v4-pro",
+  "results": {
+    "qwen3.8-max!nothink": {
+      "parsed_batches": 3,
+      "of_batches": 3,
+      "flagged": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177682-obscenity-injected",
+        "mut-177701-cyrillic-fragment",
+        "mut-177701-obscenity-injected",
+        "mut-177701-sentence-dropped",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177723-glossary-substituted",
+        "mut-177723-obscenity-injected",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "caught": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177682-obscenity-injected",
+        "mut-177701-cyrillic-fragment",
+        "mut-177701-obscenity-injected",
+        "mut-177701-sentence-dropped",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177723-glossary-substituted",
+        "mut-177723-obscenity-injected",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "false_flag": [],
+      "seconds": 30.2,
+      "diagnoses": [
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 11.8
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 9.3
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 9.1
+        }
+      ]
+    },
+    "qwen3.8-max": {
+      "parsed_batches": 0,
+      "of_batches": 3,
+      "flagged": [],
+      "caught": [],
+      "false_flag": [],
+      "seconds": 313.4,
+      "diagnoses": [
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "seconds": 30.6
+        },
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "seconds": 31.1
+        },
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "seconds": 30.6
+        }
+      ]
+    },
+    "atlas_glm-5.1!nothink": {
+      "parsed_batches": 3,
+      "of_batches": 3,
+      "flagged": [
+        "clean-177755",
+        "mut-177682-cyrillic-fragment",
+        "mut-177682-obscenity-injected",
+        "mut-177701-cyrillic-fragment",
+        "mut-177701-obscenity-injected",
+        "mut-177701-sentence-dropped",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177723-glossary-substituted",
+        "mut-177723-obscenity-injected",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "caught": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177682-obscenity-injected",
+        "mut-177701-cyrillic-fragment",
+        "mut-177701-obscenity-injected",
+        "mut-177701-sentence-dropped",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177723-glossary-substituted",
+        "mut-177723-obscenity-injected",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "false_flag": [
+        "clean-177755"
+      ],
+      "seconds": 67.9,
+      "diagnoses": [
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 24.6
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 13.8
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 29.6
+        }
+      ]
+    },
+    "atlas_glm-5.1": {
+      "parsed_batches": 3,
+      "of_batches": 3,
+      "flagged": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177682-obscenity-injected",
+        "mut-177701-cyrillic-fragment",
+        "mut-177701-obscenity-injected",
+        "mut-177701-sentence-dropped",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177723-glossary-substituted",
+        "mut-177723-obscenity-injected",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "caught": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177682-obscenity-injected",
+        "mut-177701-cyrillic-fragment",
+        "mut-177701-obscenity-injected",
+        "mut-177701-sentence-dropped",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177723-glossary-substituted",
+        "mut-177723-obscenity-injected",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "false_flag": [],
+      "seconds": 98.1,
+      "diagnoses": [
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 17.7
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 16.8
+        },
+        {
+          "attempts": 2,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 29.2
+        }
+      ]
+    }
+  }
+}

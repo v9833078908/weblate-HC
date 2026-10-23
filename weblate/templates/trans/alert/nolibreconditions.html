@@ -1,0 +1,11 @@
+{% load i18n %}
+
+<p>{% translate "This project does no longer fit into Libre hosting conditions." %}</p>
+
+{% with billing=component.project.billing %}
+  {% with libre_general_checklist=billing.libre_general_checklist_without_alerts %}
+    {% with libre_component_checklist=billing.libre_component_checklist_without_alerts show_alerts=False %}
+      {% include "snippets/libre-checklist.html" %}
+    {% endwith %}
+  {% endwith %}
+{% endwith %}

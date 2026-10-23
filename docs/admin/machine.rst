@@ -1,0 +1,136 @@
+.. _machine-translation-setup:
+
+Automatic suggestions
+=====================
+
+.. versionchanged:: 4.13
+
+   Prior to Weblate 4.13, the services were configured in the :ref:`config`.
+
+The support for several machine translation and translation memory services is
+built-in. Each service can be turned on by the administrator for whole site
+(under :guilabel:`Automatic suggestions` in :ref:`management-interface`) or at
+the project settings:
+
+.. image:: /screenshots/project-machinery.webp
+
+A project configuration overrides the site-wide one field by field: fields it
+does not set are inherited, so a project can set its own translator persona,
+style, or language-specific instructions without restating the credentials.
+Removing the project configuration returns the service to the site-wide
+settings.
+
+.. note::
+
+   They come subject to their terms of use, so ensure you are allowed to use
+   them how you want. Third-party services can receive source strings,
+   translations, and related context from Weblate.
+
+The services translate from the source language as configured at
+:ref:`component`, see :ref:`component-source_language`.
+
+Per-project automatic suggestion can also be configured via the :ref:`api`.
+
+.. seealso::
+
+   :ref:`machine-translation`
+
+.. _mt-translation-services-priority:
+
+Priority of machine translation and translation memory services
+----------------------------------------------------------------
+
+:ref:`mt-weblate-translation-memory` matches with 100% score take priority over machine translation services. If 100% match in translation memory is found, no machine translation is performed. If several 100% matches occur, the first one returned by the database is used.
+
+Each machine translation service has a predefined maximum score it can produce. The use of installed translation services is ordered according to their maximum score. For each string with translation score lower than the service's maximum, the service is asked to produce a translation. Translations with a score exceeding the current one are accepted.
+
+Managed exact repeats
+---------------------
+
+An authorized project user can define an explicit repeat rule for selected
+components and source labels. Once they have previewed and accepted a shared
+translation for an exact-repeat group, an automatic translation run reuses that
+accepted target for current shared occurrences before asking a machine
+translation service. This reuse is limited to the run's selected strings; it
+does not expand an automatic translation scope or change ordinary translation
+memory matching.
+
+An approved target, a locked occurrence, a changed source identity, an
+independent occurrence, or an overlapping repeat rule is not silently
+overwritten. Such occurrences remain visible for a human decision. A repeat
+rule does not enable machine translation by itself, and opening the repeat
+queue never sends a provider request. Model recommendations are a separate,
+explicitly confirmed operation and never write translations automatically.
+
+.. _mt-sources:
+
+Source strings for the machine translation
+------------------------------------------
+
+.. versionadded:: 5.11
+
+The origin of source strings for all third-party services can be configured.
+This can be used to tweak the service to get the best results. Following choices are available:
+
+:guilabel:`Automatic selection`
+   Chooses the best source language automatically.
+
+   This is the default behavior.
+:guilabel:`Component source language`
+   Uses the component source language.
+
+   This was the behavior before the 5.11 release.
+:guilabel:`Secondary language defined in project or component`
+   Use project :ref:`project-secondary_language` or component :ref:`component-secondary_language`.
+
+   Falls back to the automatic selection of the source language if the secondary language not configured.
+
+.. _llm-translation-context:
+
+LLM translation context
+-----------------------
+
+LLM-based automatic suggestion services receive additional context about each
+translated string, when available. This includes the string context or
+monolingual key, additional explanation, the note left by developers,
+configured secondary-language translation, plural information, failing quality
+checks, and placeholder contents. Matching glossary entries are passed with
+their explanations and selected flags, so duplicate glossary terms can be
+disambiguated.
+
+You can add target-language-specific instructions in
+:guilabel:`Language-specific instructions` using a JSON object mapping language
+codes to text. Language codes have to exist in Weblate and are matched exactly;
+whitespace is not ignored. Each instruction can contain up to 1000 characters.
+Weblate first looks for the exact target language code and then falls back to
+the base language code.
+
+The added metadata is used only to guide the generated suggestion; the returned
+translation still has to preserve the source placeholders and markup. Weblate
+also sends a short previous chat exchange to LLM services to demonstrate the
+expected JSON response format. The exchange uses bundled translated examples
+when available for the source and target language pair, or language-neutral
+formatting examples otherwise. Existing translations for the same target
+language can be appended as additional examples.
+
+
+.. include:: /snippets/machines-autogenerated.rst
+
+.. _custom-machinery:
+
+Custom machine translation
+--------------------------
+
+You can also implement your own machine translation services using a few lines
+of Python code. Place the code in a module Weblate can import (see
+:ref:`custom-module` or :ref:`docker-python-override`) and add fully qualified
+class name to :setting:`WEBLATE_MACHINERY`.
+
+.. literalinclude:: ../../weblate/examples/mt_service.py
+    :language: python
+
+.. seealso::
+
+   * :ref:`custom-modules`
+   * :ref:`custom-module`
+   * :ref:`docker-python-override`

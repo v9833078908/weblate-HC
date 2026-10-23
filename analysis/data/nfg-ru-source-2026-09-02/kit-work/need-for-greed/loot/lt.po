@@ -1,0 +1,633 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Lithuanian <http://l10n.herocraft.com/projects/need-for-greed/"
+"loot/lt/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lt\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 1 && (n % 100 < 11 || n % 100 > "
+"19)) ? 0 : ((n % 10 >= 2 && n % 10 <= 9 && (n % 100 < 11 || n % 100 > 19)) ? "
+"1 : 2);\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Žiedas"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Durklas"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Karoliai"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Auksinis skeptras"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Apyrankė"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Sagė"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Diadema"
+
+#: 549466071040
+msgid "casket"
+msgstr "Dėžutė"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Auksinė karūna"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Grynas deimantas (didelis)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Grynas deimantas (vidutinis)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Grynas deimantas (mažas)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Karmino rubinas (didelis)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Karmino rubinas (vidutinis)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Karmino rubinas (mažas)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Mėlynas safyras (didelis)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Mėlynas safyras (vidutinis)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Mėlynas safyras (mažas)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Smaragdas (didelis)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Smaragdas (vidutinis)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Smaragdas (mažas)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Ametistas (didelis)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Ametistas (vidutinis)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Ametistas (mažas)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Opalas (didelis)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Opalas (vidutinis)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Opalas (mažas)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Deimantas (neapdorotas)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Ametistas (neapdorotas)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Smaragdas (neapdorotas)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Opalas (neapdorotas)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Rubinas (neapdorotas)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Safyras (neapdorotas)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Aukso grynuolis (mažas)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Rojaus paukščio kiaušinis"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Didelis aukso gabalas"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Aukso grynuolis (didelis)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Šiukšlės"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Segtukas"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Auskaras"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Akiniai"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Surišimo akmuo (didelis)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Surišimo akmuo (vidutinis)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Paukščių brangakmenis"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Geodas (vidutinis)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Laukinis brangakmenis (vidutinis)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Artefaktas"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Žvaigždžių geležis (maža)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Kaukė"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Auksinė pirštinė"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Sidabro grynuolis (mažas)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Idolas"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Sena moneta (auksinė)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Sena moneta (sidabrinė)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Surišimo akmuo (mažas)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "Fortūnos trynys"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Pelkės lerva"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Meteoro šerdis"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Senovinis tomas"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Nusidėvėjęs ritinys"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Sandoros akmuo"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Prakeikta relikvija"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Palaidota skrynia"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Kirmino kiaušinis"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Geodas (mažas)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Vertingas geodas (mažas)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Vertingas geodas (vidutinis)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Auksinis skarabėjas"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Laukinis brangakmenis (mažas)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Sulaužytas valios durklas"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Sulaužyta veido kaukė"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Sudaužytas skeptras"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Sulaužyta karūna"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Įskilęs pirštinės šarvas"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Nežinomas daiktas"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Švytintis medalionas (auksinis)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Žydinčio sodo sagė (auksinė)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Paslėptos šviesos pakabukas (auksinis)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Paslėptas brangakmenio segtukas (auksinis)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Žiedas (auksinis)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Siauras akmeninis apyrankė (auksinė)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "Karaliaus žiedas (auksinis)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Valdovo žiedas (auksinis)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Saulės spindulių sagė (auksinė)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Auksinis valios durklas"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Rezonuojantys auskarai (auksiniai)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Tuštybės akiniai (auksiniai)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Auksinė veido kaukė"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Dvigubo likimo žiedas (auksinis)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Dangaus žiedas"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Dangaus žiedas"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Surištas diržas (sidabrinis)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Mėnulio žiedas (sidabrinis)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Gyvatės žiedas (sidabrinis)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Čiuptuvo žiedas (sidabrinis)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Garbės adata (sidabrinė)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Samana moneta"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Užkeikta moneta"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Senovės šlovės moneta"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Vargšo šerno idolas"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "Didžiojo šerno idolas"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Apdegusios galvos idolas"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Liepsnojančios kaukolės idolas"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Atminimo dėžutė"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Paslaptingas šūdo akmuo"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Diskelis su Flopcoins"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Tuščias diskas"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Šventas Dubajaus šokoladas"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Mėšlo pyragas"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Penktadienio nakties kaukė"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Kovo 12-osios kaukė"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Seno kraujo šaltinis"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Kolofonijos uodas"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Čingischano dantis"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "Jūsų dantis?!?"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Kriolio grynuolis (mažas)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Užšaldytas daiktas"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Saulės sfera"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Idolo židinys"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Žiežirnų sparnas"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Surinkta"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Ūsuotumo idolas"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "Išminties idolas"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "Jarlo skrynia"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Sužalotas aukso gabalas"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Puikus aukso gabalas"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Sutrupintas auksas"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Nepriekaištingas aukso grynuolis"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Nuobodus sidabras"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Blizgantis sidabro grynuolis"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Nuskaldytas didelis deimantas"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Kolosalinis deimantas"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Deimantas su defektais (vidutinis)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Nepriekaištingas deimantas (vidutinis)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Drumstas opalas"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Švytintis opalas"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Rudasis rubinas"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Kraujo spalvos rubinas"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Kreivas safyras"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Dangaus safyras"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Užšaldytas senovinis tomas"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Užšaldytas deimantas (didelis)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Užšaldytas deimantas (vidutinis)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Užšalęs didelis aukso gabalas"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Užšaldytas aukso grynuolis (mažas)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Užšaldytas sidabro grynuolis (mažas)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Užšalęs opalas (mažas)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Užšalęs rubinas (mažas)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Užšalęs safyras (mažas)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Užšaldytas idolas"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Blizgantys auskarai"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Mėnulio apšviesti auskarai"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Ledinis žvilgsnis"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Mėnulio apšviestas ežeras"

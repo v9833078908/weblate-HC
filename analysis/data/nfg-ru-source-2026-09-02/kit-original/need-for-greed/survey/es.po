@@ -1,0 +1,129 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: es\n"
+
+msgid "survey1Intro"
+msgstr ""
+"¡Eh! El caballo quiere aclarar algo.\n"
+"\n"
+"Solo un par de preguntas rápidas para saber con quién está tratando.\n"
+"No tardará más de un minuto."
+
+msgid "survey1Final"
+msgstr ""
+"¡Parece que... has pasado la prueba!\n"
+"\n"
+"Recordó tus respuestas.\n"
+"Y aparentemente decidió no abandonarte."
+
+msgid "survey1AcceptDescription"
+msgstr "Obtendrás una recompensa."
+
+msgid "survey1DeclineDescription"
+msgstr ""
+"Ella sobrevivirá...\n"
+"probablemente."
+
+msgid "survey1Question1"
+msgstr ""
+"¿Qué edad tienes?\n"
+"No mientas. Ella lo sabe."
+
+msgid "survey1Question1Answer1"
+msgstr "Menos de 15"
+
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+msgid "survey1Question1Answer4"
+msgstr "30 -40"
+
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+msgid "survey1Question2"
+msgstr ""
+"¿Quién eres?\n"
+"No hacen falta demasiados detalles."
+
+msgid "survey1Question2Answer1"
+msgstr "M"
+
+msgid "survey1Question2Answer2"
+msgstr "F"
+
+msgid "survey1Question2Answer3"
+msgstr "Secreto"
+
+msgid "survey1Question3"
+msgstr "¿Para qué estás aquí?"
+
+msgid "survey1Question3Answer1"
+msgstr "Correr y saquear"
+
+msgid "survey1Question3Answer2"
+msgstr "Fabricar y vender"
+
+msgid "survey1Question3Answer3"
+msgstr "Mejoras y progresión"
+
+msgid "survey1Question3Answer4"
+msgstr "Solo buen rollo…"
+
+msgid "survey1Question4"
+msgstr "¿Qué falta para que no te vayas?"
+
+msgid "survey1Question4Answer1"
+msgstr "Más historia"
+
+msgid "survey1Question4Answer2"
+msgstr "Nuevos peligros, rocas y tesoros"
+
+msgid "survey1Question4Answer3"
+msgstr "Nuevos objetos"
+
+msgid "survey1Question4Answer4"
+msgstr "Nuevas ubicaciones"
+
+msgid "survey1Question4Answer5"
+msgstr "Logros y recompensas"
+
+msgid "survey1Question5"
+msgstr "¿Qué debería arreglarse primero?"
+
+msgid "survey1Question5Answer1"
+msgstr "Diálogo"
+
+msgid "survey1Question5Answer2"
+msgstr "Recompensas"
+
+msgid "survey1Question5Answer3"
+msgstr "Dificultad de la receta"
+
+msgid "survey1Question5Answer4"
+msgstr "Densidad del mapa"
+
+msgid "survey1Question5Answer5"
+msgstr "Todo está genial"
+
+msgid "surveyDialogTitle"
+msgstr "Encuesta rápida"
+
+msgid "startSurvey"
+msgstr "Comenzar"
+
+msgid "claimReward"
+msgstr "Reclamar recompensa"

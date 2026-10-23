@@ -1,0 +1,471 @@
+action,beta_key,weblate_key,ru,translated_langs
+rename,dialogue_text_intro_start_0,dialog_text_intro_start_0,"О, это была великолепная битва! Мы нагнали Золотых Гарпий, и уже предвкушали легкую наживу...",
+rename,dialogue_text_intro_end_0,dialog_text_intro_end_0,"И мы разгромили их! Разогнали по углам, как крыс!",
+rename,dialogue_text_intro_end_1,dialog_text_intro_end_1,Но потом... Потом произошло кое-что странное.,
+rename,dialogue_character_player,dialog_character_player, ,
+rename,dialogue_character_elizabethrid,dialog_character_elizabethrid,Элизабет Рид,
+rename,dialogue_character_Captain_fear,dialog_character_Captain_fear,Мертвый капитан,
+rename,dialogue_character_Campaign_Character_shamanessmalika,dialog_character_Campaign_Character_shamanessmalika,Шаманка Малика,
+rename,dialogue_character_Campaign_Character_unknownhostage,dialog_character_Campaign_Character_unknownhostage,Незнакомый заложник,
+rename,dialogue_character_Campaign_0_0_Boss0_cutthroatkidd,dialog_character_Campaign_0_0_Boss0_cutthroatkidd,Головорез Кидд,
+rename,dialogue_character_Campaign_0_0_Boss1_harryrottooth,dialog_character_Campaign_0_0_Boss1_harryrottooth,Гарри Гнилозуб,
+rename,dialogue_character_Campaign_0_0_Boss2_crazyjoe,dialog_character_Campaign_0_0_Boss2_crazyjoe,Чокнутый Джо,
+rename,dialogue_character_Campaign_0_0_Boss3_madmorgan,dialog_character_Campaign_0_0_Boss3_madmorgan,Безумный Морган,
+rename,dialogue_character_Campaign_0_0_Boss3_mad_rickert,dialog_character_Campaign_0_0_Boss3_mad_rickert,Безумный Риккерт,
+rename,dialogue_character_Campaign_1_0_Boss0_steelbart,dialog_character_Campaign_1_0_Boss0_steelbart,Стальной Барт,
+rename,dialogue_character_Campaign_1_0_Boss1_curvejack,dialog_character_Campaign_1_0_Boss1_curvejack,Кривой Джек,
+rename,dialogue_character_Campaign_1_0_Boss2_oldbarbossa,dialog_character_Campaign_1_0_Boss2_oldbarbossa,Старый Барбосса,
+rename,dialogue_character_Campaign_1_0_Boss3_captainterror,dialog_character_Campaign_1_0_Boss3_captainterror,Капитан Террор,
+rename,dialogue_character_Campaign_2_0_Boss0_hungrycannibal,dialog_character_Campaign_2_0_Boss0_hungrycannibal,Голодный людоед,
+rename,dialogue_character_Campaign_2_0_Boss1_admiralnelson,dialog_character_Campaign_2_0_Boss1_admiralnelson,Адмирал Нельсон,
+rename,dialogue_character_Campaign_2_0_Boss2_thugsmoke,dialog_character_Campaign_2_0_Boss2_thugsmoke,Головорез Смоук,
+rename,dialogue_character_Campaign_2_0_Boss3_cannibalcaptain,dialog_character_Campaign_2_0_Boss3_cannibalcaptain,Людоед-Капитан,
+rename,dialogue_character_Campaign_2_1_Boss0_commanderlawrence,dialog_character_Campaign_2_1_Boss0_commanderlawrence,Командор Лоуренс,
+rename,dialogue_character_Campaign_2_1_Boss1_warghunter,dialog_character_Campaign_2_1_Boss1_warghunter,Охотник Варг,
+rename,dialogue_character_Campaign_2_1_Boss2_voyager,dialog_character_Campaign_2_1_Boss2_voyager,Путешественник,
+rename,dialogue_character_Campaign_2_1_Boss3_ogreking,dialog_character_Campaign_2_1_Boss3_ogreking,Король Людоедов,
+rename,dialogue_character_Campaign_3_0_Boss0_captainahab,dialog_character_Campaign_3_0_Boss0_captainahab,Капитан Ахав,
+rename,dialogue_character_Campaign_3_0_Boss1_fisherman,dialog_character_Campaign_3_0_Boss1_fisherman,Рыбак,
+rename,dialogue_character_Campaign_3_0_Boss2_willbonebreaker,dialog_character_Campaign_3_0_Boss2_willbonebreaker,Уилл Костолом,
+rename,dialogue_character_Campaign_3_0_Boss3_fishermenleader,dialog_character_Campaign_3_0_Boss3_fishermenleader,Главарь рыбаков,
+rename,dialogue_character_Campaign_3_1_Boss0_creepynecromancer,dialog_character_Campaign_3_1_Boss0_creepynecromancer,Жуткий некромант,
+rename,dialogue_character_Campaign_3_1_Boss1_sneakshaddy,dialog_character_Campaign_3_1_Boss1_sneakshaddy,Подхалим Шэдди,
+rename,dialogue_character_Campaign_3_1_Boss2_deadcaptain,dialog_character_Campaign_3_1_Boss2_deadcaptain,Мёртвый капитан,
+rename,dialogue_character_Campaign_3_1_Boss3_captainmoonblood,dialog_character_Campaign_3_1_Boss3_captainmoonblood,Капитан Мунблад,
+rename,dialogue_character_Campaign_4_Bayle_Hammer,dialog_character_Campaign_4_Bayle_Hammer,Байл Молот,
+rename,dialogue_character_Campaign_4_Black_Asper,dialog_character_Campaign_4_Black_Asper,Черный Аспер,
+rename,dialogue_character_Campaign_4_Iago,dialog_character_Campaign_4_Iago,Яго,
+rename,dialogue_character_Campaign_4_Mako,dialog_character_Campaign_4_Mako,Мако,
+rename,dialogue_character_Campaign_4_Righteous_Jim,dialog_character_Campaign_4_Righteous_Jim,Праведник Джим,
+rename,dialogue_character_Campaign_4_Kiran,dialog_character_Campaign_4_Kiran,Киран Болтун,
+rename,dialogue_character_Campaign_4_Gunnar,dialog_character_Campaign_4_Gunnar,Гуннар Костеглод,
+rename,dialogue_text_campaign_0_0_region_1,dialog_text_campaign_0_0_region_1,"Давай сразу к делу. Мы в этих морях не одни. Местные воды кишат Громовыми Пиратами, они считают эти острова своей собственностью.",
+rename,dialogue_text_campaign_0_0_region_2,dialog_text_campaign_0_0_region_2,"Они тут давно, у них свои законы и секреты. Рано или поздно мы точно столкнемся с ними.",
+rename,dialogue_text_campaign_0_0_region_3,dialog_text_campaign_0_0_region_3,"Если мы и не нагоним Мунблада сами, он не сможет проскользнуть мимо них незамеченным. И я узнаю, куда он направился.",
+rename,dialogue_text_campaign_0_0_6_miniboss_1,dialog_text_campaign_0_0_6_miniboss_1,"Милая Лиззи! Смотрю, ты никак не уймешься?",
+rename,dialogue_text_campaign_0_0_6_miniboss_2,dialog_text_campaign_0_0_6_miniboss_2,Верни мой корабль! И мое золото!,
+rename,dialogue_text_campaign_0_0_6_miniboss_3,dialog_text_campaign_0_0_6_miniboss_3,"Я бы с удовольствием поспорил с тобой насчет сложившихся обстоятельств, но у меня совершенно нет на это времени.",
+rename,dialogue_text_campaign_0_0_6_miniboss_4,dialog_text_campaign_0_0_6_miniboss_4,"Морган, объясни нашему бывшему капитану, что не нужно докучать взрослым занятым людям.",
+rename,dialogue_text_campaign_0_0_6_miniboss_win_1,dialog_text_campaign_0_0_6_miniboss_win_1,Как он посмел бросить против меня это жалкое подобие капитана!,
+rename,dialogue_text_campaign_0_0_6_miniboss_win_2,dialog_text_campaign_0_0_6_miniboss_win_2,Поднять паруса! В следующий раз он от меня не уйдет!,
+rename,dialogue_text_campaign_0_0_14_miniboss_1,dialog_text_campaign_0_0_14_miniboss_1,"Эй там, на шлюпе! Вы чего тут вынюхиваете?",
+rename,dialogue_text_campaign_0_0_14_miniboss_2,dialog_text_campaign_0_0_14_miniboss_2,"Черт, вот и Громовые Пираты. Постой, это же Кидд! Эй, Кидд, это я!",
+rename,dialogue_text_campaign_0_0_14_miniboss_3,dialog_text_campaign_0_0_14_miniboss_3,Рид! Я так и знал! Ты ответишь нам за Риккерта!,
+rename,dialogue_text_campaign_0_0_14_miniboss_win_1,dialog_text_campaign_0_0_14_miniboss_win_1,"Тебе ром в голову ударил, Кидд? Что происходит?",
+rename,dialogue_text_campaign_0_0_14_miniboss_win_2,dialog_text_campaign_0_0_14_miniboss_win_2,"Мои парни видели, как твой корабль зашел в Тенистый Промысел к Корабельщику Риккерту. Не знаю, что там было, но Риккерт совсем обезумел, и теперь носится по архипелагу, нападая на всех, кто на него косо посмотрит.",
+rename,dialogue_text_campaign_0_0_14_miniboss_win_3,dialog_text_campaign_0_0_14_miniboss_win_3,Если ты не заметил - у меня нет моего корабля! Этот подонок Мунблад обманул меня и увел галеон!,
+rename,dialogue_text_campaign_0_0_14_miniboss_win_4,dialog_text_campaign_0_0_14_miniboss_win_4,"Старик Мунблад... Наверное, я мог бы сам догадаться. Ты прости меня, Рид. В последнее время здесь творятся совсем странные вещи. И держись подальше от Риккерта. Он и раньше был странным, но сейчас…",
+rename,dialogue_text_campaign_0_0_22_miniboss_1,dialog_text_campaign_0_0_22_miniboss_1,Так ты и есть Корабельщик Риккерт?,
+rename,dialogue_text_campaign_0_0_22_miniboss_2,dialog_text_campaign_0_0_22_miniboss_2,"Нам не нравится это прозвище, принцесса. “Корабельщик, почини мою посудину, Корабельщик, прекрати так смотреть”. Плохое имя, принцесса",
+rename,dialogue_text_campaign_0_0_22_miniboss_3,dialog_text_campaign_0_0_22_miniboss_3,"Я буду звать тебя как ты захочешь, если скажешь, куда отправился Мунблад. И я не принцесса.",
+rename,dialogue_text_campaign_0_0_22_miniboss_4,dialog_text_campaign_0_0_22_miniboss_4,"Что? Принцесса обманывает нас! Уж я-то знаю! Ребята, отучите ее врать, или я отправлю вас на корм своему другу!",
+rename,dialogue_text_campaign_0_0_22_miniboss_win_1,dialog_text_campaign_0_0_22_miniboss_win_1,"Да уж, Кидд предупреждал, что этот Риккерт - странный тип. Но я не думала, что настолько. Нужно найти его, пока он не спятил окончательно.",
+rename,dialogue_text_campaign_0_0_boss_1,dialog_text_campaign_0_0_boss_1,"Дальше некуда бежать, Корабельщик. И нет твоих друзей, чтобы спрятаться за их спинами.",
+rename,dialogue_text_campaign_0_0_boss_2,dialog_text_campaign_0_0_boss_2,"О, злая принцесса не знает… У Риккерта теперь только один друг. И он тоже не любит злых людей!",
+rename,dialogue_text_campaign_0_0_boss_win_1,dialog_text_campaign_0_0_boss_win_1,Что это за тварь? Как ты ее приручил?,
+rename,dialogue_text_campaign_0_0_boss_win_2,dialog_text_campaign_0_0_boss_win_2,"Кровавый Рог! Добрый капитан на корабле с красными парусами подарил его, и теперь у Риккерта есть друг. Но мы не скажем этого злой принцессе! Нет, нет!",
+rename,dialogue_text_campaign_0_0_boss_win_3,dialog_text_campaign_0_0_boss_win_3,Красные паруса? Это точно Мунблад! Куда он отправился?,
+rename,dialogue_text_campaign_0_0_boss_win_4,dialog_text_campaign_0_0_boss_win_4,"Глупая принцесса не знает, что отсюда только один путь: на север, в <color=#1DEEFC>Край Ледяных Ветров.</color> Добрый капитан хочет помолиться богам у Алтаря. Глупая принцесса не знает, но мы ей ничего не скажем!",
+rename,dialogue_text_campaign_0_0_boss_afterReward,dialog_text_campaign_0_0_boss_afterReward,"Мы направляемся в Край ледяных ветров! Опасное место, пригодится корабль получше. Прикупим <color=#1DEEFC>новенький бриг.</color> И пинту рома! Я угощаю.",
+rename,dialogue_text_campaign_1_0_region_1,dialog_text_campaign_1_0_region_1,"Я слышала про этот Алтарь. Местная достопримечательность, можно сказать. Направление мне понятно.",
+rename,dialogue_text_campaign_1_0_region_2,dialog_text_campaign_1_0_region_2,"Однако путь неблизкий. И едва ли он окажется спокойным. Всем приготовиться, мы выдвигаемся!",
+rename,dialogue_text_campaign_1_0_6_miniboss_1,dialog_text_campaign_1_0_6_miniboss_1,"Давно не виделись, капитан Рид. Думаю, ты здесь за Мунбладом? Что ж, тебе придется встать в очередь.",
+rename,dialogue_text_campaign_1_0_6_miniboss_2,dialog_text_campaign_1_0_6_miniboss_2,Капитан Террор! Он и тебе успел насолить? Почему бы нам не объединить усилия?,
+rename,dialogue_text_campaign_1_0_6_miniboss_3,dialog_text_campaign_1_0_6_miniboss_3,"Я старомоден в вопросах мести. Ты хочешь просто забрать его корабль, а я хочу утопить его вместе с Мунбладом.",
+rename,dialogue_text_campaign_1_0_6_miniboss_4,dialog_text_campaign_1_0_6_miniboss_4,"Ну уж нет! Это мой корабль, и жизнь Мунблада - тоже!",
+rename,dialogue_text_campaign_1_0_6_miniboss_5,dialog_text_campaign_1_0_6_miniboss_5,"Я и не надеялся на твое благоразумие. Господа, развлеките капитана Рид. А я пока улажу с Мунбладом кое-какие… разногласия.",
+rename,dialogue_text_campaign_1_0_6_miniboss_win_1,dialog_text_campaign_1_0_6_miniboss_win_1,Черт! Нельзя позволить Террору потопить мой корабль!,
+rename,dialogue_text_campaign_1_0_14_miniboss_1,dialog_text_campaign_1_0_14_miniboss_1,"Кажется, я знаю этот флаг... Это что, Кривой Джек?",
+rename,dialogue_text_campaign_1_0_14_miniboss_2,dialog_text_campaign_1_0_14_miniboss_2,"Ха-ха! Элизабет Рид, мы снова встретились! Пора платить по счетам!",
+rename,dialogue_text_campaign_1_0_14_miniboss_3,dialog_text_campaign_1_0_14_miniboss_3,"Джек, тебе не хватило последнего поражения?",
+rename,dialogue_text_campaign_1_0_14_miniboss_4,dialog_text_campaign_1_0_14_miniboss_4,"Ты меня унизила, Рид! И ты за это заплатишь!",
+rename,dialogue_text_campaign_1_0_14_miniboss_win_1,dialog_text_campaign_1_0_14_miniboss_win_1,"Джек, никак ты не научишься.",
+rename,dialogue_text_campaign_1_0_14_miniboss_win_2,dialog_text_campaign_1_0_14_miniboss_win_2,"Это еще не конец, Рид!",
+rename,dialogue_text_campaign_1_0_14_miniboss_win_3,dialog_text_campaign_1_0_14_miniboss_win_3,Каждый раз одно и то же. Найди уже себе другого заклятого врага,
+rename,dialogue_text_campaign_1_0_14_miniboss_win_4,dialog_text_campaign_1_0_14_miniboss_win_4,"Ты - единственный враг, который мне нужен, Рид.",
+rename,dialogue_text_campaign_1_0_14_miniboss_win_5,dialog_text_campaign_1_0_14_miniboss_win_5,"Это очень трогательно, Джек. Но я все равно тебя покину.",
+rename,dialogue_text_campaign_1_0_22_miniboss_1,dialog_text_campaign_1_0_22_miniboss_1,Впереди ветхий корабль... Неужели это старый Барбосса?,
+rename,dialogue_text_campaign_1_0_22_miniboss_2,dialog_text_campaign_1_0_22_miniboss_2,"Здравствуй, юная Элизабет. Не думал, что мы встретимся вот так.",
+rename,dialogue_text_campaign_1_0_22_miniboss_3,dialog_text_campaign_1_0_22_miniboss_3,Барбосса! Ты ведь давно ушел из пиратов…,
+rename,dialogue_text_campaign_1_0_22_miniboss_4,dialog_text_campaign_1_0_22_miniboss_4,"Все так. Но Мунблад напомнил мне о старом долге. Не подумай, что я рад этому. Команда, заряжай!",
+rename,dialogue_text_campaign_1_0_22_miniboss_win_1,dialog_text_campaign_1_0_22_miniboss_win_1,Не так все должно было закончиться. Ты не заслужил этого.,
+rename,dialogue_text_campaign_1_0_22_miniboss_win_2,dialog_text_campaign_1_0_22_miniboss_win_2,"Может быть, но такие, как мы, редко заканчивают свою жизнь иначе. Не держи зла, юная Элизабет.",
+rename,dialogue_text_campaign_1_0_22_miniboss_win_3,dialog_text_campaign_1_0_22_miniboss_win_3,"Прощай, старый друг.",
+rename,dialogue_text_campaign_1_0_boss_1,dialog_text_campaign_1_0_boss_1,"Кажется, это тот самый Алтарь… Моего корабля не видно. Надеюсь, Террор не успел отправить его на дно.",
+rename,dialogue_text_campaign_1_0_boss_2,dialog_text_campaign_1_0_boss_2,"Капитан Рид, ты весьма упорна. К сожалению, ты опоздала. Алтарь оказался бесполезен для Мунблада. Он ушел.",
+rename,dialogue_text_campaign_1_0_boss_3,dialog_text_campaign_1_0_boss_3,"Просто ушел? Ты что, снюхался с ним? А как же твоя месть?",
+rename,dialogue_text_campaign_1_0_boss_4,dialog_text_campaign_1_0_boss_4,"Иногда случаются обстоятельства непреодолимой силы, капитан Рид. Твой бывший квартирмейстер - как раз такая непреодолимая сила. Чего не скажешь о тебе…",
+rename,dialogue_text_campaign_1_0_boss_win_1,dialog_text_campaign_1_0_boss_win_1,"Чем Мунблад тебя подкупил, Террор?",
+rename,dialogue_text_campaign_1_0_boss_win_2,dialog_text_campaign_1_0_boss_win_2,"Он не заплатил мне ни унции золота. И ушел на восток. Видела бы ты, что он сделал с твоим галеоном…",
+rename,dialogue_text_campaign_1_0_boss_win_3,dialog_text_campaign_1_0_boss_win_3,Моим галеоном?,
+rename,dialogue_text_campaign_1_0_boss_win_4,dialog_text_campaign_1_0_boss_win_4,Он проклял корабль. И теперь изумрудные паруса Проклятого Галеона светятся в ночной тьме…,
+rename,dialogue_text_campaign_1_0_boss_win_5,dialog_text_campaign_1_0_boss_win_5,Что он сделал?!,
+rename,dialogue_text_campaign_1_0_boss_win_6,dialog_text_campaign_1_0_boss_win_6,"Кому ты молишься, капитан Рид, когда тебя настигает шторм? Нерею? Может быть, Ньёрду или Калипсо? Боги Мунблада гораздо сильнее тех, кому поклоняются остальные пираты. Они отвечают ему.",
+rename,dialogue_text_campaign_1_0_boss_win_7,dialog_text_campaign_1_0_boss_win_7,"Мой корабль… Мунблад ответит за все, что натворил!",
+rename,dialogue_text_campaign_1_0_boss_win_8,dialog_text_campaign_1_0_boss_win_8,"Ты не слушаешь. Я видел это своими глазами, Рид. Надеюсь, что больше никогда не встречусь с ним. И на твоем месте я бы тоже надеялся.",
+rename,dialogue_text_campaign_2_0_region_1,dialog_text_campaign_2_0_region_1,"Мы приближаемся к Голодным скалам. У этого места дурная слава, многие корабли и команды пропали тут без вести.",
+rename,dialogue_text_campaign_2_0_region_2,dialog_text_campaign_2_0_region_2,"В этих краях должна обитать Шаманка. Знаю, знаю, магия и все такое - не в моем вкусе.",
+rename,dialogue_text_campaign_2_0_region_3,dialog_text_campaign_2_0_region_3,"Но такие люди обычно знают больше, чем кажется. Уверена, если Мунблад отправился сюда, то точно для встречи с ней.",
+rename,dialogue_text_campaign_2_0_6_miniboss_1,dialog_text_campaign_2_0_6_miniboss_1,"Милая Лиззи, не ожидал, что ты зайдешь так далеко. Что ж, тебе придется познакомиться с моими новыми друзьями.",
+rename,dialogue_text_campaign_2_0_6_miniboss_2,dialog_text_campaign_2_0_6_miniboss_2,Людоеды? Как ты смог договориться с ними?,
+rename,dialogue_text_campaign_2_0_6_miniboss_3,dialog_text_campaign_2_0_6_miniboss_3,"О, это совсем не сложно, если можешь предложить им свежее мясо. Господа, ваш обед прибыл!",
+rename,dialogue_text_campaign_2_0_6_miniboss_win,dialog_text_campaign_2_0_6_miniboss_win,"Не думала, что Мунблад падет настолько низко, чтобы водить дружбу с людоедами. Нужно быть осторожнее, кто знает, кого еще он натравит на нас.",
+rename,dialogue_text_campaign_2_0_14_miniboss_1,dialog_text_campaign_2_0_14_miniboss_1,"Корабль Королевской армады, и здесь... Это неприятности. Лучше напасть первыми, они нас всё равно не пропустят.",
+rename,dialogue_text_campaign_2_0_14_miniboss_2,dialog_text_campaign_2_0_14_miniboss_2,"Неопознанный корабль! Сдавайтесь, и мы сохраним вам жизнь!",
+rename,dialogue_text_campaign_2_0_14_miniboss_win,dialog_text_campaign_2_0_14_miniboss_win,Кто только не забредает в эти места. Что тут забыла Королевская Армада?,
+rename,dialogue_text_campaign_2_0_22_miniboss_1,dialog_text_campaign_2_0_22_miniboss_1,Свежее мясо! Прямо к нам на борт! Готовьтесь стать обедом!,
+rename,dialogue_text_campaign_2_0_22_miniboss_2,dialog_text_campaign_2_0_22_miniboss_2,Снова друзья Мунблада. К оружию!,
+rename,dialogue_text_campaign_2_0_boss_1,dialog_text_campaign_2_0_boss_1,"Чёрт, это засада! Судя по всему, Мунблад научил людоедов воскрешать мертвецов… Или то, что от них осталось.",
+rename,dialogue_text_campaign_2_0_boss_2,dialog_text_campaign_2_0_boss_2,"Друзья, вы как раз к ужину! Как и обещал нам наш добрый друг! Добро пожаловать к столу!",
+rename,dialogue_text_campaign_2_0_boss_3,dialog_text_campaign_2_0_boss_3,Вы тут всегда думаете только о еде?,
+rename,dialogue_text_campaign_2_0_boss_win_1,dialog_text_campaign_2_0_boss_win_1,"Он обманул нас! Он обещал, что с Лунным Камнем мы будем непобедимы!",
+rename,dialogue_text_campaign_2_0_boss_win_2,dialog_text_campaign_2_0_boss_win_2,С Лунным Камнем? Похоже на еще один дар Мунблада. Это с его помощью они поднимали мертвых!,
+rename,dialogue_text_campaign_2_0_boss_win_3,dialog_text_campaign_2_0_boss_win_3,"Даже знать не хочу, как его использовали, чтобы создавать этих скелетов... Но, может быть, он еще пригодится.",
+rename,dialogue_text_campaign_2_1_region_1,dialog_text_campaign_2_1_region_1,"Ты - шаманка Малика, о которой все говорят в этих водах? У меня есть вопросы.",
+rename,dialogue_text_campaign_2_1_region_2,dialog_text_campaign_2_1_region_2,"Я знаю, зачем ты явилась, дочь ветра и соли. Но мои знания не даются даром.",
+rename,dialogue_text_campaign_2_1_region_3,dialog_text_campaign_2_1_region_3,"Честные сделки - это про меня. У нас есть интересный камень, возможно он будет хорошей оплатой. Что Мунбладу нужно было от тебя? И что это за золото, падающее с неба?",
+rename,dialogue_text_campaign_2_1_region_4,dialog_text_campaign_2_1_region_4,"Это могущественная вещь, дитя. Я приму твой дар. Но дар всего один. А вопросов целых два. Мунбладу нужно было то же, что и тебе. Что же касается второго вопроса…",
+rename,dialogue_text_campaign_2_1_region_5,dialog_text_campaign_2_1_region_5,"В моих водах пропал корабль принца, наследника королевского трона. Все считают его погибшим, но я чувствую, что он жив. Я провожу тебя к нему, но спасти его должна ты сама. Верни его мне, и я открою тебе все, что знаю.",
+rename,dialogue_text_campaign_2_1_region_6,dialog_text_campaign_2_1_region_6,"Не слишком ли большая цена за один вопрос? И не слишком ли простой ответ за такой камень... Ладно, мы в деле. Говорил мне отец не связываться с колдунами…",
+rename,dialogue_text_campaign_2_1_6_miniboss_1,dialog_text_campaign_2_1_6_miniboss_1,Эти корабли... десятками они попадают на лавовые рифы в здешних водах. Вся история их походов истлеет здесь.,
+rename,dialogue_text_campaign_2_1_6_miniboss_2,dialog_text_campaign_2_1_6_miniboss_2,"Ну, вон тот корабль, кажется, не собирается тонуть здесь. Идет прямо на нас.",
+rename,dialogue_text_campaign_2_1_6_miniboss_3,dialog_text_campaign_2_1_6_miniboss_3,"Армада Короны. Осторожнее, дитя. Их помыслы касательно принца не так благородны, как ты бы могла подумать.",
+rename,dialogue_text_campaign_2_1_6_miniboss_win_1,dialog_text_campaign_2_1_6_miniboss_win_1,"Не терзайся на их счет, дитя. Ты спасешь принца и от похитителей, и от коварных слуг.",
+rename,dialogue_text_campaign_2_1_14_miniboss_1,dialog_text_campaign_2_1_14_miniboss_1,Экипаж! К боевым постам! Кто-то хочет поиграть в морской бой!,
+rename,dialogue_text_campaign_2_1_14_miniboss_2,dialog_text_campaign_2_1_14_miniboss_2,"Верните мне сына, проклятые людоеды!",
+rename,dialogue_text_campaign_2_1_14_miniboss_win_1,dialog_text_campaign_2_1_14_miniboss_win_1,"Кто-нибудь слышал, что он кричал перед атакой? Кажется, нас приняли за людоедов…",
+rename,dialogue_text_campaign_2_1_14_miniboss_win_2,dialog_text_campaign_2_1_14_miniboss_win_2,Где мой сын?! Что вы с ним сделали?!,
+rename,dialogue_text_campaign_2_1_14_miniboss_win_3,dialog_text_campaign_2_1_14_miniboss_win_3,"Мы не твои враги, скорбное сердце. Цель нашего пути в том же, в чем и твоя.",
+rename,dialogue_text_campaign_2_1_14_miniboss_win_4,dialog_text_campaign_2_1_14_miniboss_win_4,"Малика! Прости нас, мы... мы искали людоедов. Они напали на нашу деревню и выкрали наших близких. Нам показалось, будто вы - одни из них...",
+rename,dialogue_text_campaign_2_1_14_miniboss_win_5,dialog_text_campaign_2_1_14_miniboss_win_5,"Мы не держим зла, скорбное сердце. Успокой свою печаль, я ощущаю тепло жизни твоего сына. Пройдет две луны, и вы встретитесь вновь.",
+rename,dialogue_text_campaign_2_1_22_miniboss,dialog_text_campaign_2_1_22_miniboss,"Мы приближаемся к нашей цели, дочь ветра и соли. Эти падшие души - последняя преграда на пути.",
+rename,dialogue_text_campaign_2_1_boss_1,dialog_text_campaign_2_1_boss_1,"Малика! У нас был уговор, а теперь ты пришла за своим принцем? Не думай, что я пощажу тебя!",
+rename,dialogue_text_campaign_2_1_boss_2,dialog_text_campaign_2_1_boss_2,"Эй, здоровяк! Отпусти заложников, и мы разойдемся мирно!",
+rename,dialogue_text_campaign_2_1_boss_3,dialog_text_campaign_2_1_boss_3,"О, какое благородство! Но, знаешь, королевские экипажи и жители деревень еще долго будут кормить нас, если оставить заложников себе.",
+rename,dialogue_text_campaign_2_1_boss_win_1,dialog_text_campaign_2_1_boss_win_1,"Открывайте трюмы, пора освободить этих людей!",
+rename,dialogue_text_campaign_2_1_boss_win_2,dialog_text_campaign_2_1_boss_win_2,"Вы... вы нас спасли. Вы не представляете, что это значит для нас...",
+rename,dialogue_text_campaign_2_1_boss_win_3,dialog_text_campaign_2_1_boss_win_3,"Просто делаю свою работу. Но подожди, ты... ты не из деревни, верно?",
+rename,dialogue_text_campaign_2_1_boss_win_4,dialog_text_campaign_2_1_boss_win_4,"Я... да, я Альбрехт. Принц и наследник Короны.",
+rename,dialogue_text_campaign_2_1_boss_win_5,dialog_text_campaign_2_1_boss_win_5,"Прекрасно, дитя. Сопроводи нас к берегу, и я выполню свое обещание.",
+rename,dialogue_text_campaign_2_1_boss_afterReward_1,dialog_text_campaign_2_1_boss_afterReward_1,О чем говорил тот людоед? Что у него за уговор с тобой?,
+rename,dialogue_text_campaign_2_1_boss_afterReward_2,dialog_text_campaign_2_1_boss_afterReward_2,"Это будет уже третий вопрос, дитя. Но ты сделала так много… я отвечу и на него. Путь вкусивших плоть - это путь обмана. Не стоит доверять их словам.",
+rename,dialogue_text_campaign_2_1_boss_afterReward_3,dialog_text_campaign_2_1_boss_afterReward_3,"Что же до золота... Я скажу тебе то же, что и Мунбладу. Золото - дитя земли и небес. Оно не приковано к алтарю, оно не служит новым богам.",
+rename,dialogue_text_campaign_2_1_boss_afterReward_4,dialog_text_campaign_2_1_boss_afterReward_4,"Но боги морских глубин… забытые боги… это другое дело. Рыбаки, странники вод, знакомы с ними. Они едят с их рук. Ищи рыбаков Данспорта, и они расскажут о золоте.",
+rename,dialogue_text_campaign_3_0_6_miniboss_1,dialog_text_campaign_3_0_6_miniboss_1,Знакомый флаг… В прошлый раз он не принес мне ничего хорошего.,
+rename,dialogue_text_campaign_3_0_6_miniboss_2,dialog_text_campaign_3_0_6_miniboss_2,Элизабет Рид. Вы кое-что задолжали нашему клану.,
+rename,dialogue_text_campaign_3_0_6_miniboss_3,dialog_text_campaign_3_0_6_miniboss_3,"Вы опоздали. Ищите Мунблада, моего бывшего квартирмейстера. Все ваше золото у него.",
+rename,dialogue_text_campaign_3_0_6_miniboss_4,dialog_text_campaign_3_0_6_miniboss_4,"Это довольно жалкая попытка обмана, мисс Рид. Я надеялся, вы будете выше этого.",
+rename,dialogue_text_campaign_3_0_6_miniboss_win,dialog_text_campaign_3_0_6_miniboss_win,"Это не конец, мисс Рид. Придут другие. Гарпии всегда получают свое.",
+rename,dialogue_text_campaign_3_0_14_miniboss_1,dialog_text_campaign_3_0_14_miniboss_1,"Смотри, это корабль рыбаков. Если шаманка не врет, они что-то знают о золоте…",
+rename,dialogue_text_campaign_3_0_14_miniboss_2,dialog_text_campaign_3_0_14_miniboss_2,Мы не любим незваных гостей. Убирайтесь из наших вод!,
+rename,dialogue_text_campaign_3_0_14_miniboss_3,dialog_text_campaign_3_0_14_miniboss_3,"Мне просто нужно кое-что узнать… Вы не слыхали о камнях, падающих с неба?",
+rename,dialogue_text_campaign_3_0_14_miniboss_4,dialog_text_campaign_3_0_14_miniboss_4,"Мне плевать, что вам нужно. Эй, парни! Прогоните этот пиратский сброд подальше от Данспорта!",
+rename,dialogue_text_campaign_3_0_14_miniboss_win,dialog_text_campaign_3_0_14_miniboss_win,"Местные рыбаки не очень гостеприимны. Но в следующий раз этот угрюмый тип ответит на все мои вопросы, хочет он того или нет.",
+rename,dialogue_text_campaign_3_0_22_miniboss_1,dialog_text_campaign_3_0_22_miniboss_1,"Эй, на корабле! Мы ищем вашего главаря. У нас есть вопросы!",
+rename,dialogue_text_campaign_3_0_22_miniboss_2,dialog_text_campaign_3_0_22_miniboss_2,У нас есть только один ответ: уходите. Мы вас не звали. Вам здесь не рады.,
+rename,dialogue_text_campaign_3_0_22_miniboss_3,dialog_text_campaign_3_0_22_miniboss_3,Меня это начинает утомлять.,
+rename,dialogue_text_campaign_3_0_22_miniboss_win_1,dialog_text_campaign_3_0_22_miniboss_win_1,"Нам не нужны проблемы, только ответы на наши вопросы. Где найти вашего главаря?",
+rename,dialogue_text_campaign_3_0_22_miniboss_win_2,dialog_text_campaign_3_0_22_miniboss_win_2,"Проклятые пираты! Держите курс на юг, и вы его найдете. Надеюсь, он вас здорово отделает!",
+rename,dialogue_text_campaign_3_0_boss_1,dialog_text_campaign_3_0_boss_1,Эй ребята! Как улов?,
+rename,dialogue_text_campaign_3_0_boss_2,dialog_text_campaign_3_0_boss_2,"Опять вы. Вы, пиратские отродья, никогда не понимаете с первого раза.",
+rename,dialogue_text_campaign_3_0_boss_3,dialog_text_campaign_3_0_boss_3,"Мне просто нужно знать, где искать камни, падающие с небес.",
+rename,dialogue_text_campaign_3_0_boss_4,dialog_text_campaign_3_0_boss_4,"И что, я должен просто взять и рассказать тебе? Команда, к бою!",
+rename,dialogue_text_campaign_3_0_boss_win_1,dialog_text_campaign_3_0_boss_win_1,"Остановитесь! Достаточно! Хватит крови. Я расскажу все, что знаю. Но после этого вы оставите нас в покое.",
+rename,dialogue_text_campaign_3_0_boss_win_2,dialog_text_campaign_3_0_boss_win_2,Даю вам слово.,
+rename,dialogue_text_campaign_3_1_region_1,dialog_text_campaign_3_1_region_1,"Мне говорили, что вы, рыбаки, знаете про золото, падающее с неба.",
+rename,dialogue_text_campaign_3_1_region_2,dialog_text_campaign_3_1_region_2,Опять это золото… Золото - большой дар. За большой дар нужно много платить.,
+rename,dialogue_text_campaign_3_1_region_3,dialog_text_campaign_3_1_region_3,"Мы просим всего лишь наполнять наши сети и расплачиваемся малым… Такие, как ты, похоже, не боятся большой цены.",
+rename,dialogue_text_campaign_3_1_region_4,dialog_text_campaign_3_1_region_4,"Такие, как я? Значит, я не первая, кто спрашивает тебя об этом?",
+rename,dialogue_text_campaign_3_1_region_5,dialog_text_campaign_3_1_region_5,Дьявол с безумными глазами. Он повел свой проклятый корабль к Мысу Гроз.,
+rename,dialogue_text_campaign_3_1_region_6,dialog_text_campaign_3_1_region_6,"Проклятый корабль… Похоже, мы все же догоним Мунблада.",
+rename,dialogue_text_campaign_3_1_6_miniboss_1,dialog_text_campaign_3_1_6_miniboss_1,"Еще одно дыхание жизни, еще одна душа, скованная цепями вечного страха...",
+rename,dialogue_text_campaign_3_1_6_miniboss_2,dialog_text_campaign_3_1_6_miniboss_2,Ты... Ты кто такой?,
+rename,dialogue_text_campaign_3_1_6_miniboss_3,dialog_text_campaign_3_1_6_miniboss_3,"Лишь скромный слуга. Лишь проводник туда, где нет места страданиям живых.",
+rename,dialogue_text_campaign_3_1_6_miniboss_4,dialog_text_campaign_3_1_6_miniboss_4,Слуга? Чей слуга?,
+rename,dialogue_text_campaign_3_1_6_miniboss_5,dialog_text_campaign_3_1_6_miniboss_5,Я получил свой дар. Я поделюсь им с миром... И все затонет в тишине вечной смерти...,
+rename,dialogue_text_campaign_3_1_6_miniboss_win_1,dialog_text_campaign_3_1_6_miniboss_win_1,Ты тоже чувствуешь его? Их ледяной взгляд из глубин..,
+rename,dialogue_text_campaign_3_1_6_miniboss_win_2,dialog_text_campaign_3_1_6_miniboss_win_2,Твои слова... они... они безумны.,
+rename,dialogue_text_campaign_3_1_6_miniboss_win_3,dialog_text_campaign_3_1_6_miniboss_win_3,"Безумие? Нет, это прозрение. Смерть... это единственное спасение.",
+rename,dialogue_text_campaign_3_1_6_miniboss_win_4,dialog_text_campaign_3_1_6_miniboss_win_4,Я… Давай просто уйдём отсюда…,
+rename,dialogue_text_campaign_3_1_14_miniboss_1,dialog_text_campaign_3_1_14_miniboss_1,"Ты снова нашла меня, милая Лиззи.",
+rename,dialogue_text_campaign_3_1_14_miniboss_2,dialog_text_campaign_3_1_14_miniboss_2,Мунблад! Ты не сможешь вечно бегать от меня!,
+rename,dialogue_text_campaign_3_1_14_miniboss_3,dialog_text_campaign_3_1_14_miniboss_3,"Ты права, Лиззи. Тем более, что с принцем ничего не вышло. Старая карга обманула меня, отправив к этим бесполезным рыбакам…",
+rename,dialogue_text_campaign_3_1_14_miniboss_4,dialog_text_campaign_3_1_14_miniboss_4,"Что ж, четверть королевской крови - все еще королевская кровь. Возьмите ее живой, парни! Я буду ждать вас у Алтаря.",
+rename,dialogue_text_campaign_3_1_14_miniboss_win,dialog_text_campaign_3_1_14_miniboss_win,"Четверть королевской крови? О чем это он? Не важно! Вперед, к Алтарю! В этот раз Мунблад расплатится за все.",
+rename,dialogue_text_campaign_3_1_22_miniboss_1,dialog_text_campaign_3_1_22_miniboss_1,"Боги, что это за вонь?",
+rename,dialogue_text_campaign_3_1_22_miniboss_2,dialog_text_campaign_3_1_22_miniboss_2,Не может быть! Этот капитан… мертвый?,
+rename,dialogue_text_campaign_3_1_22_miniboss_3,dialog_text_campaign_3_1_22_miniboss_3,"Возвращайтесь назад, смертные! Здесь вы не найдете ничего, кроме собственной гибели.",
+rename,dialogue_text_campaign_3_1_22_miniboss_win_1,dialog_text_campaign_3_1_22_miniboss_win_1,"Он, конечно, и так мертв, но, может, еще утопить его? Просто на всякий случай.",
+rename,dialogue_text_campaign_3_1_22_miniboss_win_2,dialog_text_campaign_3_1_22_miniboss_win_2,Все вышло из тьмы глубин… И все туда вернется…,
+rename,dialogue_text_campaign_3_1_22_miniboss_win_3,dialog_text_campaign_3_1_22_miniboss_win_3,"Все эти колдуны и чудовища… Эти места пропахли магией. Похоже, мы приближаемся к Алтарю.",
+rename,dialogue_text_campaign_3_1_boss_1,dialog_text_campaign_3_1_boss_1,"Мунблад, подлая крыса! Что, больше некуда бежать?",
+rename,dialogue_text_campaign_3_1_boss_2,dialog_text_campaign_3_1_boss_2,"Здравствуй, маленькая Лиззи. Я уже боялся, что мои люди невзначай прикончили тебя. Ты как раз вовремя.",
+rename,dialogue_text_campaign_3_1_boss_3,dialog_text_campaign_3_1_boss_3,Что ты… Что ты сделал с кораблем? Что ты сделал с собой?,
+rename,dialogue_text_campaign_3_1_boss_4,dialog_text_campaign_3_1_boss_4,"Напрасно ты искала меня, маленькая Лиззи. Радуйся, ведь твоя жертва не будет напрасной.",
+rename,dialogue_text_campaign_3_1_boss_win_1,dialog_text_campaign_3_1_boss_win_1,"Великий Тангароа, почему ты оставил меня? Ах, маленькая Лиззи. Этого ли ты хотела?",
+rename,dialogue_text_campaign_3_1_boss_win_2,dialog_text_campaign_3_1_boss_win_2,"Ты угробил мой корабль! Но ничего, золота с неба хватит, чтобы купить новый. Говори, как ты собирался его достать!",
+rename,dialogue_text_campaign_3_1_boss_win_3,dialog_text_campaign_3_1_boss_win_3,"Лиззи… Боги требуют за золото великую плату. Я пытался откупиться, но не успел…",
+rename,dialogue_text_campaign_3_1_boss_win_4,dialog_text_campaign_3_1_boss_win_4,"Когда я убил того паренька в трюме корабля Гарпий, мне досталось его проклятие. Его метка. И золото. Я думал, это мой шанс. Я мог жить в тени твоего отца, но в твоей… Это слишком, маленькая Лиззи.",
+rename,dialogue_text_campaign_3_1_boss_win_5,dialog_text_campaign_3_1_boss_win_5,"Но теперь это твоя забота. Боги щедро заплатят за мою смерть. А потом и за твою. Прощай, маленькая Лиззи.",
+rename,dialogue_text_campaign_3_1_boss_afterReward_1,dialog_text_campaign_3_1_boss_afterReward_1,"Мунблад снова обманул меня. Он с кораблем на дне. А я здесь, с проклятым золотом и черной меткой...",
+rename,dialogue_text_campaign_3_1_boss_afterReward_2,dialog_text_campaign_3_1_boss_afterReward_2,"Нужно возвращаться в Огненные Земли. Если кто и знает, что делать с этим проклятием, то это Шаманка.",
+rename,dialogue_text_campaign_4_0_region_1,dialog_text_campaign_4_0_region_1,"Проклятый шторм! Понятия не имею, где мы. Уйдут недели, пока мы вернемся на прежний курс.",
+rename,dialogue_text_campaign_4_0_region_2,dialog_text_campaign_4_0_region_2,"Погоди, я узнаю эти скалы…",
+rename,dialogue_text_campaign_4_0_region_3,dialog_text_campaign_4_0_region_3,"Это же Хищные Воды! Наемники из Акульей Стаи считают их своим домом. Нам повезло, я знаю их командора, Джима Коулерса.",
+rename,dialogue_text_campaign_4_0_region_4,dialog_text_campaign_4_0_region_4,"Осталось его найти, он не откажет старым друзьям в припасах и безопасном проходе.",
+rename,dialogue_text_campaign_4_0_0_win_1,dialog_text_campaign_4_0_0_win_1,Какого черта? Наемники Стаи обычно более дружелюбные. Я припомню это Джиму при встрече…,
+rename,dialogue_text_campaign_4_0_6_miniboss_1,dialog_text_campaign_4_0_6_miniboss_1,"Не знаю, кто вы, но вы на территории Акульей Стаи. Разворачивайте свои корабли, или вас ждут последствия.",
+rename,dialogue_text_campaign_4_0_6_miniboss_2,dialog_text_campaign_4_0_6_miniboss_2,"Нет необходимости угрожать нам. Мы давние друзья с твоим командором, пропусти нас!",
+rename,dialogue_text_campaign_4_0_6_miniboss_3,dialog_text_campaign_4_0_6_miniboss_3,"Я так не думаю, капитан. У моего командора нет друзей. Мистер Винсент, возьмите в плен и допросите этого капитана. Судьба остальных меня не волнует.",
+rename,dialogue_text_campaign_4_0_6_win_1,dialog_text_campaign_4_0_6_win_1,"Не понимаю. Почему они напали на нас? Либо они все посходили с ума, либо что-то тут сильно изменилось с нашей последней встречи с Джимом.",
+rename,dialogue_text_campaign_4_0_10_win_1,dialog_text_campaign_4_0_10_win_1,Человек за бортом! Джим?! Что ты делаешь посреди моря на этих досках?,
+rename,dialogue_text_campaign_4_0_10_win_2,dialog_text_campaign_4_0_10_win_2,"Не верю своим глазам, это же моя Элизабет! Боги услышали мои молитвы!",
+rename,dialogue_text_campaign_4_0_10_win_3,dialog_text_campaign_4_0_10_win_3,"Ты не поверишь, столько всего тут произошло. Очень долгая история. Дай мне обсохнуть, мы поднимемся в твою каюту, откроем бочонок рома, и…",
+rename,dialogue_text_campaign_4_0_10_win_4,dialog_text_campaign_4_0_10_win_4,"Джим, доски за бортом еще недалеко уплыли. У тебя есть все шансы на них вернуться.",
+rename,dialogue_text_campaign_4_0_10_win_5,dialog_text_campaign_4_0_10_win_5,"Моя Элизабет, я уже начал забывать, как ты жестока. Хорошо, тогда краткий вариант для деловых людей: я больше не командор Акульей Стаи. Но это временно!",
+rename,dialogue_text_campaign_4_0_10_win_6,dialog_text_campaign_4_0_10_win_6,"Полгода назад в Стаю пришли новички - Байл Молот и его люди. Сначала все шло хорошо, но потом Байл решил, что из него получится гораздо лучший командор Стаи, чем я.",
+rename,dialogue_text_campaign_4_0_10_win_6_,dialog_text_campaign_4_0_10_win_6_,"Он захватил мой линкор, мой “Кархародон”, и теперь охотится за мной и верными мне людьми. Но с тобой у нас есть серьезные шансы на победу.",
+rename,dialogue_text_campaign_4_0_10_win_7,dialog_text_campaign_4_0_10_win_7,Со мной? Я еще ни на что не соглашалась.,
+rename,dialogue_text_campaign_4_0_10_win_8,dialog_text_campaign_4_0_10_win_8,"Кажется, ты забыла, моя Элизабет. Я спас тебя. В том бою не я должен был потерять половину тела и глаз. И не меня должны были прозвать “Праведником”. Ты. Мне. Должна.",
+rename,dialogue_text_campaign_4_0_10_win_9,dialog_text_campaign_4_0_10_win_9,"Черт… Джим, я ничего не забыла. Я…",
+rename,dialogue_text_campaign_4_0_10_win_10,dialog_text_campaign_4_0_10_win_10,"Ну вот и славно! Отправляемся немедленно! Сначала - в форт этого стервятника Аспера. У него в плену развлекаются мои старые приятели. Не знаю, сколько еще Аспер сможет терпеть этих болванов, но я бы поспешил, пока их не вздернули на рее.",
+rename,dialogue_text_campaign_4_0_14_miniboss_1,dialog_text_campaign_4_0_14_miniboss_1,"Капитан Рид, если не ошибаюсь. Кажется, в прошлую нашу встречу произошло некоторое… Недопонимание. Мы ищем нашего общего друга - Праведника Джима. Не попадался ли он вам на пути? Стая волнуется за него.",
+rename,dialogue_text_campaign_4_0_14_miniboss_2,dialog_text_campaign_4_0_14_miniboss_2,"Аспер, подлая крыса! Что пообещал Байл за твое предательство?",
+rename,dialogue_text_campaign_4_0_14_miniboss_3,dialog_text_campaign_4_0_14_miniboss_3,"Вижу, вы уже нашли его. Что ж. Это будет сложнее, чем я ожидал. Но ненамного. Мистер Мэнис, будьте любезны - отправьте этот корабль на дно. Мне нужен Джим Коулерс. В капитане Рид у нас больше нет нужды. Я буду ждать вас в форте.",
+rename,dialogue_text_campaign_4_0_22_miniboss_1,dialog_text_campaign_4_0_22_miniboss_1,Это корабль Золотых Гарпий. Что они тут делают?,
+rename,dialogue_text_campaign_4_0_22_miniboss_2,dialog_text_campaign_4_0_22_miniboss_2,"Доброго пути, славные пираты! Мы здесь не для сражений. Я ищу командора Акульей Стаи, у нашего клана есть крайне заманчивое предложение.",
+rename,dialogue_text_campaign_4_0_22_miniboss_3,dialog_text_campaign_4_0_22_miniboss_3,"Командор Акульей Стаи перед тобой. Стая всегда готова договориться за разумную плату. Я знаю, Золотые Гарпии славятся…",
+rename,dialogue_text_campaign_4_0_22_miniboss_4,dialog_text_campaign_4_0_22_miniboss_4,"Джим Коулерс, он же Праведник Джим, если я не ошибаюсь? Вас трудно не узнать. Мои источники сообщили мне, что вы больше не представляете интересы Стаи. А новый командор крайне заинтересован в вашей персоне. Что ж, если вместе с контрактом я привезу вас, возможно, нам удастся договориться на более выгодных условиях…",
+rename,dialogue_text_campaign_4_0_22_miniboss_win_1,dialog_text_campaign_4_0_22_miniboss_win_1,"Золотым Гарпиям придется сильно постараться, чтобы я забыл об этом недоразумении.",
+rename,dialogue_text_campaign_4_0_22_miniboss_win_2,dialog_text_campaign_4_0_22_miniboss_win_2,"Может, лучше ты сильно постараешься и не будешь показываться на палубе при встрече с каждым чертовым кораблем?",
+rename,dialogue_text_campaign_4_0_boss_1,dialog_text_campaign_4_0_boss_1,"Аспер! Отпусти моих людей, и мы разойдемся мирно! Можешь даже оставить себе эту заплесневелую крепость! Если мы захватим форт силой, мое предложение уже не будет столь щедрым!",
+rename,dialogue_text_campaign_4_0_boss_2,dialog_text_campaign_4_0_boss_2,Я приму ваше предложение к сведению…,
+rename,dialogue_text_campaign_4_0_boss_3,dialog_text_campaign_4_0_boss_3,"Что ж… Похоже, ваши условия неприемлемы!",
+rename,dialogue_text_campaign_4_0_boss_win_1,dialog_text_campaign_4_0_boss_win_1,"Мако, мальчик мой, что они с тобой сделали? Постой, ты всегда таким и был.",
+rename,dialogue_text_campaign_4_0_boss_win_2,dialog_text_campaign_4_0_boss_win_2,"Я тоже рад тебя видеть, босс.",
+rename,dialogue_text_campaign_4_0_boss_win_3,dialog_text_campaign_4_0_boss_win_3,"Я что-то не вижу твоего брата Яго. Где он, с ним все в порядке?",
+rename,dialogue_text_campaign_4_0_boss_win_4,dialog_text_campaign_4_0_boss_win_4,"Не думаю. Его увезли в Акулий Залив. Говорили что-то о том, что он станет примером для всех, кто сопротивляется власти Байла.",
+rename,dialogue_text_campaign_4_0_boss_win_5,dialog_text_campaign_4_0_boss_win_5,"Черт. Похоже, нам нужно поторопиться.",
+rename,dialogue_text_campaign_4_1_region_1,dialog_text_campaign_4_1_region_1,"Тебе лучше знать, куда могли увезти твоего друга. Залив большой, мы можем неделями искать нужный нам корабль.",
+rename,dialogue_text_campaign_4_1_region_2,dialog_text_campaign_4_1_region_2,"Если Байл сохранил хоть какие-то традиции в отряде, то самое подходящее место для казни - это мыс Пилохвостов. Всех предателей и мятежников отвозят туда и скармливают…",
+rename,dialogue_text_campaign_4_1_region_3,dialog_text_campaign_4_1_region_3,"О нет, избавь меня от этих подробностей. Команда, поднять паруса!",
+rename,dialogue_text_campaign_4_1_6_miniboss_1,dialog_text_campaign_4_1_6_miniboss_1,"Смотрите-ка, что тут у нас, ребята. Обед сам приплыл к нам в руки.",
+rename,dialogue_text_campaign_4_1_6_miniboss_2,dialog_text_campaign_4_1_6_miniboss_2,"Не далековато ли ты заплыл от дома, людоед? Испугался, что отправишься там на дно вслед за своим Тираном?",
+rename,dialogue_text_campaign_4_1_6_miniboss_3,dialog_text_campaign_4_1_6_miniboss_3,"Байл обещал своим братьям хорошую работенку, но не говорил, что нас ждут еще и вкусные дерзкие моряки. Мне нравится!",
+rename,dialogue_text_campaign_4_1_6_miniboss_win_1,dialog_text_campaign_4_1_6_miniboss_win_1,"Ну и сброд же набирает к себе Байл. Надо поспешить, пока он не собрал под своими знаменами отребье со всех семи морей.",
+rename,dialogue_text_campaign_4_1_14_miniboss_1,dialog_text_campaign_4_1_14_miniboss_1,"Это и есть Байл Молот? Джим, ты о чем думал, когда принимал это чудовище в Стаю?",
+rename,dialogue_text_campaign_4_1_14_miniboss_2,dialog_text_campaign_4_1_14_miniboss_2,"Праведник Джим! Я столько искал тебя, и тут ты сам приходишь ко мне в руки. Это хорошо, не придется второй раз плыть сюда, чтобы скормить всех вас акулам. Братья, разорвите их на куски!",
+rename,dialogue_text_campaign_4_1_14_miniboss_win_1,dialog_text_campaign_4_1_14_miniboss_win_1,"Яго, ты заставил нас попотеть, пока мы спасали тебя. Ты совсем не думаешь о своем командоре?",
+rename,dialogue_text_campaign_4_1_14_miniboss_win_2,dialog_text_campaign_4_1_14_miniboss_win_2,"Виноват, сэр.",
+rename,dialogue_text_campaign_4_1_14_miniboss_win_3,dialog_text_campaign_4_1_14_miniboss_win_3,"Это совсем неправильно. В следующий раз, если отправишься на корм рыбам, не смей больше показываться мне на глаз!",
+rename,dialogue_text_campaign_4_1_14_miniboss_win_4,dialog_text_campaign_4_1_14_miniboss_win_4,"Похоже, вся команда в сборе. Пора показать Байлу, кто хозяин Стаи.",
+rename,dialogue_text_campaign_4_1_22_miniboss_1,dialog_text_campaign_4_1_22_miniboss_1,"Я смотрю, у твоих новых друзей острые зубы, Джим.",
+rename,dialogue_text_campaign_4_1_22_miniboss_2,dialog_text_campaign_4_1_22_miniboss_2,"А у твоих прилипал их все меньше, Байл.",
+rename,dialogue_text_campaign_4_1_22_miniboss_3,dialog_text_campaign_4_1_22_miniboss_3,"Мне это начинает надоедать. Братья, кто принесет мне их головы - получит столько золота, сколько сможет унести с собой!",
+rename,dialogue_text_campaign_4_1_boss_1,dialog_text_campaign_4_1_boss_1,"Пора с этим заканчивать, Байл. Я пришел забрать то, что по праву принадлежит мне!",
+rename,dialogue_text_campaign_4_1_boss_2,dialog_text_campaign_4_1_boss_2,"Твоя по праву - лишь веревка и место на рее. Раз мои братья не могут этого сделать, я сам убью тебя!",
+rename,dialogue_text_campaign_4_1_boss_win_1,dialog_text_campaign_4_1_boss_win_1,"Что ж, это был славный бой, парень. Вперед, делай, что должен.",
+rename,dialogue_text_campaign_4_1_boss_win_2,dialog_text_campaign_4_1_boss_win_2,"О, нет-нет, ты будешь жить, Байл Молот. Жить и жалеть о своем предательстве. Камера в форте уже ждет тебя. Яго, Мако! Проводите сэра Молота в его новый дом.",
+rename,dialogue_text_campaign_4_1_boss_afterReward_1,dialog_text_campaign_4_1_boss_afterReward_1,"Похоже, нам пора прощаться.",
+rename,dialogue_text_campaign_4_1_boss_afterReward_2,dialog_text_campaign_4_1_boss_afterReward_2,Уже? Ты бросишь бедного калеку одного среди этих проходимцев?,
+rename,dialogue_text_campaign_4_1_boss_afterReward_3,dialog_text_campaign_4_1_boss_afterReward_3,"Прекрати, мы оба знаем, что твои шутки несмешные.",
+rename,dialogue_text_campaign_4_1_boss_afterReward_4,dialog_text_campaign_4_1_boss_afterReward_4,"Ты разбиваешь мне сердце. Хочешь, чтобы слева у меня вообще ничего целого не осталось?",
+rename,dialogue_text_campaign_4_1_boss_afterReward_5,dialog_text_campaign_4_1_boss_afterReward_5,"Ладно. Спасибо тебе, я никогда не забуду об этом. И всегда приду тебе на выручку, если понадобится. Возможно даже рискну жизнью еще раз. За достойную оплату, разумеется.",
+rename,dialogue_text_campaign_4_1_boss_afterReward_6,dialog_text_campaign_4_1_boss_afterReward_6,Я запомню. Постарайся больше не попадать в такие передряги.,
+rename,dialogue_text_campaign_4_1_boss_afterReward_7,dialog_text_campaign_4_1_boss_afterReward_7,"Имеешь в виду - не нанимать банду психопатов-людоедов к себе на службу? Не знаю, звучит слишком заманчиво. Попутного тебе ветра, моя Элизабет.",
+rename,dialogue_text_campaign_4_1_boss_afterReward_8,dialog_text_campaign_4_1_boss_afterReward_8,"Удачи, Джим Коулерс.",
+rename,ability_name_captain_heal_throw,ability_name_crew_captain_heal_throw,Лечебный ром,
+rename,ability_description_captain_heal_throw,ability_description_crew_captain_heal_throw,Бросает {0} бочки с лечебным зельем в союзных матросов (приоритет — раненым). Лечение: {1}/с в течение {2}с,
+add,item_description_cannon_big_rocket,,"Выпускает ракету, которая пробивает цели на своем пути, пока у нее хватает прочности и урона. При уничтожении поджигает палубу вокруг.",15
+add,loading_screen_long_tip_0,,"Пушки наносят большой урон, но становятся бесполезны, если канониры погибли. Размещай артиллерию в задних рядах и прикрывай щитами от вражеских стрелков.",15
+add,loading_screen_long_tip_1,,"Бойцы ближнего боя эффективны в абордаже, перепрыгнув на вражескую палубу они легко перебьют стрелков и канониров. Главное - дожить до решающего момента.",15
+add,loading_screen_long_tip_2,,"Стрелки за пару залпов расправятся с беззащитными вражескими канонирами, но с трудом пробивают бойцов, прячущихся за щитами. Задача стрелков - нанести максимальный урон до абордажа.",15
+add,loading_screen_long_tip_3,,"У матросов и оборудования встречается броня от разных типов урона - холодного оружия, пуль, взрывов и т.д. Выбирай улучшения с умом или меняй по ситуации.",15
+add,loading_screen_long_tip_4,,"Каждый капитан обладает уникальными способностями, усиливающими разных матросов или пушки. Изучи их, чтобы выбрать наиболее подходящего для каждого корабля.",15
+add,loading_screen_long_tip_5,,"Матросы, капитаны и оборудование могут иметь разные роли - нанесение урона, защита или поддержка. Залог победы в грамотном балансе между ними. ",15
+add,loading_screen_long_tip_6,,"Суперудары капитанов заряжаются при попадании по врагу. Накопив достаточно ярости, капитан применяет особую мощную атаку или способность.",15
+add,loading_screen_long_tip_7,,"Картечница наносит урон по большой площади, но долго заряжается. Если вражеские картечницы успели выстрелить, на помошь придет только Воздушный Охотник или удача.",15
+add,loading_screen_long_tip_8,,"Огонь наносит большой урон корпусу корабля. Если на палубе осталось мало матросов и пожар тушить уже некому, корабль скоро будет уничтожен.",15
+add,loading_screen_long_tip_9,,"Корабли обладают особыми свойствами и способностями - некоторые хороши для абордажа, другие - для затяжного боя на дистанции. Учитывай это при выборе команды и расстановке оборудования на палубе.",15
+add,ability_name_machinegun_resist_shred,,Решето,15
+add,ability_name_cannon_anti_projectile_auto_fire,,Заводной механизм,15
+add,ability_description_machinegun_resist_shred,,"Каждый выстрел снижает защиту цели от <sprite name=""bullet""> урона на 3%.",15
+add,ability_description_cannon_anti_projectile_auto_fire,,"При потере канониров ""Воздушный охотник"" сохраняет возможность стрельбы, но с уменьшенной в 4 раза скорострельностью",15
+add,ability_name_cannon_rocket_reinforcement,,Усиленная ракета,15
+add,ability_description_cannon_rocket_reinforcement,,Увеличивает прочность ракеты на 20%,15
+add,ability_name_cannon_rocket_aoe_radius,,Мощный заряд,15
+add,ability_description_cannon_rocket_aoe_radius,,Увеличивает радиус взрыва на 0.5м,15
+add,ability_name_cannon_rocket_shrapnel,,Осколки,15
+add,ability_description_cannon_rocket_shrapnel,,При взрыве ракета разбрасывает 8 осколков во все стороны. Каждый осколок наносит 40% урона пушки и пробивает до 2 целей.,15
+add,ability_name_cannon_rocket_no_ignite,,Огнеупорный лафет,15
+add,ability_description_cannon_rocket_no_ignite,,При уничтожении не поджигает палубу вокруг,15
+add,ability_name_cannon_rocket_soft_target,,Точно в цель,15
+add,ability_description_cannon_rocket_soft_target,,После выстрела ракета доворачивает до ближайшей цели по траектории полета,15
+add,item_info_shield_aura_periodic_damage,,Урон от ауры,15
+add,item_info_shield_aura_periodic_damage_description,,"Урон, наносимый аурой щита всем вражеским матросам в радиусе действия",15
+add,item_info_shield_aura_radius,,Радиус ауры,15
+add,item_info_shield_aura_radius_description,,Радиус действия ауры щита,15
+add,button_name_battle_pass_novice,,Больше наград,15
+add,clans_tab_clan_uphrades,,Исследования,15
+add,clan_upgrade_node_level,,{0}/{1},15
+add,clan_upgrade_node_level_max,,МАКС,15
+add,clan_joined_notification,,Вы вступили в клан «{0}»,15
+add,clan_level,,{0} Уровень,15
+add,clans_error_rejoin_cooldown,,Присоединиться к клану снова можно будет через {0},15
+add,reward_type_clan_activity_points,,Очки активности,15
+add,title_resourse_tips_clan_activity_points,,Очки активности,15
+add,description_resourse_tips_clan_activity_points,,"Показатель активности клана. Все очки, полученные участниками клана, добавляются в сундук клана",15
+add,description_resourse_tips_not_enough_clan_activity_points,,Очки активности можно получить за активности в клане и покупки спецпредложений в магазине клана,15
+add,reward_type_amethysts,,Аметисты,15
+add,title_resourse_tips_amethysts,,Аметисты,15
+add,description_resourse_tips_amethysts,,"Самая редкая валюта в пиратском мире. Можно купить в магазине клана, получить бонус от покупок других участников клана или как награду за иные активности клана",15
+add,description_resourse_tips_not_enough_amethysts,,Дополнительные аметисты можно купить в магазине клана или заработать за клановые активности,15
+add,clan_upgrade_dialog_exp,,для клана,15
+add,clans_tab_clan_shop,,Торговец,15
+add,clan_upgrade_dialog_reward_per_transaction,,Награда за взнос:,15
+add,clan_level_restriction_label,,Уровень клана {0},15
+add,clan_upgrade_dialog_locked_by_level,,Откроется на {0} уровне клана,15
+add,clan_offer_availability,,Доступно: 1,15
+add,clan_upgrade_dialog_locked_by_tree,,Не сделаны предыдущие улучшения,15
+add,clan_upgrade_dialog_not_enough_resources,,Ещё не собраны все ресурсы для улучшения,15
+add,clan_upgrade_dialog_insufficient_role,,Только лидер и офицеры могут делать улучшения,15
+add,clan_upgrade_dialog_donate_daily_limit_reached,,Пожертвовать каждый из ресурсов можно один раз в день,15
+add,clan_upgrade_dialog_donate_resource_full,,Ресурс заполнен,15
+add,clan_upgrade_dialog_donate_level_too_low,,Доступно с {0} уровня игрока,15
+add,clan_offer_card_gift_label,,Друзьям клана,15
+add,clan_upgrade_dialog_timer_next_day,,Снова пожертвовать можно через {0},15
+add,shop_name_clan_offer_1,,Горсть аметистов,15
+add,clan_upgrade_dialog_upgrade_button,,Улучшить,15
+add,shop_name_clan_offer_2,,Мешок аметистов,15
+add,clan_upgrade_dialog_transaction_button,,Внести,15
+add,shop_name_clan_offer_3,,Сундук аметистов,15
+add,ability_name_ship_clan_sailors_health,,Здоровяк,15
+add,clan_offer_description_1,,Возьми набор для себя и сможешь отправить,15
+add,ability_description_ship_clan_sailors_health,,"+{0} к здоровью <voffset=-0.2em><size=18><sprite name=""human""></size></voffset> матросов",15
+add,clan_offer_description_2,,в подарок всем в клане!,15
+add,ability_name_ship_clan_bullet_damage,,Свинцовый поцелуй,15
+add,chat_message_clan_gift,,"<color=#90EE90>Нажмите</color>, чтобы получить подарок",15
+add,ability_description_ship_clan_bullet_damage,,"+{0} к урону <voffset=-0.2em><size=18><sprite name=""bullet""></size></voffset> пулями",15
+add,chat_message_clan_gift_received,,Подарок получен,15
+add,ability_name_ship_clan_weapon_damage,,Тяжелый клинок,15
+add,clan_gift_toggle_label,,Отправить подарок в чат клана,15
+add,ability_description_ship_clan_weapon_damage,,"{0} к урону <voffset=-0.2em><size=18><sprite name=""melee""></size></voffset> оружием",15
+add,description_clan_gift_hint,,"Уверен, что не хочешь делиться?
+Только ты получишь аметисты.",15
+add,ability_name_ship_clan_explosive_damage,,Черный порох,15
+add,title_clans_tab_clan_shop_unavailable_hint,,Клановый магазин недоступен,15
+add,ability_description_ship_clan_explosive_damage,,"{0} к урону <voffset=-0.2em><size=18><sprite name=""explosion""></size></voffset> взрывами",15
+add,ability_name_ship_clan_lightning_defense,,Громоотвод,15
+add,ability_description_ship_clan_lightning_defense,,"{0} к защите от <voffset=-0.2em><size=18><sprite name=""lightning""></size></voffset> молний",15
+add,ability_name_ship_clan_fire_defense,,Огнестойкость,15
+add,ability_description_ship_clan_fire_defense,,"{0} к защите от <voffset=-0.2em><size=18><sprite name=""fire""></size></voffset> огня",15
+add,ability_name_ship_clan_poison_defense,,Противоядие,15
+add,ability_description_ship_clan_poison_defense,,"{0} к защите от <voffset=-0.2em><size=18><sprite name=""decay""></size></voffset> яда",15
+add,ability_name_ship_clan_lightning_damage,,Разряд,15
+add,ability_description_ship_clan_lightning_damage,,"+{0} к урону <voffset=-0.2em><size=18><sprite name=""lightning""></size></voffset> молниями",15
+add,ability_name_ship_clan_fire_damage,,Пиромания,15
+add,ability_description_ship_clan_fire_damage,,"+{0} к урону <voffset=-0.2em><size=18><sprite name=""fire""></size></voffset> огнем",15
+add,ability_name_ship_clan_poison_damage,,Змеиный яд,15
+add,ability_description_ship_clan_poison_damage,,"+{0} к урону <voffset=-0.2em><size=18><sprite name=""decay""></size></voffset> ядом",15
+add,ability_description_ship_clan_cannons_equipment_durability,,"+{0} к прочности пушек и других <voffset=-0.2em><size=18><sprite name=""construction""></size></voffset> конструкций, кроме щитов",15
+add,ability_name_ship_clan_captain_armor,,Офицерский ром,15
+add,ability_description_ship_clan_captain_armor,,+{0} к здоровью капитанов,15
+add,ability_description_ship_clan_ship_hull_durability,,+{0} к прочности корпуса корабля,15
+add,ability_name_ship_clan_undead_health,,Крепкие кости,15
+add,ability_description_ship_clan_undead_health,,"+{0} к здоровью <voffset=-0.2em><size=18><sprite name=""undead""></size></voffset> нежити",15
+add,ability_description_ship_clan_shield_durability,,+{0} к прочности щитов,15
+add,ability_name_ship_clan_sailors_attack_speed,,Ритм битвы,15
+add,ability_description_ship_clan_sailors_attack_speed,,"+{0} к скорости атаки <voffset=-0.2em><size=18><sprite name=""human""></size></voffset> матросов",15
+add,ability_name_ship_clan_undead_attack_speed,,Быстрые кости,15
+add,ability_description_ship_clan_undead_attack_speed,,"+{0} к скорости атаки <voffset=-0.2em><size=18><sprite name=""undead""></size></voffset> нежити",15
+add,ability_name_ship_clan_cannon_reload_speed,,Шквал огня,15
+add,ability_description_ship_clan_cannon_reload_speed,,+{0} к скорости перезарядки пушек,15
+add,ability_name_ship_clan_captain_attack_speed,,Кураж,15
+add,ability_description_ship_clan_captain_attack_speed,,+{0} к скорости атаки капитанов,15
+add,ability_name_ship_clan_explosive_crit_damage,,Двойной заряд,15
+add,ability_description_ship_clan_explosive_crit_damage,,"+{0} к критическому урону от <voffset=-0.2em><size=18><sprite name=""explosion""></size></voffset> взрывов",15
+add,ability_name_ship_clan_weapon_crit_damage,,Костолом,15
+add,ability_description_ship_clan_weapon_crit_damage,,"+{0} к критическому урону от <voffset=-0.2em><size=18><sprite name=""melee""></size></voffset> оружия",15
+add,ability_name_ship_clan_bullet_crit_damage,,Убойный выстрел,15
+add,ability_description_ship_clan_bullet_crit_damage,,"+{0} к критическому урону от <voffset=-0.2em><size=18><sprite name=""bullet""></size></voffset> пуль",15
+add,ability_name_ship_clan_elemental_crit_damage,,Стихийный шторм,15
+add,ability_description_ship_clan_elemental_crit_damage,,"+{0} к критическому урону от <voffset=-0.2em><size=18><sprite name=""fire""></size></voffset><voffset=-0.2em><size=18><sprite name=""ice""></size></voffset><voffset=-0.2em><size=18><sprite name=""decay""></size></voffset><voffset=-0.2em><size=18><sprite name=""lightning""></size></voffset> стихий",15
+add,ability_name_ship_clan_explosive_defense,,Дублёная шкура,15
+add,ability_description_ship_clan_explosive_defense,,"+{0} к защите от <voffset=-0.2em><size=18><sprite name=""explosion""></size></voffset> взрывов",15
+add,ability_name_ship_clan_weapon_defense,,Закалённый ромом,15
+add,ability_description_ship_clan_weapon_defense,,"+{0} к защите от <voffset=-0.2em><size=18><sprite name=""melee""></size></voffset> оружия",15
+add,ability_name_ship_clan_bullet_defense,,Счастливая монета,15
+add,ability_description_ship_clan_bullet_defense,,"+{0} к защите от <voffset=-0.2em><size=18><sprite name=""bullet""></size></voffset> пуль",15
+add,clan_upgrade_error_upgrade_not_found,,Ветка улучшения не найдена,15
+add,clan_upgrade_error_level_max_reached,,Ветка уже улучшена до максимума,15
+add,clan_upgrade_error_resource_not_applicable,,Этот ресурс не требуется на текущем уровне,15
+add,clan_upgrade_error_resources_not_funded,,Не все ресурсы уровня собраны,15
+add,clan_upgrade_error_total_amount_reached,,Этого ресурса уже собрано достаточно,15
+add,clan_upgrade_error_daily_limit_reached,,Достигнут дневной лимит транзакций по этому ресурсу,15
+add,clan_upgrade_error_min_clan_level_not_reached,,Недостаточный уровень клана,15
+add,clan_upgrade_error_parents_not_upgraded,,Не все предыдущие ветки улучшены,15
+add,description_clans_tab_clan_shop_unavailable_hint,,Доступ к магазину открывается после вступления или создания клана,15
+add,clan_level_required_hint,,Необходим {0} уровень клана,15
+add,shop_reward_type_fragment,,Карточки,15
+add,clan_offer_bonus_chat_message,,<color=#A5DEF4>[{0}]</color> приобрёл набор Аметистов! Забери свой бонус: ,15
+add,shop_reward_type_specific_fragment,,Карточки,15
+add,item_info_projectile_health,,Прочность снаряда,15
+add,shop_reward_type_random_fragment,,Карточки,15
+add,item_info_projectile_health_description,,Запас прочности снаряда.,15
+add,description_resourse_tips_duels_rating,,description_resourse_tips_duels_rating Не заполнено.,0
+add,description_resourse_tips_not_enough_duels_rating,,description_resourse_tips_not_enough_duels_rating Не заполнено.,0
+add,description_resourse_tips_convoy_regular_rating,,description_resourse_tips_convoy_regular_rating Не заполнено.,0
+add,description_resourse_tips_not_enough_convoy_regular_rating,,description_resourse_tips_not_enough_convoy_regular_rating Не заполнено.,0
+add,description_resourse_tips_not_enough_tournament_points,,description_resourse_tips_not_enough_tournament_points Не заполнено.,0
+add,description_resourse_tips_convoy_summer_rating,,description_resourse_tips_convoy_summer_rating Не заполнено.,0
+add,description_resourse_tips_not_enough_convoy_summer_rating,,description_resourse_tips_not_enough_convoy_summer_rating Не заполнено.,0
+add,description_resourse_tips_kraken_kill,,description_resourse_tips_kraken_kill Не заполнено.,0
+add,description_resourse_tips_not_enough_kraken_kill,,description_resourse_tips_not_enough_kraken_kill Не заполнено.,0
+add,description_resourse_tips_armada_movement_points,,description_resourse_tips_armada_movement_points Не заполнено.,0
+add,description_resourse_tips_not_enough_battle_pass_points,,description_resourse_tips_not_enough_battle_pass_points Не заполнено.,0
+add,description_resourse_tips_not_enough_bp_captain_points,,description_resourse_tips_not_enough_bp_captain_points Не заполнено.,0
+add,dialog_name_territorial_wars,,Битва за пролив,15
+add,dialog_name_territorial_wars_rules_subtitle,,Правила режима,15
+add,chat_message_clan_member_joined,,<color=#A5DEF4>[{0}]</color> вступил в клан!,15
+add,chat_message_clan_member_left,,<color=#A5DEF4>[{0}]</color> покинул клан.,15
+add,chat_message_clan_member_kicked,,<color=#A5DEF4>[{0}]</color> был исключён из клана игроком <color=#68F871>[{1}]</color>,15
+add,chat_message_clan_member_promoted,,<color=#68F871>[{0}]</color> повышен до офицера игроком <color=#A5DEF4>[{1}]</color>,15
+add,chat_message_clan_leadership_transferred,,Лидерство клана передано от <color=#A5DEF4>[{0}]</color> к <color=#68F871>[{1}]</color>,15
+add,chat_message_clan_upgrade_completed,,<color=#68F871>[{0}]</color> завершил улучшение «<color=#FFDC5F>{1}</color>».,15
+add,chat_message_clan_level_up,,Клан достиг <color=#DFB934>{0} уровня</color>! Поздравляем!,15
+add,button_battle_pass_novice_unlock_codex,,"Больше
+наград",15
+add,short_event_premium_buy_button_upper_text,,Открыть все!,15
+delete,,update_1_43_info_1,"<size=14><b>Кланы</b></size>
+Вступай в пиратский клан или создай собственный! Кланам уже доступен отдельный канал в чате и еженедельные награды.
+Новые клановые активности будут дообавлены в ближайших обновлениях!",
+delete,,update_1_43_info_2,"<size=14><b>Медик и Ремонтник</b></size>
+Мы провели работу над ребалансом и улучшением Медика и Ремонтника, сделав их более эффективными на поздних этапах игры. Исправлены ветки улучшений, изменены некоторые способности. Медики теперь могут лечить капитанов, а на высоких уровнях даже нежить, хотя запас лекарств ограничен. Ремонтник теперь больше сосредоточен на своей работе, а не бое, и получил большую живучесть.",
+delete,,update_1_43_info_3,"<size=14><b>Прочие изменения:</b></size>
+-Энна Чёрный Феникс теперь телепортирует только врагов
+-усилено влияние Снаряжения на мощность корабля
+-усилен эффект Талисмана спокойствия
+-у Шипов уменьшена прочность и сопротивление огню
+-исправлена ошибка, когда в Битве флотилий, при использовании Святой Чаши, вместе с дружественными призраками, могли появиться и призраки врага
+-исправлена ошибка восстановления матросов противника в Рейде в случае, если игрок проиграл или сдался
+-улучшены эффекты выстрела пушек
+-исправлена ошибка, при которой корабли наемников игнорировались в рейде
+-исправлена ошибка, при которой неправильно выбирался корабль при покупке
+-добавлено достижение ""Мастер алхимик"" за создание всех видов Мистического снаряжения
+-различные исправления и улучшения интерфейсов и текстов",
+delete,,update_1_44_info_2,"<size=14><b>Ракета</b></size>
+Пополнение в арсенале! Ракета сносит слабые цели на своём пути, пока хватает прочности, а затем взрывается, нанося огромный урон по площади. Имеет ограниченный угол стрельбы, поэтому важно правильно выбрать место для установки. Но будь осторожен — при разрушении она взорвётся и устроит пожар на твоей же палубе. Открывается с 25 уровня.",
+delete,,update_1_44_info_5,"<size=14><b>Изменения баланса:</b></size>
+- - Уменьшен урон Большой пушки, а её открытие перенесено с 25 на 22 уровень
+- Тяжёлому щиту добавлена броня от <sprite name=""explosion""></size>
+- Здоровье Стрелков увеличено до 180
+- Увеличена скорость перемещения Морского волка и Ассасина, уменьшена у Кока-людоеда и Скелета
+- Уменьшен урон от абордажных крюков у Гарпунного Галеона и Штурмового Линкора
+- Пулемёт больше не наносит повреждений корпусу корабля
+- Уменьшен урон от щупалец у Чудовищного шлюпа
+- Капитаны больше не прерывают атаки для использования способностей
+- Воздушный охотник больше не сбивает снаряды Метателя скелетов
+- Способность Поджог у Мортиры теперь создаёт несколько источников огня в радиусе взрыва",
+delete,,update_text,- Битва за пролив — новое онлайн-событие!,
+delete,,ShopCardPromoTapjoy,Заработай,
+delete,,ShopCardPromoTapjoy2,Заработай,

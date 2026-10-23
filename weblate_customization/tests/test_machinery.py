@@ -1,0 +1,609 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Tests for the Routed LLM machinery."""
+
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING, cast
+
+from asgiref.sync import async_to_sync
+from django.test import SimpleTestCase, TestCase
+from weblate_customization.machinery import (
+    LITELLM_DEFAULT_BASE_URL,
+    OPENROUTER_MACHINE_TRANSLATION_TITLE,
+    RoutedLiteLLMTranslation,
+    RoutedLLMMachineryForm,
+    RoutedLLMTranslation,
+)
+
+from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.openai import OpenAITranslation
+from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.utils.tests import http_mock
+
+if TYPE_CHECKING:
+    from weblate.machinery.types import SettingsDict
+
+DEEPSEEK = "deepseek/deepseek-chat-v3.1"
+GEMINI = "google/gemini-2.5-flash"
+
+CONFIGURATION: dict[str, object] = {
+    "key": "test-key",
+    "base_url": "https://openrouter.ai/api/v1",
+    "routing": {"ja": DEEPSEEK, "ko": DEEPSEEK, "zh": DEEPSEEK, "*": GEMINI},
+    "persona": "",
+    "style": "",
+    "language_instructions": {},
+}
+
+
+LITELLM_CONFIGURATION: dict[str, object] = {
+    "key": "test-key",
+    "base_url": "https://hcbifrost.herocraft.com/litellm/v1",
+    "routing": {"ja": DEEPSEEK, "ko": DEEPSEEK, "zh": DEEPSEEK, "*": GEMINI},
+    "persona": "",
+    "style": "",
+    "language_instructions": {},
+}
+
+
+CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def mock_chat(content: str = '["テスト"]') -> None:
+    http_mock.register(
+        "POST",
+        CHAT_URL,
+        json={
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 9,
+                "completion_tokens": 2,
+                "total_tokens": 11,
+            },
+        },
+    )
+
+
+def sent_payloads() -> list[dict[str, object]]:
+    payloads: list[dict[str, object]] = []
+    for call in http_mock.calls:
+        if str(call.request.url) != CHAT_URL:
+            continue
+        payload = json.loads(call.request.content)
+        if isinstance(payload, dict):
+            payloads.append(payload)
+    return payloads
+
+
+def sent_models() -> list[str]:
+    return [
+        model
+        for payload in sent_payloads()
+        if isinstance(model := payload.get("model"), str)
+    ]
+
+
+LITELLM_CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
+
+
+def mock_litellm_chat(content: str = '["テスト"]') -> None:
+    http_mock.register(
+        "POST",
+        LITELLM_CHAT_URL,
+        json={
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 9,
+                "completion_tokens": 2,
+                "total_tokens": 11,
+            },
+        },
+    )
+
+
+def litellm_sent_models() -> list[str]:
+    models: list[str] = []
+    for call in http_mock.calls:
+        if str(call.request.url) != LITELLM_CHAT_URL:
+            continue
+        payload = json.loads(call.request.content)
+        if isinstance(payload, dict) and isinstance(model := payload.get("model"), str):
+            models.append(model)
+    return models
+
+
+def as_settings(value: dict[str, object]) -> SettingsDict:
+    return cast("SettingsDict", value)
+
+
+class FormOnlyMachinery:
+    """Avoid network validation while testing only form field cleaning."""
+
+    def __init__(self, configuration: SettingsDict) -> None:
+        self.settings = configuration
+
+    def validate_settings(self) -> None:
+        pass
+
+
+class RoutedLLMFormTest(TestCase):
+    def validate(self, routing: object) -> RoutedLLMMachineryForm:
+        return RoutedLLMMachineryForm(
+            FormOnlyMachinery,
+            data={**CONFIGURATION, "routing": routing},
+        )
+
+    def test_model_field_is_removed(self) -> None:
+        form = RoutedLLMMachineryForm(FormOnlyMachinery)
+        self.assertNotIn("model", form.fields)
+
+    def test_valid_routing(self) -> None:
+        form = self.validate(CONFIGURATION["routing"])
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_valid_without_fallback(self) -> None:
+        form = self.validate({"ja": DEEPSEEK})
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_star_only(self) -> None:
+        form = self.validate({"*": GEMINI})
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_rejects_empty(self) -> None:
+        self.assertFalse(self.validate({}).is_valid())
+
+    def test_rejects_non_dict(self) -> None:
+        self.assertFalse(self.validate(["ja", DEEPSEEK]).is_valid())
+
+    def test_rejects_bad_language(self) -> None:
+        self.assertFalse(self.validate({"nosuchlang": DEEPSEEK}).is_valid())
+
+    def test_rejects_empty_model(self) -> None:
+        self.assertFalse(self.validate({"ja": ""}).is_valid())
+
+    def test_rejects_normalized_collision(self) -> None:
+        form = self.validate({"pt_BR": DEEPSEEK, "pt-BR": GEMINI})
+        self.assertFalse(form.is_valid())
+        self.assertIn("conflicting", str(form.errors["routing"]))
+
+    def test_trims_model(self) -> None:
+        form = self.validate({"ja": f"  {DEEPSEEK}  "})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["routing"], {"ja": DEEPSEEK})
+
+
+class RoutedResolveTest(SimpleTestCase):
+    def machine(self, routing: dict[str, str] | None = None) -> RoutedLLMTranslation:
+        configuration = dict(CONFIGURATION)
+        if routing is not None:
+            configuration["routing"] = routing
+        return RoutedLLMTranslation(as_settings(configuration))
+
+    def test_exact(self) -> None:
+        self.assertEqual(self.machine().resolve_model("ja"), DEEPSEEK)
+
+    def test_base_code(self) -> None:
+        self.assertEqual(self.machine().resolve_model("zh_Hans"), DEEPSEEK)
+        self.assertEqual(self.machine().resolve_model("zh-TW"), DEEPSEEK)
+
+    def test_separator_and_case_insensitive(self) -> None:
+        machine = self.machine({"pt_BR": DEEPSEEK, "*": GEMINI})
+        self.assertEqual(machine.resolve_model("PT-br"), DEEPSEEK)
+
+    def test_fallback(self) -> None:
+        self.assertEqual(self.machine().resolve_model("fr"), GEMINI)
+
+    def test_no_route_no_fallback(self) -> None:
+        machine = self.machine({"ja": DEEPSEEK})
+        self.assertIsNone(machine.resolve_model("fr"))
+
+    def test_is_supported_follows_routing(self) -> None:
+        machine = self.machine({"ja": DEEPSEEK})
+        self.assertTrue(machine.is_supported("en", "ja"))
+        self.assertFalse(machine.is_supported("en", "fr"))
+
+    def test_openrouter_request_has_service_title(self) -> None:
+        self.assertEqual(
+            self.machine().get_headers()["X-OpenRouter-Title"],
+            OPENROUTER_MACHINE_TRANSLATION_TITLE,
+        )
+
+    def test_non_openrouter_request_omits_service_title(self) -> None:
+        machine = RoutedLiteLLMTranslation(as_settings(dict(LITELLM_CONFIGURATION)))
+        self.assertNotIn("X-OpenRouter-Title", machine.get_headers())
+
+
+def batch_content(count: int) -> str:
+    return json.dumps({"strings": [f"s{i}" for i in range(count)]})
+
+
+class RoutedReplyFormatTest(SimpleTestCase):
+    """
+    Cover the reply-length ``json_schema`` shipped for the routed service.
+
+    Non-strict, applied unconditionally to every chat payload. The root is
+    an object envelope (``{"translations": [...]}``), not a bare array,
+    because OpenAI-family providers reject an array-rooted schema outright
+    (see ``docs/product/plans/2026-09-03-candidate-readiness-and-repair-visibility.md``,
+    task 2). A hardening pass to ``strict`` mode is tracked separately and
+    deliberately out of scope here (see
+    ``docs/product/plans/2026-08-12-phase0-implementation.md``, task 1).
+    """
+
+    def machine(self) -> RoutedLLMTranslation:
+        return RoutedLLMTranslation(as_settings(dict(CONFIGURATION)))
+
+    def payload(self, content: str) -> dict[str, object]:
+        return self.machine().get_chat_payload(GEMINI, "prompt", content, "", "")
+
+    @staticmethod
+    def translations_schema(payload: dict[str, object]) -> dict:
+        response_format = cast("dict", payload["response_format"])
+        schema = response_format["json_schema"]["schema"]
+        return cast("dict", schema["properties"]["translations"])
+
+    def test_schema_root_is_an_object_envelope(self) -> None:
+        payload = self.payload(batch_content(3))
+        response_format = cast("dict", payload["response_format"])
+        schema = response_format["json_schema"]["schema"]
+
+        self.assertEqual(response_format["type"], "json_schema")
+        self.assertEqual(schema["type"], "object")
+        self.assertEqual(schema["required"], ["translations"])
+        self.assertIs(schema["additionalProperties"], False)
+
+    def test_schema_fixes_element_count(self) -> None:
+        translations = self.translations_schema(self.payload(batch_content(3)))
+
+        self.assertEqual(translations["type"], "array")
+        self.assertEqual(translations["minItems"], 3)
+        self.assertEqual(translations["maxItems"], 3)
+
+    def test_single_string_batch_still_gets_schema(self) -> None:
+        translations = self.translations_schema(self.payload(batch_content(1)))
+
+        self.assertEqual(translations["minItems"], 1)
+        self.assertEqual(translations["maxItems"], 1)
+
+    def test_provider_requires_parameters(self) -> None:
+        payload = self.payload(batch_content(2))
+
+        self.assertIs(cast("dict", payload["provider"])["require_parameters"], True)
+
+    @staticmethod
+    def reply_from_schema(string_ids: list[str]) -> list[dict[str, object]]:
+        """
+        Build a reply carrying exactly the fields the schema makes mandatory.
+
+        A structured reply follows the schema, so anything the schema does not
+        require may be absent from it. Deriving the reply from the schema
+        instead of hand-writing it keeps the two halves of the contract tied:
+        dropping a field from ``required`` drops it here too.
+        """
+        # ruff: ignore[private-member-access]
+        root_schema = cast(
+            "dict", RoutedLLMTranslation._reply_format(len(string_ids))["json_schema"]
+        )["schema"]
+        schema = root_schema["properties"]["translations"]
+        required = schema["items"]["required"]
+        reply: list[dict[str, object]] = []
+        for string_id in string_ids:
+            item: dict[str, object] = {}
+            if "id" in required:
+                item["id"] = string_id
+            if "parts" in required:
+                item["parts"] = [{"type": "text", "text": f"t-{string_id}"}]
+            reply.append(item)
+        return reply
+
+    def test_schema_requires_the_echoed_id(self) -> None:
+        translations = self.translations_schema(self.payload(batch_content(3)))
+
+        self.assertIn("id", translations["items"]["properties"])
+        self.assertIn("id", translations["items"]["required"])
+
+    def test_unwrap_reply_envelope_extracts_the_translations_array(self) -> None:
+        item = {"id": "0", "parts": [{"type": "text", "text": "hi"}]}
+        wrapped = json.dumps({"translations": [item]})
+
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            self.machine()._unwrap_reply_envelope(wrapped),
+            json.dumps([item]),
+        )
+
+    def test_unwrap_reply_envelope_passes_through_a_bare_array(self) -> None:
+        bare = json.dumps([{"id": "0", "parts": [{"type": "text", "text": "hi"}]}])
+
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            self.machine()._unwrap_reply_envelope(bare),
+            bare,
+        )
+
+    def test_unwrap_reply_envelope_leaves_a_non_translations_dict_alone(self) -> None:
+        other = json.dumps({"other": "shape"})
+
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            self.machine()._unwrap_reply_envelope(other),
+            other,
+        )
+
+    def test_wrapped_and_bare_replies_parse_to_the_same_result(self) -> None:
+        item = {"id": "s0", "parts": [{"type": "text", "text": "Konnichiwa"}]}
+        sources = [("hello", None)]
+        machine = self.machine()
+
+        # ruff: ignore[private-member-access]
+        bare_result = machine._parse_llm_translations(
+            json.dumps([item]), sources, None, string_ids=["s0"]
+        )
+        # ruff: ignore[private-member-access]
+        wrapped_result = machine._parse_llm_translations(
+            json.dumps({"translations": [item]}), sources, None, string_ids=["s0"]
+        )
+
+        self.assertEqual(bare_result, wrapped_result)
+        self.assertEqual(bare_result["hello"][0]["text"], "Konnichiwa")
+
+    def test_schema_shaped_reply_pairs_with_its_sources(self) -> None:
+        """A reply the schema allows must satisfy the batch order validator."""
+        string_ids = ["a1b2", "c3d4", "e5f6"]
+        reply = self.reply_from_schema(string_ids)
+
+        # ruff: ignore[private-member-access]
+        ordered = RoutedLLMTranslation._resolve_reply_order(
+            list(reversed(cast("list", reply))), string_ids
+        )
+
+        self.assertIsNotNone(ordered)
+        self.assertEqual(
+            [cast("dict", item)["id"] for item in cast("list", ordered)], string_ids
+        )
+
+    def test_reply_without_the_echoed_id_is_refused(self) -> None:
+        string_ids = ["a1b2", "c3d4"]
+        reply = [{"parts": [{"type": "text", "text": "t"}]} for _ in string_ids]
+
+        self.assertIsNone(
+            # ruff: ignore[private-member-access]
+            RoutedLLMTranslation._resolve_reply_order(cast("list", reply), string_ids)
+        )
+
+    def test_malformed_content_omits_schema(self) -> None:
+        payload = self.payload("not json")
+
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+    def test_content_without_strings_list_omits_schema(self) -> None:
+        payload = self.payload(json.dumps({"other": "shape"}))
+
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+    def test_plain_openai_translation_is_unaffected(self) -> None:
+        machine = OpenAITranslation(as_settings({}))
+        payload = machine.get_chat_payload(GEMINI, "prompt", batch_content(3), "", "")
+
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+
+class RoutedSettingsValidationTest(TestCase):
+    @http_mock.activate
+    def test_actual_form_validates_route_without_fallback(self) -> None:
+        mock_chat()
+        form = RoutedLLMMachineryForm(
+            RoutedLLMTranslation,
+            data={**CONFIGURATION, "routing": {"ja": DEEPSEEK}},
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_actual_form_validates_star_only_route(self) -> None:
+        mock_chat()
+        form = RoutedLLMMachineryForm(
+            RoutedLLMTranslation,
+            data={**CONFIGURATION, "routing": {"*": GEMINI}},
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(sent_models(), [GEMINI])
+
+
+class RoutedDownloadTest(TestCase):
+    def machine(self, routing: dict[str, str] | None = None) -> RoutedLLMTranslation:
+        configuration = dict(CONFIGURATION)
+        if routing is not None:
+            configuration["routing"] = routing
+        machine = RoutedLLMTranslation(as_settings(configuration))
+        machine.delete_cache()
+        machine.cache_translations = False
+        return machine
+
+    @http_mock.activate
+    def test_sync_multiple_routes_cjk(self) -> None:
+        mock_chat()
+        result = self.machine().download_multiple_translations(
+            "en", "ja", [("Hello", None)]
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_sync_pending_routes_fallback(self) -> None:
+        mock_chat('["Bonjour"]')
+        result = self.machine().download_pending_translations(
+            "en", "fr", [("Hello", None, 0)]
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(sent_models(), [GEMINI])
+
+    @http_mock.activate
+    def test_async_multiple_routes_cjk(self) -> None:
+        mock_chat()
+        result = async_to_sync(self.machine().adownload_multiple_translations)(
+            "en", "zh_Hans", [("Hello", None)]
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_async_pending_routes_cjk(self) -> None:
+        mock_chat()
+        result = async_to_sync(self.machine().adownload_pending_translations)(
+            "en", "ja", [("Hello", None, 0)]
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_no_models_endpoint_call(self) -> None:
+        mock_chat()
+        self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertTrue(
+            all("/models" not in str(call.request.url) for call in http_mock.calls)
+        )
+
+    @http_mock.activate
+    def test_unsupported_language_fails_before_http(self) -> None:
+        machine = self.machine({"ja": DEEPSEEK})
+
+        with self.assertRaisesRegex(
+            MachineTranslationError, "No routed model for target language: fr"
+        ):
+            machine.download_multiple_translations("en", "fr", [("Hello", None)])
+
+        self.assertEqual(http_mock.calls, [])
+
+    @http_mock.activate
+    def test_usage_recorded_through_inherited_seam(self) -> None:
+        mock_chat()  # usage 9/2/11, no cost
+        self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.model, DEEPSEEK)
+        self.assertEqual(log.prompt_tokens, 9)
+        self.assertEqual(log.completion_tokens, 2)
+        self.assertIsNone(log.cost_usd)
+        self.assertEqual(log.project_slug, "")
+        self.assertEqual(log.operation, LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(log.unit_count, 1)
+
+    @http_mock.activate
+    def test_route_context_is_reset_after_success(self) -> None:
+        mock_chat()
+        machine = self.machine()
+
+        machine.download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertEqual(machine.get_model(), GEMINI)
+
+    @http_mock.activate
+    def test_route_context_is_reset_after_parser_error(self) -> None:
+        mock_chat("not JSON")
+        machine = self.machine()
+
+        with self.assertRaises(MachineTranslationError):
+            machine.download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertEqual(machine.get_model(), GEMINI)
+
+    @http_mock.activate
+    def test_async_route_context_is_reset_after_parser_error(self) -> None:
+        mock_chat("not JSON")
+        machine = self.machine()
+
+        with self.assertRaises(MachineTranslationError):
+            async_to_sync(machine.adownload_multiple_translations)(
+                "en", "ja", [("Hello", None)]
+            )
+
+        self.assertEqual(machine.get_model(), GEMINI)
+
+
+class RoutedLiteLLMTest(SimpleTestCase):
+    """Cover what differs from ``RoutedLLMTranslation``: slug, URL, timeout, payload."""
+
+    def machine(self, **overrides: object) -> RoutedLiteLLMTranslation:
+        configuration = {**LITELLM_CONFIGURATION, **overrides}
+        return RoutedLiteLLMTranslation(as_settings(configuration))
+
+    def test_registration_slug(self) -> None:
+        self.assertEqual(RoutedLiteLLMTranslation.name, "LiteLLM")
+        self.assertEqual(RoutedLiteLLMTranslation.get_identifier(), "litellm")
+
+    def test_default_base_url(self) -> None:
+        configuration = {
+            key: value
+            for key, value in LITELLM_CONFIGURATION.items()
+            if key != "base_url"
+        }
+        machine = RoutedLiteLLMTranslation(as_settings(configuration))
+        self.assertEqual(machine.get_runtime_base_url(), LITELLM_DEFAULT_BASE_URL)
+
+    def test_request_timeout(self) -> None:
+        self.assertEqual(RoutedLiteLLMTranslation.request_timeout, 55)
+
+    def test_trusted_error_host(self) -> None:
+        self.assertIn(
+            "hcbifrost.herocraft.com", RoutedLiteLLMTranslation.trusted_error_hosts
+        )
+
+    def test_chat_payload_has_schema_without_provider(self) -> None:
+        payload = self.machine().get_chat_payload(
+            GEMINI, "prompt", batch_content(2), "", ""
+        )
+        self.assertIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+    def test_malformed_content_pop_is_safe(self) -> None:
+        payload = self.machine().get_chat_payload(GEMINI, "prompt", "not json", "", "")
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+
+class RoutedLiteLLMDownloadTest(TestCase):
+    @http_mock.activate
+    def test_sync_multiple_routes_cjk(self) -> None:
+        mock_litellm_chat()
+        machine = RoutedLiteLLMTranslation(as_settings(dict(LITELLM_CONFIGURATION)))
+        machine.delete_cache()
+        machine.cache_translations = False
+
+        result = machine.download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertTrue(result)
+        self.assertEqual(litellm_sent_models(), [DEEPSEEK])

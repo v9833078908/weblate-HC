@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+
+<html lang="ru" dir="ltr">
+  <!--
+    PROTOTYPE, вариант B (не выбран; заменён вариантом C) - очередь повторов, «один вопрос за раз».
+    Ревью: docs/product/reviews/2026-09-22-repeat-queue-ui-variant-review.md. Запуск: README.md.
+    Вопрос: экран очереди, где группа отвечает на вопрос «что сделать с этой группой?»
+    один шаг за раз, а диагностика (контексты, состояния, замки, лимиты, provenance)
+    собрана под счётчиками и доступна по требованию, но не лезет в первый экран.
+    Контексты остаются в первом экране (см. advisory: это основание решения).
+    Третий путь («задать свой вариант») остаётся видимым всегда.
+    Платные бейджи не убираются: цена и лимит в точке запуска (P1, вердикт принят).
+
+    Sub-shape B (новая страница): отдельный файл прототипа; симлинки на реальные
+    стили репозитория. Запуск: python3 -m http.server 8777 --directory <этот каталог>.
+    Состояние: ?state=queue|preview|report|paid|editor|rule|states — одно и то же.
+    Прототип: очередь согласования повторов, вариант «один вопрос за раз».
+    Та же визуальная система (styles/, weblate_fonts/, js/), что и рабочий экран,
+    но другая иерархия: один вопрос на группу, счётчики вместо статусов,
+    диагностика под сворачиванием.
+  -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Повторы — Anvil Saga / French — HCGameLoc (prototype)</title>
+    <link rel="stylesheet" href="../../../weblate/static/styles/vendor/bootstrap5.css" />
+    <link rel="stylesheet" href="weblate_fonts/source-code-pro.css" />
+    <link rel="stylesheet" href="weblate_fonts/source-sans-3.css" />
+    <link rel="stylesheet" href="../../../weblate/static/styles/variables.css" />
+    <link rel="stylesheet" href="../../../weblate/static/styles/main.css" />
+    <link rel="stylesheet" href="../../../weblate/static/style-dark.css" media="(prefers-color-scheme: dark)" />
+    <script defer src="../../../weblate/static/js/vendor/bootstrap5.js"></script>
+    <style>
+      .proto-bar { position: fixed; inset: auto 0 0 0; z-index: 1080; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 6px 12px; background: var(--wl-color-bg); border-top: 1px solid var(--wl-color-border); }
+      .proto-bar .proto-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--wl-color-muted); margin-right: 8px; }
+      body[data-bare="1"] .proto-bar { display: none; }
+      body { padding-bottom: 56px; }
+      body[data-bare="1"] { padding-bottom: 0; }
+      .proto-state { display: none; }
+      .proto-state.is-active { display: block; }
+      .cell-code { font-family: var(--wl-font-monospace, "Source Code Pro", monospace); background: var(--wl-color-bg-muted); border-radius: 4px; padding: 2px 6px; }
+      .group-question { font-size: 24px; font-weight: 600; line-height: 31px; letter-spacing: -0.4px; margin: 0 0 8px; }
+      .group-source { font-size: 18px; line-height: 24px; }
+      .variant-row { display: flex; align-items: baseline; gap: 12px; padding: 6px 0; }
+      .variant-row + .variant-row { border-top: 1px solid var(--wl-color-border); }
+      .variant-count { color: var(--wl-color-muted); font-size: 14px; min-width: 4ch; text-align: right; }
+      .variant-origin { color: var(--wl-color-muted); font-size: 14px; }
+      .group-summary { color: var(--wl-color-muted); font-size: 14px; }
+      .decision-btn { text-align: left; white-space: normal; }
+      details.diag { margin-top: 8px; }
+      details.diag > summary { cursor: pointer; font-size: 14px; }
+      details.diag table { margin-top: 8px; }
+      .group-card { border-top: 1px solid var(--wl-color-border); padding-top: 12px; }
+      .group-card + .group-card { margin-top: 8px; }
+      .member-props .badge { margin: 0 2px 0 0; }
+      .scope-line { font-size: 14px; }
+    </style>
+  </head>
+  <body data-state="queue">
+    <nav class="navbar navbar-expand-lg bg-dark" role="navigation">
+      <div class="container-fluid">
+        <div class="navbar-brand"><a class="navbar-brand" href="#">HCGameLoc</a></div>
+        <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#wl-navbar-main" data-bs-theme="dark" id="navbar-toggle">
+          <span class="visually-hidden">Переключить навигацию</span>
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="wl-navbar-main">
+          <ul class="navbar-nav">
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown">Проекты</a>
+              <ul class="dropdown-menu shadow">
+                <li><a class="dropdown-item" href="#">Anvil Saga</a></li>
+                <li><a class="dropdown-item" href="#">Choice of Life: Samosbor</a></li>
+                <li><hr class="dropdown-divider" /></li>
+                <li><a class="dropdown-item" href="#">Просмотреть все проекты</a></li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown">Языки</a>
+              <ul class="dropdown-menu shadow">
+                <li><a class="dropdown-item" href="#">French</a></li>
+                <li><a class="dropdown-item" href="#">German</a></li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown">Проверки</a>
+              <ul class="dropdown-menu shadow">
+                <li><a class="dropdown-item" href="#">Неудачные проверки в Anvil Saga — French</a></li>
+                <li><a class="dropdown-item" href="#">Неудачные проверки в Anvil Saga</a></li>
+                <li><hr class="dropdown-divider" /></li>
+                <li><a class="dropdown-item" href="#">Обзор проверок</a></li>
+              </ul>
+            </li>
+          </ul>
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown">admin</a>
+              <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li><a class="dropdown-item" href="#">Профиль</a></li>
+                <li><a class="dropdown-item" href="#">Администрирование</a></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <header>
+      <h1>
+        <ol class="breadcrumb">
+          <li class="bread-icon">
+            <svg class="icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v4H3zM3 11h18v4H3zM3 17h18v4H3z" fill="currentColor" opacity="0.6"/></svg>
+          </li>
+          <li class="breadcrumb-item"><a href="#">Проекты</a></li>
+          <li class="breadcrumb-item"><a href="#">Anvil Saga</a></li>
+          <li class="breadcrumb-item"><a href="#">French</a></li>
+          <li class="breadcrumb-item">Повторы</li>
+        </ol>
+        <div class="clearfix"></div>
+      </h1>
+    </header>
+
+    <div class="main-content">
+
+      <!-- ============================ 1. ОЧЕРЕДЬ ============================ -->
+      <section class="proto-state is-active" data-state="queue">
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Фильтр</h4></div>
+          <div class="card-body">
+            <div class="row g-3 align-items-end">
+              <div class="col-12 col-md-3">
+                <label class="form-label" for="f-language">Целевой язык</label>
+                <select class="form-select" id="f-language"><option>French</option><option>German</option></select>
+              </div>
+              <div class="col-12 col-md-4">
+                <span class="form-label d-block">Компоненты</span>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="c-dialogs" checked /><label class="form-check-label" for="c-dialogs">dialogs</label></div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="c-ui" checked /><label class="form-check-label" for="c-ui">ui</label></div>
+              </div>
+              <div class="col-12 col-md-3">
+                <span class="form-label d-block">Метки исходника</span>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="l-ui" checked /><label class="form-check-label" for="l-ui">ui</label></div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="l-quest" checked /><label class="form-check-label" for="l-quest">quest</label></div>
+              </div>
+              <div class="col-12 col-md-2">
+                <label class="form-label" for="f-status">Статус</label>
+                <select class="form-select" id="f-status"><option>Все</option><option>Требует решения</option><option>Конфликт одобренных</option><option>Решена</option></select>
+              </div>
+              <div class="col-12">
+                <div class="row g-2 align-items-center">
+                  <div class="col-6 col-md-auto"><button class="btn btn-primary w-100" type="button">Показать группы</button></div>
+                  <div class="col-6 col-md-auto"><button class="btn btn-secondary w-100" type="button">Сбросить</button></div>
+                  <div class="col-12 col-md"><span class="text-muted small">Открытие, фильтр и предпросмотр бесплатны и ничего не пишут.</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <dl class="row mb-3">
+          <dt class="col-auto">Групп</dt><dd class="col-auto">37</dd>
+          <dt class="col-auto">Вхождений</dt><dd class="col-auto">112</dd>
+          <dt class="col-auto">Требуют решения</dt><dd class="col-auto">12</dd>
+          <dt class="col-auto">Конфликт одобренных</dt><dd class="col-auto">2</dd>
+          <dt class="col-auto">Независимых вхождений</dt><dd class="col-auto">4</dd>
+        </dl>
+
+        <div class="group-card" id="row-1" data-group-row tabindex="0" aria-label="Группа Угроза с севера, 3 вхождения, требует решения">
+          <p class="group-question">Что сделать с этой группой?</p>
+          <p class="group-source cell-code d-inline-block mb-2">Угроза с севера</p>
+          <p class="group-summary mb-2">
+            3 вхождения · компоненты <span class="badge text-bg-secondary">dialogs</span>
+            <span class="badge text-bg-secondary">ui</span> ·
+            <span class="badge text-bg-warning">Требует решения</span>
+            <span class="text-muted small">конфликтов нет · 1 замок · 1 ограничение длины</span>
+          </p>
+
+          <div class="variant-row">
+            <span class="variant-count">7×</span>
+            <span class="cell-code">La menace du nord</span>
+            <span class="variant-origin">вручную, A. Leroy</span>
+          </div>
+          <div class="variant-row">
+            <span class="variant-count">4×</span>
+            <span class="cell-code">Menace venue du nord</span>
+            <span class="variant-origin">mt:openrouter, одобрил admin</span>
+          </div>
+          <div class="variant-row">
+            <span class="variant-count">2×</span>
+            <span class="cell-code">Menace du nord</span>
+            <span class="variant-origin">вручную</span>
+          </div>
+
+          <div class="row g-2 mt-2">
+            <div class="col-12 col-md-4">
+              <button class="btn btn-primary decision-btn w-100" type="button" aria-describedby="d1-desc">
+                Переводить одинаково
+                <div class="small fw-normal" id="d1-desc">взять «La menace du nord» для всех совместимых</div>
+              </button>
+            </div>
+            <div class="col-12 col-md-4">
+              <button class="btn btn-secondary decision-btn w-100" type="button" aria-describedby="d2-desc">
+                Оставить разные переводы
+                <div class="small fw-normal" id="d2-desc">здесь два смысла: группу не объединять</div>
+              </button>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="input-group">
+                <label class="visually-hidden" for="custom-variant">Свой вариант</label>
+                <input class="form-control" id="custom-variant" type="text" placeholder="Свой вариант перевода" />
+                <button class="btn btn-outline-primary" type="button">Применить</button>
+              </div>
+            </div>
+          </div>
+
+          <details class="diag mt-3">
+            <summary>Подробности: ключи, контексты, состояния, замки и ограничения</summary>
+            <table class="table table-listing">
+              <thead>
+                <tr><th>Ключ</th><th>Компонент</th><th>Context</th><th>Состояние</th><th>Свойства</th><th>Сделать независимым</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th><span class="cell-code">EVENT_601_ANSWER_12</span></th>
+                  <td>dialogs</td><td><span class="cell-code">EVENT_601</span></td><td>Переведено</td>
+                  <td class="member-props">—</td>
+                  <td><div class="form-check"><input class="form-check-input" type="checkbox" id="ind-1" aria-label="Сделать независимым EVENT_601_ANSWER_12" /></div></td>
+                </tr>
+                <tr>
+                  <th><span class="cell-code">quest_north_warning</span></th>
+                  <td>dialogs</td><td><span class="cell-code">quest_north</span></td><td>Одобрено</td>
+                  <td class="member-props"><span class="badge text-bg-secondary">Замок</span> <span class="text-muted small">правит A. Leroy</span></td>
+                  <td class="text-muted small">недоступно: замок</td>
+                </tr>
+                <tr>
+                  <th><span class="cell-code">ui_warning_north</span></th>
+                  <td>ui</td><td><span class="cell-code">ui.warning_north</span></td><td>Переведено</td>
+                  <td class="member-props"><span class="badge text-bg-secondary">Ограничение длины: 24</span></td>
+                  <td><div class="form-check"><input class="form-check-input" type="checkbox" id="ind-2" aria-label="Сделать независимым ui_warning_north" /></div></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="form-text mb-2">
+              Одобренные переводы не перезаписываются. Запись только после предпросмотра:
+              расходящийся approved останется конфликтом, группа не станет решённой.
+            </p>
+          </details>
+        </div>
+
+        <div class="group-card" id="row-2" data-group-row tabindex="0" aria-label="Группа Основание, 2 вхождения, конфликт одобренных">
+          <p class="group-question">Что сделать с этой группой?</p>
+          <p class="group-source cell-code d-inline-block mb-2">Основание</p>
+          <p class="group-summary mb-2">
+            2 вхождения · <span class="badge text-bg-danger">Конфликт одобренных</span>
+            <span class="text-muted small">approved не перезаписывается — сначала решите конфликт</span>
+          </p>
+          <div class="variant-row"><span class="variant-count">1×</span><span class="cell-code">Base</span><span class="variant-origin">одобрено, admin</span></div>
+          <div class="variant-row"><span class="variant-count">1×</span><span class="cell-code">Armature</span><span class="variant-origin">одобрено, A. Leroy</span></div>
+          <div class="row g-2 mt-2">
+            <div class="col-12 col-md-4"><button class="btn btn-secondary decision-btn w-100" type="button" disabled aria-describedby="d3-desc">Переводить одинаково<div class="small fw-normal" id="d3-desc">сначала выберите вариант для approved</div></button></div>
+            <div class="col-12 col-md-4"><button class="btn btn-secondary decision-btn w-100" type="button">Оставить разные переводы<div class="small fw-normal">конфликт останется конфликтом</div></button></div>
+          </div>
+          <details class="diag mt-3"><summary>Подробности</summary><p class="form-text">Два одобренных варианта не выбираются автоматически.</p></details>
+        </div>
+
+        <div class="group-card" id="row-3" data-group-row tabindex="0" aria-label="Группа Старт, 4 вхождения, решена">
+          <p class="group-question">Группа решена</p>
+          <p class="group-source cell-code d-inline-block mb-2">Старт</p>
+          <p class="group-summary mb-2">
+            4 вхождения · <span class="badge text-bg-success">Решена</span>
+            <span class="text-muted small">Démarrer · general, 12.09.2026 · <a href="#">История решений</a></span>
+          </p>
+          <div class="variant-row"><span class="variant-count">4×</span><span class="cell-code">Démarrer</span><span class="variant-origin">общий перевод</span></div>
+        </div>
+
+        <div class="group-card" id="row-4" data-group-row tabindex="0" aria-label="Группа Ячейка, 5 вхождений, требует решения">
+          <p class="group-question">Что сделать с этой группой?</p>
+          <p class="group-source cell-code d-inline-block mb-2">Ячейка</p>
+          <p class="group-summary mb-2">
+            5 вхождений · <span class="badge text-bg-warning">Требует решения</span>
+            <span class="text-muted small">1 связь устарела · 1 независимое вхождение</span>
+          </p>
+          <div class="variant-row"><span class="variant-count">3×</span><span class="cell-code">Cellule</span><span class="variant-origin">mt:openrouter</span></div>
+          <div class="variant-row"><span class="variant-count">2×</span><span class="cell-code">Cellulaire</span><span class="variant-origin">вручную</span></div>
+          <div class="row g-2 mt-2">
+            <div class="col-12 col-md-4"><button class="btn btn-primary decision-btn w-100" type="button">Переводить одинаково<div class="small fw-normal">взять «Cellule» для всех совместимых</div></button></div>
+            <div class="col-12 col-md-4"><button class="btn btn-secondary decision-btn w-100" type="button">Оставить разные переводы<div class="small fw-normal">здесь два смысла</div></button></div>
+            <div class="col-12 col-md-4"><div class="input-group"><label class="visually-hidden" for="custom-variant-2">Свой вариант</label><input class="form-control" id="custom-variant-2" type="text" placeholder="Свой вариант перевода" /><button class="btn btn-outline-primary" type="button">Применить</button></div></div>
+          </div>
+          <details class="diag mt-3"><summary>Подробности</summary><p class="form-text">Устаревшая связь — исходник изменился после правила: сначала решение, потом reuse.</p></details>
+        </div>
+
+        <p class="text-muted small mt-3 mb-0">
+          Клавиатура: ↑ ↓ (или J / K) переводят фокус между группами, Enter раскрывает группу,
+          P открывает предпросмотр, / ставит фокус в фильтр статуса.
+        </p>
+      </section>
+
+      <!-- ============================ 2. PREVIEW ============================ -->
+      <section class="proto-state" data-state="preview">
+        <h2 class="card-title mb-3">Предпросмотр: что изменится</h2>
+        <div class="alert alert-info" role="status"><div class="task-message">Предпросмотр бесплатен. Ничего не записано: запись только после подтверждения, и только для перечисленных ниже вхождений.</div></div>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Что будет записано</h4></div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица с прокруткой">
+            <table class="table table-listing table-striped">
+              <thead><tr><th>Вхождение</th><th>Текущий перевод</th><th>Состояние</th><th>Ограничения</th><th>Результат</th></tr></thead>
+              <tbody>
+                <tr>
+                  <th><span class="cell-code">EVENT_601_ANSWER_12</span><div class="text-muted small">dialogs · EVENT_601 · отпечаток 4f2a91c3</div></th>
+                  <td><span class="cell-code">Menace du nord</span></td><td>Переведено</td><td>—</td>
+                  <td><span class="badge text-bg-success">Будет записано</span></td>
+                </tr>
+                <tr>
+                  <th><span class="cell-code">ui_warning_north</span><div class="text-muted small">ui · ui.warning_north · отпечаток 91b0de47</div></th>
+                  <td><span class="cell-code">Menace du Nord</span></td><td>Переведено</td>
+                  <td><span class="badge text-bg-secondary">Ограничение длины: 24</span></td>
+                  <td><span class="badge text-bg-success">Будет записано</span><div class="text-muted small">24 символа, влезает</div></td>
+                </tr>
+                <tr>
+                  <th><span class="cell-code">quest_north_warning</span><div class="text-muted small">dialogs · quest_north · отпечаток 7c11aa02</div></th>
+                  <td><span class="cell-code">Menace venue du nord</span></td><td><span class="badge text-bg-success">Одобрено</span></td>
+                  <td><span class="badge text-bg-secondary">Замок</span></td>
+                  <td><span class="badge text-bg-secondary">Пропущено: замок</span><div class="text-muted small">Одобренный перевод сохраняется</div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Область шире, чем выбранные метки</h4></div>
+          <div class="card-body">
+            <div class="alert alert-warning mb-2" role="alert"><div class="task-message">На правило не назначено ни одной метки: под него попадают <strong>все</strong> строки компонентов <span class="cell-code">dialogs</span>, <span class="cell-code">ui</span>: 2 480 строк, а не только строки с метками.</div></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="confirm-wide" /><label class="form-check-label" for="confirm-wide">Подтверждаю область: все строки компонентов dialogs и ui</label></div>
+          </div>
+        </div>
+        <p><button class="btn btn-primary" type="button">Применить (2 вхождения)</button> <button class="btn btn-secondary" type="button">Отмена</button> <span class="text-muted small ms-2">Отмена доступна, пока строки не изменены после применения.</span></p>
+      </section>
+
+      <!-- ============================ 3. ОТЧЁТ ============================ -->
+      <section class="proto-state" data-state="report">
+        <h2 class="card-title mb-3">Отчёт по группам</h2>
+        <div class="alert alert-success" role="status"><div class="task-message">Применено в 3 группах из 5. Частичный результат не означает сбой: каждая группа вернула свой итог, ни одна одобренная строка не изменена.</div></div>
+        <div class="alert alert-info" role="status" aria-live="polite"><div class="task-message">Перепроверка групп идёт в фоне: <span class="text-muted">2 из 5</span>. Строка проверки на соседних вхождениях снимется сама, отдельная массовая операция не нужна.</div>
+          <div class="progress mt-2"><div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width: 40%"></div></div>
+        </div>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица с прокруткой">
+          <table class="table table-listing">
+            <thead><tr><th>Группа</th><th class="number">Вхождений</th><th>Результат</th><th class="number">Записей</th><th>Действия</th></tr></thead>
+            <tbody>
+              <tr><th>Угроза с севера</th><td class="number">3</td><td><span class="badge text-bg-success">Применено</span> <span class="text-muted small">1 пропущено: замок</span></td><td class="number">2</td><td><a class="btn-inline" href="#">Отменить применение</a></td></tr>
+              <tr><th>Старт</th><td class="number">4</td><td><span class="badge text-bg-success">Применено</span></td><td class="number">4</td><td><a class="btn-inline" href="#">Отменить применение</a></td></tr>
+              <tr><th>Основание</th><td class="number">2</td><td><span class="badge text-bg-danger">Конфликт одобренных</span> <span class="text-muted small">approved не перезаписывается, группа не объявлена решённой</span></td><td class="number">0</td><td><a class="btn-inline" href="#">Открыть группу</a></td></tr>
+              <tr><th>Ячейка</th><td class="number">5</td><td><span class="badge text-bg-secondary">Не применено</span> <span class="text-muted small">связь устарела у 1 вхождения: исходник изменился между preview и применением</span></td><td class="number">0</td><td><a class="btn-inline" href="#">Обновить preview</a></td></tr>
+              <tr><th>Готово</th><td class="number">3</td><td><span class="badge text-bg-secondary">Частично</span> <span class="text-muted small">1 вхождение вне ваших прав, 1 не влезает в ограничение длины</span></td><td class="number">1</td><td><a class="btn-inline" href="#">Показать причины</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-muted">«Отменить применение» вернёт только те строки, которые всё ещё равны результату этого применения; более поздняя правка или одобрение дадут конфликт, а не перезапись.</p>
+      </section>
+
+      <!-- ======================= 4. РЕКОМЕНДАЦИИ И MT ======================= -->
+      <section class="proto-state" data-state="paid">
+        <h2 class="card-title mb-3">Платные операции</h2>
+        <div class="card mb-3" id="recommendations-card">
+          <div class="card-header"><h4 class="card-title mb-0">Рекомендации модели <span class="badge text-bg-warning">платно</span></h4></div>
+          <div class="card-body">
+            <p class="mb-2">Обработается вся отфильтрованная очередь: <strong>37 групп</strong>, <strong>112 вхождений</strong>. Верхняя граница запросов: <strong>37</strong>. Цена: <strong>неизвестна</strong> (провайдер не сообщает её заранее).</p>
+            <div class="alert alert-warning" role="alert"><div class="task-message">Цена неизвестна. Запуск спишет не более указанного числа запросов, фактическая стоимость станет видна после выполнения в отчёте о расходах.</div></div>
+            <div class="row g-3 align-items-end">
+              <div class="col-12 col-md-3"><label class="form-label" for="cap">Верхний предел запросов</label><input class="form-control" type="number" id="cap" value="37" min="1" /></div>
+              <div class="col-12 col-md-9"><div class="form-check"><input class="form-check-input" type="checkbox" id="confirm-cost" /><label class="form-check-label" for="confirm-cost">Подтверждаю запуск при неизвестной цене и лимит 37 запросов</label></div></div>
+            </div>
+            <p class="mt-3 mb-0">
+              <button class="btn btn-primary" type="button">Запустить подготовку рекомендаций</button>
+              <button class="btn btn-secondary ms-2" type="button" data-dismiss="recommendations-card">Не сейчас</button>
+              <span class="text-muted small ms-2">Рекомендация ничего не записывает: её принятие требует отдельного подтверждения со свежим preview.</span>
+            </p>
+          </div>
+        </div>
+        <div class="alert alert-info d-none" role="status" id="recommendations-skipped"><div class="task-message">Рекомендации пропущены. Ручной разбор очереди и автоматический перевод работают как обычно. <button class="btn btn-link p-0 align-baseline" type="button" data-restore="recommendations-card">Показать снова</button></div></div>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Профиль модели недоступен</h4></div>
+          <div class="card-body">
+            <p class="mb-2"><button class="btn btn-primary" type="button" disabled aria-describedby="profile-unavailable" title="Основной профиль модели недоступен">Подготовить рекомендации</button> <button class="btn btn-link" type="button" disabled>Настроить движок перевода</button></p>
+            <p class="mb-0 text-muted" id="profile-unavailable">Основной профиль модели сейчас недоступен, поэтому рекомендации недоступны. Ручной разбор очереди и автоматический перевод работают как обычно.</p>
+          </div>
+        </div>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Результаты запуска</h4></div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Таблица с прокруткой">
+            <table class="table table-listing table-striped">
+              <thead><tr><th>Группа</th><th>Рекомендация</th><th>Основание</th><th>Состояние</th><th class="number">Действия</th></tr></thead>
+              <tbody>
+                <tr><th>Угроза с севера</th><td>использовать существующий: <span class="cell-code">La menace du nord</span></td><td class="text-muted small">7 из 13 вхождений уже используют его; контексты quest и ui совместимы</td><td><span class="badge text-bg-info">Готова</span></td><td class="actions"><a class="btn-inline" href="#">Принять (с preview)</a></td></tr>
+                <tr><th>Готово</th><td>нужен человек</td><td class="text-muted small">полный контекст не помещается в лимит, выборка не отправлялась</td><td><span class="badge text-bg-secondary">Ожидает решения</span></td><td class="actions"><a class="btn-inline" href="#">Открыть группу</a></td></tr>
+                <tr><th>Ячейка</th><td>предложить новый: <span class="cell-code">Cellule</span></td><td class="text-muted small">связь устарела после правки исходника</td><td><span class="badge text-bg-warning">Рекомендация устарела</span></td><td class="actions"><a class="btn-inline" href="#">Перезапустить</a></td></tr>
+                <tr><th>Мастерская</th><td>—</td><td class="text-muted small">запрос отправлен, ответ не получен</td><td><span class="badge text-bg-secondary">Неизвестно</span></td><td class="actions"><a class="btn-inline" href="#">Повторить с новым лимитом</a></td></tr>
+                <tr><th>Печь</th><td>—</td><td class="text-muted small">отмена до отправки: запросы по этим группам не уходили</td><td><span class="badge text-bg-secondary">Отменено</span></td><td class="actions"><a class="btn-inline" href="#">Запустить снова</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-body text-muted small">«Неизвестно» не означает сбой: запрос ушёл, ответа нет. Повтор требует нового лимита; уже сохранённые результаты повторно не запрашиваются. Отмена запрещает следующие запросы, но не отменяет отправленный.</div>
+        </div>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Пакетный автоматический перевод</h4></div>
+          <div class="card-body">
+            <p class="mb-2">Разрешённых общих строк: <strong>18</strong>, подставятся без обращения к модели. Групп без общего перевода: <strong>14</strong>, по одному кандидату на группу. Независимые и нерешённые вхождения: <strong>26</strong>, обычный контекстный путь.</p>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="rec-after-mt" /><label class="form-check-label" for="rec-after-mt">Подготовить рекомендации по остаточным расхождениям после перевода <span class="badge text-bg-warning">платно</span></label></div>
+            <p class="text-muted small mb-2">Без этой галочки после перевода платных вызовов не будет. Сбой рекомендаций не отменяет перевод и показывается отдельной строкой в отчёте.</p>
+            <button class="btn btn-primary" type="button">Перевести</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ 5. РЕДАКТОР ============================ -->
+      <section class="proto-state" data-state="editor">
+        <h2 class="card-title mb-3">Редактор: правка строки из группы</h2>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Строка EVENT_601_ANSWER_12</h4></div>
+          <div class="card-body">
+            <p class="mb-1 text-muted small">Исходник (Russian)</p>
+            <p class="cell-code mb-3">Угроза с севера</p>
+            <p class="mb-1 text-muted small">Перевод (French), строка входит в группу «Угроза с севера»</p>
+            <label class="form-label visually-hidden" for="target">Перевод</label>
+            <textarea class="form-control" id="target" rows="2">Menace du nord</textarea>
+          </div>
+        </div>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Эта строка входит в группу повторов</h4></div>
+          <div class="card-body">
+            <p>Ваша правка отличается от общего перевода группы <span class="cell-code">La menace du nord</span>. Выберите, что сделать: скрытого распространения не будет ни в одном варианте.</p>
+            <div class="form-check mb-2"><input class="form-check-input" type="radio" name="shared-choice" id="ch-shared" /><label class="form-check-label" for="ch-shared">Изменить общий перевод: новая формулировка будет предложена всем вхождениям группы (с preview, одобренные не перезаписываются)</label></div>
+            <div class="form-check mb-2"><input class="form-check-input" type="radio" name="shared-choice" id="ch-independent" /><label class="form-check-label" for="ch-independent">Сделать это вхождение независимым: строка выходит из общего перевода и живёт сама</label></div>
+            <p class="form-text">Ничего не выбрано заранее. Без выбора правка не сохранится.</p>
+            <button class="btn btn-primary" type="button">Сохранить</button> <button class="btn btn-secondary" type="button">Отмена</button>
+          </div>
+        </div>
+        <div class="alert alert-danger" role="alert"><div class="task-message"><strong>Само изменение не сохранилось.</strong> Строка входит в группу повторов: выберите «Изменить общий перевод» или «Сделать независимым» и повторите сохранение. Через API то же состояние приходит как 409 без записи.</div></div>
+        <div class="card">
+          <div class="card-header"><h4 class="card-title mb-0">Объекты для проверки</h4></div>
+          <div class="card-body">
+            <div class="check-item">
+              <h5 class="mb-1">Непоследовательный повтор</h5>
+              <p class="mb-2 text-muted">Одна и та же исходная строка по-разному переведена под другим ключом.</p>
+              <p class="mb-0"><a class="btn-inline" href="#">Открыть очередь повторов</a> <button class="btn btn-warning" type="button">Скрыть</button> <a class="btn-inline ms-2" href="#">Просмотр и проверка документации</a></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ 6. ПРАВИЛО ============================ -->
+      <section class="proto-state" data-state="rule">
+        <h2 class="card-title mb-3">Правило общих повторов</h2>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Область правила</h4></div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-12 col-md-3"><label class="form-label" for="r-language">Целевой язык</label><select class="form-select" id="r-language"><option>French</option><option>German</option></select></div>
+              <div class="col-12 col-md-4">
+                <span class="form-label d-block">Компоненты</span>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="r-dialogs" checked /><label class="form-check-label" for="r-dialogs">dialogs</label></div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="r-ui" checked /><label class="form-check-label" for="r-ui">ui</label></div>
+                <p class="form-text mb-0">Компоненты и метки только из этого проекта: чужой проект в правило не добавить.</p>
+              </div>
+              <div class="col-12 col-md-5">
+                <span class="form-label d-block">Метки исходника</span>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="r-label-ui" checked /><label class="form-check-label" for="r-label-ui">ui</label></div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="r-label-quest" checked /><label class="form-check-label" for="r-label-quest">quest</label></div>
+                <p class="form-text mb-0">Достаточно одной из выбранных меток: метки складываются по «или», а не по «и». Пустой набор меток означает все строки выбранных компонентов, и тогда preview попросит отдельное подтверждение области.</p>
+              </div>
+            </div>
+            <hr />
+            <p class="scope-line mb-0"><strong>Область применения:</strong> компоненты <span class="cell-code">dialogs</span>, <span class="cell-code">ui</span>; метки <span class="cell-code">ui</span>, <span class="cell-code">quest</span> — сработает, если у строки есть любая из этих меток.</p>
+          </div>
+        </div>
+        <div class="alert alert-info" role="status"><div class="task-message">Правило отвечает за будущие строки и запуски. Уже переведённое оно не трогает: ни один текущий перевод при сохранении правила не меняется.</div></div>
+        <div class="alert alert-warning" role="alert"><div class="task-message">Это правило пересекается с активным правилом <span class="cell-code">ui</span> <span class="cell-code">dialogs</span> на тех же строках. Победителя по порядку создания нет: измените область одного из правил.</div></div>
+        <p><button class="btn btn-primary" type="button">Сохранить правило</button> <button class="btn btn-secondary" type="button">Отмена</button></p>
+      </section>
+
+      <!-- ============================ 7. СОСТОЯНИЯ ============================ -->
+      <section class="proto-state" data-state="states">
+        <h2 class="card-title mb-3">Состояния</h2>
+        <div class="card mb-3">
+          <div class="card-header"><h4 class="card-title mb-0">Нет расхождений в выбранной области</h4></div>
+          <div class="card-body">
+            <p class="mb-2">В компонентах <span class="cell-code">dialogs</span> и <span class="cell-code">ui</span> для French нет расходящихся групп повторов. Изменения исходника и новые загрузки попадут сюда автоматически: правило области уже действует.</p>
+            <p class="mb-0"><a class="btn-inline" href="#">Показать все группы языка</a> <a class="btn-inline" href="#">Правило области</a></p>
+          </div>
+        </div>
+        <div class="alert alert-warning" role="alert"><div class="task-message"><strong>Нет прав на применение.</strong> Права <span class="cell-code">unit.edit</span> не хватает на 2 из 5 вхождений: они останутся без изменений, остальные можно применить.</div></div>
+        <div class="alert alert-info" role="status"><div class="task-message">Правило области пересекается с активным правилом <span class="cell-code">ui</span> + <span class="cell-code">dialogs</span> на тех же строках. Победителя по порядку создания нет: измените область одного из правил.</div></div>
+      </section>
+    </div>
+
+    <div class="proto-bar" role="group" aria-label="Состояния прототипа">
+      <span class="proto-label">Прототип</span>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="queue">Очередь</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="preview">Preview</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="report">Отчёт</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="paid">Платные операции</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="editor">Редактор</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="rule">Правило области</button>
+      <button class="btn btn-sm btn-secondary" type="button" data-jump="states">Состояния</button>
+    </div>
+
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("bare") === "1") { document.body.dataset.bare = "1"; }
+        function show(name) {
+          document.body.dataset.state = name;
+          document.querySelectorAll(".proto-state").forEach(function (s) { s.classList.toggle("is-active", s.dataset.state === name); });
+          document.querySelectorAll("[data-jump]").forEach(function (b) {
+            b.classList.toggle("btn-primary", b.dataset.jump === name);
+            b.classList.toggle("btn-secondary", b.dataset.jump !== name);
+          });
+        }
+        document.querySelectorAll("[data-jump]").forEach(function (b) { b.addEventListener("click", function () { show(b.dataset.jump); }); });
+        show(params.get("state") || "queue");
+        document.querySelectorAll("[data-dismiss]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            document.getElementById(b.dataset.dismiss).classList.add("d-none");
+            document.getElementById("recommendations-skipped").classList.remove("d-none");
+          });
+        });
+        document.querySelectorAll("[data-restore]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            document.getElementById(b.dataset.restore).classList.remove("d-none");
+            document.getElementById("recommendations-skipped").classList.add("d-none");
+          });
+        });
+        const rows = Array.from(document.querySelectorAll("[data-group-row]"));
+        document.addEventListener("keydown", function (e) {
+          const t = e.target;
+          if (t.closest("input, select, textarea")) { return; }
+          if (e.key === "/" ) { const s = document.getElementById("f-status"); if (s) { e.preventDefault(); s.focus(); } return; }
+          if (e.key === "p" || e.key === "P") { show("preview"); return; }
+          const i = rows.indexOf(t.closest("[data-group-row]"));
+          if (i === -1) { return; }
+          if (["j","k","J","K"].includes(e.key)) { e.preventDefault(); rows[Math.max(0, Math.min(rows.length-1, i + (e.key==="j"||e.key==="J" ? 1 : -1)))].focus(); }
+          else if (e.key === "Enter") { e.preventDefault(); const d = t.closest("[data-group-row]").querySelector("details"); if (d) { d.open = !d.open; } }
+        });
+      })();
+    </script>
+  </body>
+</html>

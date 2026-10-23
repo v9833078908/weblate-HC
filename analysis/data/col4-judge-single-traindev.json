@@ -1,0 +1,774 @@
+{
+  "_arm": "single",
+  "_batch": 10,
+  "_captured": "2026-08-13T17:55Z",
+  "_concurrency": 4,
+  "_few_shot_held_out": [
+    "clean-177707",
+    "mut-177734-cyrillic-fragment",
+    "mut-177829-obscenity-injected"
+  ],
+  "_labels": {
+    "defect": 232,
+    "pass": 251
+  },
+  "_models": [
+    "deepseek/deepseek-v4-pro",
+    "qwen/qwen3-235b-a22b-2507",
+    "openai/gpt-5.4-mini"
+  ],
+  "_records": 483,
+  "_splits": [
+    "dev",
+    "train"
+  ],
+  "_strata": {
+    "clean": 251,
+    "mutation": 114,
+    "terminology": 118
+  },
+  "arms": {
+    "deepseek/deepseek-v4-pro": {
+      "metrics": {
+        "auto_pass": {
+          "_observed_caveat": "The golden set is enriched with constructed defects, so the observed rates describe the set, not production. The projection below is the transferable number.",
+          "observed_critical_miss_rate": {
+            "high": 1.5,
+            "k": 0,
+            "low": 0.0,
+            "n": 257,
+            "point": 0.0
+          },
+          "observed_miss_rate": {
+            "high": 8.9,
+            "k": 14,
+            "low": 3.3,
+            "n": 257,
+            "point": 5.4
+          },
+          "projected_miss_rate_at_production_prevalence": {
+            "assumed_prevalence_pct": 18.2,
+            "draws": 2000,
+            "high": 2.12,
+            "low": 0.71,
+            "point": 1.37
+          },
+          "rate": {
+            "high": 57.6,
+            "k": 257,
+            "low": 48.8,
+            "n": 483,
+            "point": 53.2
+          }
+        },
+        "boundary_h_needs_human": {
+          "_what": "flag or reject against pass. The confidence router, and the product boundary.",
+          "tnr": {
+            "high": 98.4,
+            "k": 243,
+            "low": 93.8,
+            "n": 251,
+            "point": 96.8
+          },
+          "tpr": {
+            "high": 96.4,
+            "k": 218,
+            "low": 90.1,
+            "n": 232,
+            "point": 94.0
+          }
+        },
+        "boundary_r_has_critical": {
+          "_what": "reject against flag or pass. The release gate.",
+          "tnr_on_clean": {
+            "high": 98.4,
+            "k": 243,
+            "low": 93.8,
+            "n": 251,
+            "point": 96.8
+          },
+          "tpr": {
+            "high": 100.0,
+            "k": 61,
+            "low": 94.1,
+            "n": 61,
+            "point": 100.0
+          }
+        },
+        "by_annotator": {
+          "fable-anthropic-frontier-2026-08-12": {
+            "n": 92,
+            "tnr_h": {
+              "high": 100.0,
+              "k": 92,
+              "low": 96.0,
+              "n": 92,
+              "point": 100.0
+            },
+            "tpr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            }
+          },
+          "generator:20260812001": {
+            "n": 22,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 97.5,
+              "k": 20,
+              "low": 72.2,
+              "n": 22,
+              "point": 90.9
+            }
+          },
+          "generator:20260812002": {
+            "n": 92,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 94.0,
+              "k": 82,
+              "low": 81.1,
+              "n": 92,
+              "point": 89.1
+            }
+          },
+          "openai-codex-gpt-5.6-terra-2026-08-12": {
+            "n": 159,
+            "tnr_h": {
+              "high": 97.4,
+              "k": 151,
+              "low": 90.4,
+              "n": 159,
+              "point": 95.0
+            },
+            "tpr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            }
+          },
+          "probe:visibility-adherence": {
+            "n": 118,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 99.5,
+              "k": 116,
+              "low": 94.0,
+              "n": 118,
+              "point": 98.3
+            }
+          }
+        },
+        "by_stratum": {
+          "clean": {
+            "n": 251,
+            "needs_human_recall": null,
+            "pass_rate_on_clean": {
+              "high": 98.4,
+              "k": 243,
+              "low": 93.8,
+              "n": 251,
+              "point": 96.8
+            }
+          },
+          "mutation": {
+            "n": 114,
+            "needs_human_recall": {
+              "high": 93.9,
+              "k": 102,
+              "low": 82.5,
+              "n": 114,
+              "point": 89.5
+            },
+            "pass_rate_on_clean": null
+          },
+          "terminology": {
+            "n": 118,
+            "needs_human_recall": {
+              "high": 99.5,
+              "k": 116,
+              "low": 94.0,
+              "n": 118,
+              "point": 98.3
+            },
+            "pass_rate_on_clean": null
+          }
+        },
+        "confusion_matrix": {
+          "clean->flag": 7,
+          "clean->pass": 243,
+          "clean->reject": 1,
+          "critical->reject": 61,
+          "major->flag": 138,
+          "major->pass": 14,
+          "major->reject": 19
+        },
+        "false_critical_on_clean": {
+          "_what": "A clean string rejected by the judge never reaches the game, so this is a delivery defect, not noise.",
+          "high": 2.2,
+          "k": 1,
+          "low": 0.1,
+          "n": 251,
+          "point": 0.4
+        },
+        "false_flag_on_clean": {
+          "high": 5.6,
+          "k": 7,
+          "low": 1.4,
+          "n": 251,
+          "point": 2.8
+        },
+        "needs_human_recall_on_terminology": {
+          "high": 99.5,
+          "k": 116,
+          "low": 94.0,
+          "n": 118,
+          "point": 98.3
+        },
+        "records": 483,
+        "reject_recall_on_critical_mutations": {
+          "high": 100.0,
+          "k": 61,
+          "low": 94.1,
+          "n": 61,
+          "point": 100.0
+        },
+        "scored": 483,
+        "unparsed": 0,
+        "verdict_derived_from_errors_disagreed_with_model_verdict": 2
+      },
+      "usage": {
+        "completion_tokens": 120429,
+        "cost_per_1000_records": 0.2838,
+        "cost_usd": 0.137099,
+        "prompt_tokens": 76766,
+        "records": 483,
+        "requests": 49,
+        "retries": 0,
+        "seconds": 721.4,
+        "transport_error_samples": [],
+        "transport_errors": {},
+        "unparsed": 0
+      }
+    },
+    "openai/gpt-5.4-mini": {
+      "metrics": {
+        "auto_pass": {
+          "_observed_caveat": "The golden set is enriched with constructed defects, so the observed rates describe the set, not production. The projection below is the transferable number.",
+          "observed_critical_miss_rate": {
+            "high": 3.9,
+            "k": 4,
+            "low": 0.6,
+            "n": 261,
+            "point": 1.5
+          },
+          "observed_miss_rate": {
+            "high": 15.5,
+            "k": 29,
+            "low": 7.8,
+            "n": 261,
+            "point": 11.1
+          },
+          "projected_miss_rate_at_production_prevalence": {
+            "assumed_prevalence_pct": 18.2,
+            "draws": 2000,
+            "high": 3.9,
+            "low": 1.97,
+            "point": 2.92
+          },
+          "rate": {
+            "high": 58.4,
+            "k": 261,
+            "low": 49.6,
+            "n": 483,
+            "point": 54.0
+          }
+        },
+        "boundary_h_needs_human": {
+          "_what": "flag or reject against pass. The confidence router, and the product boundary.",
+          "tnr": {
+            "high": 95.1,
+            "k": 232,
+            "low": 88.5,
+            "n": 251,
+            "point": 92.4
+          },
+          "tpr": {
+            "high": 91.2,
+            "k": 203,
+            "low": 82.6,
+            "n": 232,
+            "point": 87.5
+          }
+        },
+        "boundary_r_has_critical": {
+          "_what": "reject against flag or pass. The release gate.",
+          "tnr_on_clean": {
+            "high": 95.1,
+            "k": 232,
+            "low": 88.5,
+            "n": 251,
+            "point": 92.4
+          },
+          "tpr": {
+            "high": 89.6,
+            "k": 50,
+            "low": 70.5,
+            "n": 61,
+            "point": 82.0
+          }
+        },
+        "by_annotator": {
+          "fable-anthropic-frontier-2026-08-12": {
+            "n": 92,
+            "tnr_h": {
+              "high": 97.0,
+              "k": 86,
+              "low": 86.5,
+              "n": 92,
+              "point": 93.5
+            },
+            "tpr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            }
+          },
+          "generator:20260812001": {
+            "n": 22,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 95.3,
+              "k": 19,
+              "low": 66.7,
+              "n": 22,
+              "point": 86.4
+            }
+          },
+          "generator:20260812002": {
+            "n": 92,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 90.7,
+              "k": 78,
+              "low": 76.1,
+              "n": 92,
+              "point": 84.8
+            }
+          },
+          "openai-codex-gpt-5.6-terra-2026-08-12": {
+            "n": 159,
+            "tnr_h": {
+              "high": 95.2,
+              "k": 146,
+              "low": 86.5,
+              "n": 159,
+              "point": 91.8
+            },
+            "tpr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            }
+          },
+          "probe:visibility-adherence": {
+            "n": 118,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 94.1,
+              "k": 106,
+              "low": 83.1,
+              "n": 118,
+              "point": 89.8
+            }
+          }
+        },
+        "by_stratum": {
+          "clean": {
+            "n": 251,
+            "needs_human_recall": null,
+            "pass_rate_on_clean": {
+              "high": 95.1,
+              "k": 232,
+              "low": 88.5,
+              "n": 251,
+              "point": 92.4
+            }
+          },
+          "mutation": {
+            "n": 114,
+            "needs_human_recall": {
+              "high": 90.5,
+              "k": 97,
+              "low": 77.4,
+              "n": 114,
+              "point": 85.1
+            },
+            "pass_rate_on_clean": null
+          },
+          "terminology": {
+            "n": 118,
+            "needs_human_recall": {
+              "high": 94.1,
+              "k": 106,
+              "low": 83.1,
+              "n": 118,
+              "point": 89.8
+            },
+            "pass_rate_on_clean": null
+          }
+        },
+        "confusion_matrix": {
+          "clean->flag": 15,
+          "clean->pass": 232,
+          "clean->reject": 4,
+          "critical->flag": 7,
+          "critical->pass": 4,
+          "critical->reject": 50,
+          "major->flag": 131,
+          "major->pass": 25,
+          "major->reject": 15
+        },
+        "false_critical_on_clean": {
+          "_what": "A clean string rejected by the judge never reaches the game, so this is a delivery defect, not noise.",
+          "high": 4.0,
+          "k": 4,
+          "low": 0.6,
+          "n": 251,
+          "point": 1.6
+        },
+        "false_flag_on_clean": {
+          "high": 9.6,
+          "k": 15,
+          "low": 3.7,
+          "n": 251,
+          "point": 6.0
+        },
+        "needs_human_recall_on_terminology": {
+          "high": 94.1,
+          "k": 106,
+          "low": 83.1,
+          "n": 118,
+          "point": 89.8
+        },
+        "records": 483,
+        "reject_recall_on_critical_mutations": {
+          "high": 89.6,
+          "k": 50,
+          "low": 70.5,
+          "n": 61,
+          "point": 82.0
+        },
+        "scored": 483,
+        "unparsed": 0,
+        "verdict_derived_from_errors_disagreed_with_model_verdict": 1
+      },
+      "usage": {
+        "completion_tokens": 10710,
+        "cost_per_1000_records": 0.2205,
+        "cost_usd": 0.106514,
+        "prompt_tokens": 77758,
+        "records": 483,
+        "requests": 49,
+        "retries": 0,
+        "seconds": 48.6,
+        "transport_error_samples": [],
+        "transport_errors": {},
+        "unparsed": 0
+      }
+    },
+    "qwen/qwen3-235b-a22b-2507": {
+      "metrics": {
+        "auto_pass": {
+          "_observed_caveat": "The golden set is enriched with constructed defects, so the observed rates describe the set, not production. The projection below is the transferable number.",
+          "observed_critical_miss_rate": {
+            "high": 2.2,
+            "k": 1,
+            "low": 0.1,
+            "n": 256,
+            "point": 0.4
+          },
+          "observed_miss_rate": {
+            "high": 14.0,
+            "k": 25,
+            "low": 6.7,
+            "n": 256,
+            "point": 9.8
+          },
+          "projected_miss_rate_at_production_prevalence": {
+            "assumed_prevalence_pct": 18.2,
+            "draws": 2000,
+            "high": 3.51,
+            "low": 1.67,
+            "point": 2.54
+          },
+          "rate": {
+            "high": 57.4,
+            "k": 256,
+            "low": 48.5,
+            "n": 483,
+            "point": 53.0
+          }
+        },
+        "boundary_h_needs_human": {
+          "_what": "flag or reject against pass. The confidence router, and the product boundary.",
+          "tnr": {
+            "high": 94.8,
+            "k": 231,
+            "low": 88.0,
+            "n": 251,
+            "point": 92.0
+          },
+          "tpr": {
+            "high": 92.6,
+            "k": 207,
+            "low": 84.6,
+            "n": 232,
+            "point": 89.2
+          }
+        },
+        "boundary_r_has_critical": {
+          "_what": "reject against flag or pass. The release gate.",
+          "tnr_on_clean": {
+            "high": 94.8,
+            "k": 231,
+            "low": 88.0,
+            "n": 251,
+            "point": 92.0
+          },
+          "tpr": {
+            "high": 98.3,
+            "k": 58,
+            "low": 86.5,
+            "n": 61,
+            "point": 95.1
+          }
+        },
+        "by_annotator": {
+          "fable-anthropic-frontier-2026-08-12": {
+            "n": 92,
+            "tnr_h": {
+              "high": 96.3,
+              "k": 85,
+              "low": 85.1,
+              "n": 92,
+              "point": 92.4
+            },
+            "tpr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            }
+          },
+          "generator:20260812001": {
+            "n": 22,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 89.9,
+              "k": 17,
+              "low": 56.6,
+              "n": 22,
+              "point": 77.3
+            }
+          },
+          "generator:20260812002": {
+            "n": 92,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 95.5,
+              "k": 84,
+              "low": 83.8,
+              "n": 92,
+              "point": 91.3
+            }
+          },
+          "openai-codex-gpt-5.6-terra-2026-08-12": {
+            "n": 159,
+            "tnr_h": {
+              "high": 95.2,
+              "k": 146,
+              "low": 86.5,
+              "n": 159,
+              "point": 91.8
+            },
+            "tpr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            }
+          },
+          "probe:visibility-adherence": {
+            "n": 118,
+            "tnr_h": {
+              "high": null,
+              "k": 0,
+              "low": null,
+              "n": 0,
+              "point": null
+            },
+            "tpr_h": {
+              "high": 94.1,
+              "k": 106,
+              "low": 83.1,
+              "n": 118,
+              "point": 89.8
+            }
+          }
+        },
+        "by_stratum": {
+          "clean": {
+            "n": 251,
+            "needs_human_recall": null,
+            "pass_rate_on_clean": {
+              "high": 94.8,
+              "k": 231,
+              "low": 88.0,
+              "n": 251,
+              "point": 92.0
+            }
+          },
+          "mutation": {
+            "n": 114,
+            "needs_human_recall": {
+              "high": 93.2,
+              "k": 101,
+              "low": 81.5,
+              "n": 114,
+              "point": 88.6
+            },
+            "pass_rate_on_clean": null
+          },
+          "terminology": {
+            "n": 118,
+            "needs_human_recall": {
+              "high": 94.1,
+              "k": 106,
+              "low": 83.1,
+              "n": 118,
+              "point": 89.8
+            },
+            "pass_rate_on_clean": null
+          }
+        },
+        "confusion_matrix": {
+          "clean->flag": 17,
+          "clean->pass": 231,
+          "clean->reject": 3,
+          "critical->flag": 2,
+          "critical->pass": 1,
+          "critical->reject": 58,
+          "major->flag": 127,
+          "major->pass": 24,
+          "major->reject": 20
+        },
+        "false_critical_on_clean": {
+          "_what": "A clean string rejected by the judge never reaches the game, so this is a delivery defect, not noise.",
+          "high": 3.5,
+          "k": 3,
+          "low": 0.4,
+          "n": 251,
+          "point": 1.2
+        },
+        "false_flag_on_clean": {
+          "high": 10.6,
+          "k": 17,
+          "low": 4.3,
+          "n": 251,
+          "point": 6.8
+        },
+        "needs_human_recall_on_terminology": {
+          "high": 94.1,
+          "k": 106,
+          "low": 83.1,
+          "n": 118,
+          "point": 89.8
+        },
+        "records": 483,
+        "reject_recall_on_critical_mutations": {
+          "high": 98.3,
+          "k": 58,
+          "low": 86.5,
+          "n": 61,
+          "point": 95.1
+        },
+        "scored": 483,
+        "unparsed": 0,
+        "verdict_derived_from_errors_disagreed_with_model_verdict": 0
+      },
+      "usage": {
+        "completion_tokens": 15134,
+        "cost_per_1000_records": 0.0455,
+        "cost_usd": 0.021989,
+        "prompt_tokens": 77641,
+        "records": 483,
+        "requests": 49,
+        "retries": 0,
+        "seconds": 122.6,
+        "transport_error_samples": [],
+        "transport_errors": {},
+        "unparsed": 0
+      }
+    }
+  }
+}
