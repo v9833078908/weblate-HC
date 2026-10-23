@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import defaultdict, deque
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, ClassVar, cast
 from urllib.parse import urlsplit
@@ -143,6 +144,23 @@ class RoutedLLMTranslation(OpenAITranslation):
     settings_form = RoutedLLMMachineryForm
     project_settings_form = RoutedProjectOpenRouterMachineryForm
     trusted_error_hosts: ClassVar[set[str]] = {"openrouter.ai"}
+    output_rules: ClassVar[dict[str, str]] = {
+        "placeholder_rule": "Every source placeholder occurrence is mandatory. The server owns its exact token, markup, attributes and metadata. Choose only its position; never emit raw tokens or markup in translated text.",
+        "shape_rule": 'Return one closed JSON object {"translations": {INPUT_ID: {"text": [...], "placeholders": {...}}}}. Each input id is a required object key, not an output field.',
+        "identity_rule": "Return exactly the input string-id keys, including a singleton. No extra ids, fields, diagnostics or metadata.",
+        "parts_rule": 'For N source placeholder parts, return exactly N+1 strings in "text" and exactly N occurrence keys p0 through p(N-1) in "placeholders". Number occurrences in source parts order, even for repeated ids. Each occurrence requires integer "position" in 0..N: insert immediately before that text slot. Equal positions keep source occurrence order. Grammar placeholders may reorder within their original markup boundaries; markup and syntax keep source order.',
+        "text_rule": 'Translate the whole string, then split its text around the protected occurrences. Empty text slots are allowed. An occurrence with source translatable=true additionally requires "text" for its entire translated wrapped content; otherwise it contains only "position". Do not copy source id, type, kind, role, close_id or translatable into output.',
+        "atom_rule": "Protected occurrences are opaque, source-owned atoms. Never put placeholder tokens, tags, attributes or their mapped immutable contents in text slots. The server reconstructs them exactly from the source.",
+        "envelope_rule": 'Return exactly one JSON object with "translations", with nothing before or after it. Input ids pair outputs with sources, regardless of object key order.',
+        "mapping_rule": "Placeholder mappings provide context for wording. Reference each source occurrence only through its mandatory pN key; do not copy mapped content into the output.",
+        "wrapper_rule": 'For a translatable wrapper, put all translated inner content in that occurrence\'s "text". Never split or duplicate its delimiters; the server restores them.',
+        "output_examples": """For source parts [{"type":"text","text":"Armor "},{"type":"placeholder","id":"@@PH0@@","kind":"markup","text":"","translatable":false},{"type":"text","text":" +10%"}] with id s0, a valid answer is:
+{"translations":{"s0":{"text":["방어력 "," +10%"],"placeholders":{"p0":{"position":1}}}}}
+The p0 occurrence is required even when its text is empty. A text-only answer without p0 is invalid.
+For source "Он ушёл" without placeholders, do not add final punctuation:
+{"translations":{"s1":{"text":["Il est parti"],"placeholders":{}}}}
+Respond ONLY with the required JSON object. Follow the supplied response schema.""",
+    }
 
     def __init__(self, configuration: SettingsDict) -> None:
         super().__init__(configuration)
@@ -152,14 +170,6 @@ class RoutedLLMTranslation(OpenAITranslation):
 
     def get_runtime_base_url(self) -> str:
         return self.settings.get("base_url") or DEFAULT_BASE_URL
-
-    def _get_prompt(self, target_language: str) -> str:
-        # The reply schema wraps the array the base prompt describes.
-        return (
-            super()._get_prompt(target_language)
-            + '\nWhen a response schema is supplied, return {"translations": [...]}:'
-            " the array described above, wrapped in that one key.\n"
-        )
 
     def get_headers(self) -> dict[str, str]:
         """Identify this service to OpenRouter without affecting other proxies."""
@@ -294,110 +304,187 @@ class RoutedLLMTranslation(OpenAITranslation):
         payload = super().get_chat_payload(
             model, prompt, content, previous_content, previous_response
         )
-        count = self._expected_reply_length(content)
-        if count:
-            payload["response_format"] = self._reply_format(count)
-            # A provider that silently ignores the schema would answer in a
-            # shape the parser rejects, so route only to ones that honour it.
+        strings = self._request_strings(content)
+        if strings:
+            payload["response_format"] = self._reply_format(strings)
             provider = cast("dict[str, object]", payload.setdefault("provider", {}))
             provider["require_parameters"] = True
         return payload
 
     @staticmethod
-    def _expected_reply_length(content: str) -> int:
-        """Return how many strings the batch asks for, taken from the request."""
+    def _request_strings(content: str) -> list[dict]:
         try:
             strings = json.loads(content)["strings"]
         except (TypeError, KeyError, json.JSONDecodeError):
-            return 0
-        return len(strings) if isinstance(strings, list) else 0
+            return []
+        return strings if isinstance(strings, list) else []
 
     @staticmethod
-    def _reply_format(count: int) -> dict:
-        """
-        Constrain the reply to one structured object per requested string.
+    def _closed_schema(properties: dict) -> dict:
+        return {
+            "type": "object",
+            "properties": properties,
+            "required": list(properties),
+            "additionalProperties": False,
+        }
 
-        Fix the batch length and distinguish text from placeholder parts so a
-        provider cannot omit placeholder identity or preservation metadata.
-        Full source-placeholder presence and ordering remain parser checks:
-        text may split or merge, and grammar placeholders may reorder.
-
-        The outer ``id`` is required because
-        ``BaseLLMTranslation._resolve_reply_order`` pairs a batch reply with its
-        sources through it and refuses a batch whose items carry no usable id.
-        Declaring it in the prompt alone is not enough: a structured reply
-        follows the schema, so an undeclared id is simply absent, every batch
-        larger than one string is refused, and the run degrades into
-        single-string requests that each re-pay the whole prompt prefix.
-        """
+    @classmethod
+    def _reply_format(cls, strings: list[dict]) -> dict:
+        translations = {}
+        for item in strings:
+            placeholders = [
+                part for part in item["parts"] if part["type"] == "placeholder"
+            ]
+            occurrences = {}
+            for index, part in enumerate(placeholders):
+                fields = {
+                    "position": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": len(placeholders),
+                    }
+                }
+                if part["translatable"]:
+                    fields["text"] = {"type": "string"}
+                occurrences[f"p{index}"] = cls._closed_schema(fields)
+            translations[item["id"]] = cls._closed_schema(
+                {
+                    "text": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": len(placeholders) + 1,
+                        "maxItems": len(placeholders) + 1,
+                    },
+                    "placeholders": cls._closed_schema(occurrences),
+                }
+            )
         return {
             "type": "json_schema",
             "json_schema": {
                 "name": "translations",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "translations": {
-                            "type": "array",
-                            "minItems": count,
-                            "maxItems": count,
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "id": {"type": "string"},
-                                    "parts": {
-                                        "type": "array",
-                                        "minItems": 1,
-                                        "items": {
-                                            "anyOf": [
-                                                {
-                                                    "type": "object",
-                                                    "properties": {
-                                                        "type": {
-                                                            "type": "string",
-                                                            "enum": ["text"],
-                                                        },
-                                                        "text": {"type": "string"},
-                                                    },
-                                                    "required": ["type", "text"],
-                                                },
-                                                {
-                                                    "type": "object",
-                                                    "properties": {
-                                                        "type": {
-                                                            "type": "string",
-                                                            "enum": ["placeholder"],
-                                                        },
-                                                        "text": {"type": "string"},
-                                                        "id": {"type": "string"},
-                                                        "kind": {"type": "string"},
-                                                        "role": {"type": "string"},
-                                                        "close_id": {"type": "string"},
-                                                        "translatable": {
-                                                            "type": "boolean"
-                                                        },
-                                                    },
-                                                    "required": [
-                                                        "type",
-                                                        "text",
-                                                        "id",
-                                                        "kind",
-                                                        "translatable",
-                                                    ],
-                                                },
-                                            ],
-                                        },
-                                    },
-                                },
-                                "required": ["id", "parts"],
-                            },
-                        },
-                    },
-                    "required": ["translations"],
-                    "additionalProperties": False,
-                },
+                "strict": True,
+                "schema": cls._closed_schema(
+                    {"translations": cls._closed_schema(translations)}
+                ),
             },
         }
+
+    def _build_previous_messages_from_examples(
+        self, source_language: str, target_language: str, examples: list
+    ) -> tuple[str, str]:
+        content, response = super()._build_previous_messages_from_examples(
+            source_language, target_language, examples
+        )
+        translations = {}
+        for source, target in zip(
+            json.loads(content)["strings"], json.loads(response), strict=True
+        ):
+            occurrences: dict[tuple[str, str | None], deque[str]] = defaultdict(deque)
+            for index, part in enumerate(
+                part for part in source["parts"] if part["type"] == "placeholder"
+            ):
+                occurrences[part["id"], part.get("close_id")].append(f"p{index}")
+            text = [""]
+            placements = {}
+            for part in target["parts"]:
+                if part["type"] == "text":
+                    text[-1] += part["text"]
+                    continue
+                key = occurrences[part["id"], part.get("close_id")].popleft()
+                placement = {"position": len(text)}
+                if part["translatable"]:
+                    placement["text"] = part["text"]
+                placements[key] = placement
+                text.append("")
+            translations[source["id"]] = {"text": text, "placeholders": placements}
+        return content, json.dumps({"translations": translations}, ensure_ascii=False)
+
+    @staticmethod
+    def _unique_reply_object(pairs: list[tuple[str, object]]) -> dict:
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                msg = "Duplicate object member in protected-slot reply."
+                raise ValueError(msg)
+            result[key] = value
+        return result
+
+    @staticmethod
+    def _require_reply_fields(value: object, keys: set[str]) -> dict:
+        if not isinstance(value, dict) or set(value) != keys:
+            msg = "Missing or unexpected fields in protected-slot reply."
+            raise ValueError(msg)
+        return value
+
+    def _decode_reply(
+        self,
+        translations_string: str | None,
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None,
+        string_ids: list[str],
+    ) -> list[dict]:
+        reply = self._require_reply_fields(
+            json.loads(
+                translations_string or "", object_pairs_hook=self._unique_reply_object
+            ),
+            {"translations"},
+        )
+        translations = self._require_reply_fields(
+            reply["translations"], set(string_ids)
+        )
+        occurrence_counts: dict[tuple[int | None, str], int] = defaultdict(int)
+        decoded = []
+        for index, ((source, unit), string_id) in enumerate(
+            zip(sources, string_ids, strict=True)
+        ):
+            if source_occurrences is None:
+                occurrence_key = (id(unit) if unit is not None else None, source)
+                source_occurrence = occurrence_counts[occurrence_key]
+                occurrence_counts[occurrence_key] += 1
+            else:
+                source_occurrence = source_occurrences[index]
+            placeholders = [
+                part
+                for part in self._get_string_parts(source, unit, source_occurrence)
+                if part["type"] == "placeholder"
+            ]
+            item = self._require_reply_fields(
+                translations[string_id], {"text", "placeholders"}
+            )
+            text = item["text"]
+            if (
+                not isinstance(text, list)
+                or len(text) != len(placeholders) + 1
+                or any(not isinstance(slot, str) for slot in text)
+            ):
+                msg = "Wrong text slots in protected-slot reply."
+                raise ValueError(msg)
+            placements = self._require_reply_fields(
+                item["placeholders"], {f"p{i}" for i in range(len(placeholders))}
+            )
+            before: list[list[dict]] = [[] for _ in text]
+            for slot_index, part in enumerate(placeholders):
+                fields = {"position", "text"} if part["translatable"] else {"position"}
+                placement = self._require_reply_fields(
+                    placements[f"p{slot_index}"], fields
+                )
+                position = placement["position"]
+                if type(position) is not int or not 0 <= position < len(text):
+                    msg = "Invalid protected occurrence position."
+                    raise ValueError(msg)
+                restored = dict(part)
+                if part["translatable"]:
+                    if not isinstance(placement["text"], str):
+                        msg = "Invalid translated wrapper content."
+                        raise ValueError(msg)
+                    restored["text"] = placement["text"]
+                before[position].append(restored)
+            parts = []
+            for bucket, slot in zip(before, text, strict=True):
+                parts.extend(bucket)
+                parts.append({"type": "text", "text": slot})
+            decoded.append({"id": string_id, "parts": parts})
+        return decoded
 
     def _parse_llm_translations(
         self,
@@ -407,33 +494,21 @@ class RoutedLLMTranslation(OpenAITranslation):
         *,
         string_ids: list[str],
     ) -> DownloadMultipleTranslations:
-        """
-        Unwrap the object envelope before the base parser runs.
-
-        The schema now declares ``{"translations": [...]}`` (an object,
-        which OpenAI-family providers require), but a provider that still
-        answers with the bare array this schema shipped before keeps
-        working: only a dict carrying a list under ``translations`` is
-        unwrapped, everything else reaches the base parser unchanged.
-        """
+        try:
+            decoded = self._decode_reply(
+                translations_string, sources, source_occurrences, string_ids
+            )
+        except (ValueError, TypeError) as error:
+            msg = str(error)
+            self.log_handled_error(msg, extra_log=translations_string)
+            self._record_llm_outcome("refused", reason=msg, reply=translations_string)
+            raise MachineTranslationError(msg) from error
         return super()._parse_llm_translations(
-            self._unwrap_reply_envelope(translations_string),
+            json.dumps(decoded, ensure_ascii=False),
             sources,
             source_occurrences,
             string_ids=string_ids,
         )
-
-    @staticmethod
-    def _unwrap_reply_envelope(translations_string: str | None) -> str | None:
-        if not translations_string:
-            return translations_string
-        try:
-            parsed = json.loads(translations_string)
-        except json.JSONDecodeError:
-            return translations_string
-        if isinstance(parsed, dict) and isinstance(parsed.get("translations"), list):
-            return json.dumps(parsed["translations"])
-        return translations_string
 
 
 class RoutedLiteLLMTranslation(RoutedLLMTranslation):

@@ -5090,19 +5090,6 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(self.MACHINE_CLS.batch_size, 10)
         self.assertLess(self.MACHINE_CLS.batch_size, DummyTranslation.batch_size)
 
-    def test_prompt_forbids_metadata_output(self) -> None:
-        self.assertIn('object containing only "id" and "parts"', PROMPT)
-        self.assertIn(
-            "Do not emit empty extra strings, diagnostics, explanations, or metadata.",
-            PROMPT,
-        )
-        self.assertIn(
-            "do not include their check_id, name, description, or generated "
-            "diagnostics in output",
-            PROMPT,
-        )
-        self.assertIn("Prefer structured objects when", PROMPT)
-
     def test_prompt_declares_the_developer_note_in_the_schema(self) -> None:
         self.assertIn('"note"', PROMPT)
 

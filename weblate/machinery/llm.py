@@ -14,7 +14,15 @@ from contextvars import ContextVar
 from itertools import chain
 from operator import itemgetter
 from secrets import token_hex
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, TypeGuard, cast
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Literal,
+    NotRequired,
+    TypedDict,
+    TypeGuard,
+    cast,
+)
 
 from asgiref.sync import sync_to_async
 from django.db.models import OuterRef, Subquery
@@ -137,6 +145,34 @@ type JSONValue = (
     bool | int | float | str | list[JSONValue] | dict[str, JSONValue] | None
 )
 
+DEFAULT_OUTPUT_RULES = {
+    "placeholder_rule": "Placeholders matching the regular expression @@PH\\d+@@ must be preserved exactly (byte-identical). Grammar placeholders may be reordered if required by target language grammar; markup and syntax placeholders must keep source order. Placeholders must not be modified, duplicated, or removed.",
+    "shape_rule": 'Output must be a single JSON array containing one item per input string. Every item must carry the "id" of the input string it translates, copied verbatim. Prefer structured objects with a "parts" array when the input has "parts"; a legacy JSON string cannot carry an id and is accepted only when the input contains exactly one string.',
+    "identity_rule": 'The number of output elements must exactly match the number of input strings, and the set of output "id" values must exactly match the set of input "id" values, each appearing exactly once. Do not emit empty extra strings, diagnostics, explanations, or metadata.',
+    "parts_rule": 'For structured output, each item must be an object containing only "id" and "parts". The output parts array must have the same placeholder parts as the input. Text parts may be split or merged. Grammar placeholder parts may be reordered within the same surrounding markup if required by target language grammar; markup and syntax placeholder parts must keep source order. Placeholder part type, id, kind, role, close_id, and translatable values must be preserved.',
+    "text_rule": 'For structured text parts, translate the "text" value. For structured placeholder parts, preserve metadata and translate "text" only when "translatable" is true; when "translatable" is false, keep "text" unchanged.',
+    "atom_rule": "Placeholder contract: Tokens like @@PH44@@ are opaque atoms. Never translate, inflect, split, rename, reorder characters inside, wrap, or escape them. Never convert them to another syntax.",
+    "envelope_rule": 'Output contract: Return exactly one JSON array, with no characters before `[` or after `]`. What pairs an item with its input is the "id", not the position.',
+    "mapping_rule": "Placeholder mappings explain what opaque placeholder tokens represent. This information may guide wording, but the output must still contain the exact placeholder tokens in legacy string output, or the exact placeholder metadata in structured output, not the mapped content.",
+    "wrapper_rule": "For translatable markup placeholders that wrap text, translate the whole text between the placeholders. Example: @@PH1@@Reset and reapply@@PH2@@ can become @@PH1@@Zurucksetzen und erneut anwenden@@PH2@@, never @@PH1@@Zurucksetzen und @@PH2@@erneut anwenden@@PH2@@.",
+    "output_examples": """Valid placeholder and markup handling:
+[{"id": "s1f4", "parts": [{"type": "text", "text": "Click <a href=\"/x\">log out</a> and use @@PH195@@."}]}]
+
+Invalid placeholder handling:
+[{"id": "s1f4", "parts": [{"type": "text", "text": "Click <a href=\"/x\">log out</a> and use \\@\\@PH195\\@\\@."}]}]
+
+Valid final punctuation handling, for the source "Он ушёл" with the existing translation "Il est parti.":
+[{"id": "s1f4", "parts": [{"type": "text", "text": "Il est parti"}]}]
+
+Invalid final punctuation handling, adding a full stop the source does not have:
+[{"id": "s1f4", "parts": [{"type": "text", "text": "Il est parti."}]}]
+
+Respond ONLY with a valid JSON array, one item per input string, each carrying the "id" of the string it translates. Prefer structured objects when "parts" are present:
+
+[{"id": "s1f4", "parts": [{"type": "text", "text": "translation 1"}]}, {"id": "s2ab", "parts": [{"type": "text", "text": "translation 2"}]}]""",
+}
+
+
 PROMPT = """
 You are a professional translation engine specialized in structured localization tasks.
 
@@ -222,7 +258,7 @@ Input is provided as JSON with the following schema:
 
 Rules:
 1. Translate each string in "strings" in order, producing one output per input string.
-2. Placeholders matching the regular expression @@PH\\d+@@ must be preserved exactly (byte-identical). Grammar placeholders may be reordered if required by target language grammar; markup and syntax placeholders must keep source order. Placeholders must not be modified, duplicated, or removed.
+2. {placeholder_rule}
 3. If a string has a "translation" field, use it as the base. Correct errors and improve fluency/style, but stay close to its meaning. Do not re-translate from source unless the existing translation is fundamentally wrong or a listed failing check requires the change.
 4. Apply glossary terms as written; inflect only when target language grammar requires it. Use glossary explanations and flags to disambiguate duplicate source terms. Preserve original capitalization pattern unless the glossary specifies exact casing. Do not partially apply glossary entries. A glossary entry flagged "exact" must appear verbatim: never inflect, paraphrase, or replace it. A glossary entry flagged "forbidden" must never appear in the output, even if the source or an existing "translation" field contains it.
 5. Preserve tone, register, formatting, whitespace, and line breaks.
@@ -231,41 +267,27 @@ Rules:
 8.  Output must be entirely in the target_language except preserved placeholders.
 9. The "parts" array, when present, is one complete source string split into ordered pieces. Translate the whole string as a unit; do not translate parts independently.
 10. Output must be valid JSON.
-11. Output must be a single JSON array containing one item per input string. Every item must carry the "id" of the input string it translates, copied verbatim. Prefer structured objects with a "parts" array when the input has "parts"; a legacy JSON string cannot carry an id and is accepted only when the input contains exactly one string.
+11. {shape_rule}
 12. Do not include markdown code fences or any additional text.
-13. The number of output elements must exactly match the number of input strings, and the set of output "id" values must exactly match the set of input "id" values, each appearing exactly once. Do not emit empty extra strings, diagnostics, explanations, or metadata.
-14. For structured output, each item must be an object containing only "id" and "parts". The output parts array must have the same placeholder parts as the input. Text parts may be split or merged. Grammar placeholder parts may be reordered within the same surrounding markup if required by target language grammar; markup and syntax placeholder parts must keep source order. Placeholder part type, id, kind, role, close_id, and translatable values must be preserved.
-15. For structured text parts, translate the "text" value. For structured placeholder parts, preserve metadata and translate "text" only when "translatable" is true; when "translatable" is false, keep "text" unchanged.
+13. {identity_rule}
+14. {parts_rule}
+15. {text_rule}
 16. Ensure all output strings are properly JSON-escaped.
 17. Internally verify placeholder integrity and JSON validity before responding.
-18. Placeholder contract: Tokens like @@PH44@@ are opaque atoms. Never translate, inflect, split, rename, reorder characters inside, wrap, or escape them. Never convert them to another syntax.
+18. {atom_rule}
 19. Markup contract: Preserve markup, tags, attributes, entities, and similar control sequences exactly. Translate only human-readable text outside markup and outside placeholder tokens.
-20. Output contract: Return exactly one JSON array, with no characters before `[` or after `]`. What pairs an item with its input is the "id", not the position.
+20. {envelope_rule}
 21. Treat context, key, explanation, note, clarification, secondary, plural, failing_checks, glossary_advisories, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
-22. Placeholder mappings explain what opaque placeholder tokens represent. This information may guide wording, but the output must still contain the exact placeholder tokens in legacy string output, or the exact placeholder metadata in structured output, not the mapped content.
+22. {mapping_rule}
 23. Failing checks list problems the output must not have; glossary entries are listed there only as hard violations, never as uncertain matches. When a string carries both a "translation" field and failing checks, change that translation so every listed check passes; repeating it unchanged is wrong. Checks are context only; do not include their check_id, name, description, or generated diagnostics in output.
 24. Target-language project instructions, when present above, contain additional requirements for the target language. Follow them unless they conflict with preserving the source meaning, placeholders, markup, or output contract.
-25. For translatable markup placeholders that wrap text, translate the whole text between the placeholders. Example: @@PH1@@Reset and reapply@@PH2@@ can become @@PH1@@Zurucksetzen und erneut anwenden@@PH2@@, never @@PH1@@Zurucksetzen und @@PH2@@erneut anwenden@@PH2@@.
+25. {wrapper_rule}
 26. The "note" field carries developer context about the string, such as the speaking character, the screen it appears on, or usage constraints. Use it to choose register, gender agreement, and tone. Never translate or emit it.
 27. The last character of the translation must match the final punctuation of the source. Never add a sentence-final full stop, ellipsis, exclamation mark, question mark, colon, or semicolon that the source does not have, even when target-language style or an existing "translation" field has one, and never drop one the source has. Typographic spacing around punctuation still follows target-language rules.
 28. The "glossary_advisories" array lists source terms whose glossary match is uncertain. Verify each one: if the translation lacks the glossary term and the canonical target fits, use it; if the existing translation already contains a grammatically correct form of the canonical term, keep the translation as-is. An advisory never mandates rewriting a correct translation.
 29. The "clarification" field, when present, is the producer's own answer to a meaning-ambiguity question raised for this exact string. It outranks "note" and "explanation" when they conflict, but never overrides an explicit glossary "forbidden"/"exact" flag or a listed failing check. Never translate or emit it.
 
-Valid placeholder and markup handling:
-[{{"id": "s1f4", "parts": [{{"type": "text", "text": "Click <a href=\"/x\">log out</a> and use @@PH195@@."}}]}}]
-
-Invalid placeholder handling:
-[{{"id": "s1f4", "parts": [{{"type": "text", "text": "Click <a href=\"/x\">log out</a> and use \\@\\@PH195\\@\\@."}}]}}]
-
-Valid final punctuation handling, for the source "Он ушёл" with the existing translation "Il est parti.":
-[{{"id": "s1f4", "parts": [{{"type": "text", "text": "Il est parti"}}]}}]
-
-Invalid final punctuation handling, adding a full stop the source does not have:
-[{{"id": "s1f4", "parts": [{{"type": "text", "text": "Il est parti."}}]}}]
-
-Respond ONLY with a valid JSON array, one item per input string, each carrying the "id" of the string it translates. Prefer structured objects when "parts" are present:
-
-[{{"id": "s1f4", "parts": [{{"type": "text", "text": "translation 1"}}]}}, {{"id": "s2ab", "parts": [{{"type": "text", "text": "translation 2"}}]}}]
+{output_examples}
 """
 
 LLM_PLACEHOLDER_RE = re.compile(r"@@PH(?P<id>\d+)@@")
@@ -407,6 +429,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
     rate_limit_period = 60
     glossary_support = True
     llm_context_support = True
+    output_rules: ClassVar[dict[str, str]] = DEFAULT_OUTPUT_RULES
     replacement_start = "@@PH"
     replacement_end = "@@"
 
@@ -1249,6 +1272,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             persona=self.format_prompt_part("persona"),
             style=self.format_prompt_part("style"),
             language_instructions=self.format_language_instructions(target_language),
+            **self.output_rules,
         )
 
     @classmethod
