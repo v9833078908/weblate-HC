@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 from app.db import DomainError, Store, revision
-from app.models import Job, QualityCycle, Record
+from app.models import Job, QualityCycle, QualityOperation, Record
 from app.services.runs import cancel_run, claim_job, ensure_project_available, get_run, resume_run
 
 
@@ -307,6 +307,41 @@ def test_preflight_accepts_only_valid_isolation_and_still_blocks_another_unknown
         )
     with pytest.raises(ValueError):
         module.assert_quiet(database)
+
+
+@pytest.mark.parametrize("state", ["intent", "accepted", "unknown"])
+@pytest.mark.parametrize("orphan", [False, True])
+def test_failed_quality_export_cannot_hide_an_unsettled_operation(legacy, state, orphan):
+    store, database, _ = legacy
+    with store.session() as session:
+        session.get(Job, "legacy").status = "failed"
+        session.get(Job, "legacy").data = {"operations": {}}
+        if not orphan:
+            session.add(
+                QualityCycle(
+                    id="failed-cycle",
+                    owner="producer",
+                    job_id="legacy",
+                    remote_project="protected-remote",
+                    policy_revision="p",
+                    policy={},
+                    phase="export",
+                    status="failed_verification",
+                )
+            )
+        session.add(
+            QualityOperation(
+                id="unknown-quality-request",
+                cycle_id="failed-cycle",
+                operation_key="export",
+                kind="export",
+                state=state,
+            )
+        )
+    before = database_rows(database)
+    with pytest.raises(ValueError, match="quality operation"):
+        deployment_module("preflight").assert_quiet(database)
+    assert database_rows(database) == before
 
 
 def test_isolated_profile_queue_does_not_starve_an_unrelated_project(legacy):

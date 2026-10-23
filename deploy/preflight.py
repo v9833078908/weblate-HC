@@ -78,6 +78,15 @@ def assert_quiet(path, *, allow_profile_unknown=False):
             ):
                 raise ValueError("Unsettled external operation prevents maintenance")
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        # A failed export/cycle does not settle an earlier external request.
+        # Scan the journal independently, including operations with no parent.
+        if (
+            "quality_operations" in tables
+            and db.execute(
+                "SELECT 1 FROM quality_operations WHERE state IN ('intent','accepted','unknown')"
+            ).fetchone()
+        ):
+            raise ValueError("Unsettled quality operation prevents maintenance")
         if (
             "quality_cycles" in tables
             and db.execute(
