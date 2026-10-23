@@ -317,10 +317,10 @@ class RoutedLLMTranslation(OpenAITranslation):
         """
         Constrain the reply to one structured object per requested string.
 
-        The element count is the part that matters: a reply that ends early is
-        the dominant failure mode, and no prompt rule enforces the length.
-        Part fields stay optional because only placeholders carry them, and a
-        text part is rejected downstream unless it holds exactly type and text.
+        Fix the batch length and distinguish text from placeholder parts so a
+        provider cannot omit placeholder identity or preservation metadata.
+        Full source-placeholder presence and ordering remain parser checks:
+        text may split or merge, and grammar placeholders may reorder.
 
         The outer ``id`` is required because
         ``BaseLLMTranslation._resolve_reply_order`` pairs a batch reply with its
@@ -349,20 +349,43 @@ class RoutedLLMTranslation(OpenAITranslation):
                                         "type": "array",
                                         "minItems": 1,
                                         "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "type": {
-                                                    "type": "string",
-                                                    "enum": ["text", "placeholder"],
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "type": {
+                                                            "type": "string",
+                                                            "enum": ["text"],
+                                                        },
+                                                        "text": {"type": "string"},
+                                                    },
+                                                    "required": ["type", "text"],
                                                 },
-                                                "text": {"type": "string"},
-                                                "id": {"type": "string"},
-                                                "kind": {"type": "string"},
-                                                "role": {"type": "string"},
-                                                "close_id": {"type": "string"},
-                                                "translatable": {"type": "boolean"},
-                                            },
-                                            "required": ["type", "text"],
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "type": {
+                                                            "type": "string",
+                                                            "enum": ["placeholder"],
+                                                        },
+                                                        "text": {"type": "string"},
+                                                        "id": {"type": "string"},
+                                                        "kind": {"type": "string"},
+                                                        "role": {"type": "string"},
+                                                        "close_id": {"type": "string"},
+                                                        "translatable": {
+                                                            "type": "boolean"
+                                                        },
+                                                    },
+                                                    "required": [
+                                                        "type",
+                                                        "text",
+                                                        "id",
+                                                        "kind",
+                                                        "translatable",
+                                                    ],
+                                                },
+                                            ],
                                         },
                                     },
                                 },

@@ -39,6 +39,8 @@ Weblate 2026.8.1
 
 .. rubric:: Improvements
 
+* Fixed existing-translation overwrite in the :http:post:`translation autotranslate API </api/translations/(string:project)/(string:component)/(string:language)/autotranslate/>` judge mode, finalized confirmed worker pre-flight failures, and required protected placeholder metadata in routed LLM response schemas.
+
 * A user-started automatic translation now resumes after a routine service restart instead of being silently lost: its progress bar reports whether it is waiting for a worker, actively updating, or has shown no update for 10 minutes, and its counter now tracks strings actually written rather than technical progress steps. Redelivery after a restart is at-least-once, not exactly-once; already-written strings are not overwritten.
 * LLM judge reports now distinguish strings with a usable conclusion from skipped, pending, and failed rows, and label a known incomplete or unprovable scope instead of presenting a clean subset as a full check.
 * Component operations watched through a progress bar now overtake queued parent-statistics housekeeping, while repeated parent-statistics updates are coalesced into one pending calculation and at most one sequential follow-up.

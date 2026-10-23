@@ -160,7 +160,7 @@ from weblate.trans.exceptions import (
     FileParseError,
     PluralFormsMismatchError,
 )
-from weblate.trans.forms import AutoForm
+from weblate.trans.forms import AutoForm, configured_routed_engine
 from weblate.trans.judge import (
     judge_configuration_ready,
     judge_configuration_snapshot,
@@ -3713,7 +3713,7 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
         },
     )
     @action(detail=True, methods=["post"])
-    def autotranslate(self, request: Request, **kwargs):
+    def autotranslate(self, request: Request, **kwargs):  # ruff: ignore[complex-structure]
         translation = self.get_object()
         if translation.component.locked:
             raise LockedError(
@@ -3761,6 +3761,24 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
                 ),
             )
             _preview, units = batch.preview_judge_scope_snapshot(execution_version=1)
+            engines = autoform.cleaned_data["engines"]
+            if (
+                autoform.cleaned_data.get("overwrite_existing", False)
+                and autoform.cleaned_data["auto_source"] == "mt"
+                and not engines
+            ):
+                engine = configured_routed_engine(
+                    translation.component.project.get_machinery_settings()
+                )
+                if engine is None:
+                    raise ValidationError(
+                        {
+                            "engines": gettext(
+                                "Select at least one machine translation engine."
+                            )
+                        }
+                    )
+                engines = [engine]
             preparation_requested = autoform.cleaned_data.get(
                 "auto_source"
             ) == "mt" and not autoform.cleaned_data.get("overwrite_existing", False)
@@ -3780,10 +3798,13 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
                 "mode": "judge",
                 "q": autoform.cleaned_data["q"],
                 "auto_source": autoform.cleaned_data["auto_source"],
-                "engines": autoform.cleaned_data["engines"],
+                "engines": engines,
                 "threshold": autoform.cleaned_data["threshold"],
                 "judge_proposal_only": False,
-                "judge_pretranslate": False,
+                "judge_pretranslate": (
+                    autoform.cleaned_data["auto_source"] == "mt"
+                    and autoform.cleaned_data.get("overwrite_existing", False)
+                ),
                 "judge_mutating_repairs": False,
                 "judge_candidate_severities": list(DEFAULT_CANDIDATE_SEVERITIES),
                 "overwrite_existing": autoform.cleaned_data.get(

@@ -2479,6 +2479,7 @@ Translations
     :<json string component: Turn on contribution to shared translation memory for the project to get access to additional components.
     :<json array engines: Machine translation engines. Required when ``auto_source`` is ``mt``, except for ``mode: judge``, which resolves the project's configured engine for its mandatory preparation.
     :<json string threshold: Score threshold
+    :<json boolean overwrite_existing: In ``judge`` mode with ``auto_source: mt``, machine translate and save existing selected translations before judging them. Defaults to ``false``.
 
     .. note::
 
@@ -2491,11 +2492,24 @@ Translations
        worker deliveries and restarts; non-judge modes retain the synchronous
        ``200 OK`` response. The ``weblate auto_translate`` management command
        does not offer a ``judge`` mode.
-       A ``judge`` run first machine translates every empty string of the
-       selected scope - across all languages - and the judges only start once
-       preparation is complete. If preparation is blocked (no engine, missing
-       permission, provider refusal), the judges do not start and the report
-       details state the blocker.
+       With ``auto_source: mt``, a ``judge`` run first machine translates
+       every empty string of the selected scope - across all languages - and
+       the judges only start once preparation is complete. If preparation is
+       blocked (no engine, missing permission, provider refusal), the judges
+       do not start and the report details state the blocker.
+       Setting ``overwrite_existing: true`` instead machine translates and
+       saves the selected strings, including existing translations, before
+       judging each chunk. If ``engines`` is omitted, this uses the project's
+       configured routed engine; without one, the request is rejected.
+       Selecting ``auto_source: others`` judges stored translations without
+       starting machine translation, even when overwrite is set.
+
+       ``202 Accepted`` confirms queuing, not completion. A confirmed worker
+       pre-flight failure finalizes the run as failed. If every LLM translation
+       response in an overwrite run is refused, the run is partial and its
+       warnings include the refusal reason; judging the unchanged translations
+       does not make the overwrite successful.
+
 .. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/file/
 
     Download current translation file as it is stored in the VCS (without the ``format``

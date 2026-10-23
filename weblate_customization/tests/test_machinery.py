@@ -8,9 +8,13 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, cast
+from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.test import SimpleTestCase, TestCase
+from jsonschema import validate
+from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
+from weblate_customization.checks import GameMarkupCheck
 from weblate_customization.machinery import (
     LITELLM_DEFAULT_BASE_URL,
     OPENROUTER_MACHINE_TRANSLATION_TITLE,
@@ -19,9 +23,11 @@ from weblate_customization.machinery import (
     RoutedLLMTranslation,
 )
 
+from weblate.checks import models as check_models
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.openai import OpenAITranslation
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.tests.factories import make_unit
 from weblate.utils.tests import http_mock
 
 if TYPE_CHECKING:
@@ -413,6 +419,161 @@ class RoutedReplyFormatTest(SimpleTestCase):
 
         self.assertNotIn("response_format", payload)
         self.assertNotIn("provider", payload)
+
+
+class RoutedPlaceholderSchemaTest(SimpleTestCase):
+    """Validate the provider contract against real protected sprite parts."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.enterContext(
+            patch.dict(check_models.CHECKS.data, {"game-markup": GameMarkupCheck()})
+        )
+        self.unit = make_unit(source='Tap <sprite name="fire">', code="ko")
+        self.machine = RoutedLLMTranslation(as_settings(dict(CONFIGURATION)))
+        self.source, self.replacements = self.machine.cleanup_text(
+            self.unit.source, self.unit
+        )
+        # ruff: ignore[private-member-access]
+        self.source_parts = self.machine._get_string_parts(self.source, self.unit)
+        self.placeholder_id = next(
+            part["id"] for part in self.source_parts if part["type"] == "placeholder"
+        )
+        self.content = json.dumps(
+            {
+                "strings": [
+                    {"id": "s0", "source": self.source, "parts": self.source_parts}
+                ]
+            }
+        )
+
+    def schema(self, *, litellm: bool = False, content: str | None = None) -> dict:
+        machine = (
+            RoutedLiteLLMTranslation(as_settings(dict(LITELLM_CONFIGURATION)))
+            if litellm
+            else self.machine
+        )
+        payload = machine.get_chat_payload(
+            GEMINI, "prompt", self.content if content is None else content, "", ""
+        )
+        return payload["response_format"]["json_schema"]["schema"]
+
+    def test_schema_rejects_placeholder_missing_required_metadata(self) -> None:
+        for litellm in (False, True):
+            schema = self.schema(litellm=litellm)
+            for missing in (("id",), ("kind",), ("translatable",), ("id", "kind")):
+                placeholder = {
+                    "type": "placeholder",
+                    "id": self.placeholder_id,
+                    "kind": "markup",
+                    "text": "",
+                    "translatable": False,
+                }
+                for field in missing:
+                    del placeholder[field]
+                reply = {
+                    "translations": [
+                        {
+                            "id": "s0",
+                            "parts": [{"type": "text", "text": "点击 "}, placeholder],
+                        }
+                    ]
+                }
+                with (
+                    self.subTest(litellm=litellm, missing=missing),
+                    self.assertRaises(JSONSchemaValidationError),
+                ):
+                    validate(reply, schema)
+
+    def test_schema_accepts_preserved_sprite_and_parser_restores_it(self) -> None:
+        reply = {
+            "translations": [
+                {
+                    "id": "s0",
+                    "parts": [
+                        {"type": "text", "text": "点击 "},
+                        {
+                            "type": "placeholder",
+                            "id": self.placeholder_id,
+                            "kind": "markup",
+                            "text": "",
+                            "translatable": False,
+                        },
+                    ],
+                }
+            ]
+        }
+        for litellm in (False, True):
+            with self.subTest(litellm=litellm):
+                validate(reply, self.schema(litellm=litellm))
+        # ruff: ignore[private-member-access]
+        result = self.machine._parse_llm_translations(
+            json.dumps(reply), [(self.source, self.unit)], None, string_ids=["s0"]
+        )
+        self.assertEqual(
+            self.machine.uncleanup_text(
+                self.replacements, result[self.source][0]["text"]
+            ),
+            '点击 <sprite name="fire">',
+        )
+
+    def test_missing_sprite_is_still_refused_by_parser(self) -> None:
+        reply = {
+            "translations": [
+                {"id": "s0", "parts": [{"type": "text", "text": "누르세요"}]}
+            ]
+        }
+        with self.assertRaises(MachineTranslationError):
+            # ruff: ignore[private-member-access]
+            self.machine._parse_llm_translations(
+                json.dumps(reply), [(self.source, self.unit)], None, string_ids=["s0"]
+            )
+
+    def test_placeholder_without_identity_is_still_refused_by_parser(self) -> None:
+        reply = {
+            "translations": [
+                {
+                    "id": "s0",
+                    "parts": [
+                        {"type": "text", "text": "点击 "},
+                        {
+                            "type": "placeholder",
+                            "text": "",
+                            "translatable": False,
+                        },
+                    ],
+                }
+            ]
+        }
+        with self.assertRaises(MachineTranslationError):
+            # ruff: ignore[private-member-access]
+            self.machine._parse_llm_translations(
+                json.dumps(reply), [(self.source, self.unit)], None, string_ids=["s0"]
+            )
+
+    def test_text_only_reply_remains_valid(self) -> None:
+        content = json.dumps(
+            {
+                "strings": [
+                    {
+                        "id": "s0",
+                        "source": "Tap",
+                        "parts": [{"type": "text", "text": "Tap"}],
+                    }
+                ]
+            }
+        )
+        reply = {
+            "translations": [{"id": "s0", "parts": [{"type": "text", "text": "点击"}]}]
+        }
+        for litellm in (False, True):
+            with self.subTest(litellm=litellm):
+                validate(reply, self.schema(litellm=litellm, content=content))
+        # ruff: ignore[private-member-access]
+        result = self.machine._parse_llm_translations(
+            json.dumps(reply), [("Tap", None)], None, string_ids=["s0"]
+        )
+        self.assertEqual(result["Tap"][0]["text"], "点击")
 
 
 class RoutedSettingsValidationTest(TestCase):

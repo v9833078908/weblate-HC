@@ -1174,19 +1174,6 @@ class AutoTranslate(BaseAutoTranslate):
         if not units:
             self.judge_summary = JudgeSummary(cap_remainder=preview.remaining)
             return
-        if (
-            self.overwrite_existing
-            and self.producer_run is not None
-            and not prepare
-            and self.producer_run.preparation_phase == "ready"
-        ):
-            # A batch judge run whose mandatory preparation already ran never
-            # overwrites existing text; an overwrite request belongs to a
-            # plain MT run. Direct process_judge callers and runs whose
-            # preparation never started keep the historical behavior.
-            raise JudgeError(
-                gettext("Overwrite cannot be combined with the judge mode.")
-            )
         if self.producer_run is not None:
             # A redelivered attempt (acks_late/reject_on_worker_lost) must
             # neither lose a unit's already-recorded outcome nor pay for it
@@ -2591,7 +2578,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     "cap_remainder", summary["cap_remainder"]
                 ),
             )
-        if run.requested_mode == "translate":
+        if run.requested_mode == "translate" or (
+            run.requested_mode == "judge"
+            and self.overwrite_existing
+            and self.judge_pretranslate
+        ):
             # Aggregate LLM translation refusals so a run whose only signal
             # of failure lives in LLMUsageLog still surfaces it: a single-
             # string batch that was refused is terminal (the batch splitter
@@ -2735,7 +2726,14 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 )
                 and isinstance(
                     error,
-                    (DatabaseError, MemoryError, SystemExit, KeyboardInterrupt),
+                    (
+                        DatabaseError,
+                        MemoryError,
+                        SystemExit,
+                        KeyboardInterrupt,
+                        JudgeError,
+                        PermissionDenied,
+                    ),
                 )
             ):
                 self._finish_producer_run(
@@ -2776,6 +2774,17 @@ class BatchAutoTranslate(BaseAutoTranslate):
         threshold: int,
         source_component_ids: list[int] | None,
     ) -> str:
+        producer_run = None
+        if self.mode == "judge":
+            producer_run = self._adopt_producer_run()
+            self.active_producer_run = producer_run
+            if producer_run.status in {
+                ProducerRun.Status.COMPLETED,
+                ProducerRun.Status.FAILED,
+                ProducerRun.Status.CANCELLED,
+                ProducerRun.Status.PARTIAL,
+            }:
+                return gettext("Automatic translation completed.")
         judge_preview = (
             self.preview_judge_scope(
                 execution_version=self._producer_execution_version()
@@ -2784,23 +2793,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
             else None
         )
         preparation_scope: PreparationScope | None = None
-        if (
-            self.mode == "judge"
-            and self.overwrite_existing
-            and self.producer_run_id is not None
-            and ProducerRun.objects.filter(
-                pk=self.producer_run_id, requested_mode="judge"
-            ).exists()
-        ):
-            # A queued bulk judge run never overwrites existing text; an
-            # overwrite request belongs to a plain MT run. A direct batch
-            # without a queued run keeps the historical behavior.
-            failure = gettext("Overwrite cannot be combined with the judge mode.")
-            self.add_warning(gettext("Automatic translation failed: %s") % failure)
-            self.failure_message = gettext("Automatic translation failed: %s") % failure
-            return self.failure_message
         if judge_preview is not None:
-            producer_run = self._adopt_producer_run()
             if self.mode == "judge" and producer_run is not None:
                 verdict_only = (
                     producer_run.execution_options.get("judge_skip_preparation") is True
@@ -3192,7 +3185,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 overwrite_existing=self.overwrite_existing,
                 judge_uncapped=True,
                 producer_run=producer_run,
-                judge_pretranslate=False,
+                judge_pretranslate=self.judge_pretranslate,
                 judge_mutating_repairs=self.judge_mutating_repairs,
                 judge_candidate_severities=self.judge_candidate_severities,
                 judge_proposal_only=self.judge_proposal_only,

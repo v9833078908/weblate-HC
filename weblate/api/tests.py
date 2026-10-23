@@ -12316,6 +12316,23 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
         self.assertEqual(JudgeVerdict.objects.count(), 0)
         self.assertFalse(JudgeRequestAttempt.objects.filter(run__isnull=True).exists())
 
+    def test_judge_configuration_failure_in_worker_finishes_run(self) -> None:
+        def unavailable_configuration(**kwargs):
+            with override_settings(JUDGE_ENABLED=False):
+                validate_judge_configuration()
+
+        with patch(
+            "weblate.trans.autotranslate.BatchAutoTranslate.preview_judge_scope",
+            side_effect=unavailable_configuration,
+        ):
+            response = self.post_judge()
+
+        run = ProducerRun.objects.get(pk=response.data["run_id"])
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertIsNotNone(run.finished)
+        self.assertTrue(run.failure)
+        self.assertEqual(JudgeRequestAttempt.objects.filter(run=run).count(), 0)
+
     @http_mock.activate
     def test_judge_worker_exception_leaves_the_run_for_redelivery(self) -> None:
         # A worker exception is crash-like, not a confirmed provider failure:
@@ -12398,6 +12415,108 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
         self.unit.refresh_from_db()
         self.assertEqual(self.unit.target, before_target)
         self.assertEqual(self.unit.state, STATE_APPROVED)
+
+    @http_mock.activate
+    def test_judge_other_source_does_not_start_mt_when_overwrite_is_set(self) -> None:
+        self.serve_pass()
+        before = self.unit.target
+        with patch(
+            "weblate.trans.autotranslate.fetch_machinery_matches",
+            side_effect=AssertionError("The other-source check must not call MT."),
+        ):
+            response = self.post_judge(overwrite_existing=True)
+
+        run = ProducerRun.objects.get(pk=response.data["run_id"])
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED, run.failure)
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, before)
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @http_mock.activate
+    def test_judge_overwrite_applies_mt_before_judging(self) -> None:
+        self.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.project.save(update_fields=["machinery_settings"])
+        self.serve_pass()
+        replacement = "Aktualizovaný překlad\n"
+
+        def translate(units, *, services, **kwargs):
+            if not services:
+                return {}
+            return {
+                unit.pk: {
+                    "translation": [replacement],
+                    "quality": [90],
+                    "origin": [None],
+                }
+                for unit in units
+            }
+
+        for engines in (["openrouter"], []):
+            with self.subTest(engines=engines):
+                self.unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+                with patch(
+                    "weblate.trans.autotranslate.fetch_machinery_matches",
+                    side_effect=translate,
+                ):
+                    response = self.post_judge(
+                        auto_source="mt",
+                        engines=engines,
+                        overwrite_existing=True,
+                    )
+
+                run = ProducerRun.objects.get(pk=response.data["run_id"])
+                self.assertEqual(run.status, ProducerRun.Status.COMPLETED, run.failure)
+                self.unit.refresh_from_db()
+                self.assertEqual(self.unit.target, replacement)
+                row = JudgeRunUnit.objects.get(run=run, unit=self.unit)
+                self.assertEqual(row.before_target, [replacement])
+                self.assertEqual(row.outcome, JudgeRunUnit.Outcome.PASSED)
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @http_mock.activate
+    def test_judge_overwrite_reports_a_refused_translation_as_partial(self) -> None:
+        self.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.project.save(update_fields=["machinery_settings"])
+        self.serve_pass()
+        before = self.unit.target
+        reason = "Mismatching assistant reply items."
+
+        def refuse(units, *, services, **kwargs):
+            run = ProducerRun.objects.get(pk=services[0].usage_run_id)
+            run.usage_logs.create(
+                model="offline/model",
+                operation="translation",
+                outcome="refused",
+                refusal_reason=reason,
+                batch_size=1,
+            )
+            return {}
+
+        with patch(
+            "weblate.trans.autotranslate.fetch_machinery_matches",
+            side_effect=refuse,
+        ):
+            response = self.post_judge(
+                auto_source="mt",
+                engines=["openrouter"],
+                overwrite_existing=True,
+            )
+
+        run = ProducerRun.objects.get(pk=response.data["run_id"])
+        self.assertEqual(run.status, ProducerRun.Status.PARTIAL)
+        self.assertTrue(any(reason in warning for warning in run.warnings))
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, before)
 
     @override_settings(
         WEBLATE_MACHINERY=(
