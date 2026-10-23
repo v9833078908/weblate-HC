@@ -1647,8 +1647,10 @@ class JudgeApplication(models.Model):
         related_name="judge_applications",
     )
     change = models.OneToOneField(
+        # Protect the receipt's audit entry unless the unit and receipt are
+        # being removed in the same cascade.
         "trans.Change",
-        on_delete=models.deletion.PROTECT,
+        on_delete=models.deletion.RESTRICT,
         related_name="judge_application",
     )
     run = models.ForeignKey(

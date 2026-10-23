@@ -37,6 +37,7 @@ from django.utils import timezone
 from django.utils.translation import gettext
 
 from weblate.checks.consistency import REPEAT_DRIFT_CHECK_ID
+from weblate.checks.glossary import GLOSSARY_CHECK_ID, evaluate_glossary_terms
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
 from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD, MachineTranslationError
@@ -141,6 +142,16 @@ def build_request(
     target_plurals = (
         unit.get_target_plurals() if target_plurals is None else target_plurals
     )
+    failing_checks = unit.all_checks_names - JUDGE_CHECKS - {REPEAT_DRIFT_CHECK_ID}
+    # An advisory glossary miss is an inflection guess, not proof: framing it
+    # as a proven check would stop the seat from judging the term itself.
+    # Only a hard failure stays, as in the MT/repair prompt (llm.py).
+    if GLOSSARY_CHECK_ID in failing_checks:
+        hard, _advisory = evaluate_glossary_terms(
+            unit, unit.get_source_plurals()[0], target_plurals[0]
+        )
+        if not hard:
+            failing_checks -= {GLOSSARY_CHECK_ID}
     return JudgeRequest(
         unit_key=unit.context,
         source=unit.source,
@@ -154,9 +165,7 @@ def build_request(
         explanation=unit.source_unit.explanation,
         glossary_terms=get_matched_glossary_prompt_entries(unit),
         clarification=unit_clarification_answer(unit),
-        failing_checks=sorted(
-            unit.all_checks_names - JUDGE_CHECKS - {REPEAT_DRIFT_CHECK_ID}
-        ),
+        failing_checks=sorted(failing_checks),
         target_plurals=target_plurals,
         unit_id=unit.id,
     )

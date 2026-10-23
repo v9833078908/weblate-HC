@@ -519,6 +519,11 @@ Reachability preconditions:
   accumulating run and receipt history; this is a capacity planning
   concern, not a data-integrity one, since none of these rows are
   secrets. *(maintainer)*
+  This retention does not prevent an authorized string deletion: dependent
+  judge verdicts and application/undo receipts are removed with that string.
+  While the string exists, an application receipt still protects its audit
+  entry against separate deletion. The provider exchange journal follows
+  its own retention rules described above.
 
 Environment assumptions
 -----------------------

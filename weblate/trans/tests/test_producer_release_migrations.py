@@ -16,6 +16,15 @@ from django.test import SimpleTestCase, TransactionTestCase
 
 
 class ProducerReleaseMigrationGraphTest(SimpleTestCase):
+    def test_current_production_repair_history_is_in_the_upgrade_plan(self) -> None:
+        loader = MigrationLoader(None)
+        self.assertNotIn("trans", loader.detect_conflicts())
+        leaves = loader.graph.leaf_nodes("trans")
+        self.assertEqual(len(leaves), 1)
+        plan = loader.graph.forwards_plan(leaves[0])
+        self.assertIn(("trans", "0147_judge_application_change_restrict"), plan)
+        self.assertIn(("trans", "0152_delivery_retention"), plan)
+
     def test_quality_and_mt_share_one_upgrade_target(self) -> None:
         loader = MigrationLoader(None)
         self.assertNotIn("trans", loader.detect_conflicts())

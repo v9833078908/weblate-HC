@@ -1979,6 +1979,44 @@ class JudgeLoopTest(ViewTestCase):
         self.assertNotIn("repeat-drift", build_request(unit).failing_checks)
 
 
+class JudgeGlossaryEvidenceTest(ViewTestCase):
+    CREATE_GLOSSARIES = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.unit = self.get_unit()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.unit.translate(self.user, "Ahoj světe!\n", STATE_TRANSLATED)
+        Check.objects.create(unit=self.unit, name="check_glossary")
+        self.unit.clear_checks_cache()
+        self.glossary = self.project.glossaries[0].translation_set.get(
+            language=self.translation.language
+        )
+
+    def add_glossary(self, target: str, flags: str = "") -> None:
+        with self.captureOnCommitCallbacks(execute=True):
+            self.glossary.add_unit(None, "", "hello", target, author=self.user)
+        self.glossary.unit_set.update(extra_flags=flags)
+        self.project.invalidate_glossary_cache()
+        self.unit.glossary_terms = None
+
+    def test_advisory_miss_is_not_sent_back_as_evidence(self) -> None:
+        # cs has no Snowball, so a plain term missing from the target is only
+        # an advisory: the seat must still judge the term itself.
+        self.add_glossary("nazdar")
+        self.assertIn("check_glossary", self.unit.all_checks_names)
+        self.assertNotIn("check_glossary", build_request(self.unit).failing_checks)
+
+    def test_hard_failure_is_sent_as_evidence(self) -> None:
+        self.add_glossary("ahoj", "forbidden")
+        self.assertIn("check_glossary", build_request(self.unit).failing_checks)
+
+    def test_candidate_target_decides_the_evidence(self) -> None:
+        self.add_glossary("ahoj", "forbidden")
+        request = build_request(self.unit, target_plurals=["Nazdar světe!\n"])
+        self.assertNotIn("check_glossary", request.failing_checks)
+
+
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
