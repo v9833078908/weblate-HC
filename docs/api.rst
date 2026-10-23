@@ -3662,6 +3662,10 @@ retry rows) are pruned automatically, on a schedule an administrator
 configures. Do not build a client that assumes an estimate, a run report,
 or an undo receipt disappears on its own.
 
+Deleting a string also removes its judge verdicts and applied-candidate
+receipts. A receipt protects its audit entry from separate deletion while
+the string exists; it does not prevent deletion of the string itself.
+
 .. http:get:: /api/producer/me/
 
     Returns the authenticated user and the server capabilities the
