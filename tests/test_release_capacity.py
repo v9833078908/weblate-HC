@@ -175,3 +175,35 @@ def test_second_unpinned_base_cannot_bypass_build_contract(release, tmp_path):
     )
     with pytest.raises(ValueError, match="identity"):
         release.validate_build_contract(tmp_path)
+
+
+def test_image_smoke_checks_packaging_without_loading_django_models(release, tmp_path):
+    # A cold interpreter has no Django registry or runtime credentials. Packaging
+    # must be checkable even when machinery cannot be imported before setup.
+    for name in ("weblate", "loc_kit_ingest", "weblate_customization"):
+        package = tmp_path / name
+        package.mkdir()
+        (package / "__init__.py").write_text("")
+    machinery = tmp_path / "weblate_customization/machinery.py"
+    machinery.write_text(
+        "raise RuntimeError('Django registry has not been initialized')\n"
+    )
+    (tmp_path / "numpy.py").write_text("__version__ = '2.3.5'\n")
+    command = release.image_smoke_command("sha256:" + "a" * 64)
+    script = command[command.index("-c") + 1]
+    subprocess.run([sys.executable, "-B", "-c", script], cwd=tmp_path, check=True)
+    machinery.unlink()
+    assert (
+        subprocess.run(
+            [sys.executable, "-B", "-c", script], cwd=tmp_path, check=False
+        ).returncode
+        != 0
+    )
+    machinery.write_text("")
+    (tmp_path / "numpy.py").write_text("__version__ = '2.4.0'\n")
+    assert (
+        subprocess.run(
+            [sys.executable, "-B", "-c", script], cwd=tmp_path, check=False
+        ).returncode
+        != 0
+    )

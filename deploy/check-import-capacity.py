@@ -329,17 +329,7 @@ def build_release(*, repo, commit, output, mode="dry-run", capacity=None):
     ):
         msg = "Built image identity differs from approved contract"
         raise ValueError(msg)
-    docker(
-        "run",
-        "--rm",
-        "--network",
-        "none",
-        "--entrypoint",
-        "/app/venv/bin/python",
-        metadata["Id"],
-        "-c",
-        "import numpy,weblate,weblate_customization.machinery,loc_kit_ingest; assert numpy.__version__ == '2.3.5'",
-    )
+    docker(*image_smoke_command(metadata["Id"]))
     if windows_capacity()["D"] < metadata["Size"] + 3 * GIB:
         msg = "Insufficient export space"
         raise ValueError(msg)
@@ -354,6 +344,26 @@ def build_release(*, repo, commit, output, mode="dry-run", capacity=None):
     )
     (output / "manifest.json").write_text(json.dumps(result, indent=2))
     return result
+
+
+def image_smoke_command(image_id):
+    # Packaging check only: machinery imports Django models and requires a real
+    # application registry. Never load runtime settings or credentials here.
+    return (
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--entrypoint",
+        "/app/venv/bin/python",
+        image_id,
+        "-c",
+        (
+            "import importlib.util as u, numpy, weblate, loc_kit_ingest; "
+            "assert u.find_spec('weblate_customization.machinery'); "
+            "assert numpy.__version__ == '2.3.5'"
+        ),
+    )
 
 
 def main():
