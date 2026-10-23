@@ -1,0 +1,28 @@
+[Unit]
+Description=BDHC Weblate wizard profile preparation worker
+After=network-online.target wizard-api.service
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=weblate-wizard
+Group=weblate-wizard
+WorkingDirectory=/opt/bdhc/weblate-wizard/current
+EnvironmentFile=/opt/bdhc/weblate-wizard/shared/wizard.env
+Environment=PYTHONPATH=/opt/bdhc/weblate-wizard/current/backend
+ExecStart=/opt/bdhc/weblate-wizard/current/.venv/bin/python -m app.profile_worker
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=150
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bdhc/weblate-wizard/shared/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,326 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""
+Regression tests for current keyed PO inference in ``loc_kit_ingest.infer``.
+
+These describe the behavior of column 0 as an unconditional PO key column,
+before Task A2 teaches ``infer_profile`` to also recognise it as a language
+column in narrow, explicit conditions.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+import loc_kit_ingest.infer as infer_module
+from loc_kit_ingest.infer import InferenceError, infer_component, infer_profile
+from loc_kit_ingest.profile import SCHEMA_VERSION, SCHEMA_VERSION_PO_CALCULATED
+
+
+def test_regular_key_header_uses_column_zero_as_key():
+    rows = [
+        ["key", "ru", "en"],
+        ["greeting", "Привет", "Hello"],
+        ["farewell", "Пока", "Bye"],
+    ]
+    document, _notes = infer_component("Sheet1", rows, component="Test")
+
+    assert document["key"] == {"column": 1, "header": "key"}
+    assert [lang["code"] for lang in document["languages"]] == ["ru", "en"]
+    assert document["source_lang"] == "ru"
+
+
+def test_id_header_in_key_column_stays_a_string_id_not_a_language():
+    # "id" is a registered Indonesian language code, but column 0 is never
+    # scanned for language candidates: it is always the PO key column.
+    rows = [
+        ["id", "ru", "en"],
+        ["1001", "Привет", "Hello"],
+        ["1002", "Пока", "Bye"],
+    ]
+    document, _notes = infer_component("Sheet1", rows, component="Test")
+
+    assert document["key"] == {"column": 1, "header": "id"}
+    codes = [lang["code"] for lang in document["languages"]]
+    assert "id" not in codes
+    assert codes == ["ru", "en"]
+
+
+def test_numeric_only_column_is_demoted_with_a_note():
+    rows = [
+        ["key", "ru", "en"],
+        ["a", "Привет", "1001"],
+        ["b", "Пока", "1002"],
+    ]
+    document, notes = infer_component("Sheet1", rows, component="Test")
+
+    codes = [lang["code"] for lang in document["languages"]]
+    assert codes == ["ru"]
+    assert any("holds only numbers" in note and "language en" in note for note in notes)
+
+
+def test_empty_column_is_demoted_with_a_note():
+    rows = [
+        ["key", "ru", "en"],
+        ["a", "Привет", ""],
+        ["b", "Пока", ""],
+    ]
+    document, notes = infer_component("Sheet1", rows, component="Test")
+
+    codes = [lang["code"] for lang in document["languages"]]
+    assert codes == ["ru"]
+    assert any("is empty; excluded" in note for note in notes)
+
+
+def test_underfilled_column_is_demoted_with_a_note():
+    header = ["key", "ru", "de"]
+    data_rows = [[f"k{i}", "Привет", ""] for i in range(4)]
+    data_rows[0][2] = "Hallo"  # 1 of 4 rows filled: 25% share
+    rows = [header, *data_rows]
+
+    _, notes = infer_component("Sheet1", rows, component="Test", min_fill=50.0)
+
+    assert any("under the 50% threshold" in note and "-> de" in note for note in notes)
+
+
+def test_caption_row_becomes_an_explicit_skip_rows_entry():
+    rows = [
+        ["key", "ru", "en"],
+        ["", "Russian", "English"],
+        ["greeting", "Привет", "Hello"],
+    ]
+    document, _notes = infer_component("Sheet1", rows, component="Test")
+
+    assert document["grammar"]["skip_rows"] == [2]
+    assert document["first_data_row"] == 3
+
+
+def test_absent_keys_fail():
+    rows = [
+        ["key", "ru", "en"],
+        ["", "Привет", "Hello"],
+        ["", "Пока", "Bye"],
+    ]
+    with pytest.raises(InferenceError, match="no keys in column 1"):
+        infer_component("Sheet1", rows, component="Test")
+
+
+def test_infer_profile_produces_one_v1_component_per_sheet():
+    sheet_one = [
+        ["key", "ru", "en"],
+        ["greeting", "Привет", "Hello"],
+    ]
+    sheet_two = [
+        ["key", "ru", "en"],
+        ["farewell", "Пока", "Bye"],
+    ]
+    document, _notes = infer_profile(
+        {"Sheet One": sheet_one, "Sheet Two": sheet_two}, kit_stem="Kit"
+    )
+
+    assert document["schema_version"] == SCHEMA_VERSION
+    assert len(document["components"]) == 2
+    assert {c["sheet"] for c in document["components"]} == {"Sheet One", "Sheet Two"}
+
+
+def test_keyless_header_promotes_column_zero_to_a_language():
+    rows = [
+        ["ru", "en", "ja"],
+        ["Привет", "Hello", "こんにちは"],
+        ["Пока", "Bye", "さようなら"],
+    ]
+    document, notes = infer_component("Sheet1", rows, component="Test")
+
+    codes = [lang["code"] for lang in document["languages"]]
+    assert codes == ["ru", "en", "ja"]
+    assert document["key"] == {"column": 1, "header": "ru"}
+    assert document["source_lang"] == "ru"
+    assert any("is both the PO key and a language column" in note for note in notes)
+
+
+def test_denylisted_id_header_is_not_promoted_even_with_nonnumeric_data():
+    rows = [
+        ["id", "ru", "en"],
+        ["player_1", "Привет", "Hello"],
+        ["player_2", "Пока", "Bye"],
+    ]
+    document, notes = infer_component("Sheet1", rows, component="Test")
+
+    codes = [lang["code"] for lang in document["languages"]]
+    assert "id" not in codes
+    assert codes == ["ru", "en"]
+    assert document["key"] == {"column": 1, "header": "id"}
+    assert not any("is both the PO key and a language column" in note for note in notes)
+
+
+def test_language_shaped_unknown_header_says_it_became_a_comment():
+    rows = [
+        ["key", "ru", "en", "chn"],
+        ["a", "Привет", "Hello", "你好"],
+        ["b", "Пока", "Bye", "再见"],
+    ]
+    document, notes = infer_component("Sheet1", rows, component="Test")
+
+    assert [lang["code"] for lang in document["languages"]] == ["ru", "en"]
+    assert [comment["header"] for comment in document["comments"]] == ["chn"]
+    assert any(
+        "looks like a language code but is not one" in note
+        and "developer comment" in note
+        for note in notes
+    )
+
+
+def test_prose_header_keeps_the_plain_developer_comment_note():
+    rows = [
+        ["key", "ru", "en", "Character limit"],
+        ["a", "Привет", "Hello", "20 chars"],
+        ["b", "Пока", "Bye", "12 chars"],
+    ]
+    _document, notes = infer_component("Sheet1", rows, component="Test")
+
+    assert any(note.endswith("-> developer comment") for note in notes)
+    assert not any("looks like a language code" in note for note in notes)
+
+
+def test_section_banner_rows_are_skipped_and_leave_the_fill_share_intact():
+    # Shipped kits break the sheet into sections with a caption whose text
+    # sits in a comment column, and with a marker key. Neither row holds a
+    # string, so both must be skipped instead of failing the whole kit.
+    rows = [
+        ["ID", "COMMENTS", "RU", "EN"],
+        ["", "МЕНЮ", "", ""],
+        ["Continue", "", "Продолжить", "Continue"],
+        ["# Юниты", "", "", ""],
+        ["Tank", "", "Танк", "Tank"],
+    ]
+    document, notes = infer_component("Sheet1", rows, component="Test")
+
+    assert document["grammar"]["skip_rows"] == [2, 4]
+    assert document["first_data_row"] == 2
+    # Banners leave the denominator, so a fully translated column reads 100%.
+    assert any("-> language en (2/2 rows, 100.0%)" in note for note in notes)
+    assert any("skipped as section banners: row(s) 2, 4" in note for note in notes)
+
+
+def test_a_real_key_without_any_text_is_not_treated_as_a_banner():
+    # A hole in the kit: the key names a string that no language provides.
+    # Skipping it would hide the omission, so it must reach the parser and
+    # fail there as po.key_without_content.
+    rows = [
+        ["id", "ru", "en"],
+        ["line_1", "Привет", "Hello"],
+        ["line_2", "", ""],
+    ]
+    document, _notes = infer_component("Sheet1", rows, component="Test")
+
+    assert document["grammar"]["skip_rows"] == []
+
+
+def test_explanation_metadata_stays_separate_from_developer_comments():
+    rows = [
+        ["key", "ru", "en", "Comment", "Explanation"],
+        ["greeting", "Привет", "Hello", "Shown on the home screen", "Warm welcome"],
+    ]
+
+    document, _notes = infer_profile({"UI": rows}, kit_stem="UI")
+    component = document["components"][0]
+
+    assert document["schema_version"] == 3
+    assert component["comments"] == [
+        {"column": 4, "name": "Comment", "header": "Comment"}
+    ]
+    assert component["explanation"] == {
+        "column": 5,
+        "name": "Explanation",
+        "header": "Explanation",
+    }
+
+
+def test_two_populated_explanation_columns_are_rejected():
+    rows = [
+        ["key", "ru", "en", "Explanation", "Пояснение"],
+        ["greeting", "Привет", "Hello", "Warm welcome", "Shown on the home screen"],
+    ]
+
+    with pytest.raises(InferenceError, match="explanation metadata"):
+        infer_component("UI", rows, component="UI")
+
+
+def test_length_column_is_ignored_calculated_not_a_location_reference():
+    """Reclassifying the helper as a reference would leak counts into PO metadata."""
+    rows = [
+        ["Key", "en", "English length", "Id", "es"],
+        ["unit.one", "Scout", "5", "1001", "Explorador"],
+        ["unit.two", "Tank", "4", "1002", ""],
+    ]
+
+    document, _notes = infer_profile(
+        {"Units": rows},
+        kit_stem="Units",
+        source_lang="en",
+        include_languages=frozenset({"es"}),
+    )
+    component = document["components"][0]
+
+    assert document["schema_version"] == SCHEMA_VERSION_PO_CALCULATED
+    assert component["ignored_columns"] == [
+        {
+            "column": 3,
+            "header": "English length",
+            "formula_policy": "ignore",
+        }
+    ]
+    assert component["references"] == [{"column": 4, "name": "Id", "header": "Id"}]
+
+
+def test_source_neutral_analysis_keeps_low_fill_and_id_ambiguous():
+    """Choosing the leftmost source or Indonesian Id would bypass producer answers."""
+    rows = [
+        ["Key", "de", "ru", "es", "Id"],
+        ["unit.one", "Späher", "Разведчик", "Explorador", "1001"],
+        ["unit.two", "Panzer", "Танк", "", "1002"],
+    ]
+
+    analysis, _notes = infer_module.analyze_profile_candidates(
+        {"Units": rows}, kit_stem="Units", min_fill=80.0
+    )
+    component = analysis["components"][0]
+
+    assert "source_lang" not in component
+    assert component["source_language"] is None
+    assert component["source_candidates"] == ["de", "ru", "es"]
+    assert [language["code"] for language in component["languages"]] == [
+        "de",
+        "ru",
+        "es",
+    ]
+    assert component["unresolved_columns"] == [
+        {
+            "column": 5,
+            "header": "Id",
+            "candidates": ["service", "language:id"],
+        }
+    ]
+
+
+def test_explicit_source_language_is_first_even_when_german_is_leftmost():
+    """Keeping sheet order would violate the source-first normalization contract."""
+    rows = [
+        ["Key", "de", "ru", "es"],
+        ["unit.one", "Späher", "Разведчик", "Explorador"],
+        ["unit.two", "Panzer", "Танк", ""],
+    ]
+
+    document, _notes = infer_profile(
+        {"Units": rows},
+        kit_stem="Units",
+        source_lang="ru",
+        include_languages=frozenset({"es"}),
+    )
+
+    assert document["components"][0]["source_lang"] == "ru"
+    assert [
+        language["code"] for language in document["components"][0]["languages"]
+    ] == ["ru", "de", "es"]

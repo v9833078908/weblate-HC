@@ -1,0 +1,19 @@
+{
+  "manifest_version": 1,
+  "analysis": {
+    "selected_sheets": [
+      "Default",
+      "Units",
+      "Perks",
+      "Arcade",
+      "Settings",
+      "GDPR",
+      "Tutorial"
+    ],
+    "totals": {
+      "input_rows": 20,
+      "imported_rows": 18,
+      "quarantined_rows": 2
+    }
+  }
+}

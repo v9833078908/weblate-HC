@@ -1,0 +1,27 @@
+[project]
+name = "bdhc-weblate-wizard"
+version = "0.1.0"
+description = "Standalone producer wizard for BDHC and external Weblate"
+requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+dependencies = [
+  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "httpx>=0.28,<1",
+  "pydantic>=2.10,<3", "sqlalchemy>=2.0,<3", "alembic>=1.15,<2",
+  "argon2-cffi>=23.1", "python-multipart>=0.0.20", "openpyxl==3.1.5",
+  "translate-toolkit==3.19.17",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.11"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["backend"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

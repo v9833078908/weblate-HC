@@ -1,0 +1,16 @@
+[Unit]
+Description=Backup wizard private SQLite data
+
+[Service]
+Type=oneshot
+User=weblate-wizard
+Group=weblate-wizard
+EnvironmentFile=/opt/bdhc/weblate-wizard/shared/wizard.env
+Environment=PYTHONPATH=/opt/bdhc/weblate-wizard/current/backend
+ExecStart=/opt/bdhc/weblate-wizard/current/.venv/bin/python -m app.backup /opt/bdhc/weblate-wizard/shared/backups
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bdhc/weblate-wizard/shared/backups
+ReadOnlyPaths=/opt/bdhc/weblate-wizard/shared/data

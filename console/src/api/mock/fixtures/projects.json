@@ -1,0 +1,17 @@
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "slug": "pirate-ships",
+      "name": "Pirate Ships",
+      "advanced_url": "https://weblate.test/projects/pirate-ships/"
+    },
+    {
+      "slug": "star-squad",
+      "name": "Star Squad",
+      "advanced_url": "https://weblate.test/projects/star-squad/"
+    }
+  ]
+}

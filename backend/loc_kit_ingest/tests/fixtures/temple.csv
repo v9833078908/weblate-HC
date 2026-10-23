@@ -1,0 +1,4 @@
+id,Character,ru,en,Id
+id-ignore,label,label,label,label
+
+sample_key,Character: Sample, leading [shake]текст[/shake] ,<color=#E3BA59>Text &#13;{value:cond:1}</color>,42

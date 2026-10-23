@@ -1,0 +1,16 @@
+# Replace the hostname/certificate paths; install only with deployment approval.
+# For this variant configure WIZARD_BIND=127.0.0.1, WIZARD_SECURE_COOKIE=1,
+# WIZARD_PUBLIC_ORIGIN=https://wizard.example.com.
+server {
+    listen 443 ssl;
+    server_name wizard.example.com;
+    ssl_certificate /etc/letsencrypt/live/wizard.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/wizard.example.com/privkey.pem;
+    client_max_body_size 100m;
+    location / {
+        proxy_pass http://127.0.0.1:18511;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 150s;
+    }
+}

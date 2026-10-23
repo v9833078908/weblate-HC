@@ -1,0 +1,5 @@
+Key,Character,Explanation,English(en),Russian(ru),Spanish(es),State
+ui.start,Guide,Button label,<b>Start</b>,<b>Начать</b>,,approved
+shared.key,Captain,Shared line,Open {0},Открыть {0},Abrir {0},translated
+duplicate.key,,Current copy,Current value,,,new
+whitespace.key,,Keep spaces, Leading source , Перевод ,,new

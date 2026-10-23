@@ -1,0 +1,29 @@
+# Explicitly keep writes disabled for the first installation and existing project checks.
+WIZARD_EXTERNAL_WRITES=0
+# MT observation uses GET only. New translated rows extend the idle window.
+WIZARD_MT_OBSERVATION_SECONDS=1800
+WIZARD_MT_MAX_OBSERVATION_SECONDS=7200
+# Durable MT is opt-in and requires mt_async_batches=1 on Weblate.
+WIZARD_MT_ASYNC_BATCHES=0
+# Comma-separated remote project slugs. Keep empty for rollout smoke checks.
+WIZARD_MT_ASYNC_PROJECTS=
+WEBLATE_CONNECT_TIMEOUT=10
+WEBLATE_WRITE_READ_TIMEOUT=600
+WEBLATE_GET_READ_TIMEOUT=60
+WEBLATE_WRITE_TIMEOUT=60
+WEBLATE_POOL_TIMEOUT=10
+# Existing wizard.env integration file paths remain private on the server.
+
+# Keep the agent off until a private key and permitted quality evaluation succeed.
+WIZARD_PROFILE_AGENT_ENABLED=0
+PROFILE_LLM_BASE_URL=https://openrouter.ai/api/v1
+PROFILE_LLM_MODEL=openai/gpt-6-luna
+PROFILE_LLM_MODEL_VERSION=openai/gpt-6-luna-20260922
+PROFILE_LLM_TOKEN_FILE=/opt/bdhc/weblate-wizard/shared/secrets/profile-llm-token
+PROFILE_LLM_REASONING_EFFORT=low
+PROFILE_LLM_MAX_COMPLETION_TOKENS=16384
+
+# Identify this specific service in OpenRouter application attribution.
+PROFILE_LLM_APP_TITLE=HCGameLoc Wizard - Translation Profile Agent
+# Leave empty to use WIZARD_PUBLIC_ORIGIN; override with the actual wizard URL.
+PROFILE_LLM_HTTP_REFERER=

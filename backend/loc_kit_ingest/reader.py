@@ -1,0 +1,327 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import csv
+from dataclasses import dataclass
+from itertools import islice
+from typing import TYPE_CHECKING
+from zipfile import BadZipFile, ZipFile
+
+from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
+
+from loc_kit_ingest.langcode import language_code
+from loc_kit_ingest.model import Diagnostic, Severity
+from loc_kit_ingest.profile import Profile, RecordMapGrammar
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from loc_kit_ingest.profile import ComponentProfile
+
+# --------------------------------------------------------------------------- #
+# Reading
+# --------------------------------------------------------------------------- #
+
+_CSV_DELIMITERS = (",", ";", "\t")
+_DELIMITER_SCAN_ROWS = 20
+
+# A byte budget alone does not bound work: blank CSV records cost almost
+# nothing per row, and an XLSX worksheet can declare a vast sparse
+# rectangle its iterator walks before any byte is counted.
+_MAX_ROWS = 200_000
+_MAX_CELLS = 2_000_000
+
+
+class ReaderError(ValueError):
+    """Fatal I/O or format error during reading."""
+
+
+@dataclass(frozen=True)
+class FormulaCell:
+    """One unevaluated XLSX formula found during structural inspection."""
+
+    sheet: str
+    coordinate: str
+    row: int
+    column: int
+    formula: str
+
+
+@dataclass(frozen=True)
+class WorkbookInspection:
+    """Materialized cells plus formula provenance, without evaluation."""
+
+    sheets: dict[str, list[list[str]]]
+    formulas: tuple[FormulaCell, ...] = ()
+
+
+def read_sheets(
+    path: Path,
+    *,
+    max_bytes: int | None = None,
+    profile: Profile | None = None,
+) -> dict[str, list[list[str]]]:
+    """
+    Read a kit file into a dict of sheet_name -> list of rows.
+
+    ``max_bytes`` caps both the uploaded file and its expanded spreadsheet
+    data before the caller receives a materialized table.
+    """
+    inspection = inspect_sheets(path, max_bytes=max_bytes)
+    _validate_formula_policy(inspection, profile)
+    return inspection.sheets
+
+
+def inspect_sheets(path: Path, *, max_bytes: int | None = None) -> WorkbookInspection:
+    """Read cells and report formulas without evaluating or accepting them."""
+    if max_bytes is not None and path.stat().st_size > max_bytes:
+        msg = "input limit exceeded"
+        raise ReaderError(msg)
+    suffix = path.suffix.lower()
+    if suffix == ".csv":
+        return WorkbookInspection(
+            {path.stem: _read_csv(path, _detect_delimiter(path), max_bytes=max_bytes)}
+        )
+    if suffix == ".tsv":
+        return WorkbookInspection(
+            {path.stem: _read_csv(path, "\t", max_bytes=max_bytes)}
+        )
+    if suffix == ".xlsx":
+        return _inspect_xlsx(path, max_bytes=max_bytes)
+    msg = f"unsupported file suffix: {suffix!r}"
+    raise ReaderError(msg)
+
+
+def _validate_formula_policy(
+    inspection: WorkbookInspection, profile: Profile | None
+) -> None:
+    allowed: dict[str, tuple[int, frozenset[int]]] = {}
+    if profile is not None:
+        for component in profile.components:
+            allowed[component.sheet] = (
+                component.header_row,
+                frozenset(
+                    column.column
+                    for column in component.ignored_columns
+                    if column.formula_policy == "ignore"
+                ),
+            )
+    for formula in inspection.formulas:
+        header_row, allowed_columns = allowed.get(formula.sheet, (-1, frozenset()))
+        if formula.row <= header_row or formula.column not in allowed_columns:
+            msg = f"{formula.sheet}!{formula.coordinate} contains a formula"
+            raise ReaderError(msg)
+
+
+def _read_csv(path: Path, delimiter: str, *, max_bytes: int | None) -> list[list[str]]:
+    rows: list[list[str]] = []
+    used = 0
+    with path.open(newline="", encoding="utf-8-sig") as f:
+        for index, row in enumerate(csv.reader(f, delimiter=delimiter), start=1):
+            if index > _MAX_ROWS:
+                msg = "input limit exceeded"
+                raise ReaderError(msg)
+            used += sum(max(1, len(cell.encode("utf-8"))) for cell in row)
+            if max_bytes is not None and used > max_bytes:
+                msg = "input limit exceeded"
+                raise ReaderError(msg)
+            rows.append(row)
+    return rows
+
+
+def _detect_delimiter(path: Path) -> str:
+    """Choose the delimiter under which the sheet has a recognisable header."""
+    best: tuple[int, int, int, str] | None = None
+    for priority, delimiter in enumerate(_CSV_DELIMITERS):
+        for index, row in enumerate(_scan_rows(path, delimiter)):
+            hits = sum(1 for cell in row if language_code(cell) is not None)
+            if hits:
+                candidate = (index, -hits, priority, delimiter)
+                if best is None or candidate < best:
+                    best = candidate
+                break
+    return best[3] if best is not None else ","
+
+
+def _scan_rows(path: Path, delimiter: str) -> list[list[str]]:
+    """Parse the top of the file with one delimiter candidate."""
+    try:
+        with path.open(newline="", encoding="utf-8-sig") as f:
+            return list(
+                islice(csv.reader(f, delimiter=delimiter), _DELIMITER_SCAN_ROWS)
+            )
+    except csv.Error:
+        return []
+
+
+def _inspect_xlsx(path: Path, *, max_bytes: int | None) -> WorkbookInspection:
+    if max_bytes is not None:
+        try:
+            with ZipFile(path) as archive:
+                members = archive.infolist()
+                if (
+                    len(members) > 1000
+                    or sum(member.file_size for member in members) > max_bytes
+                ):
+                    msg = "input limit exceeded"
+                    raise ReaderError(msg)
+        except BadZipFile as error:
+            msg = "invalid XLSX archive"
+            raise ReaderError(msg) from error
+
+    # ``openpyxl`` is a required dependency; importing at module level keeps
+    # malformed workbook errors consistent with the standalone CLI.
+
+    result: dict[str, list[list[str]]] = {}
+    formulas: list[FormulaCell] = []
+    used = 0
+    try:
+        wb = load_workbook(path, read_only=True, data_only=False)
+    except (BadZipFile, InvalidFileException) as error:
+        msg = "invalid XLSX archive"
+        raise ReaderError(msg) from error
+    cells = 0
+    row_count = 0
+    try:
+        for ws in wb.worksheets:
+            if ws.sheet_state != "visible":
+                continue
+            rows: list[list[str]] = []
+            for row in ws.iter_rows():
+                row_count += 1
+                cells += len(row)
+                if row_count > _MAX_ROWS or cells > _MAX_CELLS:
+                    msg = "input limit exceeded"
+                    raise ReaderError(msg)
+                formulas.extend(
+                    FormulaCell(
+                        sheet=ws.title,
+                        coordinate=cell.coordinate,
+                        row=cell.row - 1,
+                        column=cell.column - 1,
+                        formula=str(cell.value),
+                    )
+                    for cell in row
+                    if cell.data_type == "f"
+                )
+                values = [
+                    str(cell.value) if cell.value is not None else "" for cell in row
+                ]
+                used += sum(max(1, len(value.encode("utf-8"))) for value in values)
+                if max_bytes is not None and used > max_bytes:
+                    msg = "input limit exceeded"
+                    raise ReaderError(msg)
+                rows.append(values)
+            result[ws.title] = rows
+    finally:
+        wb.close()
+    return WorkbookInspection(result, tuple(formulas))
+
+
+# --------------------------------------------------------------------------- #
+# Header validation
+# --------------------------------------------------------------------------- #
+
+
+def validate_sheet_headers(
+    component: ComponentProfile, rows: list[list[str]]
+) -> tuple[Diagnostic, ...]:
+    """
+    Check that every configured header cell matches the sheet's header row.
+
+    Returns a tuple of ERROR diagnostics for each mismatch.
+    """
+    header_row = component.header_row  # 0-based
+    if header_row >= len(rows):
+        return (
+            Diagnostic(
+                Severity.ERROR,
+                "header.missing",
+                component.component,
+                component.sheet,
+                header_row + 1,
+                f"header row {header_row + 1} does not exist in sheet",
+            ),
+        )
+
+    header_cells = rows[header_row]
+
+    diagnostics: list[Diagnostic] = []
+
+    def _check(label: str, column: int, expected: str) -> None:
+        if column >= len(header_cells):
+            diagnostics.append(
+                Diagnostic(
+                    Severity.ERROR,
+                    "header.mismatch",
+                    component.component,
+                    component.sheet,
+                    header_row + 1,
+                    f"column {column + 1} ({label}) is out of bounds "
+                    f"(only {len(header_cells)} columns)",
+                )
+            )
+            return
+        actual = header_cells[column]
+        if actual != expected:
+            diagnostics.append(
+                Diagnostic(
+                    Severity.ERROR,
+                    "header.mismatch",
+                    component.component,
+                    component.sheet,
+                    header_row + 1,
+                    f"header mismatch for {label}: "
+                    f"expected {expected!r}, got {actual!r}",
+                )
+            )
+
+    # Language columns
+    for lang in component.languages:
+        _check(f"language {lang.code}", lang.column, lang.header)
+
+    # Key column (PO only)
+    if component.key is not None:
+        _check("key", component.key.column, component.key.header)
+
+    # Comment columns
+    for col in component.comments:
+        _check(f"comment {col.name}", col.column, col.header)
+
+    # Reference columns
+    for col in component.references:
+        _check(f"reference {col.name}", col.column, col.header)
+
+    for col in component.ignored_columns:
+        _check("ignored column", col.column, col.header)
+
+    # Record-map section and note columns (profile v2)
+    grammar = component.grammar
+    if isinstance(grammar, RecordMapGrammar):
+        if grammar.section_field is not None:
+            _check(
+                "section field",
+                grammar.section_field.column,
+                grammar.section_field.header,
+            )
+        for note in grammar.notes:
+            label = (
+                f"{note.scope} note"
+                if note.language is None
+                else f"{note.scope} note ({note.language})"
+            )
+            _check(label, note.column, note.header)
+        if grammar.source_flags is not None:
+            _check(
+                "source flags",
+                grammar.source_flags.column,
+                grammar.source_flags.header,
+            )
+        for ignored in grammar.ignored_columns:
+            _check("ignored column", ignored.column, ignored.header)
+
+    return tuple(diagnostics)

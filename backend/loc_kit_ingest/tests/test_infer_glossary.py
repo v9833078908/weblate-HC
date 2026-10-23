@@ -1,0 +1,632 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import pytest
+
+from loc_kit_ingest.infer import (
+    _MAX_REGIONS,  # ruff: ignore[import-private-name] - tests probe the guard limit
+    _MAX_SKIPPED_ROWS,  # ruff: ignore[import-private-name] - tests probe the guard limit
+    InferenceError,
+    infer_glossary_profile,
+)
+from loc_kit_ingest.langcode import language_code
+from loc_kit_ingest.model import Severity
+from loc_kit_ingest.parser import parse_component
+from loc_kit_ingest.profile import parse_profile
+from loc_kit_ingest.reader import read_sheets, validate_sheet_headers
+from loc_kit_ingest.writer import render_component, validate_rendered_component
+
+# Standard language-only kit: header codes, a caption row with language
+# names, a section row (imported as an ordinary term), a blank row, a
+# partially filled language (ja), and an empty language (fr).
+STANDARD = [
+    ["ru", "en", "fr", "ja"],
+    ["Russian", "English", "french", "japanese"],
+    ["Персонажи", "Characters", "", "キャラクター"],
+    ["Герой", "Hero", "", "ヒーロー"],
+    [],
+    ["Меч", "Sword", "", ""],
+]
+
+
+@pytest.mark.parametrize(
+    ("header", "code"),
+    [
+        ("zh-TC", "zh_Hant"),
+        ("zh_TC", "zh_Hant"),
+        ("zh-tc", "zh_Hant"),
+        ("zh-SC", "zh_Hans"),
+        ("zh-Hant", "zh_Hant"),
+        ("zh-CN", "zh_CN"),
+        ("pt-PT", "pt_PT"),
+        ("en", "en"),
+        ("id", "id"),
+    ],
+)
+def test_vendor_language_codes_alias_to_canonical(header: str, code: str) -> None:
+    assert language_code(header) == code
+
+
+def test_standard_layout_infers_v2_record_map() -> None:
+    document, _notes = infer_glossary_profile("Terms", STANDARD, component="terms")
+    assert document["schema_version"] == 2
+    (comp,) = document["components"]
+    assert comp["kind"] == "tbx"
+    assert comp["sheet"] == "Terms"
+    assert comp["source_lang"] == "ru"
+    assert comp["header_row"] == 1
+    codes = [lang["code"] for lang in comp["languages"]]
+    assert codes == ["ru", "en", "ja"]  # fr пустой - исключён
+    grammar = comp["grammar"]
+    assert grammar["type"] == "record-map"
+    assert grammar["term_row_offset"] == 0
+    assert grammar["skip_rows"] == [2]  # caption-строка
+    assert grammar["regions"] == [
+        {"first_record_row": 3, "last_record_row": 4, "record_stride": 1},
+        {"first_record_row": 6, "last_record_row": 6, "record_stride": 1},
+    ]
+
+
+def test_partially_filled_language_is_imported_as_a_target() -> None:
+    document, notes = infer_glossary_profile("Terms", STANDARD, component="terms")
+    (comp,) = document["components"]
+    assert comp["initial_target_languages"] == ["en", "ja"]
+    assert comp["grammar"]["allow_empty_targets"] is True
+    assert any("ja" in note and "untranslated" in note for note in notes)
+
+
+def test_row_without_source_term_is_skipped_with_note() -> None:
+    rows = [
+        ["ru", "en"],
+        ["Герой", "Hero"],
+        ["", "Stray"],
+        ["Меч", "Sword"],
+    ]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["skip_rows"] == [3]
+    assert comp["grammar"]["regions"] == [
+        {"first_record_row": 2, "last_record_row": 2, "record_stride": 1},
+        {"first_record_row": 4, "last_record_row": 4, "record_stride": 1},
+    ]
+    assert any("row 3" in note for note in notes)
+
+
+def test_populated_non_language_column_is_refused() -> None:
+    rows = [
+        ["domain", "ru", "en"],
+        ["Оружие", "Меч", "Sword"],
+    ]
+    with pytest.raises(InferenceError, match="column 1"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_no_language_header_is_refused() -> None:
+    with pytest.raises(InferenceError):
+        infer_glossary_profile("S", [["key", "value"], ["a", "b"]], component="s")
+
+
+def test_target_with_gaps_is_imported_instead_of_refused() -> None:
+    rows = [["ru", "en"], ["Леон", ""], ["Аки", "Aki"]]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["initial_target_languages"] == ["en"]
+    assert comp["grammar"]["allow_empty_targets"] is True
+    assert any("en" in note and "untranslated" in note for note in notes)
+
+
+def test_complete_kit_does_not_declare_allow_empty_targets() -> None:
+    rows = [["ru", "en"], ["Леон", "Leon"], ["Аки", "Aki"]]
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    assert "allow_empty_targets" not in document["components"][0]["grammar"]
+
+
+def test_sheet_without_any_target_language_is_refused() -> None:
+    rows = [["ru", "en"], ["Леон", ""], ["Аки", ""]]
+    with pytest.raises(InferenceError, match="no target language"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_sparse_language_column_is_still_refused() -> None:
+    rows = [["ru", "en"], *[[f"термин{i}", ""] for i in range(40)]]
+    rows[1][1] = "Leon"
+    with pytest.raises(InferenceError, match="too sparse"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_target_descriptions_do_not_bypass_term_min_fill() -> None:
+    rows = [["ru", "en", "ja"]]
+    for index in range(40):
+        rows.extend(
+            [
+                [f"термин{index}", f"term{index}", "訳" if index == 0 else ""],
+                [DESC_RU, DESC_EN, DESC_EN],
+            ]
+        )
+    with pytest.raises(InferenceError, match="too sparse"):
+        infer_glossary_profile("Terms", rows, component="terms")
+
+
+def test_document_survives_parse_profile() -> None:
+    """The inferred document must be a valid profile without edits."""
+    document, _ = infer_glossary_profile("Terms", STANDARD, component="terms")
+    profile = parse_profile(document)
+    assert profile.components[0].source_lang == "ru"
+
+
+def test_wide_blank_row_is_ignored_and_costs_nothing() -> None:
+    """
+    A blank row may be far wider than the data.
+
+    It must not register as an unmapped populated column, and it must not
+    drive the column scan: iterating every column up to the widest row and
+    rescanning all rows per column is quadratic in an uploaded file.
+    """
+    rows = [["ru", "en"], ["Герой", "Hero"], ["Меч", "Sword"]]
+    rows.append([""] * 4000)  # blank, but 2000x wider than the content
+
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert [lang["code"] for lang in comp["languages"]] == ["ru", "en"]
+    assert comp["grammar"]["regions"] == [
+        {"first_record_row": 2, "last_record_row": 3, "record_stride": 1}
+    ]
+
+
+def test_too_many_skipped_rows_is_refused() -> None:
+    """Every skipped row emits a note, so the count must be bounded."""
+    rows = [["ru", "en"]]
+    for index in range(_MAX_SKIPPED_ROWS + 5):
+        rows.extend(
+            [
+                [f"термин{index}", f"term{index}"],
+                ["", f"stray{index}"],  # no source term -> skipped
+            ]
+        )
+
+    with pytest.raises(InferenceError, match="fragmented"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_too_many_regions_is_refused() -> None:
+    """
+    Regions and skip rows are cross-multiplied by the profile validator.
+
+    A sheet that alternates term / blank-separator rows splits into one
+    region per term, so the region count has to be bounded too.
+    """
+    rows = [["ru", "en"]]
+    for index in range(_MAX_REGIONS + 5):
+        rows.extend(
+            [
+                [f"термин{index}", f"term{index}"],
+                [],  # blank row: splits the region, is not "skipped"
+            ]
+        )
+
+    with pytest.raises(InferenceError, match="fragmented"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+# Term/description kit: every term row is followed by a prose row, exactly
+# like the real Heart Abyss terminology export.
+DESC_RU = "Леон - дзинко, главный герой игры. " * 5
+DESC_EN = "Leon is a jinko, the main character of the game. " * 5
+PAIRS = [
+    ["ru", "en"],
+    ["Russian", "English"],
+    ["Леон", "Leon"],
+    [DESC_RU, DESC_EN],
+    ["Аки", "Aki"],
+    [DESC_RU, DESC_EN],
+]
+
+
+def test_pairs_layout_yields_stride_two() -> None:
+    document, _notes = infer_glossary_profile("Terms", PAIRS, component="terms")
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"] == [
+        {"first_record_row": 3, "last_record_row": 6, "record_stride": 2}
+    ]
+    assert grammar["term_row_offset"] == 0
+    assert grammar["notes"] == [
+        {"scope": "source", "column": 1, "header": "ru", "row_offset": 1},
+        {
+            "scope": "target",
+            "column": 2,
+            "header": "en",
+            "row_offset": 1,
+            "language": "en",
+        },
+    ]
+
+
+def test_section_row_above_pairs_is_declared() -> None:
+    rows = [PAIRS[0], PAIRS[1], ["Персонажи", "Characters"], *PAIRS[2:]]
+    document, _notes = infer_glossary_profile("Terms", rows, component="terms")
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"] == [
+        {
+            "first_record_row": 4,
+            "last_record_row": 7,
+            "record_stride": 2,
+            "section_row": 3,
+            "section_column": 1,
+        }
+    ]
+
+
+def test_flat_sheet_keeps_stride_one_and_declares_no_notes() -> None:
+    document, _notes = infer_glossary_profile("Terms", STANDARD, component="terms")
+    grammar = document["components"][0]["grammar"]
+    assert all(region["record_stride"] == 1 for region in grammar["regions"])
+    assert "notes" not in grammar
+
+
+def test_long_rows_without_alternation_stay_flat_with_a_note() -> None:
+    rows = [
+        ["ru", "en"],
+        ["Леон", "Leon"],
+        [DESC_RU, DESC_EN],
+        [DESC_RU, DESC_EN],
+        ["Аки", "Aki"],
+    ]
+    document, notes = infer_glossary_profile("Terms", rows, component="terms")
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"][0]["record_stride"] == 1
+    assert any("switch the layout" in note for note in notes)
+
+
+def test_mixed_layout_blocks_are_refused() -> None:
+    rows = [
+        ["ru", "en"],
+        ["Леон", "Leon"],
+        [DESC_RU, DESC_EN],
+        [],
+        ["Меч", "Sword"],
+        ["Щит", "Shield"],
+    ]
+    with pytest.raises(InferenceError, match="mixes"):
+        infer_glossary_profile("Terms", rows, component="terms")
+
+
+def test_target_language_without_descriptions_is_still_a_target() -> None:
+    rows = [
+        ["ru", "en", "ja"],
+        ["Леон", "Leon", "レオン"],
+        [DESC_RU, DESC_EN, ""],
+        ["Аки", "Aki", "アキ"],
+        [DESC_RU, DESC_EN, ""],
+    ]
+    document, _notes = infer_glossary_profile("Terms", rows, component="terms")
+    comp = document["components"][0]
+    assert comp["initial_target_languages"] == ["en", "ja"]
+
+
+def test_language_with_descriptions_but_missing_terms_is_refused() -> None:
+    rows = [
+        ["ru", "en", "ja"],
+        ["Леон", "Leon", ""],
+        [DESC_RU, DESC_EN, DESC_EN],
+        ["Аки", "Aki", ""],
+        [DESC_RU, DESC_EN, DESC_EN],
+    ]
+    with pytest.raises(InferenceError, match="descriptions"):
+        infer_glossary_profile("Terms", rows, component="terms")
+
+
+def test_explicit_pairs_layout_overrides_detection() -> None:
+    rows = [
+        ["ru", "en"],
+        ["Леон", "Leon"],
+        ["дзинко, герой", "a jinko, the hero"],
+    ]
+    document, _notes = infer_glossary_profile(
+        "Terms", rows, component="terms", layout="pairs"
+    )
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"][0]["record_stride"] == 2
+    assert len(grammar["notes"]) == 2
+
+
+def test_explicit_flat_layout_overrides_detection() -> None:
+    document, _notes = infer_glossary_profile(
+        "Terms", PAIRS, component="terms", layout="flat"
+    )
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"][0]["record_stride"] == 1
+    assert "notes" not in grammar
+
+
+def test_explicit_pairs_layout_on_a_lone_row_is_refused() -> None:
+    rows = [["ru", "en"], ["Леон", "Leon"]]
+    with pytest.raises(InferenceError, match="stands alone"):
+        infer_glossary_profile("Terms", rows, component="terms", layout="pairs")
+
+
+def test_unknown_layout_is_refused() -> None:
+    with pytest.raises(InferenceError, match="unknown layout"):
+        infer_glossary_profile("Terms", PAIRS, component="terms", layout="guess")
+
+
+def test_paired_document_survives_parse_profile() -> None:
+    document, _notes = infer_glossary_profile("Terms", PAIRS, component="terms")
+    profile = parse_profile(document)
+    grammar = profile.components[0].grammar
+    assert grammar.regions[0].record_stride == 2
+    assert [note.row_offset for note in grammar.notes] == [1, 1]
+
+
+FLAT_WITH_NOTE = [
+    ["ru", "en", "tr", "fr", "note"],
+    ["Russian", "English", "Turkish", "French", "Note"],
+    ["Партия", "Party", "Parti", "Parti", "Правящая политическая партия."],
+    ["Самосбор", "Samosbor", "Samosbor", "Samosbor", "Термин вселенной."],
+]
+
+
+def test_note_column_becomes_a_source_note_field() -> None:
+    document, notes = infer_glossary_profile("S", FLAT_WITH_NOTE, component="s")
+    (comp,) = document["components"]
+    assert [lang["code"] for lang in comp["languages"]] == ["ru", "en", "tr", "fr"]
+    assert comp["grammar"]["notes"] == [
+        {"scope": "source", "column": 5, "header": "note", "row_offset": 0}
+    ]
+    assert any("explanation of the source term" in note for note in notes)
+    parse_profile(document)
+
+
+@pytest.mark.parametrize("header", ["Notes", "ОПИСАНИЕ", "Comment", " context "])
+def test_note_header_matching_ignores_case_and_padding(header: str) -> None:
+    rows = [row[:] for row in FLAT_WITH_NOTE]
+    rows[0][4] = header
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["notes"][0]["column"] == 5
+
+
+def test_empty_recognised_note_column_does_not_compete() -> None:
+    rows = [
+        ["ru", "en", "note", "comment"],
+        ["Партия", "Party", "", "Правящая политическая партия."],
+        ["Самосбор", "Samosbor", "", "Термин вселенной."],
+    ]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["notes"][0]["column"] == 4
+    assert any("column 3" in note and "empty" in note for note in notes)
+
+
+def test_two_populated_note_columns_are_refused() -> None:
+    rows = [
+        ["ru", "en", "note", "comment"],
+        ["Партия", "Party", "Проза", "Ещё проза"],
+    ]
+    with pytest.raises(InferenceError, match="columns 3, 4 all look like term notes"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_empty_note_column_is_excluded_with_a_warning() -> None:
+    rows = [["ru", "en", "note"], ["Партия", "Party", ""]]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert "notes" not in comp["grammar"]
+    assert any("column 3" in note and "empty" in note for note in notes)
+
+
+def test_flat_note_on_a_source_less_row_is_refused() -> None:
+    rows = [
+        ["ru", "en", "note"],
+        ["Партия", "Party", "Правящая политическая партия."],
+        ["", "", "не привязанная к термину заметка"],
+    ]
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_unrecognised_extra_column_has_actionable_error() -> None:
+    rows = [["ru", "en", "Character limit"], ["Партия", "Party", "40"]]
+    with pytest.raises(
+        InferenceError, match="recognised term-note header, for example"
+    ):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_flags_column_becomes_a_source_flags_field() -> None:
+    rows = [
+        ["ru", "en", "flags"],
+        ["HeroCraft", "HeroCraft", "read-only"],
+        ["Судно", "Vessel", "forbidden"],
+    ]
+
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (component,) = document["components"]
+
+    assert component["grammar"]["source_flags"] == {
+        "column": 3,
+        "header": "flags",
+        "row_offset": 0,
+    }
+    assert any("source glossary flags" in note for note in notes)
+    parse_profile(document)
+
+
+def test_flags_header_matching_ignores_case_and_padding() -> None:
+    rows = [["ru", "en", " FLAGS "], ["HeroCraft", "HeroCraft", "read-only"]]
+
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+
+    assert document["components"][0]["grammar"]["source_flags"]["column"] == 3
+
+
+def test_flags_on_a_source_less_row_are_refused() -> None:
+    rows = [
+        ["ru", "en", "flags"],
+        ["HeroCraft", "HeroCraft", "read-only"],
+        ["", "", "forbidden"],
+    ]
+
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+PAIRS_WITH_NOTE = [
+    ["ru", "en", "note"],
+    ["Персонажи", "Characters", ""],
+    ["Партия", "Party", "Мужской род во французском."],
+    [
+        (
+            "Правящая политическая партия страны, а не партия товара; "
+            "не обозначает набор одинаковых предметов."
+        ),
+        "The ruling party of the country, not a batch of goods.",
+        "",
+    ],
+    ["Самосбор", "Samosbor", "Транслитерируется."],
+    [
+        (
+            "Аномальное явление, разрушающее материю вокруг себя и меняющее "
+            "поведение персонажей поблизости."
+        ),
+        "An anomaly that dissolves the matter around it.",
+        "",
+    ],
+]
+
+
+def test_explicit_pairs_layout_orders_description_before_note_column() -> None:
+    document, _notes = infer_glossary_profile(
+        "S", PAIRS_WITH_NOTE, component="s", layout="pairs"
+    )
+    (comp,) = document["components"]
+    assert comp["grammar"]["regions"][0]["record_stride"] == 2
+    scopes = [
+        (n["scope"], n["column"], n["row_offset"]) for n in comp["grammar"]["notes"]
+    ]
+    assert scopes[0] == ("source", 1, 1)
+    assert scopes[-1] == ("source", 3, 0)
+    parse_profile(document)
+
+
+def test_automatic_pairs_layout_maps_the_note_column() -> None:
+    document, _notes = infer_glossary_profile("S", PAIRS_WITH_NOTE, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["regions"][0]["record_stride"] == 2
+    assert comp["grammar"]["notes"][-1] == {
+        "scope": "source",
+        "column": 3,
+        "header": "note",
+        "row_offset": 0,
+    }
+
+
+def test_pairs_rejects_note_on_a_source_less_row() -> None:
+    rows = [*PAIRS_WITH_NOTE, ["", "", "не привязанная к термину заметка"]]
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s", layout="pairs")
+
+
+@pytest.mark.parametrize("row", [1, 3])
+def test_explicit_pairs_rejects_note_outside_term_rows(row: int) -> None:
+    rows = [item[:] for item in PAIRS_WITH_NOTE]
+    rows[row][2] = "необъявленная заметка"
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s", layout="pairs")
+
+
+@pytest.mark.parametrize("header", ["id", "ID"])
+def test_technical_id_column_becomes_an_ignored_column(header: str) -> None:
+    rows = [
+        [header, "ru", "en"],
+        ["char_leon", "Леон", "Leon"],
+        ["char_aki", "Аки", "Aki"],
+    ]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["ignored_columns"] == [{"column": 1, "header": header}]
+    assert [lang["code"] for lang in comp["languages"]] == ["ru", "en"]
+    assert any("column 1" in note and "not imported" in note for note in notes)
+    parse_profile(document)
+
+
+def test_ignored_columns_absent_when_every_column_maps() -> None:
+    rows = [["ru", "en"], ["Леон", "Leon"], ["Аки", "Aki"]]
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    assert "ignored_columns" not in document["components"][0]["grammar"]
+
+
+def _render_round_trip(document, rows, tmp_path):
+    component = parse_profile(document).components[0]
+    diagnostics = list(validate_sheet_headers(component, rows))
+    result = parse_component(component, rows)
+    diagnostics.extend(result.diagnostics)
+    render_component(component, result, tmp_path)
+    diagnostics.extend(validate_rendered_component(component, result, tmp_path))
+    assert [d for d in diagnostics if d.severity is Severity.ERROR] == []
+    return component, result
+
+
+def _infer_csv(tmp_path, name: str, body: str):
+    path = tmp_path / name
+    path.write_text(body, encoding="utf-8-sig")
+    rows = read_sheets(path)[path.stem]
+    document, notes = infer_glossary_profile(path.stem, rows, component=path.stem)
+    return rows, document, notes
+
+
+@pytest.mark.parametrize(
+    ("name", "body", "targets", "ignored_columns", "blank_target"),
+    [
+        (
+            "Temple.csv",
+            "ru;en;notes\nЛеон;Leon;Имя собственное, мужской род.\nАки;Aki;Сестра Леона.\n",
+            ["en"],
+            None,
+            None,
+        ),
+        (
+            "Terms.csv",
+            (
+                "id,ru,en,ja,zh-TC,notes\n"
+                "char_leon,Леон,Leon,レオン,,главный герой\n"
+                "char_aki,Аки,Aki,,阿姬,\n"
+                "char_joe,Джо,Joe,,,паук\n"
+            ),
+            ["en", "ja", "zh_Hant"],
+            [{"column": 1, "header": "id"}],
+            ("Джо", "zh_Hant"),
+        ),
+        (
+            "Terms-semicolon.csv",
+            "ru;en;ja;zh-TC;notes\nЛеон;Leon;レオン;;главный герой\nАки;Aki;;阿姬;\n",
+            ["en", "ja", "zh_Hant"],
+            None,
+            ("Аки", "ja"),
+        ),
+    ],
+)
+def test_real_kit_csv_shapes_survive_infer_and_render(
+    tmp_path, name, body, targets, ignored_columns, blank_target
+) -> None:
+    rows, document, notes = _infer_csv(tmp_path, name, body)
+    (component,) = document["components"]
+    assert component["source_lang"] == "ru"
+    assert component["initial_target_languages"] == targets
+    if ignored_columns is None:
+        assert "ignored_columns" not in component["grammar"]
+    else:
+        assert component["grammar"]["ignored_columns"] == ignored_columns
+    if blank_target is None:
+        assert "allow_empty_targets" not in component["grammar"]
+    else:
+        assert component["grammar"]["allow_empty_targets"] is True
+        assert any("untranslated" in note for note in notes)
+
+    _component, result = _render_round_trip(document, rows, tmp_path)
+    if blank_target is not None:
+        source, language = blank_target
+        blank = next(unit for unit in result.units if unit.values["ru"] == source)
+        assert not blank.values[language]

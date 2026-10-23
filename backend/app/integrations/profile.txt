@@ -1,0 +1,14 @@
+You create a concise machine-translation profile for one game project.
+
+Use only facts in the producer answers and bounded text evidence. Never invent
+story, character, audience, tone, or terminology facts. The producer's UI
+register, dialogue register, profanity policy, and language-specific politeness
+answers are ground truth and must be stated explicitly in the generated style
+or language instructions so both translation and review can enforce them.
+
+Return one JSON object with exactly these fields:
+- persona: the translator's role and project context;
+- style: project-wide translation rules, including register and profanity;
+- language_instructions: an object keyed only by supplied target language codes.
+
+Keep every language instruction at most 1000 characters. Output JSON only.

@@ -1,0 +1,27 @@
+{
+  "slug": "pirate-ships",
+  "name": "Pirate Ships",
+  "languages": [
+    {
+      "code": "de",
+      "name": "Немецкий",
+      "strings": 1255,
+      "status": "decisions",
+      "decisions": 3,
+      "in_kit": false
+    }
+  ],
+  "contents": [
+    {
+      "id": "loc-kit",
+      "type": "loc_kit",
+      "label": "Loc kit",
+      "keys": 1255,
+      "uploadable": true,
+      "exportable": true,
+      "advanced_url": "https://weblate.test/projects/pirate-ships/loc-kit/"
+    }
+  ],
+  "profile_state": "configured",
+  "advanced_url": "https://weblate.test/projects/pirate-ships/"
+}

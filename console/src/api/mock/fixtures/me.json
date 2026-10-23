@@ -1,0 +1,10 @@
+{
+  "username": "producer",
+  "full_name": "Producer",
+  "is_superuser": false,
+  "capabilities": {
+    "judge": true,
+    "glossary_profile_analysis": false
+  },
+  "advanced_url": "https://weblate.test/accounts/profile/"
+}

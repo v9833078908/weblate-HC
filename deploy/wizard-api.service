@@ -1,0 +1,28 @@
+[Unit]
+Description=BDHC Weblate wizard API
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=weblate-wizard
+Group=weblate-wizard
+WorkingDirectory=/opt/bdhc/weblate-wizard/current
+EnvironmentFile=/opt/bdhc/weblate-wizard/shared/wizard.env
+Environment=PYTHONPATH=/opt/bdhc/weblate-wizard/current/backend
+ExecStart=/opt/bdhc/weblate-wizard/current/.venv/bin/python -m uvicorn app.main:create_app --factory --app-dir backend --host ${WIZARD_BIND} --port ${WIZARD_PORT} --no-proxy-headers
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=360
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bdhc/weblate-wizard/shared/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
