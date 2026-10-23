@@ -72,6 +72,9 @@ def semantic_key(input, settings):
 
 
 def prepare_profile(store, settings, owner, slug, body):
+    from app.services.run_isolation import assert_project_not_isolated
+
+    assert_project_not_isolated(store, local_slug=slug)
     input = build_profile_input(store, owner, slug, body)
     if any("profiles require" in warning for warning in input["warnings"]):
         raise DomainError(
@@ -184,6 +187,18 @@ def process_profile_once(store, settings, generator=generate_profile_from_input)
     with store.session() as session:
         session.connection().exec_driver_sql("BEGIN IMMEDIATE")
         jobs = list(session.scalars(select(Record).where(Record.kind == "profile_generation")))
+        from app.services.run_isolation import ensure_project_not_isolated
+
+        available = []
+        for candidate in jobs:
+            try:
+                ensure_project_not_isolated(session, "", candidate.data["project"])
+            except DomainError as error:
+                if error.code != "run_isolated":
+                    raise
+                continue
+            available.append(candidate)
+        jobs = available
         for job in jobs:
             value = copy.deepcopy(job.data)
             if value["state"] == "running" and value["lease_until"] <= now:
@@ -205,6 +220,9 @@ def process_profile_once(store, settings, generator=generate_profile_from_input)
             return False
         value = copy.deepcopy(job.data)
         input = value["input"]
+        from app.services.run_isolation import ensure_project_not_isolated
+
+        ensure_project_not_isolated(session, "", value["project"])
         current = session.get(Record, "profile:" + value["project"])
         draft = session.get(Record, input["upload_token"])
         if (

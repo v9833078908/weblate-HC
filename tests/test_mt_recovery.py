@@ -359,14 +359,16 @@ def test_incremental_uses_durable_scope_only_for_planned_empty_ids(tmp_path, mon
     remote.start_scoped_translation = lambda *a: pytest.fail("Legacy paid endpoint called")
     settings = Settings(mt_async_batches_enabled=True, mt_async_projects=("test",))
     with pytest.raises(DomainError) as caught:
-        process_incremental(data, remote, checkpoint, settings=settings, snapshot_loader=snapshot)
+        process_incremental(
+            data, remote, checkpoint, settings=settings, snapshot_loader=snapshot, store=args[0]
+        )
     assert caught.value.code == "incremental_wait"
     assert len(remote.posts) == 1
     assert [u["unit_id"] for u in remote.posts[0][0]["units"]] == [2]
     clock[0] += 31
     remote.completed = True
     result = process_incremental(
-        data, remote, checkpoint, settings=settings, snapshot_loader=snapshot
+        data, remote, checkpoint, settings=settings, snapshot_loader=snapshot, store=args[0]
     )
     assert result["local"]["de"] == {"one": "Ready", "two": "Welt"}
     assert len(remote.posts) == 1

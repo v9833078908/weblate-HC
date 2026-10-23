@@ -86,6 +86,9 @@ def advance_mt_batches(
     lease=None,
 ):
     """Advance one durable scope; the caller's checkpoint retains its worker fence."""
+    from app.services.run_isolation import assert_project_not_isolated
+
+    assert_project_not_isolated(store, data["remote_project"], data.get("project"))
     project = data["remote_project"]
     scope_key = component + ":" + language
     now = time.time()

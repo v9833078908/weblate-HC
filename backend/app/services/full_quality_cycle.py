@@ -245,6 +245,9 @@ def assert_verification_baseline(store, cycle, snapshot):
 
 def advance_full_quality_cycle(store, owner, cycle_id, client, *, scope, language):
     cycle = get_quality_cycle(store, owner, cycle_id)
+    from app.services.run_isolation import assert_project_not_isolated
+
+    assert_project_not_isolated(store, cycle["remote_project"])
     if cycle["phase"] == "completed" or cycle["next_wakeup"] > time.time():
         return cycle
     context = _data(store, cycle, "full-context") or {

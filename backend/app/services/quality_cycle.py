@@ -55,6 +55,9 @@ def _waiting(store, cycle_id: str, seconds: int = 15) -> dict:
 def handle_quality_error(store, owner: str, cycle_id: str, error: DomainError) -> dict:
     """Persist a safe project-level outcome instead of failing the parent job."""
     cycle = get_quality_cycle(store, owner, cycle_id)
+    from app.services.run_isolation import assert_project_not_isolated
+
+    assert_project_not_isolated(store, cycle["remote_project"])
     counts = dict(cycle["counts"])
     classification = failure_class(error.code)
     remote_status = getattr(error, "remote_status", None)
@@ -303,6 +306,9 @@ def advance_quality_cycle(
 ) -> dict:
     """Advance at most one durable remote phase; per-unit failures stay local."""
     cycle = get_quality_cycle(store, owner, cycle_id)
+    from app.services.run_isolation import assert_project_not_isolated
+
+    assert_project_not_isolated(store, cycle["remote_project"])
     if cycle["phase"] == "completed":
         return cycle
     if cycle["policy"].get("workflow_version") == 2:

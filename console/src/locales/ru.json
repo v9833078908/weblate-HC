@@ -1,4 +1,6 @@
 {
+  "archived_unknown": "Изолировано",
+  "Run isolated. Resuming and new paid operations for this project are forbidden. History is preserved; the outcome of one request is unknown.": "Задание изолировано. Возобновление и новые платные операции для этого проекта запрещены. История сохранена; результат одного запроса неизвестен.",
   "Translations are checked without changes.": "Переводы проверяются без изменений.",
   "completed_with_exceptions": "Завершено с исключениями",
   "needs_configuration": "Требуется настройка",

@@ -24,6 +24,8 @@ const document = parseDocument(original);
 const schemas = Object.fromEntries(Object.entries(wizard.components.schemas).map(([name,schema])=>[`Wizard${name}`, remap(schema)]));
 schemas.ProducerLocalizationRequest = remap(wizard.components.schemas.LocalizationRequest);
 schemas.ProducerRun = document.getIn(["components","schemas","ProducerRun"]).toJSON();
+schemas.ProducerRun.properties.status.description = "archived_unknown preserves an unresolved provider result and forbids resume.";
+schemas.ProducerRun.allOf = [{if:{properties:{status:{const:"archived_unknown"}},required:["status"]},then:{properties:{resume_allowed:{const:false},outcome:{type:"null"}}}}];
 schemas.ProducerRun.properties.execution_mode = {type:"string",enum:["repair","verify_only"],readOnly:true};
 for (const key of ["translation_coverage","judge_coverage","payment_outcome"]) schemas.ProducerRun.properties[key] = {type:"object",readOnly:true,additionalProperties:true};
 const edits = [];

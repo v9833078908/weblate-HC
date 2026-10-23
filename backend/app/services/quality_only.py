@@ -124,6 +124,9 @@ def _validate_current_copy(client, project, manifest, mapping, language, scope):
 
 
 def start_quality_only_run(store, owner, slug, body, client, engine):
+    from app.services.run_isolation import assert_project_not_isolated
+
+    assert_project_not_isolated(store, local_slug=slug)
     body = copy.deepcopy(body)
     body["scope"]["unit_ids"] = sorted(body["scope"]["unit_ids"])
     key = revision(["quality-only", owner, slug, body["client_request_id"]])
@@ -143,6 +146,7 @@ def start_quality_only_run(store, owner, slug, body, client, engine):
         body["parent_run_id"],
         verify_only=body.get("execution_mode") == "verify_only",
     )
+    assert_project_not_isolated(store, link["remote_slug"], slug)
     language = body["language"]
     if language not in manifest["targets"]:
         raise DomainError("quality_scope", "Language is not present in the prepared copy", 409)

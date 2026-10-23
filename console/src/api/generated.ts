@@ -6670,6 +6670,7 @@ export interface components {
         ProducerRun: {
             /** Format: uuid */
             readonly id: string;
+            /** @description archived_unknown preserves an unresolved provider result and forbids resume. */
             readonly status: string;
             readonly requested_mode: string;
             /** Format: date-time */
@@ -6701,7 +6702,7 @@ export interface components {
             readonly payment_outcome?: {
                 [key: string]: unknown;
             };
-        };
+        } & unknown;
         /**
          * @description * `judge` - judge
          * @enum {string}

@@ -15,6 +15,11 @@ from app.models import Job, Record
 from app.services.drafts import get_draft
 from app.services.manifest import component_source
 from app.services.profiles import get_profile
+from app.services.run_isolation import (
+    ensure_project_not_isolated,
+    ensure_run_not_isolated,
+    has_isolation_marker,
+)
 
 
 def now_iso():
@@ -64,6 +69,7 @@ def reusable_project(store, owner, slug, manifest):
 
 
 def ensure_project_available(session, owner, slug, except_id=None, remote_slug=None):
+    ensure_project_not_isolated(session, remote_slug or "", slug)
     link = session.get(Record, "link:" + slug)
     if link and link.owner == owner:
         remote_slug = link.data["remote_slug"]
@@ -248,6 +254,8 @@ def start_run(store, owner, slug, body, engine):
             s.connection().exec_driver_sql("BEGIN IMMEDIATE")
             existing = s.scalar(select(Job).where(Job.idempotency_key == key, Job.owner == owner))
             if existing:
+                ensure_run_not_isolated(s, existing)
+                ensure_project_not_isolated(s, existing.data["remote_project"], slug)
                 return public_run(existing)
             ensure_project_available(s, owner, slug)
             reused_project = (
@@ -274,13 +282,13 @@ def start_run(store, owner, slug, body, engine):
         raise
 
 
-def public_run(job):
+def public_run(job, *, isolated=False):
     from app.services.mt_batches import public_mt_observation
     from app.services.run_outcomes import run_outcomes
 
     data = job.data
     outcomes = run_outcomes(data)
-    status = job.status
+    status = "archived_unknown" if isolated else job.status
     if status == "running" and job.lease_until < time.time():
         status = "no-update"
     operations = data["operations"]
@@ -303,8 +311,7 @@ def public_run(job):
         .get("quality", {})
         .get("execution_mode", "repair"),
         **outcomes,
-        "result_bundle_available": job.status == "completed"
-        and bool(data.get("quality_artifact_id")),
+        "result_bundle_available": status == "completed" and bool(data.get("quality_artifact_id")),
         "created": data["created"],
         "started": data["started"],
         "finished": data["finished"],
@@ -342,7 +349,7 @@ def public_run(job):
             if not data["warnings"]
             else "attention"
         )
-        if data["export_id"]
+        if data["export_id"] and status != "archived_unknown"
         else None,
         "resume_allowed": status in {"failed", "unknown"},
         "resume_reason": "Only unfinished operations are observed or processed"
@@ -367,7 +374,7 @@ def get_run(store, owner, run_id):
         job = s.get(Job, run_id)
         if not job or job.owner != owner:
             raise DomainError("not_found", "Not found", 404)
-        return public_run(job)
+        return public_run(job, isolated=has_isolation_marker(s, job))
 
 
 def resume_run(store, owner, run_id, attempt):
@@ -376,6 +383,7 @@ def resume_run(store, owner, run_id, attempt):
         job = s.get(Job, run_id)
         if not job or job.owner != owner:
             raise DomainError("not_found", "Not found", 404)
+        ensure_run_not_isolated(s, job)
         if job.status not in {"unknown", "failed"} or job.data["attempt"] != attempt:
             raise DomainError("stale_run", "Reload the current run", 409)
         if job.lease_until > time.time():
@@ -393,9 +401,11 @@ def resume_run(store, owner, run_id, attempt):
 
 def cancel_run(store, owner, run_id):
     with store.session() as s:
+        s.connection().exec_driver_sql("BEGIN IMMEDIATE")
         job = s.get(Job, run_id)
         if not job or job.owner != owner:
             raise DomainError("not_found", "Not found", 404)
+        ensure_run_not_isolated(s, job)
         if job.status in {"queued", "running", "unknown"}:
             job.status = "cancel_requested"
             if not job.lease_owner and job.data.get("rate_limit", {}).get("waiting"):
@@ -408,14 +418,25 @@ def cancel_run(store, owner, run_id):
 def claim_job(store, lease_owner):
     stamp = time.time()
     with store.session() as s:
-        candidate = s.scalar(
-            select(Job.id)
+        s.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        candidates = s.scalars(
+            select(Job)
             .where(
                 Job.status.in_(["queued", "running", "cancel_requested"]), Job.lease_until <= stamp
             )
             .order_by(Job.id)
-            .limit(1)
         )
+        candidate = None
+        for job in candidates:
+            try:
+                ensure_run_not_isolated(s, job)
+                ensure_project_not_isolated(
+                    s, job.data.get("remote_project", ""), job.data.get("project")
+                )
+            except DomainError:
+                continue
+            candidate = job.id
+            break
         if candidate is None:
             return None
         changed = s.execute(

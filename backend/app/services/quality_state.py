@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.db import DomainError
 from app.models import QualityCycle, QualityEvent, QualityGroup, QualityOperation, QualityUnit
+from app.services.run_isolation import ensure_project_not_isolated
 
 _OPERATION_ORDER = {
     "intent": 0,
@@ -61,6 +62,7 @@ def create_quality_cycle(store, owner: str, job_id: str, remote_project: str, po
         raise DomainError("quality_policy", "Quality policy revision is required")
     try:
         with store.session() as session:
+            ensure_project_not_isolated(session, remote_project)
             existing = session.scalar(
                 select(QualityCycle).where(
                     QualityCycle.job_id == job_id,
@@ -161,16 +163,24 @@ def claim_quality_cycle(
 ) -> dict | None:
     stamp = time.time() if now is None else now
     with store.session() as session:
-        candidate = session.scalar(
-            select(QualityCycle.id)
+        session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        candidates = session.scalars(
+            select(QualityCycle)
             .where(
                 QualityCycle.status.in_(["queued", "running", "waiting"]),
                 QualityCycle.lease_until <= stamp,
                 QualityCycle.next_wakeup <= stamp,
             )
             .order_by(QualityCycle.id)
-            .limit(1)
         )
+        candidate = None
+        for cycle in candidates:
+            try:
+                ensure_project_not_isolated(session, cycle.remote_project)
+            except DomainError:
+                continue
+            candidate = cycle.id
+            break
         if candidate is None:
             return None
         changed = session.execute(
@@ -191,6 +201,9 @@ def claim_quality_cycle(
 def reserve_quality_operation(store, cycle_id: str, operation_key: str, kind: str) -> dict:
     try:
         with store.session() as session:
+            cycle = session.get(QualityCycle, cycle_id)
+            if cycle is not None:
+                ensure_project_not_isolated(session, cycle.remote_project)
             existing = session.scalar(
                 select(QualityOperation).where(
                     QualityOperation.cycle_id == cycle_id,

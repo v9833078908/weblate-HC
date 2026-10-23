@@ -15,7 +15,7 @@ from xml.etree import ElementTree as ET
 from loc_kit_ingest.parser import parse_component
 from loc_kit_ingest.profile import parse_profile
 from loc_kit_ingest.writer import render_component, validate_rendered_component
-from sqlalchemy import update
+from sqlalchemy import select, update
 from translate.storage.xliff import Xliff1File
 
 from app.db import DomainError, Store, revision
@@ -102,6 +102,7 @@ def process_once(store, settings, remote=None):
     if claimed is None:
         return False
     run_id = claimed["id"]
+    not_isolated = ~select(Record.id).where(Record.id == "run-isolation:" + run_id).exists()
     owner = claimed["owner"]
     data = claimed["data"]
     verified_export = None
@@ -116,6 +117,8 @@ def process_once(store, settings, remote=None):
                         Job.id == run_id,
                         Job.lease_owner == lease_owner,
                         Job.lease_until > time.time(),
+                        Job.status != "archived_unknown",
+                        not_isolated,
                     )
                     .values(lease_until=time.time() + 900)
                 )
@@ -128,6 +131,15 @@ def process_once(store, settings, remote=None):
             job = s.get(Job, run_id)
             if not job or job.lease_owner != lease_owner or job.lease_until <= time.time():
                 raise Cancelled()
+            from app.services.run_isolation import (
+                ensure_project_not_isolated,
+                ensure_run_not_isolated,
+            )
+
+            ensure_run_not_isolated(s, job)
+            ensure_project_not_isolated(
+                s, job.data.get("remote_project", ""), job.data.get("project")
+            )
             if job.status == "cancel_requested" and status != "cancelled":
                 raise Cancelled()
             result = s.execute(
@@ -137,6 +149,8 @@ def process_once(store, settings, remote=None):
                     Job.lease_owner == lease_owner,
                     Job.lease_until > time.time(),
                     Job.status == job.status,
+                    Job.status != "archived_unknown",
+                    not_isolated,
                 )
                 .values(
                     data=copy.deepcopy(data),
@@ -861,6 +875,7 @@ def process_once(store, settings, remote=None):
                     Job.lease_owner == lease_owner,
                     Job.lease_until > time.time(),
                     Job.status == "running",
+                    not_isolated,
                 )
                 .values(data=completed_data, status="completed", lease_owner="", lease_until=0)
             )
@@ -929,7 +944,11 @@ def process_once(store, settings, remote=None):
             s.execute(
                 update(Job)
                 .where(
-                    Job.id == run_id, Job.lease_owner == lease_owner, Job.lease_until > time.time()
+                    Job.id == run_id,
+                    Job.lease_owner == lease_owner,
+                    Job.lease_until > time.time(),
+                    Job.status != "archived_unknown",
+                    not_isolated,
                 )
                 .values(data=copy.deepcopy(data), status="cancelled", lease_owner="", lease_until=0)
             )

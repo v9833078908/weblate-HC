@@ -41892,6 +41892,7 @@ components:
         status:
           type: string
           readOnly: true
+          description: archived_unknown preserves an unresolved provider result and forbids resume.
         requested_mode:
           type: string
           readOnly: true
@@ -41980,6 +41981,19 @@ components:
         - status
         - summary
         - warnings
+      allOf:
+        - if:
+            properties:
+              status:
+                const: archived_unknown
+            required:
+              - status
+          then:
+            properties:
+              resume_allowed:
+                const: false
+              outcome:
+                type: "null"
     ProducerRunKindEnum:
       enum:
       - judge

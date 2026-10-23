@@ -56,6 +56,18 @@ function renderRun(api: ProducerApi) {
 
 afterEach(() => vi.useRealTimers());
 
+it("keeps an archived uncertain job readable without any replay controls", async () => {
+  const api = apiMock({ ...running, status: "archived_unknown", resume_allowed: true });
+  renderRun(api);
+  expect(await screen.findByText("Изолировано")).toBeVisible();
+  expect(screen.getByText(/История сохранена; результат одного запроса неизвестен/)).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Продолжить незавершённое задание" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Отменить дальнейшую обработку" })).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Скачать диагностический отчёт" })).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Проверить состояние" }));
+  expect(api.resumeRun).not.toHaveBeenCalled();
+});
+
 it("shows verified input coverage and explicitly scopes payment uncertainty to MT", async () => {
   const api = apiMock({ ...running, requested_mode: "quality", execution_mode: "verify_only", translation_coverage: { filled: 1662, total: 1662, missing: 0 }, payment_outcome: { unknown: 0, automatic_paid_replay_allowed: false } });
   renderRun(api);

@@ -178,6 +178,7 @@ gettext("Review quarantined rows");
 gettext("Rows with PASS");
 gettext("Rows with both judge responses");
 gettext("Run deterministic checks, two judges, consistency repair and recheck before export");
+gettext("Run isolated. Resuming and new paid operations for this project are forbidden. History is preserved; the outcome of one request is unknown.");
 gettext("Save context");
 gettext("Save languages");
 gettext("Save selection");

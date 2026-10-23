@@ -6,7 +6,11 @@ import argparse
 import hashlib
 import json
 import sqlite3
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from app.services.isolation_contract import ARCHIVED, PREFIX, validate_isolation_record
 
 # Canonical SQLite table/index definitions from the closed 0002–0004 migrations.
 # Normalize whitespace only; unknown columns, constraints, indexes or triggers fail closed.
@@ -35,14 +39,52 @@ def readonly(path):
     return sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
 
 
+def isolation_ids(db):
+    records = {
+        row["id"]: dict(row)
+        for row in db.execute(
+            "SELECT * FROM records WHERE kind='run_isolation' OR id LIKE 'run-isolation:%'"
+        )
+    }
+    validated = set()
+    for row in db.execute("SELECT * FROM jobs"):
+        job = dict(row)
+        ident = PREFIX + job["id"]
+        if job["status"] == ARCHIVED or ident in records:
+            validate_isolation_record(job, records.get(ident, {}))
+            validated.add(ident)
+    if set(records) != validated:
+        raise ValueError("Orphan isolation record prevents maintenance")
+    return {ident.removeprefix(PREFIX) for ident in validated}
+
+
+def validate_isolations(path):
+    with readonly(path) as db:
+        db.row_factory = sqlite3.Row
+        return isolation_ids(db)
+
+
 def assert_quiet(path, *, allow_profile_unknown=False):
     with readonly(path) as db:
-        for status, data in db.execute("select status,data from jobs"):
-            value = json.loads(data)
-            if status in {"queued", "running", "unknown", "cancel_requested"} or any(
+        db.row_factory = sqlite3.Row
+        isolated = isolation_ids(db)
+        for row in db.execute("SELECT * FROM jobs"):
+            job = dict(row)
+            if job["id"] in isolated:
+                continue
+            value = json.loads(job["data"])
+            if job["status"] in {"queued", "running", "unknown", "cancel_requested"} or any(
                 op["state"] in {"intent", "accepted"} for op in value.get("operations", {}).values()
             ):
                 raise ValueError("Unsettled external operation prevents maintenance")
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if (
+            "quality_cycles" in tables
+            and db.execute(
+                "SELECT 1 FROM quality_cycles WHERE status IN ('queued','running','waiting','unknown')"
+            ).fetchone()
+        ):
+            raise ValueError("Unsettled quality cycle prevents maintenance")
         if not allow_profile_unknown:
             for (data,) in db.execute("select data from records where kind='profile_generation'"):
                 if json.loads(data).get("state") in {"running", "unknown"}:
@@ -124,6 +166,7 @@ if __name__ == "__main__":
     p.add_argument("--allow-recovery-addition", action="store_true")
     p.add_argument("--read-only-rollback", action="store_true")
     args = p.parse_args()
+    validate_isolations(args.database)
     if not args.read_only_rollback:
         assert_quiet(args.database, allow_profile_unknown=args.allow_profile_unknown)
     if args.compatible:

@@ -137,7 +137,7 @@ export function RunCard({ api }: RunCardProps) {
 
   const rows = useMemo(() => stageRows(run?.stages), [run?.stages]);
   const resume = async () => {
-    if (!run?.resume_allowed) return;
+    if (!run?.resume_allowed || run.status === "archived_unknown") return;
     setResuming(true);
     try {
       setRun(await api.resumeRun(run.id, runAttempt(run)));
@@ -169,7 +169,7 @@ export function RunCard({ api }: RunCardProps) {
               {run.execution_mode === "verify_only" ? <p>{t("Verify only — without changing translations")}</p> : null}
               {run.requested_mode === "quality" ? <p>{t("Machine translation is not run. The original completed job and its file are preserved.")}</p> : null}
             </div>
-            {run.resume_allowed ? (
+            {run.resume_allowed && run.status !== "archived_unknown" ? (
               <button
                 className="primary-button"
                 disabled={resuming}
@@ -180,6 +180,11 @@ export function RunCard({ api }: RunCardProps) {
               </button>
             ) : null}
           </div>
+          {run.status === "archived_unknown" ? (
+            <AsyncNotice>
+              {t("Run isolated. Resuming and new paid operations for this project are forbidden. History is preserved; the outcome of one request is unknown.")}
+            </AsyncNotice>
+          ) : null}
           {run.status === "no-update" || run.liveness === "no-update" ? (
             <AsyncNotice kind="error">
               {t(
