@@ -1,6 +1,6 @@
 # Source-owned protected slots for routed translation
 
-Status: implementation and deployment approved in chat, 2026-10-23; architecture reviewed with refusal-accounting and strict-decoding requirements incorporated.
+Status: complete; approved implementation deployed and both configured model families verified on production, 2026-10-23.
 
 ## Goal and evidence
 
@@ -83,7 +83,7 @@ selection must mirror request preparation, including explicit plural occurrences
   missing slots, extra slots/ids, repeated markers, grammar reordering, wrapper
   text, ordered-markup refusal, no-marker text, batches and sync/async paths.
 - [x] Update the owning producer guide and unreleased changelog after smoke proof.
-- [ ] Commit only task files, fast-forward main, push, deploy from the clean
+- [x] Commit only task files, fast-forward main, push, deploy from the clean
   worktree. Preserve the unrelated operations-plan edit in the main checkout.
 
 ## Verification and rollout gates
@@ -126,4 +126,16 @@ unit target/state. No mass translation run or historical queued-run restart.
   These two probes cost $0.00953011, without storing translations.
 - Placement refinement: three failing-before schema subtests; all 25 protected
   slot regressions pass after requiring interior text and fixed markup positions.
-  Follow-up rollout and the separately authorized second pair are pending.
+  Follow-up review found no actionable defect; scoped pre-commit checks passed.
+- Production checkout and running OCI image independently verified at
+  `03ef9d855455f65c168ff791748d80c506d55cb4`; healthy container, login HTTP 200,
+  all supervisor programs running.
+- Final English Gemini probe: HTTP 200, finish `stop`, usable decoded answer,
+  exact sprite and full markup multiset preserved, stored unit target/state
+  unchanged; cost $0.01022850.
+- Final Korean DeepSeek probe: HTTP 200, finish `stop`, usable decoded answer,
+  exact sprite and full markup multiset preserved, stored unit target/state
+  unchanged; cost $0.00199375.
+- Final pair cost $0.01222225, below its separately approved $0.10 ceiling.
+  Replies were recorded idempotently in private files, without retries or
+  saving translations. No historical queued run or mass translation was launched.
