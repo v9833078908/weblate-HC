@@ -55,6 +55,18 @@ billing duplication, or an independently authorized legacy MT request. Keep
 receipts and unit intents during code rollback; erasing them removes this safety
 boundary. *(documented)* (source: :doc:`/api`)
 
+The separate producer wizard can archive a locally unresolved run with a
+versioned isolation record while preserving its payload, operation keys and
+unknown financial result. Its offline operator command requires a verified
+backup, a matching durable snapshot, recent read-only reconciliation and no
+active writers. Maintenance accepts only an intact record; resume, worker
+admission and new paid wizard operations remain fenced by remote-project
+identity. This local journal is not a provider billing proof or a protection
+against a database administrator rewriting both identities. It does not
+restrict independently authorized Weblate users. Code rollback must retain the
+journal, disable outbound credentials and keep old workers stopped. A production
+application of this procedure requires a separate approved maintenance window.
+
 .. list-table::
    :header-rows: 1
 
