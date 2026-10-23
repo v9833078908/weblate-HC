@@ -12316,6 +12316,100 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
         self.assertEqual(JudgeVerdict.objects.count(), 0)
         self.assertFalse(JudgeRequestAttempt.objects.filter(run__isnull=True).exists())
 
+    @override_settings(
+        JUDGE_BASE_URL="https://api.openai.com/v1",
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        ),
+    )
+    @http_mock.activate
+    def test_judge_repair_access_refusal_preserves_evidence_as_partial(self) -> None:
+        self.project.machinery_settings = {
+            "openrouter": {"key": "test", "routing": {"*": "vendor/repair"}}
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        http_mock.register(
+            "POST",
+            "https://api.openai.com/v1/chat/completions",
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "segments": [
+                                        {
+                                            "id": 0,
+                                            "verdict": "flag",
+                                            "errors": [
+                                                {
+                                                    "span": "Ahoj",
+                                                    "category": "omission",
+                                                    "severity": "major",
+                                                    "description": "Missing world.",
+                                                }
+                                            ],
+                                            "back_translation": "Hello.",
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+        http_mock.register(
+            "POST",
+            self.CHAT_URL,
+            status_code=403,
+            json={
+                "error": {"code": 403, "message": "Access denied by security policy."}
+            },
+        )
+        before = self.unit.target
+        for batch_size in (1, 10):
+            with (
+                self.subTest(batch_size=batch_size),
+                patch(
+                    "weblate_customization.machinery.RoutedLLMTranslation.batch_size",
+                    batch_size,
+                ),
+            ):
+                cache.clear()
+                response = self.post_judge()
+                run = ProducerRun.objects.get(pk=response.data["run_id"])
+                row = JudgeRunUnit.objects.get(run=run, unit=self.unit)
+                self.assertEqual(
+                    row.outcome,
+                    JudgeRunUnit.Outcome.MAJOR,
+                    list(
+                        JudgeRequestAttempt.objects.filter(run=run).values(
+                            "failure_kind",
+                            "http_status",
+                            "exception_class",
+                            "response_shape",
+                        )
+                    ),
+                )
+                self.assertEqual(row.verdict.effective_severity, "major")
+                self.assertEqual(
+                    run.status,
+                    ProducerRun.Status.PARTIAL,
+                    {"repair_status": row.repair_status, "warnings": run.warnings},
+                )
+                self.assertIsNotNone(run.finished)
+                self.assertTrue(
+                    any(
+                        "OpenRouter" in warning and "403" in warning
+                        for warning in run.warnings
+                    )
+                )
+                self.unit.refresh_from_db()
+                self.assertEqual(self.unit.target, before)
+                self.assertFalse(self.unit.suggestion_set.exists())
+
     def test_judge_configuration_failure_in_worker_finishes_run(self) -> None:
         def unavailable_configuration(**kwargs):
             with override_settings(JUDGE_ENABLED=False):

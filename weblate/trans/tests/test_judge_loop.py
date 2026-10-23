@@ -1912,7 +1912,7 @@ class JudgeLoopTest(ViewTestCase):
         # repair_targets builds its prompt from failing_checks.
         seen = []
 
-        def spy(units, _user, *, run_id=None):
+        def spy(units, _user, *, run_id=None, on_failure=None):
             seen.extend({check.name for check in unit.all_checks} for unit in units)
             return {unit.id: ["fixed text"] for unit in units}
 
@@ -2200,7 +2200,7 @@ class JudgeGlossaryRepairLockTest(ViewTestCase):
         original = unit.target
         client = mock_request_verdicts([[MAJOR], [MAJOR]])
 
-        def change_context(units, _user, *, run_id=None):
+        def change_context(units, _user, *, run_id=None, on_failure=None):
             self.source_term.explanation = "Changed while the judge was running."
             self.source_term.save(update_fields=["explanation"])
             return {unit.id: ["must not be applied"] for unit in units}

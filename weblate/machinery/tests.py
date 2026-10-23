@@ -6772,17 +6772,32 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertNotIn("https://provider.example", str(caught.exception))
         self.assertNotIn("https://provider.example", caught.exception.safe_message)
 
-    def test_check_failure_keeps_an_ordinary_403_a_plain_error(self) -> None:
+    def test_check_failure_classifies_access_refusals_without_leaking_detail(
+        self,
+    ) -> None:
         machine = self.get_machine()
-        response = make_error_response(
-            "https://example.com/chat/completions",
-            403,
-            json_data={"error": {"message": "Model access denied for this key"}},
-        )
-
-        with self.assertRaises(Exception) as caught:
-            machine.check_failure(response)
-        self.assertNotIsInstance(caught.exception, MachineTranslationServiceError)
+        for status, reason in (
+            (401, MachineTranslationServiceError.REASON_AUTHENTICATION),
+            (403, MachineTranslationServiceError.REASON_PERMISSION),
+        ):
+            with self.subTest(status=status):
+                response = make_error_response(
+                    "https://example.com/chat/completions",
+                    status,
+                    json_data={
+                        "error": {
+                            "code": status,
+                            "message": "Access denied. Secret: sk-private-provider-detail",
+                        }
+                    },
+                )
+                with self.assertRaises(MachineTranslationServiceError) as caught:
+                    machine.check_failure(response)
+                self.assertEqual(caught.exception.reason_code, reason)
+                self.assertIn(str(status), caught.exception.safe_message)
+                self.assertNotIn(
+                    "sk-private-provider-detail", caught.exception.safe_message
+                )
 
     def test_check_failure_classifies_an_upstream_402_inside_http_200(self) -> None:
         machine = self.get_machine()

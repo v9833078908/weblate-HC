@@ -2509,6 +2509,9 @@ Translations
        response in an overwrite run is refused, the run is partial and its
        warnings include the refusal reason; judging the unchanged translations
        does not make the overwrite successful.
+       If repair generation fails after judging, the run stops as partial.
+       Its warnings identify the repair service and the safe refusal reason;
+       recorded verdicts remain available and existing translations are kept.
 
 .. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/file/
 

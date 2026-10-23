@@ -350,12 +350,13 @@ class BatchMachineTranslation(DocVersionsMixin):
         """
         Classify a failed response as a confirmed service refusal, or None.
 
-        HTTP 402 is always a spent balance. A 403 only becomes a money
-        refusal when the provider's own detail confirms a quota or balance
-        limit; other 403s stay plain access errors instead of being
-        mislabeled as a depleted budget. No default for other statuses: a
-        generic failure must not masquerade as a quota refusal.
+        HTTP 402 is always a spent balance. A 403 is a quota or balance
+        refusal only when the provider confirms that cause; otherwise it is
+        a permission refusal. Authentication and permission failures stop
+        further requests without exposing the provider's raw detail.
         """
+        if response.status_code == 401:
+            return MachineTranslationServiceError.REASON_AUTHENTICATION
         if response.status_code == 402:
             return MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
         if response.status_code == 403:
@@ -366,6 +367,7 @@ class BatchMachineTranslation(DocVersionsMixin):
                 "insufficient" in detail and ("credit" in detail or "balance" in detail)
             ) or "payment" in detail:
                 return MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
+            return MachineTranslationServiceError.REASON_PERMISSION
         return None
 
     def raise_service_failure(

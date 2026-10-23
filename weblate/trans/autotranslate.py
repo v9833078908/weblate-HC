@@ -394,6 +394,7 @@ class BaseAutoTranslate:
             allow_non_shared_tm_source_components
         )
         self.failure_message: str | None = None
+        self.repair_failure: str | None = None
         self.warnings: list[str] = []
         self.judge_summary: JudgeSummary | None = None
 
@@ -1376,6 +1377,18 @@ class AutoTranslate(BaseAutoTranslate):
                 "checking. Start a new run."
             )
             self.add_warning(self.failure_message)
+        for failure in getattr(verdicts, "repair_failures", ()):
+            warning = gettext(
+                "Could not generate a repair for %(language)s using "
+                "%(service)s: %(reason)s"
+            ) % {
+                "language": self.translation.language.code,
+                "service": failure.service,
+                "reason": failure.error,
+            }
+            self.add_warning(warning)
+            if self.failure_message is None:
+                self.repair_failure = self.failure_message = warning
         for language_code in sorted(
             getattr(verdicts, "unsupported_repair_languages", set())
         ):
@@ -2504,6 +2517,14 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 .exists()
                 else ProducerRun.Status.CANCELLED
             )
+        if (
+            status == ProducerRun.Status.FAILED
+            and self.repair_failure
+            and failure == self.repair_failure
+        ):
+            # Judging completed and its evidence is durable; only the repair
+            # failed. Stop this run without discarding the usable verdicts.
+            status = ProducerRun.Status.PARTIAL
         run.status = status
         run.finished = timezone.now()
         run.failure = failure
@@ -2688,6 +2709,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
             judge_remaining -= auto_translate.judge_units_processed
         if auto_translate.failure_message:
             self.failure_message = auto_translate.failure_message
+            self.repair_failure = auto_translate.repair_failure
         self.updated += auto_translate.updated
         for warning in auto_translate.get_warnings():
             self.add_warning(warning)

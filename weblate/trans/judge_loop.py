@@ -39,7 +39,11 @@ from weblate.checks.consistency import REPEAT_DRIFT_CHECK_ID
 from weblate.checks.glossary import GLOSSARY_CHECK_ID, evaluate_glossary_terms
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
-from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD, MachineTranslationError
+from weblate.machinery.base import (
+    MACHINERY_DEFAULT_THRESHOLD,
+    MachineTranslationError,
+    MachineTranslationServiceError,
+)
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
 from weblate.trans.forms import configured_routed_engine
@@ -55,7 +59,7 @@ from weblate.trans.judge import (
     resolve_judge_seat_profile,
     validate_judge_configuration,
 )
-from weblate.trans.machinery import fetch_machinery_matches
+from weblate.trans.machinery import MachineryBatchOutcome, fetch_machinery_matches
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     JudgeAdaptiveState,
@@ -192,7 +196,11 @@ def _machinery_candidates(
 
 
 def repair_targets(
-    units: list[Unit], user: User | None, *, run_id: str | None = None
+    units: list[Unit],
+    user: User | None,
+    *,
+    run_id: str | None = None,
+    on_failure: Callable[[MachineryBatchOutcome], None] | None = None,
 ) -> dict[int, list[str]]:
     """
     Return usable repair targets keyed by unit id, writing nothing.
@@ -201,6 +209,7 @@ def repair_targets(
     run run_checks(), so the round's judge-* Check row exists and
     weblate/machinery/llm.py feeds failing_checks into the prompt of every
     string in the batch. Callers MUST run_checks() first.
+    ``on_failure`` receives sanitized provider failures, not an empty candidate.
     """
     if not units:
         return {}
@@ -213,7 +222,7 @@ def repair_targets(
     engine = MACHINERY[engine_id](setting)
     engine.usage_run_id = run_id
     if engine.batch_size == 1:
-        return _repair_targets_per_unit(engine, units, user)
+        return _repair_targets_per_unit(engine, units, user, on_failure=on_failure)
     try:
         matches = fetch_machinery_matches(
             units=units,
@@ -221,9 +230,11 @@ def repair_targets(
             services=[engine],
             threshold=MACHINERY_DEFAULT_THRESHOLD,
             log_translation=translation,
+            on_failure=on_failure,
         )
     except MachineTranslationError as error:
         translation.log_error("failed judge repair: %s", error)
+        _report_repair_failure(engine, units, error, on_failure)
         return {}
     repairs: dict[int, list[str]] = {}
     for unit in units:
@@ -272,8 +283,40 @@ def unsupported_repair_language(units: list[Unit]) -> str | None:
     return language_code
 
 
+def _report_repair_failure(
+    engine: BatchMachineTranslation,
+    units: list[Unit],
+    error: MachineTranslationError,
+    on_failure: Callable[[MachineryBatchOutcome], None] | None,
+) -> None:
+    if on_failure is None:
+        return
+    classified = isinstance(error, MachineTranslationServiceError)
+    on_failure(
+        MachineryBatchOutcome(
+            status="failed",
+            service=engine.name,
+            unit_ids=tuple(unit.pk for unit in units),
+            reason_code=(
+                error.reason_code
+                if classified
+                else MachineTranslationServiceError.REASON_PROVIDER_UNAVAILABLE
+            ),
+            error=(
+                error.safe_message
+                if classified
+                else gettext("The provider refused the request.")
+            ),
+        )
+    )
+
+
 def _repair_targets_per_unit(
-    engine: BatchMachineTranslation, units: list[Unit], user: User | None
+    engine: BatchMachineTranslation,
+    units: list[Unit],
+    user: User | None,
+    *,
+    on_failure: Callable[[MachineryBatchOutcome], None] | None,
 ) -> dict[int, list[str]]:
     repairs: dict[int, list[str]] = {}
     for unit in units:
@@ -281,6 +324,7 @@ def _repair_targets_per_unit(
             candidates = engine.translate(unit, user)
         except MachineTranslationError as error:
             unit.translation.log_error("failed judge repair: %s", error)
+            _report_repair_failure(engine, [unit], error, on_failure)
             continue
         texts = _select_repair_texts(unit, candidates)
         if texts is not None:
@@ -1330,6 +1374,7 @@ class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builti
         self.repair_status: dict[int, str] = {}
         self.attempt_counts: dict[int, int] = {}
         self.unsupported_repair_languages: set[str] = set()
+        self.repair_failures: list[MachineryBatchOutcome] = []
 
 
 def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-many-locals, too-many-statements]
@@ -1582,10 +1627,21 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
         # G4: a cancellation observed here stops the round from spending a
         # repair MT call; the verdicts already computed above are kept.
         cancelled_before_repair = bool(repairable_units) and is_cancelled()
+        repair_failures: list[MachineryBatchOutcome] = []
         repairs = (
-            repair_targets(repairable_units, user, run_id=run_id)
+            repair_targets(
+                repairable_units,
+                user,
+                run_id=run_id,
+                on_failure=repair_failures.append,
+            )
             if repairable_units and not cancelled_before_repair
             else {}
+        )
+        verdicts.repair_failures.extend(
+            failure
+            for failure in repair_failures
+            if any(unit_id not in repairs for unit_id in failure.unit_ids)
         )
         unsupported_language = (
             unsupported_repair_language(repairable_units) if repairable_units else None
