@@ -17,6 +17,37 @@ from app.worker import process_once
 from test_mt_wait import waiting_run
 
 
+def test_shared_paid_post_admission_survives_restart_without_throttling_get(tmp_path, monkeypatch):
+    from app.db import Store
+
+    clock = [1000.0]
+    monkeypatch.setattr(time, "time", lambda: clock[0])
+    token = tmp_path / "token"
+    token.write_text("private-offline-token")
+    calls = []
+    transport = httpx.MockTransport(
+        lambda request: calls.append(request.method) or httpx.Response(200, json={})
+    )
+    settings = Settings(data_dir=tmp_path, weblate_token_file=str(token))
+    client = WeblateClient(settings, transport, admission_store=Store(tmp_path))
+    client.request("POST", "producer/projects/a/runs/", json={})
+    restarted = WeblateClient(settings, transport, admission_store=Store(tmp_path))
+    with pytest.raises(WeblateRejected) as refused:
+        restarted.request("POST", "producer/projects/b/runs/", json={})
+    assert refused.value.retry_after == 75
+    restarted.request("GET", "producer/runs/a/")
+    assert calls == ["POST", "GET"]
+    clock[0] += 75
+    restarted.request("POST", "producer/projects/b/runs/", json={})
+    assert calls == ["POST", "GET", "POST"]
+
+
+def test_new_observation_default_is_six_hours_and_bounded_at_24():
+    assert Settings().mt_max_observation_seconds == 21600
+    with pytest.raises(ValueError):
+        Settings(mt_max_observation_seconds=86401)
+
+
 @pytest.mark.parametrize("method", ["GET", "POST"])
 @pytest.mark.parametrize(
     "header,expected",

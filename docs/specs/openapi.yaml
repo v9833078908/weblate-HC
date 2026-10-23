@@ -14,111 +14,120 @@ info:
 paths:
   /api/producer/projects/{slug}/context/resolve/:
     post:
-      operationId: wizard_context_resolve_post
-      tags:
-        - producer
+      summary: Context Resolve
+      operationId: context_resolve_api_producer_projects__slug__context_resolve__post
       parameters:
-        - in: path
-          name: slug
+        - name: slug
+          in: path
           required: true
-          schema: &a1
+          schema:
             type: string
-      security:
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Owner-bound local result. No external Weblate writes.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProducerContextResolution"
-        "409":
-          description: Profile, upload or context revision changed.
+            title: Slug
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ContextResolveRequest"
+              $ref: "#/components/schemas/WizardContextResolveRequest"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/profile/prepare/:
     post:
-      operationId: wizard_profile_prepare_post
-      tags:
-        - producer
+      summary: Prepare
+      operationId: prepare_api_producer_projects__slug__profile_prepare__post
       parameters:
-        - in: path
-          name: slug
+        - name: slug
+          in: path
           required: true
-          schema: *a1
-      security:
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Owner-bound local result. No external Weblate writes.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProducerProfilePreparation"
-        "409":
-          description: Profile, upload or context revision changed.
+          schema:
+            type: string
+            title: Slug
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ProfilePrepareRequest"
+              $ref: "#/components/schemas/WizardProfilePrepareRequest"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/profile/preparations/{job_id}/:
     get:
-      operationId: wizard_profile_preparations_job_id_get
-      tags:
-        - producer
+      summary: Preparation
+      operationId: preparation_api_producer_projects__slug__profile_preparations__job_id___get
       parameters:
-        - in: path
-          name: slug
+        - name: slug
+          in: path
           required: true
-          schema: *a1
-        - in: path
-          name: job_id
+          schema:
+            type: string
+            title: Slug
+        - name: job_id
+          in: path
           required: true
-          schema: *a1
-      security:
-        - cookieAuth: []
+          schema:
+            type: string
+            title: Job Id
       responses:
         "200":
-          description: Owner-bound local result. No external Weblate writes.
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProducerProfilePreparation"
-        "409":
-          description: Profile, upload or context revision changed.
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/profile/commit/:
     post:
-      operationId: wizard_profile_commit_post
-      tags:
-        - producer
+      summary: Commit
+      operationId: commit_api_producer_projects__slug__profile_commit__post
       parameters:
-        - in: path
-          name: slug
+        - name: slug
+          in: path
           required: true
-          schema: *a1
-      security:
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Owner-bound local result. No external Weblate writes.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProducerProfile"
-        "409":
-          description: Profile, upload or context revision changed.
+          schema:
+            type: string
+            title: Slug
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ProfileCommitRequest"
+              $ref: "#/components/schemas/WizardProfileCommitRequest"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/addons/:
     get:
       operationId: api_addons_list
@@ -14194,670 +14203,78 @@ paths:
           description: ''
   /api/producer/languages/:
     get:
-      operationId: api_producer_languages_retrieve
-      description: Read the complete language catalogue from external Weblate without modifying it.
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+      summary: Catalog
+      operationId: catalog_api_producer_languages__get
       responses:
-        '400':
+        "200":
+          description: Successful Response
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerLanguageSearch'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+              schema: {}
   /api/producer/me/:
     get:
-      operationId: api_producer_me_retrieve
-      description: Return the current user and what this server can actually do.
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+      summary: Me
+      operationId: me_api_producer_me__get
       responses:
-        '400':
+        "200":
+          description: Successful Response
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerMe'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+              schema: {}
   /api/producer/projects/:
     get:
-      operationId: api_producer_projects_list
-      description: Return the permission-filtered project list.
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: page_size
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+      summary: Projects
+      operationId: projects_api_producer_projects__get
       responses:
-        '400':
+        "200":
+          description: Successful Response
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedProducerProjectSummaryList'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+              schema: {}
     post:
-      operationId: api_producer_projects_create
-      description: Create an empty project from its display name.
-      tags:
-      - producer
+      summary: Create Project
+      operationId: create_project_api_producer_projects__post
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProducerProjectCreate'
+              $ref: "#/components/schemas/WizardProjectCreate"
         required: true
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
       responses:
-        '400':
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '415':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse415'
-              examples:
-                UnsupportedMediaType:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: unsupported_media_type
-                      detail: Unsupported media type "application/json" in request.
-                      attr: null
-          description: The request media type is not supported.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerProjectSummary'
-          description: The resource was created.
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/:
     get:
-      operationId: api_producer_projects_retrieve
-      description: One project the authenticated producer may access.
+      summary: Project
+      operationId: project_api_producer_projects__slug___get
       parameters:
-      - in: path
-        name: slug
-        schema:
-          type: string
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerProjectDetail'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/decisions/apply/:
     post:
       operationId: api_producer_projects_decisions_apply_create
@@ -15024,309 +14441,81 @@ paths:
               $ref: '#/components/headers/X-RateLimit-Reset'
   /api/producer/projects/{slug}/export/:
     get:
-      operationId: api_producer_projects_export_retrieve
-      description: Stream one revision-checked source-first project export.
+      summary: Download
+      operationId: download_api_producer_projects__slug__export__get
       parameters:
-      - in: query
-        name: content
-        schema:
-          type: string
-        description: Comma-separated Producer content slugs; defaults to all.
-      - in: query
-        name: format
-        schema:
-          type: string
-          enum:
-          - csv
-          - json
-          - xlsx
-        required: true
-      - in: query
-        name: revision
-        schema:
-          type: string
-        required: true
-      - in: path
-        name: slug
-        schema:
-          type: string
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
+        - name: revision
+          in: query
+          required: true
+          schema:
+            type: string
+            title: Revision
+        - name: format
+          in: query
+          required: false
+          schema:
+            enum:
+              - xlsx
+              - csv
+              - json
+            type: string
+            default: xlsx
+            title: Format
+        - name: content
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+            title: Content
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                type: string
-                format: binary
-            text/csv:
-              schema:
-                type: string
-                format: binary
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-              schema:
-                type: string
-                format: binary
-          description: Source-first export in the requested format.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
-        '409':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerConflict'
-          description: ''
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/export/summary/:
     get:
-      operationId: api_producer_projects_export_summary_retrieve
-      description: Describe the exact persistent content currently available to export.
+      summary: Summary
+      operationId: summary_api_producer_projects__slug__export_summary__get
       parameters:
-      - in: query
-        name: content
-        schema:
-          type: string
-        description: Comma-separated Producer content slugs; defaults to all.
-      - in: path
-        name: slug
-        schema:
-          type: string
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
+        - name: content
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+            title: Content
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerExportSummary'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/languages/:
     get:
       operationId: api_producer_projects_languages_retrieve
@@ -15619,459 +14808,84 @@ paths:
           description: ''
   /api/producer/projects/{slug}/localization/:
     post:
-      operationId: api_producer_projects_localization_create
-      description: Start the durable import of one confirmed Producer upload.
+      summary: Start
+      operationId: start_api_producer_projects__slug__localization__post
       parameters:
-      - in: path
-        name: slug
-        schema:
-          type: string
-        required: true
-      tags:
-      - producer
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProducerLocalizationRequest'
-        required: true
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+              $ref: "#/components/schemas/WizardLocalizationRequest"
       responses:
-        '400':
+        "202":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '415':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse415'
-              examples:
-                UnsupportedMediaType:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: unsupported_media_type
-                      detail: Unsupported media type "application/json" in request.
-                      attr: null
-          description: The request media type is not supported.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerRun'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerRun'
-          description: The resource was created.
-        '409':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerConflict'
-          description: ''
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/profile/:
     get:
-      operationId: api_producer_projects_profile_retrieve
-      description: Read or revision-check Producer-owned project-profile answers.
+      summary: Get
+      operationId: get_api_producer_projects__slug__profile__get
       parameters:
-      - in: path
-        name: slug
-        schema:
-          type: string
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerProfile'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+                $ref: "#/components/schemas/WizardHTTPValidationError"
     patch:
-      operationId: api_producer_projects_profile_partial_update
-      description: Read or revision-check Producer-owned project-profile answers.
+      summary: Patch
+      operationId: patch_api_producer_projects__slug__profile__patch
       parameters:
-      - in: path
-        name: slug
-        schema:
-          type: string
-        required: true
-      tags:
-      - producer
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedProducerProfilePatch'
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+              $ref: "#/components/schemas/WizardProfilePatch"
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '415':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse415'
-              examples:
-                UnsupportedMediaType:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: unsupported_media_type
-                      detail: Unsupported media type "application/json" in request.
-                      attr: null
-          description: The request media type is not supported.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerProfile'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
-        '409':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerConflict'
-          description: ''
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/runs/:
     post:
       operationId: api_producer_projects_runs_create
@@ -16399,283 +15213,56 @@ paths:
           description: ''
   /api/producer/projects/{slug}/uploads/:
     post:
-      operationId: api_producer_projects_uploads_create
-      description: Analyze an upload locally and persist a private editable draft.
+      summary: Upload
+      operationId: upload_api_producer_projects__slug__uploads__post
       parameters:
-      - in: path
-        name: slug
-        schema:
-          type: string
-        required: true
-      tags:
-      - producer
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
       requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProducerUploadRequest'
         required: true
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/WizardBody_upload_api_producer_projects__slug__uploads__post"
       responses:
-        '400':
+        "201":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '415':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse415'
-              examples:
-                UnsupportedMediaType:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: unsupported_media_type
-                      detail: Unsupported media type "application/json" in request.
-                      attr: null
-          description: The request media type is not supported.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerUploadAnalysis'
-          description: The resource was created.
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/projects/{slug}/uploads/active/:
     get:
-      operationId: api_producer_projects_uploads_active_retrieve
-      description: Return the newest editable draft for this project, owner, and session.
+      summary: Active
+      operationId: active_api_producer_projects__slug__uploads_active__get
       parameters:
-      - in: path
-        name: slug
-        schema:
-          type: string
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerUploadAnalysis'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/runs/{id}/:
     get:
       operationId: api_producer_runs_retrieve
@@ -17413,852 +16000,152 @@ paths:
           description: ''
   /api/producer/uploads/{token}/:
     get:
-      operationId: api_producer_uploads_retrieve
-      description: Read or cancel one owner/session/project-bound upload draft.
+      summary: Get Upload
+      operationId: get_upload_api_producer_uploads__token___get
       parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Token
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerUploadAnalysis'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+                $ref: "#/components/schemas/WizardHTTPValidationError"
     patch:
-      operationId: api_producer_uploads_partial_update
-      description: Read or cancel one owner/session/project-bound upload draft.
+      summary: Update Upload
+      operationId: update_upload_api_producer_uploads__token___patch
       parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - producer
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Token
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProducerUploadAnswersRequest'
-        required: true
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+              $ref: "#/components/schemas/WizardUploadPatch"
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '415':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse415'
-              examples:
-                UnsupportedMediaType:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: unsupported_media_type
-                      detail: Unsupported media type "application/json" in request.
-                      attr: null
-          description: The request media type is not supported.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerUploadAnalysis'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
-        '409':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerConflict'
-          description: ''
-    delete:
-      operationId: api_producer_uploads_destroy
-      description: Read or cancel one owner/session/project-bound upload draft.
-      parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '204':
-          description: No response body
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/uploads/{token}/heartbeat/:
     post:
-      operationId: api_producer_uploads_heartbeat_create
-      description: Extend an active draft without changing its revision or analysis.
+      summary: Heartbeat
+      operationId: heartbeat_api_producer_uploads__token__heartbeat__post
       parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - producer
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProducerUploadHeartbeat'
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Token
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '415':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse415'
-              examples:
-                UnsupportedMediaType:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: unsupported_media_type
-                      detail: Unsupported media type "application/json" in request.
-                      attr: null
-          description: The request media type is not supported.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerUploadHeartbeat'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/uploads/{token}/quarantine/:
     get:
-      operationId: api_producer_uploads_quarantine_retrieve
-      description: Return bounded pages of rows excluded by the deterministic gate.
+      summary: Rows
+      operationId: rows_api_producer_uploads__token__quarantine__get
       parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Token
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            title: Page
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 200
+            title: Page Size
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerUploadPage'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
-        '409':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerConflict'
-          description: ''
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/producer/uploads/{token}/rows/:
     get:
-      operationId: api_producer_uploads_rows_retrieve
-      description: Return bounded pages of original and normalized selected rows.
+      summary: Rows
+      operationId: rows_api_producer_uploads__token__rows__get
       parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - producer
-      security:
-      - tokenAuth: []
-      - bearerAuth: []
-      - cookieAuth: []
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Token
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            title: Page
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 200
+            title: Page Size
       responses:
-        '400':
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse400'
-          description: The request was invalid or could not be parsed.
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse401'
-              examples:
-                AuthenticationFailed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: authentication_failed
-                      detail: Incorrect authentication credentials.
-                      attr: null
-                NotAuthenticated:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_authenticated
-                      detail: Authentication credentials were not provided.
-                      attr: null
-          description: Authentication credentials were missing or invalid.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse404'
-              examples:
-                NotFound:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_found
-                      detail: Not found.
-                      attr: null
-          description: The requested resource was not found or is not accessible.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse405'
-              examples:
-                MethodNotAllowed:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: method_not_allowed
-                      detail: Method "get" not allowed.
-                      attr: null
-          description: The HTTP method is not allowed for this resource.
-        '406':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse406'
-              examples:
-                NotAcceptable:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: not_acceptable
-                      detail: Could not satisfy the request Accept header.
-                      attr: null
-          description: The requested response media type is not available.
-        '423':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse423'
-          description: The resource is locked.
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse429'
-              examples:
-                Throttled:
-                  value:
-                    type: client_error
-                    errors:
-                    - code: throttled
-                      detail: Request was throttled.
-                      attr: null
-          description: The API request rate limit was exceeded.
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse500'
-              examples:
-                APIException:
-                  value:
-                    type: server_error
-                    errors:
-                    - code: error
-                      detail: A server error occurred.
-                      attr: null
-          description: An unexpected server error occurred.
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerUploadPage'
-          description: Successful response.
-          headers:
-            X-RateLimit-Limit:
-              $ref: '#/components/headers/X-RateLimit-Limit'
-            X-RateLimit-Remaining:
-              $ref: '#/components/headers/X-RateLimit-Remaining'
-            X-RateLimit-Reset:
-              $ref: '#/components/headers/X-RateLimit-Reset'
-        '409':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProducerConflict'
-          description: ''
+                $ref: "#/components/schemas/WizardHTTPValidationError"
   /api/projects/:
     get:
       operationId: api_projects_list
@@ -36825,10 +34712,8 @@ paths:
         "200":
           description: Successful Response
           content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
+            application/json:
+              schema: {}
         "422":
           description: Validation Error
           content:
@@ -36941,8 +34826,10 @@ paths:
           in: query
           required: false
           schema:
+            enum:
+              - exact
+              - contains
             type: string
-            enum: [exact, contains]
             default: exact
             title: Match
       responses:
@@ -36973,8 +34860,7 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/WizardProjectConnection"
+              schema: {}
         "422":
           description: Validation Error
           content:
@@ -36997,8 +34883,7 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/WizardProjectConnection"
+              schema: {}
         "422":
           description: Validation Error
           content:
@@ -37056,8 +34941,480 @@ paths:
           description: Successful Response
           content:
             application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
               schema:
-                $ref: "#/components/schemas/WizardProjectConnection"
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/projects/{slug}/uploads/restore/:
+    post:
+      summary: Restore Upload
+      operationId: restore_upload_api_producer_projects__slug__uploads_restore__post
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/bdhc/titles/:
+    get:
+      summary: Search
+      operationId: search_api_producer_bdhc_titles__get
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+            title: Q
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/projects/{slug}/bdhc-preview/:
+    post:
+      summary: Preview
+      operationId: preview_api_producer_projects__slug__bdhc_preview__post
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardBDHCPreviewRequest"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/projects/{slug}/bdhc-apply/:
+    post:
+      summary: Apply
+      operationId: apply_api_producer_projects__slug__bdhc_apply__post
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardBDHCApplyRequest"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/projects/{slug}/profile/manual/:
+    patch:
+      summary: Manual
+      operationId: manual_api_producer_projects__slug__profile_manual__patch
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardManualProfilePatch"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/runs/{run_id}/quality-report/:
+    get:
+      summary: Saved Quality Report
+      operationId: saved_quality_report_api_producer_runs__run_id__quality_report__get
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Run Id
+        - name: format
+          in: query
+          required: false
+          schema:
+            enum:
+              - xlsx
+              - json
+            type: string
+            default: xlsx
+            title: Format
+        - name: category
+          in: query
+          required: false
+          schema:
+            enum:
+              - all
+              - blocking
+              - unverified
+              - advisory
+            type: string
+            default: all
+            title: Category
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            title: Page
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            minimum: 1
+            default: 50
+            title: Page Size
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/runs/{run_id}/result-bundle/:
+    get:
+      summary: Saved Quality Bundle
+      operationId: saved_quality_bundle_api_producer_runs__run_id__result_bundle__get
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Run Id
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/runs/{run_id}/quality/:
+    get:
+      summary: Quality Report
+      operationId: quality_report_api_producer_runs__run_id__quality__get
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Run Id
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/runs/{run_id}/verification-preview/:
+    get:
+      summary: Preview Verification
+      operationId: preview_verification_api_producer_runs__run_id__verification_preview__get
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Run Id
+        - name: language
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: "null"
+            title: Language
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/projects/{slug}/quality-runs/:
+    post:
+      summary: Start Quality Only
+      operationId: start_quality_only_api_producer_projects__slug__quality_runs__post
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Slug
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardQualityOnlyRequest"
+      responses:
+        "202":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/runs/{run_id}/:
+    get:
+      summary: Run
+      operationId: run_api_producer_runs__run_id___get
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Run Id
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/runs/{run_id}/resume/:
+    post:
+      summary: Resume
+      operationId: resume_api_producer_runs__run_id__resume__post
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Run Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardResumeRequest"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /api/producer/runs/{run_id}/cancel/:
+    post:
+      summary: Cancel
+      operationId: cancel_api_producer_runs__run_id__cancel__post
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Run Id
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /health/live:
+    get:
+      summary: Live
+      operationId: live_health_live_get
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /health/ready:
+    get:
+      summary: Ready
+      operationId: ready_health_ready_get
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /auth/login:
+    get:
+      summary: Login Page
+      operationId: login_page_auth_login_get
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
+    post:
+      summary: Login
+      operationId: login_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardLogin"
+        required: true
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardHTTPValidationError"
+  /auth/logout:
+    post:
+      summary: Logout
+      operationId: logout_auth_logout_post
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /:
+    get:
+      summary: Root
+      operationId: root__get
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /console/{path}:
+    get:
+      summary: Console
+      operationId: console_console__path__get
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Path
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
         "422":
           description: Validation Error
           content:
@@ -37110,10 +35467,6 @@ components:
       title: ConnectionConfirm
     WizardChangesPreview:
       properties:
-        glossary_upload_id:
-          type: string
-        glossary_revision:
-          type: string
         upload_id:
           type: string
           title: Upload Id
@@ -37130,6 +35483,16 @@ components:
           type: boolean
           title: Include Old Empty
           default: false
+        glossary_upload_id:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Glossary Upload Id
+        glossary_revision:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Glossary Revision
       additionalProperties: false
       type: object
       required:
@@ -37168,6 +35531,10 @@ components:
             - type: string
             - type: "null"
           title: Glossary Revision
+        glossary_confirmed:
+          type: boolean
+          title: Glossary Confirmed
+          default: false
         change_plan_id:
           anyOf:
             - type: string
@@ -37178,6 +35545,8 @@ components:
             - type: string
             - type: "null"
           title: Change Plan Revision
+        quality:
+          $ref: "#/components/schemas/WizardQualityPolicy"
       additionalProperties: false
       type: object
       required:
@@ -42877,32 +41246,45 @@ components:
       - collisions
       - files
     ProducerLocalizationRequest:
-      type: object
-      description: Closed request binding project creation to one confirmed upload.
       properties:
-        glossary_confirmed:
-          type: boolean
-        change_plan_id:
-          type: string
-        change_plan_revision:
-          type: string
         upload_id:
           type: string
-          format: uuid
+          title: Upload Id
         revision:
           type: string
-          maxLength: 64
-          minLength: 64
+          title: Revision
         glossary_upload_id:
-          type: string
-          format: uuid
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Glossary Upload Id
         glossary_revision:
-          type: string
-          maxLength: 64
-          minLength: 64
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Glossary Revision
+        glossary_confirmed:
+          type: boolean
+          title: Glossary Confirmed
+          default: false
+        change_plan_id:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Change Plan Id
+        change_plan_revision:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Change Plan Revision
+        quality:
+          $ref: "#/components/schemas/WizardQualityPolicy"
+      additionalProperties: false
+      type: object
       required:
-      - revision
-      - upload_id
+        - upload_id
+        - revision
+      title: LocalizationRequest
     ProducerMe:
       type: object
       description: Identity and capabilities for the authenticated producer.
@@ -43519,14 +41901,14 @@ components:
           readOnly: true
         started:
           type:
-          - string
-          - 'null'
+            - string
+            - "null"
           format: date-time
           readOnly: true
         finished:
           type:
-          - string
-          - 'null'
+            - string
+            - "null"
           format: date-time
           readOnly: true
         summary:
@@ -43540,21 +41922,21 @@ components:
           readOnly: true
         liveness:
           type:
-          - string
-          - 'null'
+            - string
+            - "null"
           readOnly: true
         outcome:
           type:
-          - string
-          - 'null'
+            - string
+            - "null"
           readOnly: true
         resume_allowed:
           type: boolean
           readOnly: true
         resume_reason:
           type:
-          - string
-          - 'null'
+            - string
+            - "null"
           readOnly: true
         preparation_phase:
           type: string
@@ -43563,23 +41945,41 @@ components:
           type: object
           additionalProperties: {}
           readOnly: true
+        execution_mode:
+          type: string
+          enum:
+            - repair
+            - verify_only
+          readOnly: true
+        translation_coverage:
+          type: object
+          readOnly: true
+          additionalProperties: true
+        judge_coverage:
+          type: object
+          readOnly: true
+          additionalProperties: true
+        payment_outcome:
+          type: object
+          readOnly: true
+          additionalProperties: true
       required:
-      - coverage
-      - created
-      - failure
-      - finished
-      - id
-      - liveness
-      - outcome
-      - preparation_phase
-      - requested_mode
-      - resume_allowed
-      - resume_reason
-      - stages
-      - started
-      - status
-      - summary
-      - warnings
+        - coverage
+        - created
+        - failure
+        - finished
+        - id
+        - liveness
+        - outcome
+        - preparation_phase
+        - requested_mode
+        - resume_allowed
+        - resume_reason
+        - stages
+        - started
+        - status
+        - summary
+        - warnings
     ProducerRunKindEnum:
       enum:
       - judge
@@ -46507,6 +44907,526 @@ components:
           type: integer
       required:
       - group_id
+    WizardBDHCApplyRequest:
+      properties:
+        revision:
+          type: string
+          title: Revision
+        preview_id:
+          type: string
+          title: Preview Id
+      additionalProperties: false
+      type: object
+      required:
+        - revision
+        - preview_id
+      title: BDHCApplyRequest
+    WizardBDHCPreviewRequest:
+      properties:
+        revision:
+          type: string
+          title: Revision
+        title_id:
+          type: string
+          title: Title Id
+      additionalProperties: false
+      type: object
+      required:
+        - revision
+        - title_id
+      title: BDHCPreviewRequest
+    WizardBody_upload_api_producer_projects__slug__uploads__post:
+      properties:
+        files:
+          items:
+            type: string
+            contentMediaType: application/octet-stream
+          type: array
+          title: Files
+        declared_kind:
+          type: string
+          enum:
+            - string
+            - glossary
+          title: Declared Kind
+          default: string
+        ui_mode:
+          type: string
+          enum:
+            - quick
+            - detailed
+          title: Ui Mode
+          default: quick
+      type: object
+      required:
+        - files
+      title: Body_upload_api_producer_projects__slug__uploads__post
+    WizardColumnRole:
+      properties:
+        file:
+          type: string
+          maxLength: 500
+          title: File
+        sheet:
+          type: string
+          maxLength: 200
+          title: Sheet
+        column:
+          type: integer
+          maximum: 10000
+          minimum: 1
+          title: Column
+        role:
+          type: string
+          enum:
+            - key
+            - language
+            - comment
+            - reference
+            - explanation
+            - flags
+            - ignored
+          title: Role
+        language:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Language
+      additionalProperties: false
+      type: object
+      required:
+        - file
+        - sheet
+        - column
+        - role
+      title: ColumnRole
+    WizardContextResolveRequest:
+      properties:
+        revision:
+          type: string
+          title: Revision
+        upload_token:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Upload Token
+        query:
+          anyOf:
+            - type: string
+              maxLength: 200
+            - type: "null"
+          title: Query
+        title_id:
+          anyOf:
+            - type: string
+              maxLength: 200
+            - type: "null"
+          title: Title Id
+      additionalProperties: false
+      type: object
+      required:
+        - revision
+        - upload_token
+      title: ContextResolveRequest
+    WizardLogin:
+      properties:
+        username:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Username
+        password:
+          type: string
+          maxLength: 1000
+          minLength: 1
+          title: Password
+      additionalProperties: false
+      type: object
+      required:
+        - username
+        - password
+      title: Login
+    WizardManualProfilePatch:
+      properties:
+        revision:
+          type: string
+          title: Revision
+        generated:
+          $ref: "#/components/schemas/WizardTranslationProfile"
+      additionalProperties: false
+      type: object
+      required:
+        - revision
+        - generated
+      title: ManualProfilePatch
+    WizardProfileAnswers:
+      properties:
+        genre:
+          type: string
+          maxLength: 100
+          title: Genre
+          default: ""
+        setting:
+          type: string
+          maxLength: 600
+          title: Setting
+          default: ""
+        player_role:
+          type: string
+          maxLength: 300
+          title: Player Role
+          default: ""
+        audience:
+          type: string
+          maxLength: 400
+          title: Audience
+          default: ""
+        register_ui:
+          type: string
+          maxLength: 100
+          title: Register Ui
+          default: ""
+        register_dialogue:
+          type: string
+          maxLength: 100
+          title: Register Dialogue
+          default: ""
+        profanity:
+          type: string
+          maxLength: 100
+          title: Profanity
+          default: ""
+        profanity_level:
+          anyOf:
+            - type: string
+              maxLength: 100
+            - type: "null"
+          title: Profanity Level
+        cjk_politeness:
+          anyOf:
+            - type: string
+              maxLength: 200
+            - type: "null"
+          title: Cjk Politeness
+      additionalProperties: false
+      type: object
+      title: ProfileAnswers
+    WizardProfileCommitRequest:
+      properties:
+        revision:
+          type: string
+          title: Revision
+        upload_token:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Upload Token
+        upload_revision:
+          type: string
+          title: Upload Revision
+        context_snapshot_id:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Context Snapshot Id
+        answers:
+          $ref: "#/components/schemas/WizardProfileAnswers"
+        edited_fields:
+          items:
+            type: string
+          type: array
+          maxItems: 120
+          title: Edited Fields
+        job_id:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Job Id
+        generated:
+          $ref: "#/components/schemas/WizardTranslationProfile"
+      additionalProperties: false
+      type: object
+      required:
+        - revision
+        - upload_token
+        - upload_revision
+        - answers
+        - generated
+      title: ProfileCommitRequest
+    WizardProfilePatch:
+      properties:
+        revision:
+          type: string
+          title: Revision
+        answers:
+          $ref: "#/components/schemas/WizardProfileAnswers"
+      additionalProperties: false
+      type: object
+      required:
+        - revision
+        - answers
+      title: ProfilePatch
+    WizardProfilePrepareRequest:
+      properties:
+        revision:
+          type: string
+          title: Revision
+        upload_token:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Upload Token
+        upload_revision:
+          type: string
+          title: Upload Revision
+        context_snapshot_id:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Context Snapshot Id
+        answers:
+          $ref: "#/components/schemas/WizardProfileAnswers"
+        edited_fields:
+          items:
+            type: string
+          type: array
+          maxItems: 120
+          title: Edited Fields
+      additionalProperties: false
+      type: object
+      required:
+        - revision
+        - upload_token
+        - upload_revision
+        - answers
+      title: ProfilePrepareRequest
+    WizardProjectCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+      additionalProperties: false
+      type: object
+      required:
+        - name
+      title: ProjectCreate
+    WizardQualityOnlyRequest:
+      properties:
+        execution_mode:
+          type: string
+          enum:
+            - repair
+            - verify_only
+          title: Execution Mode
+          default: repair
+        parent_run_id:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Parent Run Id
+        language:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,100}$
+          title: Language
+        scope:
+          $ref: "#/components/schemas/WizardQualityOnlyScope"
+        glossary_revision:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Glossary Revision
+        client_request_id:
+          type: string
+          format: uuid
+          title: Client Request Id
+      additionalProperties: false
+      type: object
+      required:
+        - parent_run_id
+        - language
+        - scope
+        - glossary_revision
+        - client_request_id
+      title: QualityOnlyRequest
+    WizardQualityOnlyScope:
+      properties:
+        unit_ids:
+          items:
+            type: integer
+            exclusiveMinimum: 0
+          type: array
+          maxItems: 10000
+          minItems: 1
+          title: Unit Ids
+      additionalProperties: false
+      type: object
+      required:
+        - unit_ids
+      title: QualityOnlyScope
+    WizardQualityPolicy:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+          default: false
+        execution_mode:
+          type: string
+          enum:
+            - repair
+            - verify_only
+          title: Execution Mode
+          default: repair
+        language:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,100}$
+          title: Language
+          default: de
+        max_repair_rounds:
+          type: integer
+          enum:
+            - 0
+            - 1
+            - 2
+          title: Max Repair Rounds
+          default: 2
+        consistency:
+          items:
+            type: string
+            enum:
+              - repeat-drift
+              - glossary
+          type: array
+          maxItems: 2
+          title: Consistency
+      additionalProperties: false
+      type: object
+      title: QualityPolicy
+    WizardResumeRequest:
+      properties:
+        attempt:
+          type: integer
+          minimum: 1
+          title: Attempt
+      additionalProperties: false
+      type: object
+      required:
+        - attempt
+      title: ResumeRequest
+    WizardSheetSelection:
+      properties:
+        file:
+          type: string
+          maxLength: 500
+          title: File
+        sheet:
+          type: string
+          maxLength: 200
+          title: Sheet
+      additionalProperties: false
+      type: object
+      required:
+        - file
+        - sheet
+      title: SheetSelection
+    WizardTranslationProfile:
+      properties:
+        persona:
+          type: string
+          maxLength: 4000
+          minLength: 1
+          title: Persona
+        style:
+          type: string
+          maxLength: 4000
+          minLength: 1
+          title: Style
+        language_instructions:
+          additionalProperties:
+            type: string
+          type: object
+          title: Language Instructions
+      additionalProperties: false
+      type: object
+      required:
+        - persona
+        - style
+      title: TranslationProfile
+    WizardUploadAnswers:
+      properties:
+        selected_files:
+          items:
+            type: string
+          type: array
+          maxItems: 100
+          title: Selected Files
+        selected_sheets:
+          items:
+            $ref: "#/components/schemas/WizardSheetSelection"
+          type: array
+          maxItems: 100
+          title: Selected Sheets
+        source_language:
+          anyOf:
+            - type: string
+            - type: "null"
+          title: Source Language
+        included_target_languages:
+          items:
+            type: string
+          type: array
+          maxItems: 100
+          title: Included Target Languages
+        column_roles:
+          items:
+            $ref: "#/components/schemas/WizardColumnRole"
+          type: array
+          maxItems: 10000
+          title: Column Roles
+        duplicate_policy:
+          type: string
+          enum:
+            - separate-components
+            - quarantine
+          title: Duplicate Policy
+          default: separate-components
+        profile_answers:
+          additionalProperties: true
+          type: object
+          title: Profile Answers
+      additionalProperties: false
+      type: object
+      title: UploadAnswers
+    WizardUploadPatch:
+      properties:
+        revision:
+          type: string
+          title: Revision
+        answers:
+          anyOf:
+            - $ref: "#/components/schemas/WizardUploadAnswers"
+            - type: "null"
+        ui_mode:
+          type: string
+          enum:
+            - quick
+            - detailed
+          title: Ui Mode
+        current_step:
+          type: string
+          enum:
+            - select-content
+            - map-columns
+            - confirm
+          title: Current Step
+      additionalProperties: false
+      type: object
+      required:
+        - revision
+        - ui_mode
+        - current_step
+      title: UploadPatch
   securitySchemes:
     bearerAuth:
       type: apiKey

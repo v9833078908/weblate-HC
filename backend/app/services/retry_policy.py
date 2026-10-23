@@ -28,3 +28,19 @@ def retry_after_seconds(value: str | None) -> float | None:
 def retry_delay(attempt: int, *, ceiling: int = 300) -> int:
     """Bounded exponential backoff; the persisted attempt survives restarts."""
     return min(ceiling, 5 * (2 ** max(0, attempt - 1)))
+
+
+def failure_class(code: str) -> str:
+    if code in {"weblate_unavailable", "weblate_rejected"}:
+        return "transient"
+    if code == "weblate_unknown":
+        return "unknown-write"
+    if code in {"weblate_configuration", "quality_configuration"}:
+        return "configuration"
+    if code in {"permission", "external_read_only"}:
+        return "permission"
+    if code == "weblate_schema":
+        return "schema"
+    if code in {"stale", "stale-revision"}:
+        return "stale"
+    return "semantic-exhausted"

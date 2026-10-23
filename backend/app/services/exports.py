@@ -82,16 +82,7 @@ def build_export(manifest, translations, prefer_remote=False):
         columns[sheet["id"]] = {
             lang["code"]: lang["column"] - 1 for lang in sheet["profile"]["languages"]
         }
-        reserved_columns[sheet["id"]] = {
-            field["column"] - 1
-            for name in ("key", "comments", "references", "ignored_columns", "flags", "explanation")
-            for field in (
-                sheet["profile"].get(name, [])
-                if isinstance(sheet["profile"].get(name, []), list)
-                else [sheet["profile"][name]]
-            )
-            if "column" in field
-        }
+        reserved_columns[sheet["id"]] = reserved_export_columns(sheet["profile"])
     counts = {
         code: {"strings": 0, "translated": 0, "empty": 0, "blocked": 0}
         for code in manifest["targets"]
@@ -460,20 +451,7 @@ def serialize_export(value, slug, format):
             slug + "-loc-kit.json",
         )
     if format == "xlsx":
-        workbook = Workbook()
-        workbook.remove(workbook.active)
-        used = set()
-        for index, sheet in enumerate(value["sheets"], 1):
-            title = re.sub(r"[\\/*?:\[\]]", "_", sheet["name"])[:27] or "Sheet"
-            if title.casefold() in used:
-                title = title[:25] + f"-{index}"
-            used.add(title.casefold())
-            ws = workbook.create_sheet(title)
-            for row in sheet["rows"]:
-                ws.append(row)
-                for cell in ws[ws.max_row]:
-                    if isinstance(cell.value, str):
-                        cell.data_type = "s"
+        workbook, _sheets = export_workbook(value)
         output = io.BytesIO()
         workbook.save(output)
         return (
@@ -502,3 +480,46 @@ def serialize_export(value, slug, format):
                 archive.writestr(sheet["id"] + ".csv", text.getvalue().encode("utf-8-sig"))
         return output.getvalue(), "application/zip", slug + "-loc-kit-csv.zip"
     raise DomainError("export_format", "Choose xlsx, csv or json")
+
+
+def reserved_export_columns(profile):
+    """Zero-based service columns that can never become translation output."""
+    return {
+        field["column"] - 1
+        for name in ("key", "comments", "references", "ignored_columns", "flags", "explanation")
+        for field in (
+            profile.get(name, []) if isinstance(profile.get(name, []), list) else [profile[name]]
+        )
+        if "column" in field
+    }
+
+
+def export_sheet_titles(value):
+    """Use one identity-to-title map for the workbook and its quality report."""
+    titles, used = {}, set()
+    for sheet in value["sheets"]:
+        base = re.sub(r"[\\/*?:\[\]]", "_", sheet["name"])[:27] or "Sheet"
+        title, suffix = base, 2
+        while title.casefold() in used:
+            tail = f"-{suffix}"
+            title = base[: 31 - len(tail)] + tail
+            suffix += 1
+        used.add(title.casefold())
+        titles[sheet["id"]] = title
+    return titles
+
+
+def export_workbook(value):
+    """Build literal-value sheets and retain identity despite renamed Excel tabs."""
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    titles, sheets = export_sheet_titles(value), {}
+    for sheet in value["sheets"]:
+        ws = workbook.create_sheet(titles[sheet["id"]])
+        sheets[sheet["id"]] = ws
+        for row in sheet["rows"]:
+            ws.append(row)
+            for cell in ws[ws.max_row]:
+                if isinstance(cell.value, str):
+                    cell.data_type = "s"
+    return workbook, sheets

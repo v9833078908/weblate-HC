@@ -27,6 +27,11 @@ def public_mt_observation(data):
                 "total",
                 "last_progress",
                 "next_poll_at",
+                "deadline",
+                "no_progress_warning",
+                "exceptions",
+                "payment_unknown",
+                "coverage_unknown",
             )
         }
         for key, value in data.get("mt_batches", {}).items()
@@ -68,7 +73,17 @@ def pending_mt_units(rows):
 
 
 def advance_mt_batches(
-    store, run_id, client, *, data, checkpoint, settings, component, language, unit_ids=None
+    store,
+    run_id,
+    client,
+    *,
+    data,
+    checkpoint,
+    settings,
+    component,
+    language,
+    unit_ids=None,
+    lease=None,
 ):
     """Advance one durable scope; the caller's checkpoint retains its worker fence."""
     project = data["remote_project"]
@@ -78,6 +93,7 @@ def advance_mt_batches(
         scope_key,
         {
             "started": now,
+            "deadline": now + settings.mt_max_observation_seconds,
             "last_progress": now,
             "filled": 0,
             "history": [],
@@ -87,9 +103,11 @@ def advance_mt_batches(
         },
     )
     data["mt_next_poll_at"] = scope["next_poll_at"]
-    if (
-        now - scope["started"] >= settings.mt_max_observation_seconds
-        or now - scope["last_progress"] >= settings.mt_observation_seconds
+    # Older checkpoints did not save the configured maximum. Preserve the
+    # previous release's conservative ceiling instead of granting a new window.
+    scope.setdefault("deadline", scope["started"] + min(7200, settings.mt_max_observation_seconds))
+    if not scope.get("autonomous") and (
+        now >= scope["deadline"] or now - scope["last_progress"] >= settings.mt_observation_seconds
     ):
         raise DomainError(
             "weblate_unknown",
@@ -97,7 +115,7 @@ def advance_mt_batches(
             503,
         )
 
-    if now < scope["next_poll_at"]:
+    if not scope.get("autonomous") and now < scope["next_poll_at"]:
         return False
 
     def defer(delay, state):
@@ -143,6 +161,23 @@ def advance_mt_batches(
                     "mt_configuration", "Weblate does not support durable MT batches", 503
                 )
             scope["capability_verified"] = True
+            scope["autonomous"] = capabilities.get("mt_reconciliation") == 1
+        if scope.get("autonomous"):
+            from app.services.run_recovery import advance_run_recovery
+
+            return advance_run_recovery(
+                store,
+                run_id,
+                client,
+                data=data,
+                scope=scope,
+                checkpoint=checkpoint,
+                settings=settings,
+                component=component,
+                language=language,
+                unit_ids=unit_ids,
+                lease=lease,
+            )
         active = scope["active"]
         receipt = None
         if active is not None:

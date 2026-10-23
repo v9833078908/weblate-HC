@@ -674,6 +674,30 @@ fieldset {
 
 .disclosure-button {width:100%; text-align:left; padding:1rem; margin:.75rem 0; min-height:44px;}
 .problem-table-wrap {max-width:100%; overflow-x:auto;}
+.quality-mark-blocking { background: #ffc0cb; color: #111; }
+.quality-artifact-panel { min-inline-size: 0; }
+.quality-artifact-panel .problem-table-wrap table { min-inline-size: 80rem; }
+.quality-artifact-panel th, .quality-artifact-panel td { min-inline-size: 8rem; }
+.quality-mark-unverified { background: #fff2cc; color: #111; }
+.quality-mark-blocking td, .quality-mark-unverified td { white-space: pre-wrap; overflow-wrap: anywhere; }
 .problem-table-wrap table {width:100%; border-collapse:collapse;}
 .problem-table-wrap th, .problem-table-wrap td {padding:.6rem; border-bottom:1px solid #ccd6d3; text-align:left; vertical-align:top; overflow-wrap:anywhere;}
 .helper-note ul {max-height:24rem; overflow:auto;}
+.quality-counts {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+
+.quality-counts div,
+.quality-policy {
+  border: 1px solid var(--border-color, #c9d2cc);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.quality-counts dd {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0.25rem 0 0;
+}

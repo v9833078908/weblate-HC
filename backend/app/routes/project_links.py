@@ -24,7 +24,10 @@ router = APIRouter(prefix="/api/producer")
 
 @router.get("/integration-policy/")
 def integration_policy(request: Request, actor=Depends(require_actor)):
-    return {"external_writes": request.app.state.settings.external_writes_enabled}
+    return {
+        "external_writes": request.app.state.settings.external_writes_enabled,
+        "quality_cycle": request.app.state.settings.quality_cycle_enabled,
+    }
 
 
 class ConnectionPreview(ClosedModel):

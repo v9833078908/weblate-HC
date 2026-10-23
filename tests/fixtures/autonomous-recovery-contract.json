@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "sheet_rows": [1042, 38, 328, 18, 6, 230],
+  "execution_modes": ["repair", "verify_only"],
+  "required_verify_capabilities": {"quality_execution_policy": 1, "verify_only_immutable": 1},
+  "reconciliation": {
+    "ready": [1], "never_sent": [2], "waiting": [3], "paid_unknown": [4],
+    "paid_invalid": [5], "stale": [6], "forbidden": [7]
+  },
+  "provider_recovery": {"openrouter": "unsupported", "litellm": "unsupported"}
+}

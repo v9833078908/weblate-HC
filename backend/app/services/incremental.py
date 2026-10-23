@@ -12,7 +12,16 @@ from app.settings import Settings
 
 
 def process_incremental(
-    data, client, checkpoint, *, snapshot_loader=None, archive_glossary=None, settings=None
+    data,
+    client,
+    checkpoint,
+    *,
+    snapshot_loader=None,
+    archive_glossary=None,
+    settings=None,
+    store=None,
+    run_id="incremental",
+    lease=None,
 ):
     """Execute an immutable delta. Every external mutation has a durable intent."""
     project = data["remote_project"]
@@ -22,6 +31,7 @@ def process_incremental(
     current = load()
     operations = data["operations"]
     settings = settings or Settings()
+    mt_pending = False
     if not any(key.startswith("delta:") for key in operations):
         if revision(current) != plan["snapshot_hash"]:
             raise DomainError("remote_changed", "Внешний проект изменился; нужен новый план", 409)
@@ -290,8 +300,8 @@ def process_incremental(
                     )
                 allowed_ids = [current_rows[key]["target_ids"][code] for key in keys]
                 ready = advance_mt_batches(
-                    None,
-                    "incremental",
+                    store,
+                    run_id,
                     client,
                     data=data,
                     checkpoint=checkpoint,
@@ -299,9 +309,10 @@ def process_incremental(
                     component=cid,
                     language=code,
                     unit_ids=allowed_ids,
+                    lease=lease,
                 )
                 if not ready:
-                    raise DomainError("incremental_wait", "Waiting for durable MT observation", 503)
+                    mt_pending = True
                 continue
             for offset in range(0, len(group["translate"][code]), 100):
                 keys = group["translate"][code][offset : offset + 100]
@@ -338,6 +349,12 @@ def process_incremental(
                     mt_ready,
                     lambda ids=ids: client.start_scoped_translation(project, cid, code, ids),
                 )
+    if mt_pending:
+        from app.services.run_recovery import next_mt_wakeup
+
+        data["mt_next_poll_at"] = next_mt_wakeup(data)
+        checkpoint()
+        raise DomainError("incremental_wait", "Waiting for durable MT observation", 503)
     latest = load()
     result = {}
     for group in plan["components"]:

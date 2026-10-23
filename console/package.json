@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "api:generate": "openapi-typescript ../docs/specs/openapi.yaml -o src/api/generated.ts",
+    "api:generate": "node scripts/generate-wizard-openapi.mjs && openapi-typescript ../docs/specs/openapi.yaml --default-non-nullable false -o src/api/generated.ts",
     "i18n:generate": "node scripts/generate-gettext-catalog.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

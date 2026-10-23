@@ -13,7 +13,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["wizard_context_resolve_post"];
+        /** Context Resolve */
+        post: operations["context_resolve_api_producer_projects__slug__context_resolve__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -29,7 +30,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["wizard_profile_prepare_post"];
+        /** Prepare */
+        post: operations["prepare_api_producer_projects__slug__profile_prepare__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -43,7 +45,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["wizard_profile_preparations_job_id_get"];
+        /** Preparation */
+        get: operations["preparation_api_producer_projects__slug__profile_preparations__job_id___get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -61,7 +64,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["wizard_profile_commit_post"];
+        /** Commit */
+        post: operations["commit_api_producer_projects__slug__profile_commit__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1101,8 +1105,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Read the complete language catalogue from external Weblate without modifying it. */
-        get: operations["api_producer_languages_retrieve"];
+        /** Catalog */
+        get: operations["catalog_api_producer_languages__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1118,8 +1122,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Return the current user and what this server can actually do. */
-        get: operations["api_producer_me_retrieve"];
+        /** Me */
+        get: operations["me_api_producer_me__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1135,11 +1139,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Return the permission-filtered project list. */
-        get: operations["api_producer_projects_list"];
+        /** Projects */
+        get: operations["projects_api_producer_projects__get"];
         put?: never;
-        /** @description Create an empty project from its display name. */
-        post: operations["api_producer_projects_create"];
+        /** Create Project */
+        post: operations["create_project_api_producer_projects__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1153,8 +1157,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description One project the authenticated producer may access. */
-        get: operations["api_producer_projects_retrieve"];
+        /** Project */
+        get: operations["project_api_producer_projects__slug___get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1195,8 +1199,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Stream one revision-checked source-first project export. */
-        get: operations["api_producer_projects_export_retrieve"];
+        /** Download */
+        get: operations["download_api_producer_projects__slug__export__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1212,8 +1216,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Describe the exact persistent content currently available to export. */
-        get: operations["api_producer_projects_export_summary_retrieve"];
+        /** Summary */
+        get: operations["summary_api_producer_projects__slug__export_summary__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1249,8 +1253,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Start the durable import of one confirmed Producer upload. */
-        post: operations["api_producer_projects_localization_create"];
+        /** Start */
+        post: operations["start_api_producer_projects__slug__localization__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1264,15 +1268,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Read or revision-check Producer-owned project-profile answers. */
-        get: operations["api_producer_projects_profile_retrieve"];
+        /** Get */
+        get: operations["get_api_producer_projects__slug__profile__get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** @description Read or revision-check Producer-owned project-profile answers. */
-        patch: operations["api_producer_projects_profile_partial_update"];
+        /** Patch */
+        patch: operations["patch_api_producer_projects__slug__profile__patch"];
         trace?: never;
     };
     "/api/producer/projects/{slug}/runs/": {
@@ -1318,8 +1322,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Analyze an upload locally and persist a private editable draft. */
-        post: operations["api_producer_projects_uploads_create"];
+        /** Upload */
+        post: operations["upload_api_producer_projects__slug__uploads__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1333,8 +1337,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Return the newest editable draft for this project, owner, and session. */
-        get: operations["api_producer_projects_uploads_active_retrieve"];
+        /** Active */
+        get: operations["active_api_producer_projects__slug__uploads_active__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1417,16 +1421,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Read or cancel one owner/session/project-bound upload draft. */
-        get: operations["api_producer_uploads_retrieve"];
+        /** Get Upload */
+        get: operations["get_upload_api_producer_uploads__token___get"];
         put?: never;
         post?: never;
-        /** @description Read or cancel one owner/session/project-bound upload draft. */
-        delete: operations["api_producer_uploads_destroy"];
+        delete?: never;
         options?: never;
         head?: never;
-        /** @description Read or cancel one owner/session/project-bound upload draft. */
-        patch: operations["api_producer_uploads_partial_update"];
+        /** Update Upload */
+        patch: operations["update_upload_api_producer_uploads__token___patch"];
         trace?: never;
     };
     "/api/producer/uploads/{token}/heartbeat/": {
@@ -1438,8 +1441,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Extend an active draft without changing its revision or analysis. */
-        post: operations["api_producer_uploads_heartbeat_create"];
+        /** Heartbeat */
+        post: operations["heartbeat_api_producer_uploads__token__heartbeat__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1453,8 +1456,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Return bounded pages of rows excluded by the deterministic gate. */
-        get: operations["api_producer_uploads_quarantine_retrieve"];
+        /** Rows */
+        get: operations["rows_api_producer_uploads__token__quarantine__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1470,8 +1473,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Return bounded pages of original and normalized selected rows. */
-        get: operations["api_producer_uploads_rows_retrieve"];
+        /** Rows */
+        get: operations["rows_api_producer_uploads__token__rows__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2859,6 +2862,330 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/producer/projects/{slug}/uploads/restore/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Upload */
+        post: operations["restore_upload_api_producer_projects__slug__uploads_restore__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/bdhc/titles/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search */
+        get: operations["search_api_producer_bdhc_titles__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/projects/{slug}/bdhc-preview/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview */
+        post: operations["preview_api_producer_projects__slug__bdhc_preview__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/projects/{slug}/bdhc-apply/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply */
+        post: operations["apply_api_producer_projects__slug__bdhc_apply__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/projects/{slug}/profile/manual/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Manual */
+        patch: operations["manual_api_producer_projects__slug__profile_manual__patch"];
+        trace?: never;
+    };
+    "/api/producer/runs/{run_id}/quality-report/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Saved Quality Report */
+        get: operations["saved_quality_report_api_producer_runs__run_id__quality_report__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/runs/{run_id}/result-bundle/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Saved Quality Bundle */
+        get: operations["saved_quality_bundle_api_producer_runs__run_id__result_bundle__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/runs/{run_id}/quality/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quality Report */
+        get: operations["quality_report_api_producer_runs__run_id__quality__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/runs/{run_id}/verification-preview/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Verification */
+        get: operations["preview_verification_api_producer_runs__run_id__verification_preview__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/projects/{slug}/quality-runs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Quality Only */
+        post: operations["start_quality_only_api_producer_projects__slug__quality_runs__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/runs/{run_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run */
+        get: operations["run_api_producer_runs__run_id___get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/runs/{run_id}/resume/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume */
+        post: operations["resume_api_producer_runs__run_id__resume__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/producer/runs/{run_id}/cancel/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_api_producer_runs__run_id__cancel__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live */
+        get: operations["live_health_live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ready */
+        get: operations["ready_health_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Login Page */
+        get: operations["login_page_auth_login_get"];
+        put?: never;
+        /** Login */
+        post: operations["login_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Root */
+        get: operations["root__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Console */
+        get: operations["console_console__path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export interface webhooks {
     AddonWebhook: {
@@ -2973,8 +3300,6 @@ export interface components {
         };
         /** ChangesPreview */
         WizardChangesPreview: {
-            glossary_upload_id?: string;
-            glossary_revision?: string;
             /** Upload Id */
             upload_id: string;
             /** Revision */
@@ -2987,7 +3312,11 @@ export interface components {
              * Include Old Empty
              * @default false
              */
-            include_old_empty: boolean;
+            include_old_empty?: boolean;
+            /** Glossary Upload Id */
+            glossary_upload_id?: string | null;
+            /** Glossary Revision */
+            glossary_revision?: string | null;
         };
         /** ChangesConfirm */
         WizardChangesConfirm: {
@@ -3006,10 +3335,16 @@ export interface components {
             glossary_upload_id?: string | null;
             /** Glossary Revision */
             glossary_revision?: string | null;
+            /**
+             * Glossary Confirmed
+             * @default false
+             */
+            glossary_confirmed?: boolean;
             /** Change Plan Id */
             change_plan_id?: string | null;
             /** Change Plan Revision */
             change_plan_revision?: string | null;
+            quality?: components["schemas"]["WizardQualityPolicy"];
         };
         /** ValidationError */
         WizardValidationError: {
@@ -6071,17 +6406,26 @@ export interface components {
             readonly files: components["schemas"]["ProducerAnalyzedFile"][];
             readonly collisions: components["schemas"]["ProducerCollision"][];
         };
-        /** @description Closed request binding project creation to one confirmed upload. */
+        /** LocalizationRequest */
         ProducerLocalizationRequest: {
-            glossary_confirmed?: boolean;
-            change_plan_id?: string;
-            change_plan_revision?: string;
-            /** Format: uuid */
+            /** Upload Id */
             upload_id: string;
+            /** Revision */
             revision: string;
-            /** Format: uuid */
-            glossary_upload_id?: string;
-            glossary_revision?: string;
+            /** Glossary Upload Id */
+            glossary_upload_id?: string | null;
+            /** Glossary Revision */
+            glossary_revision?: string | null;
+            /**
+             * Glossary Confirmed
+             * @default false
+             */
+            glossary_confirmed?: boolean;
+            /** Change Plan Id */
+            change_plan_id?: string | null;
+            /** Change Plan Revision */
+            change_plan_revision?: string | null;
+            quality?: components["schemas"]["WizardQualityPolicy"];
         };
         /** @description Identity and capabilities for the authenticated producer. */
         ProducerMe: {
@@ -6346,6 +6690,17 @@ export interface components {
             readonly coverage: {
                 [key: string]: unknown;
             };
+            /** @enum {string} */
+            readonly execution_mode?: "repair" | "verify_only";
+            readonly translation_coverage?: {
+                [key: string]: unknown;
+            };
+            readonly judge_coverage?: {
+                [key: string]: unknown;
+            };
+            readonly payment_outcome?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * @description * `judge` - judge
@@ -6435,9 +6790,9 @@ export interface components {
             files: string[];
             relative_paths?: string[];
             /** @default string */
-            declared_kind: components["schemas"]["ProducerUploadKindEnum"];
+            declared_kind?: components["schemas"]["ProducerUploadKindEnum"];
             /** @default quick */
-            ui_mode: components["schemas"]["UiModeEnum"];
+            ui_mode?: components["schemas"]["UiModeEnum"];
         };
         ProducerUploadRow: {
             readonly file: string;
@@ -7205,53 +7560,53 @@ export interface components {
              */
             end?: string;
             /** @default  */
-            language: string;
+            language?: string;
             /** @default count */
-            sort_by: components["schemas"]["SortByEnum"];
+            sort_by?: components["schemas"]["SortByEnum"];
             /** @default descending */
-            sort_order: components["schemas"]["SortOrderEnum"];
+            sort_order?: components["schemas"]["SortOrderEnum"];
             /** @default unique */
-            counting_mode: components["schemas"]["CountingModeEnum"];
+            counting_mode?: components["schemas"]["CountingModeEnum"];
             /** @default state:<translated */
-            q: string;
+            q?: string;
             /**
              * Format: decimal
              * @default 1.0000
              */
-            base_rate: string;
+            base_rate?: string;
             /** @default 80 */
-            tm_threshold: number;
+            tm_threshold?: number;
             /**
              * Format: decimal
              * @default 100.00
              */
-            rate_new: string;
+            rate_new?: string;
             /**
              * Format: decimal
              * @default 50.00
              */
-            rate_needs_editing: string;
+            rate_needs_editing?: string;
             /**
              * Format: decimal
              * @default 0.00
              */
-            rate_tm_100: string;
+            rate_tm_100?: string;
             /**
              * Format: decimal
              * @default 50.00
              */
-            rate_tm_fuzzy: string;
+            rate_tm_fuzzy?: string;
             /**
              * Format: decimal
              * @default 0.00
              */
-            rate_repetition: string;
+            rate_repetition?: string;
             /** @default 5 */
-            min_changes: number;
+            min_changes?: number;
             /** @default 1000 */
-            max_changes: number;
+            max_changes?: number;
             /** @default 10000 */
-            max_words: number;
+            max_words?: number;
         };
         /**
          * @description * `credits` - Credits
@@ -7355,53 +7710,53 @@ export interface components {
              */
             end?: string;
             /** @default  */
-            language: string;
+            language?: string;
             /** @default count */
-            sort_by: components["schemas"]["SortByEnum"];
+            sort_by?: components["schemas"]["SortByEnum"];
             /** @default descending */
-            sort_order: components["schemas"]["SortOrderEnum"];
+            sort_order?: components["schemas"]["SortOrderEnum"];
             /** @default unique */
-            counting_mode: components["schemas"]["CountingModeEnum"];
+            counting_mode?: components["schemas"]["CountingModeEnum"];
             /** @default state:<translated */
-            q: string;
+            q?: string;
             /**
              * Format: decimal
              * @default 1.0000
              */
-            base_rate: string;
+            base_rate?: string;
             /** @default 80 */
-            tm_threshold: number;
+            tm_threshold?: number;
             /**
              * Format: decimal
              * @default 100.00
              */
-            rate_new: string;
+            rate_new?: string;
             /**
              * Format: decimal
              * @default 50.00
              */
-            rate_needs_editing: string;
+            rate_needs_editing?: string;
             /**
              * Format: decimal
              * @default 0.00
              */
-            rate_tm_100: string;
+            rate_tm_100?: string;
             /**
              * Format: decimal
              * @default 50.00
              */
-            rate_tm_fuzzy: string;
+            rate_tm_fuzzy?: string;
             /**
              * Format: decimal
              * @default 0.00
              */
-            rate_repetition: string;
+            rate_repetition?: string;
             /** @default 5 */
-            min_changes: number;
+            min_changes?: number;
             /** @default 1000 */
-            max_changes: number;
+            max_changes?: number;
             /** @default 10000 */
-            max_words: number;
+            max_words?: number;
         };
         Screenshot: {
             readonly id: number;
@@ -7550,7 +7905,7 @@ export interface components {
         };
         SuggestionAcceptRequest: {
             /** @default false */
-            approve: boolean;
+            approve?: boolean;
         };
         SuggestionActionResult: {
             result: string;
@@ -7709,11 +8064,11 @@ export interface components {
             author_email?: string;
             author_name?: string;
             /** @default translate */
-            method: components["schemas"]["MethodEnum"];
+            method?: components["schemas"]["MethodEnum"];
             /** @default  */
-            fuzzy: components["schemas"]["FuzzyEnum"] | components["schemas"]["BlankEnum"];
+            fuzzy?: components["schemas"]["FuzzyEnum"] | components["schemas"]["BlankEnum"];
             /** @default  */
-            conflicts: components["schemas"]["ConflictsEnum"] | components["schemas"]["BlankEnum"];
+            conflicts?: components["schemas"]["ConflictsEnum"] | components["schemas"]["BlankEnum"];
         };
         UploadResult: {
             result: boolean;
@@ -7797,6 +8152,276 @@ export interface components {
         UserGroupDeleteRequest: {
             group_id: number;
         };
+        /** BDHCApplyRequest */
+        WizardBDHCApplyRequest: {
+            /** Revision */
+            revision: string;
+            /** Preview Id */
+            preview_id: string;
+        };
+        /** BDHCPreviewRequest */
+        WizardBDHCPreviewRequest: {
+            /** Revision */
+            revision: string;
+            /** Title Id */
+            title_id: string;
+        };
+        /** Body_upload_api_producer_projects__slug__uploads__post */
+        WizardBody_upload_api_producer_projects__slug__uploads__post: {
+            /** Files */
+            files: string[];
+            /**
+             * Declared Kind
+             * @default string
+             * @enum {string}
+             */
+            declared_kind?: "string" | "glossary";
+            /**
+             * Ui Mode
+             * @default quick
+             * @enum {string}
+             */
+            ui_mode?: "quick" | "detailed";
+        };
+        /** ColumnRole */
+        WizardColumnRole: {
+            /** File */
+            file: string;
+            /** Sheet */
+            sheet: string;
+            /** Column */
+            column: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "key" | "language" | "comment" | "reference" | "explanation" | "flags" | "ignored";
+            /** Language */
+            language?: string | null;
+        };
+        /** ContextResolveRequest */
+        WizardContextResolveRequest: {
+            /** Revision */
+            revision: string;
+            /** Upload Token */
+            upload_token: string;
+            /** Query */
+            query?: string | null;
+            /** Title Id */
+            title_id?: string | null;
+        };
+        /** Login */
+        WizardLogin: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+        };
+        /** ManualProfilePatch */
+        WizardManualProfilePatch: {
+            /** Revision */
+            revision: string;
+            generated: components["schemas"]["WizardTranslationProfile"];
+        };
+        /** ProfileAnswers */
+        WizardProfileAnswers: {
+            /**
+             * Genre
+             * @default
+             */
+            genre?: string;
+            /**
+             * Setting
+             * @default
+             */
+            setting?: string;
+            /**
+             * Player Role
+             * @default
+             */
+            player_role?: string;
+            /**
+             * Audience
+             * @default
+             */
+            audience?: string;
+            /**
+             * Register Ui
+             * @default
+             */
+            register_ui?: string;
+            /**
+             * Register Dialogue
+             * @default
+             */
+            register_dialogue?: string;
+            /**
+             * Profanity
+             * @default
+             */
+            profanity?: string;
+            /** Profanity Level */
+            profanity_level?: string | null;
+            /** Cjk Politeness */
+            cjk_politeness?: string | null;
+        };
+        /** ProfileCommitRequest */
+        WizardProfileCommitRequest: {
+            /** Revision */
+            revision: string;
+            /** Upload Token */
+            upload_token: string;
+            /** Upload Revision */
+            upload_revision: string;
+            /** Context Snapshot Id */
+            context_snapshot_id?: string | null;
+            answers: components["schemas"]["WizardProfileAnswers"];
+            /** Edited Fields */
+            edited_fields?: string[];
+            /** Job Id */
+            job_id?: string | null;
+            generated: components["schemas"]["WizardTranslationProfile"];
+        };
+        /** ProfilePatch */
+        WizardProfilePatch: {
+            /** Revision */
+            revision: string;
+            answers: components["schemas"]["WizardProfileAnswers"];
+        };
+        /** ProfilePrepareRequest */
+        WizardProfilePrepareRequest: {
+            /** Revision */
+            revision: string;
+            /** Upload Token */
+            upload_token: string;
+            /** Upload Revision */
+            upload_revision: string;
+            /** Context Snapshot Id */
+            context_snapshot_id?: string | null;
+            answers: components["schemas"]["WizardProfileAnswers"];
+            /** Edited Fields */
+            edited_fields?: string[];
+        };
+        /** ProjectCreate */
+        WizardProjectCreate: {
+            /** Name */
+            name: string;
+        };
+        /** QualityOnlyRequest */
+        WizardQualityOnlyRequest: {
+            /**
+             * Execution Mode
+             * @default repair
+             * @enum {string}
+             */
+            execution_mode?: "repair" | "verify_only";
+            /** Parent Run Id */
+            parent_run_id: string;
+            /** Language */
+            language: string;
+            scope: components["schemas"]["WizardQualityOnlyScope"];
+            /** Glossary Revision */
+            glossary_revision: string;
+            /**
+             * Client Request Id
+             * Format: uuid
+             */
+            client_request_id: string;
+        };
+        /** QualityOnlyScope */
+        WizardQualityOnlyScope: {
+            /** Unit Ids */
+            unit_ids: number[];
+        };
+        /** QualityPolicy */
+        WizardQualityPolicy: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled?: boolean;
+            /**
+             * Execution Mode
+             * @default repair
+             * @enum {string}
+             */
+            execution_mode?: "repair" | "verify_only";
+            /**
+             * Language
+             * @default de
+             */
+            language?: string;
+            /**
+             * Max Repair Rounds
+             * @default 2
+             * @enum {integer}
+             */
+            max_repair_rounds?: 0 | 1 | 2;
+            /** Consistency */
+            consistency?: ("repeat-drift" | "glossary")[];
+        };
+        /** ResumeRequest */
+        WizardResumeRequest: {
+            /** Attempt */
+            attempt: number;
+        };
+        /** SheetSelection */
+        WizardSheetSelection: {
+            /** File */
+            file: string;
+            /** Sheet */
+            sheet: string;
+        };
+        /** TranslationProfile */
+        WizardTranslationProfile: {
+            /** Persona */
+            persona: string;
+            /** Style */
+            style: string;
+            /** Language Instructions */
+            language_instructions?: {
+                [key: string]: string;
+            };
+        };
+        /** UploadAnswers */
+        WizardUploadAnswers: {
+            /** Selected Files */
+            selected_files?: string[];
+            /** Selected Sheets */
+            selected_sheets?: components["schemas"]["WizardSheetSelection"][];
+            /** Source Language */
+            source_language?: string | null;
+            /** Included Target Languages */
+            included_target_languages?: string[];
+            /** Column Roles */
+            column_roles?: components["schemas"]["WizardColumnRole"][];
+            /**
+             * Duplicate Policy
+             * @default separate-components
+             * @enum {string}
+             */
+            duplicate_policy?: "separate-components" | "quarantine";
+            /** Profile Answers */
+            profile_answers?: {
+                [key: string]: unknown;
+            };
+        };
+        /** UploadPatch */
+        WizardUploadPatch: {
+            /** Revision */
+            revision: string;
+            answers?: components["schemas"]["WizardUploadAnswers"] | null;
+            /**
+             * Ui Mode
+             * @enum {string}
+             */
+            ui_mode: "quick" | "detailed";
+            /**
+             * Current Step
+             * @enum {string}
+             */
+            current_step: "select-content" | "map-columns" | "confirm";
+        };
     };
     responses: never;
     parameters: never;
@@ -7813,7 +8438,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    wizard_context_resolve_post: {
+    context_resolve_api_producer_projects__slug__context_resolve__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -7824,29 +8449,31 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ContextResolveRequest"];
+                "application/json": components["schemas"]["WizardContextResolveRequest"];
             };
         };
         responses: {
-            /** @description Owner-bound local result. No external Weblate writes. */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerContextResolution"];
+                    "application/json": unknown;
                 };
             };
-            /** @description Profile, upload or context revision changed. */
-            409: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
             };
         };
     };
-    wizard_profile_prepare_post: {
+    prepare_api_producer_projects__slug__profile_prepare__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -7857,29 +8484,31 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProfilePrepareRequest"];
+                "application/json": components["schemas"]["WizardProfilePrepareRequest"];
             };
         };
         responses: {
-            /** @description Owner-bound local result. No external Weblate writes. */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerProfilePreparation"];
+                    "application/json": unknown;
                 };
             };
-            /** @description Profile, upload or context revision changed. */
-            409: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
             };
         };
     };
-    wizard_profile_preparations_job_id_get: {
+    preparation_api_producer_projects__slug__profile_preparations__job_id___get: {
         parameters: {
             query?: never;
             header?: never;
@@ -7891,25 +8520,27 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Owner-bound local result. No external Weblate writes. */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerProfilePreparation"];
+                    "application/json": unknown;
                 };
             };
-            /** @description Profile, upload or context revision changed. */
-            409: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
             };
         };
     };
-    wizard_profile_commit_post: {
+    commit_api_producer_projects__slug__profile_commit__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -7920,25 +8551,27 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProfileCommitRequest"];
+                "application/json": components["schemas"]["WizardProfileCommitRequest"];
             };
         };
         responses: {
-            /** @description Owner-bound local result. No external Weblate writes. */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerProfile"];
+                    "application/json": unknown;
                 };
             };
-            /** @description Profile, upload or context revision changed. */
-            409: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
             };
         };
     };
@@ -17875,7 +18508,7 @@ export interface operations {
             };
         };
     };
-    api_producer_languages_retrieve: {
+    catalog_api_producer_languages__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -17884,93 +18517,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerLanguageSearch"];
-                };
-            };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": unknown;
                 };
             };
         };
     };
-    api_producer_me_retrieve: {
+    me_api_producer_me__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -17979,193 +18537,38 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerMe"];
-                };
-            };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": unknown;
                 };
             };
         };
     };
-    api_producer_projects_list: {
+    projects_api_producer_projects__get: {
         parameters: {
-            query?: {
-                /** @description A page number within the paginated result set. */
-                page?: number;
-                /** @description Number of results to return per page. */
-                page_size?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedProducerProjectSummaryList"];
-                };
-            };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": unknown;
                 };
             };
         };
     };
-    api_producer_projects_create: {
+    create_project_api_producer_projects__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -18174,103 +18577,31 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProducerProjectCreate"];
+                "application/json": components["schemas"]["WizardProjectCreate"];
             };
         };
         responses: {
-            /** @description The resource was created. */
+            /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerProjectSummary"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The request media type is not supported. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse415"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
     };
-    api_producer_projects_retrieve: {
+    project_api_producer_projects__slug___get: {
         parameters: {
             query?: never;
             header?: never;
@@ -18281,88 +18612,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerProjectDetail"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
@@ -18477,13 +18742,12 @@ export interface operations {
             };
         };
     };
-    api_producer_projects_export_retrieve: {
+    download_api_producer_projects__slug__export__get: {
         parameters: {
             query: {
-                /** @description Comma-separated Producer content slugs; defaults to all. */
-                content?: string;
-                format: "csv" | "json" | "xlsx";
                 revision: string;
+                format?: "xlsx" | "csv" | "json";
+                content?: string;
             };
             header?: never;
             path: {
@@ -18493,106 +18757,29 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Source-first export in the requested format. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string;
-                    "text/csv": string;
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProducerConflict"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
     };
-    api_producer_projects_export_summary_retrieve: {
+    summary_api_producer_projects__slug__export_summary__get: {
         parameters: {
             query?: {
-                /** @description Comma-separated Producer content slugs; defaults to all. */
                 content?: string;
             };
             header?: never;
@@ -18603,88 +18790,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerExportSummary"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
@@ -18904,7 +19025,7 @@ export interface operations {
             };
         };
     };
-    api_producer_projects_localization_create: {
+    start_api_producer_projects__slug__localization__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -18915,123 +19036,31 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProducerLocalizationRequest"];
+                "application/json": components["schemas"]["WizardLocalizationRequest"];
             };
         };
         responses: {
-            /** @description Successful response. */
-            200: {
+            /** @description Successful Response */
+            202: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerRun"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The resource was created. */
-            201: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerRun"];
-                };
-            };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProducerConflict"];
-                };
-            };
-            /** @description The request media type is not supported. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse415"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
     };
-    api_producer_projects_profile_retrieve: {
+    get_api_producer_projects__slug__profile__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -19042,93 +19071,27 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerProfile"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
     };
-    api_producer_projects_profile_partial_update: {
+    patch_api_producer_projects__slug__profile__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -19137,111 +19100,28 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
-                "application/json": components["schemas"]["PatchedProducerProfilePatch"];
+                "application/json": components["schemas"]["WizardProfilePatch"];
             };
         };
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerProfile"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProducerConflict"];
-                };
-            };
-            /** @description The request media type is not supported. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse415"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
@@ -19491,7 +19371,7 @@ export interface operations {
             };
         };
     };
-    api_producer_projects_uploads_create: {
+    upload_api_producer_projects__slug__uploads__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -19502,103 +19382,31 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProducerUploadRequest"];
+                "multipart/form-data": components["schemas"]["WizardBody_upload_api_producer_projects__slug__uploads__post"];
             };
         };
         responses: {
-            /** @description The resource was created. */
+            /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerUploadAnalysis"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The request media type is not supported. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse415"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
     };
-    api_producer_projects_uploads_active_retrieve: {
+    active_api_producer_projects__slug__uploads_active__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -19609,88 +19417,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerUploadAnalysis"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
@@ -20223,7 +19965,7 @@ export interface operations {
             };
         };
     };
-    api_producer_uploads_retrieve: {
+    get_upload_api_producer_uploads__token___get: {
         parameters: {
             query?: never;
             header?: never;
@@ -20234,185 +19976,27 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerUploadAnalysis"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
     };
-    api_producer_uploads_destroy: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No response body */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
-                };
-            };
-        };
-    };
-    api_producer_uploads_partial_update: {
+    update_upload_api_producer_uploads__token___patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -20423,224 +20007,31 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProducerUploadAnswersRequest"];
+                "application/json": components["schemas"]["WizardUploadPatch"];
             };
         };
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerUploadAnalysis"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProducerConflict"];
-                };
-            };
-            /** @description The request media type is not supported. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse415"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
     };
-    api_producer_uploads_heartbeat_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["ProducerUploadHeartbeat"];
-            };
-        };
-        responses: {
-            /** @description Successful response. */
-            200: {
-                headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProducerUploadHeartbeat"];
-                };
-            };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            /** @description The request media type is not supported. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse415"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
-                };
-            };
-        };
-    };
-    api_producer_uploads_quarantine_retrieve: {
+    heartbeat_api_producer_uploads__token__heartbeat__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -20651,103 +20042,32 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerUploadPage"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
-                };
-            };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
-                };
-            };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProducerConflict"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
     };
-    api_producer_uploads_rows_retrieve: {
+    rows_api_producer_uploads__token__quarantine__get: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
             header?: never;
             path: {
                 token: string;
@@ -20756,96 +20076,56 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful response. */
+            /** @description Successful Response */
             200: {
                 headers: {
-                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
-                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
-                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProducerUploadPage"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The request was invalid or could not be parsed. */
-            400: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse400"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
-            /** @description Authentication credentials were missing or invalid. */
-            401: {
+        };
+    };
+    rows_api_producer_uploads__token__rows__get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse401"];
+                    "application/json": unknown;
                 };
             };
-            /** @description The requested resource was not found or is not accessible. */
-            404: {
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse404"];
-                };
-            };
-            /** @description The HTTP method is not allowed for this resource. */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse405"];
-                };
-            };
-            /** @description The requested response media type is not available. */
-            406: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse406"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProducerConflict"];
-                };
-            };
-            /** @description The resource is locked. */
-            423: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse423"];
-                };
-            };
-            /** @description The API request rate limit was exceeded. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse429"];
-                };
-            };
-            /** @description An unexpected server error occurred. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse500"];
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
                 };
             };
         };
@@ -33694,7 +32974,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/octet-stream": string;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -33878,7 +33158,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WizardProjectConnection"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -33909,7 +33189,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WizardProjectConnection"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -33979,7 +33259,601 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WizardProjectConnection"];
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_upload_api_producer_projects__slug__uploads_restore__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_producer_bdhc_titles__get: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_producer_projects__slug__bdhc_preview__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WizardBDHCPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_api_producer_projects__slug__bdhc_apply__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WizardBDHCApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    manual_api_producer_projects__slug__profile_manual__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WizardManualProfilePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    saved_quality_report_api_producer_runs__run_id__quality_report__get: {
+        parameters: {
+            query?: {
+                format?: "xlsx" | "json";
+                category?: "all" | "blocking" | "unverified" | "advisory";
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    saved_quality_bundle_api_producer_runs__run_id__result_bundle__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    quality_report_api_producer_runs__run_id__quality__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_verification_api_producer_runs__run_id__verification_preview__get: {
+        parameters: {
+            query?: {
+                language?: string | null;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_quality_only_api_producer_projects__slug__quality_runs__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WizardQualityOnlyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_api_producer_runs__run_id___get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_api_producer_runs__run_id__resume__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WizardResumeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_api_producer_runs__run_id__cancel__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    live_health_live_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    ready_health_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    login_page_auth_login_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+        };
+    };
+    login_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WizardLogin"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WizardHTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    root__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    console_console__path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
                 };
             };
             /** @description Validation Error */

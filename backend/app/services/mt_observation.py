@@ -22,19 +22,23 @@ def record_translation_observation(state, settings, *, filled=None, total=None, 
             started = min(candidates) if candidates else now
         observation = {
             "started": started,
+            "deadline": started + settings.mt_max_observation_seconds,
             "last_progress": started,
             "max_filled": 0,
             "filled": 0,
             "total": total,
         }
         state["observation"] = observation
+    observation.setdefault(
+        "deadline", observation["started"] + min(7200, settings.mt_max_observation_seconds)
+    )
     if filled is not None:
         if filled > observation["max_filled"]:
             observation["last_progress"] = now
             observation["max_filled"] = filled
         observation.update(filled=filled, total=total)
     state["observe_until"] = min(
-        observation["started"] + settings.mt_max_observation_seconds,
+        observation["deadline"],
         observation["last_progress"] + settings.mt_observation_seconds,
     )
     return now < state["observe_until"]

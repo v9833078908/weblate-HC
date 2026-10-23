@@ -8,6 +8,7 @@ import json
 import pytest
 from app.db import DomainError, revision
 from app.services import incremental
+from app.settings import Settings
 
 
 def test_incremental_partial_progress_survives_reload_and_keeps_absolute_bound(
@@ -81,7 +82,11 @@ def test_incremental_partial_progress_survives_reload_and_keeps_absolute_bound(
             units[index]["targets"]["de"] = "Neu"
         with pytest.raises(DomainError) as error:
             incremental.process_incremental(
-                data, remote, checkpoint, snapshot_loader=lambda: copy.deepcopy(snapshot)
+                data,
+                remote,
+                checkpoint,
+                settings=Settings(mt_max_observation_seconds=7200),
+                snapshot_loader=lambda: copy.deepcopy(snapshot),
             )
         assert error.value.code == "incremental_wait"
         data = json.loads(saved.read_text())
@@ -92,7 +97,11 @@ def test_incremental_partial_progress_survives_reload_and_keeps_absolute_bound(
     clock[0] = 8201
     with pytest.raises(DomainError) as error:
         incremental.process_incremental(
-            data, remote, checkpoint, snapshot_loader=lambda: copy.deepcopy(snapshot)
+            data,
+            remote,
+            checkpoint,
+            settings=Settings(mt_max_observation_seconds=7200),
+            snapshot_loader=lambda: copy.deepcopy(snapshot),
         )
     assert error.value.code == "weblate_unknown"
     assert remote.posts == 1 and units[0]["targets"]["de"] == "Alt"

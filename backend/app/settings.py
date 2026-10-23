@@ -22,17 +22,28 @@ class Settings:
         default_factory=lambda: os.getenv("BDHC_API_BASE_URL", "http://192.168.0.180:19101")
     )
     bdhc_token_file: str = field(default_factory=lambda: os.getenv("BDHC_API_TOKEN_FILE", ""))
-    weblate_url: str = "https://l10n.herocraft.com/api/"
+    weblate_url: str = field(
+        default_factory=lambda: os.getenv("WEBLATE_API_BASE_URL", "https://l10n.herocraft.com/api/")
+    )
     weblate_token_file: str = field(default_factory=lambda: os.getenv("WEBLATE_API_TOKEN_FILE", ""))
     engine: str = field(default_factory=lambda: os.getenv("WEBLATE_MT_ENGINE", "openrouter"))
     external_writes_enabled: bool = field(
         default_factory=lambda: os.getenv("WIZARD_EXTERNAL_WRITES", "0") == "1"
     )
+    quality_cycle_enabled: bool = field(
+        default_factory=lambda: os.getenv("WIZARD_QUALITY_CYCLE_ENABLED", "0") == "1"
+    )
+    full_quality_cycle_enabled: bool = field(
+        default_factory=lambda: os.getenv("WIZARD_FULL_QUALITY_CYCLE_ENABLED", "0") == "1"
+    )
     mt_observation_seconds: int = field(
         default_factory=lambda: int(os.getenv("WIZARD_MT_OBSERVATION_SECONDS", "1800"))
     )
     mt_max_observation_seconds: int = field(
-        default_factory=lambda: int(os.getenv("WIZARD_MT_MAX_OBSERVATION_SECONDS", "7200"))
+        default_factory=lambda: int(os.getenv("WIZARD_MT_MAX_OBSERVATION_SECONDS", "21600"))
+    )
+    producer_post_interval_seconds: float = field(
+        default_factory=lambda: float(os.getenv("WIZARD_PRODUCER_POST_INTERVAL_SECONDS", "75"))
     )
     mt_async_batches_enabled: bool = field(
         default_factory=lambda: os.getenv("WIZARD_MT_ASYNC_BATCHES", "0") == "1"
@@ -82,6 +93,11 @@ class Settings:
     )
 
     def __post_init__(self):
+        if (
+            not math.isfinite(self.producer_post_interval_seconds)
+            or not 1 <= self.producer_post_interval_seconds <= 86400
+        ):
+            raise ValueError("Invalid producer POST interval")
         for name, maximum in (
             ("weblate_connect_timeout", 120),
             ("weblate_write_read_timeout", 1800),

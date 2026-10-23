@@ -9,7 +9,10 @@ mode=${2:-code}
 baseline=$(python3 "$(dirname "$0")/verify_backup.py" "$backup")
 [[ "$baseline" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,60}$ && -d "$root/releases/$baseline" ]]
 if [[ "$mode" == code ]]; then
-  python3 "$(dirname "$0")/preflight.py" "$root/shared/data/wizard.sqlite" --compatible "$backup/data/wizard.sqlite" --allow-profile-unknown
+  python3 "$(dirname "$0")/preflight.py" "$root/shared/data/wizard.sqlite" --compatible "$backup/data/wizard.sqlite" --allow-recovery-addition --read-only-rollback
+else
+  # Restoring old data must never erase paid receipts or ready translations.
+  python3 "$(dirname "$0")/preflight.py" "$root/shared/data/wizard.sqlite" --unchanged "$backup/data/wizard.sqlite"
 fi
 if [[ "${3:-}" == --dry-run ]]; then
   echo "Verified baseline $baseline; mode $mode. No running service changed."
@@ -35,7 +38,12 @@ if [[ "$mode" == full ]]; then
 fi
 # Disable profile calls for both new and legacy code; recovery keeps old settings.
 python3 "$(dirname "$0")/disable_profile_agent.py" "$root/shared/wizard.env"
-ln -s "$root/releases/$baseline" "$root/current.rollback"
+target="$root/releases/$baseline"
+if [[ "$mode" == code ]]; then
+  bridge="$root/releases/rollback-bridge-$(date -u +%Y%m%d%H%M%S)"
+  target=$(python3 "$(dirname "$0")/prepare_rollback_bridge.py" "$target" "$(readlink -f "$root/current")" "$bridge")
+fi
+ln -s "$target" "$root/current.rollback"
 mv -Tf "$root/current.rollback" "$root/current"
 for name in wizard-api.service wizard-worker.service wizard-profile-worker.service wizard-backup.service wizard-backup.timer; do
   [[ ! -f "$backup/systemd/$name" ]] || install -m 0644 "$backup/systemd/$name" "/etc/systemd/system/$name"

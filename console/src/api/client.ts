@@ -7,6 +7,12 @@ export interface RemoteSnapshot { slug: string; name: string; languages: string[
 export interface ProjectConnection { remote_slug: string; read_only: boolean; snapshot: RemoteSnapshot; component_map: Record<string, string>; observed: number; }
 export interface ConnectionPreview { id: string; snapshot_hash: string; snapshot: RemoteSnapshot; }
 export interface ChangePlan { glossary_preview?: {source:string; targets:string[]; components:Array<{sheet:string;units:Array<{key:string;values:Record<string,string>}>}>} | null; id: string; revision: string; read_only: boolean; confirmed?: boolean; profile_preview?: {engine:string;before:Record<string,unknown>;after:Record<string,unknown>}; components: Array<{ source?:string; remote_id?:string; create_component?:boolean; sheet: string; new: Array<{key: string; source?:string; explanation?:string}>; unchanged: string[]; changed: string[]; retained: string[]; translate: Record<string, string[]>; seed?: Record<string, Record<string,string>>; old_empty: Record<string, string[]>; }>; blocked: Array<{sheet: string; reason: string}>; }
+export interface QualityPolicy { enabled: boolean; execution_mode?: "repair" | "verify_only"; language: string; max_repair_rounds: 0 | 1 | 2; consistency: Array<"repeat-drift" | "glossary">; }
+export interface QualityReport { cycle_id: string; phase: string; round: number; status: string; counts: Record<string, number>; units: Array<{unit_id:number;outcome:string;round:number;candidate_id:number|null;application_id:number|null;issue_kinds:string[]}>; }
+export interface VerificationPreview {
+  project: string; languages: string[]; selected: number; initial_calls: number | null; cost: null;
+  request: {parent_run_id:string; language:string; scope:{unit_ids:number[]}; glossary_revision:string; execution_mode:"verify_only"};
+}
 
 export type ProducerMe = components["schemas"]["ProducerMe"];
 export type ProducerLanguage = components["schemas"]["ProducerLanguage"];
@@ -21,7 +27,13 @@ export type ProducerUploadAnalysis =
 export type ProducerUploadAnswers =
   components["schemas"]["ProducerUploadAnswers"];
 export type ProducerUploadPage = components["schemas"]["ProducerUploadPage"];
-export type ProducerRun = components["schemas"]["ProducerRun"];
+export type ProducerRun = components["schemas"]["ProducerRun"] & {
+  result_bundle_available?: boolean;
+  execution_mode?: "repair" | "verify_only";
+  translation_coverage?: {filled:number;total:number;missing:number};
+  judge_coverage?: {both_parsed:number;pass:number;without_pass:number;total:number};
+  payment_outcome?: {unknown:number;automatic_paid_replay_allowed:false};
+};
 export type ProducerExportSummary =
   components["schemas"]["ProducerExportSummary"];
 export type ProducerLocalizationRequest =
@@ -106,6 +118,7 @@ function errorCode(payload: unknown, fallback: string): string {
 }
 
 export class ProducerApi {
+  readonly #verificationKeys = new Map<string,string>();
   readonly #config: ConsoleConfig;
   readonly #dependencies: ProducerApiDependencies;
 
@@ -114,7 +127,7 @@ export class ProducerApi {
     return value.results;
   }
 
-  getIntegrationPolicy(): Promise<{external_writes: boolean}> {
+  getIntegrationPolicy(): Promise<{external_writes: boolean; quality_cycle: boolean}> {
     return this.#request("integration-policy/");
   }
 
@@ -149,6 +162,28 @@ export class ProducerApi {
 
   private localPost<T>(path: string, body: unknown): Promise<T> {
     return this.#request(path, {method: "POST", body: JSON.stringify(body), headers: {"Content-Type": "application/json", "X-CSRFToken": this.#config.csrfToken}});
+  }
+
+  previewVerification(runId: string, language?: string): Promise<VerificationPreview> {
+    return this.#request(`runs/${encodeURIComponent(runId)}/verification-preview/${language ? `?language=${encodeURIComponent(language)}` : ""}`);
+  }
+
+  startVerification(slug: string, preview: VerificationPreview): Promise<ProducerRun> {
+    const storageKey = "verification-request:" + this.#config.apiRoot + ":" + JSON.stringify(preview.request);
+    let remembered = this.#verificationKeys.get(storageKey);
+    try {remembered ??= sessionStorage.getItem(storageKey) ?? undefined;} catch { /* Retain in-memory identity if browser storage is unavailable. */ }
+    if (remembered && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(remembered)) {
+      this.#verificationKeys.set(storageKey, remembered);
+      return this.localPost(`projects/${encodeURIComponent(slug)}/quality-runs/`, {...preview.request, client_request_id:remembered});
+    }
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    const hex = Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+    const client_request_id = `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+    this.#verificationKeys.set(storageKey,client_request_id);
+    try {sessionStorage.setItem(storageKey,client_request_id);} catch { /* Server receipts and semantic fences remain authoritative. */ }
+    return this.localPost(`projects/${encodeURIComponent(slug)}/quality-runs/`, {...preview.request, client_request_id});
   }
 
   restoreUpload(slug: string, signal?: AbortSignal): Promise<ProducerUploadAnalysis> {
@@ -353,7 +388,7 @@ export class ProducerApi {
 
   async startLocalization(
     slug: string,
-    body: ProducerLocalizationRequest & {change_plan_id?: string; change_plan_revision?: string},
+    body: ProducerLocalizationRequest & {change_plan_id?: string; change_plan_revision?: string; quality?: QualityPolicy},
     signal?: AbortSignal,
   ): Promise<ProducerRun> {
     return this.#request<ProducerRun>(
@@ -372,6 +407,12 @@ export class ProducerApi {
 
   async getRun(id: string, signal?: AbortSignal): Promise<ProducerRun> {
     return this.#request<ProducerRun>(`runs/${encodeURIComponent(id)}/`, {
+      signal,
+    });
+  }
+
+  async getQualityReport(id: string, signal?: AbortSignal): Promise<QualityReport> {
+    return this.#request<QualityReport>(`runs/${encodeURIComponent(id)}/quality/`, {
       signal,
     });
   }

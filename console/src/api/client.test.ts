@@ -33,6 +33,18 @@ describe("ProducerApi", () => {
   const locationAssign = vi.fn();
   let api: ProducerApi;
 
+  it("keeps the verification request key after an uncertain response and reload", async () => {
+    sessionStorage.clear();
+    fetchMock.mockImplementation(async () => jsonResponse({id:"same-job"}));
+    const preview = {project:"copy",languages:["pl"],selected:2,initial_calls:2,cost:null,
+      request:{parent_run_id:"cache-proof",language:"pl",scope:{unit_ids:[1,2]},glossary_revision:"same-audit",execution_mode:"verify_only" as const}};
+    await api.startVerification("copy", preview);
+    const first = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const reloaded = new ProducerApi(config,{fetch:fetchMock as unknown as typeof fetch,locationAssign});
+    await reloaded.startVerification("copy", preview);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(first);
+  });
+
   beforeEach(() => {
     fetchMock.mockReset();
     locationAssign.mockReset();

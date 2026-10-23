@@ -104,6 +104,7 @@ def process_once(store, settings, remote=None):
     run_id = claimed["id"]
     owner = claimed["owner"]
     data = claimed["data"]
+    verified_export = None
     stopped = threading.Event()
 
     def heartbeat():
@@ -219,14 +220,46 @@ def process_once(store, settings, remote=None):
             raise DomainError(
                 "engine_changed", "Restore the engine used by this saved run before resuming", 503
             )
-        client = remote or WeblateClient(settings)
-        if remote is None and not snapshot.get("persistent") and not snapshot.get("change_plan"):
+        client = remote or WeblateClient(settings, admission_store=store)
+        early_quality = snapshot.get("quality", {})
+        if early_quality.get("enabled") and early_quality.get("workflow_version") == 2:
+            from app.services.quality_contract import require_full_quality_capabilities
+
+            try:
+                if not settings.quality_cycle_enabled or not settings.full_quality_cycle_enabled:
+                    raise DomainError(
+                        "quality_configuration", "Full quality cycle is disabled", 503
+                    )
+                require_full_quality_capabilities(client.producer_me())
+            except DomainError as error:
+                if error.code not in {"quality_configuration", "weblate_configuration"}:
+                    raise
+                data["phase"] = "quality-waiting-configuration"
+                data["quality"] = {
+                    "status": "waiting_for_configuration",
+                    "phase": "preflight",
+                    "counts": {},
+                }
+                checkpoint()
+                raise Waiting() from error
+        if (
+            remote is None
+            and not snapshot.get("persistent")
+            and not snapshot.get("change_plan")
+            and data.get("mode") != "quality_only"
+        ):
             raise DomainError(
                 "project_read_only",
                 "Повторная запись в прежний проект запрещена; подключите его для чтения",
                 403,
             )
-        if snapshot.get("change_plan"):
+        mt_pending = False
+        if data.get("mode") == "quality_only":
+            from app.services.quality_only import validate_quality_only_job
+
+            validate_quality_only_job(store, owner, data, client)
+            translations = {}
+        elif snapshot.get("change_plan"):
             from app.services.incremental import process_incremental
             from app.services.project_links import get_link
 
@@ -245,18 +278,34 @@ def process_once(store, settings, remote=None):
                 client,
                 checkpoint,
                 settings=settings,
+                store=store,
+                run_id=run_id,
+                lease=lease_owner,
                 archive_glossary=lambda c, n: archive_component(
                     c, store.data_dir / "runs" / run_id / n
                 ),
             )
         else:
-            operation(
+            project_result = operation(
                 "project",
                 lambda: client.get_project(project),
-                lambda: client.create_project(snapshot["name"], project),
+                lambda: (
+                    client.create_project(snapshot["name"], project, translation_review=True)
+                    if early_quality.get("enabled")
+                    else client.create_project(snapshot["name"], project)
+                ),
                 "create-project",
                 allow_existing=data.get("reuse_project", False),
             )
+            if (
+                early_quality.get("enabled")
+                and project_result.get("translation_review") is not True
+            ):
+                raise DomainError(
+                    "quality_configuration",
+                    "Translation review must be enabled for this quality project; existing settings were not changed",
+                    503,
+                )
             if snapshot.get("persistent"):
                 from app.services.project_links import get_link
 
@@ -347,6 +396,11 @@ def process_once(store, settings, remote=None):
                             component_source(kit, component),
                             archive_component(component, store.data_dir / "runs" / run_id / name),
                             glossary=glossary,
+                            **(
+                                {"allow_translation_propagation": True}
+                                if early_quality.get("workflow_version") == 2 and not glossary
+                                else {}
+                            ),
                         ),
                         "publish-components",
                         allow_existing=data.get("reuse_project", False),
@@ -441,9 +495,11 @@ def process_once(store, settings, remote=None):
                             settings=settings,
                             component=name,
                             language=code,
+                            lease=lease_owner,
                         )
                         if not ready:
-                            raise Waiting()
+                            mt_pending = True
+                            continue
                         translations[name][code] = client.download_translation(project, name, code)
                         continue
 
@@ -548,6 +604,217 @@ def process_once(store, settings, remote=None):
                         }
                         checkpoint()
                     translations[name][code] = translated
+
+        if mt_pending:
+            from app.services.run_recovery import next_mt_wakeup
+
+            data["mt_next_poll_at"] = next_mt_wakeup(data)
+            raise Waiting()
+        quality_policy = snapshot.get("quality", {})
+        if quality_policy.get("enabled"):
+            if not settings.quality_cycle_enabled:
+                data["phase"] = "quality-waiting-configuration"
+                checkpoint()
+                raise Waiting()
+            quality_language = quality_policy.get("language", "de")
+            if quality_language not in manifest["targets"]:
+                raise DomainError(
+                    "quality_scope",
+                    "The requested quality language is not part of this localization run",
+                    409,
+                )
+
+            def quality_component_name(component):
+                if data.get("mode") == "quality_only":
+                    return snapshot["quality_only"]["mapping"][
+                        component_mapping_key(manifest, component)
+                    ]
+                plan = snapshot.get("change_plan")
+                return (
+                    plan["mapping"][component_mapping_key(manifest, component)]
+                    if plan
+                    else component["id"]
+                )
+
+            if "quality_scope" not in data:
+                rows = [
+                    unit
+                    for component in manifest["components"]
+                    if quality_language in component_targets(manifest, component)
+                    for unit in client.list_units(
+                        project, quality_component_name(component), quality_language
+                    )
+                ]
+                from app.services.quality_preflight import filled_quality_scope
+
+                data["quality_input_scope"] = {"unit_ids": sorted(unit["id"] for unit in rows)}
+                selected, excluded = filled_quality_scope(rows)
+                # Legacy servers expose no per-unit target list: keep their
+                # original conservative scope and preparation contract.
+                if all("target" not in unit for unit in rows):
+                    selected, excluded = data["quality_input_scope"], []
+                unit_ids = data["quality_input_scope"]["unit_ids"]
+                data["quality_ready_scope"] = selected
+                data["quality_untranslated_exceptions"] = excluded
+                if not unit_ids:
+                    raise DomainError(
+                        "quality_scope", "Weblate returned an empty quality scope", 409
+                    )
+                data["quality_scope"] = {"unit_ids": unit_ids}
+                checkpoint()
+            from app.services.quality_cycle import (
+                advance_quality_cycle,
+                handle_quality_error,
+                quality_unit_census,
+            )
+            from app.services.quality_state import create_quality_cycle
+
+            durable_policy = {
+                **quality_policy,
+                "require_no_mt": True,
+                "initial_judge_scope": data.get("quality_ready_scope", data["quality_scope"]),
+                "revision": revision(quality_policy),
+            }
+            cycle = create_quality_cycle(
+                store,
+                owner,
+                run_id,
+                project,
+                durable_policy,
+            )
+            data["quality_cycle_id"] = cycle["id"]
+            try:
+                cycle = advance_quality_cycle(
+                    store,
+                    owner,
+                    cycle["id"],
+                    client,
+                    scope=data["quality_scope"],
+                    language=quality_language,
+                )
+            except DomainError as error:
+                if getattr(error, "remote_status", None) == 429:
+                    raise
+                if data.get("mode") == "quality_only" and error.code == "quality_input_incomplete":
+                    raise
+                cycle = handle_quality_error(store, owner, cycle["id"], error)
+            data["quality"] = {
+                "cycle_id": cycle["id"],
+                "phase": cycle["phase"],
+                "round": cycle["round"],
+                "status": cycle["status"],
+                "counts": cycle["counts"],
+            }
+            checkpoint()
+            if cycle["phase"] != "completed":
+                raise Waiting()
+            data["quality"]["units"] = quality_unit_census(store, cycle["id"])
+            if cycle["status"] == "completed_with_exceptions":
+                warning = "Quality cycle completed with isolated exceptions"
+                if warning not in data["warnings"]:
+                    data["warnings"].append(warning)
+
+            # Judge repairs happened after the MT snapshot was loaded. Export
+            # only a fresh, post-recheck snapshot.
+            def download_quality_translations():
+                return {
+                    component["id"]: {
+                        code: client.download_translation(
+                            project, quality_component_name(component), code
+                        )
+                        for code in component_targets(manifest, component)
+                    }
+                    for component in manifest["components"]
+                }
+
+            if quality_policy.get("workflow_version") == 2:
+                from app.services.quality_export import (
+                    build_corrected_quality_export,
+                    download_stable_quality_export,
+                )
+                from app.services.quality_state import get_quality_cycle
+
+                def prepare_verified_file():
+                    if data.get("mode") == "quality_only":
+                        from app.services.quality_only import validate_quality_only_job
+
+                        validate_quality_only_job(store, owner, data, client)
+                    values = download_quality_translations()
+                    from app.services.project_links import snapshot_project
+
+                    fresh_snapshot = snapshot_project(client, project)
+                    return {
+                        "translations": values,
+                        "remote_snapshot": fresh_snapshot,
+                        "export": build_corrected_quality_export(
+                            manifest,
+                            values,
+                            change_plan=snapshot.get("change_plan"),
+                            remote_snapshot=fresh_snapshot,
+                        ),
+                    }
+
+                verified, provenance = download_stable_quality_export(
+                    store,
+                    owner,
+                    cycle["id"],
+                    client,
+                    prepare_verified_file,
+                    include_snapshot=True,
+                )
+                translations = verified["translations"]
+                verified_export = verified["export"]
+                verified_export["quality_provenance"] = copy.deepcopy(provenance)
+                from app.services.quality_artifacts import (
+                    bind_quality_cells,
+                    build_quality_artifacts,
+                    immutable_record_id,
+                )
+
+                final_snapshot = verified["quality_final_snapshot"]
+                mapping = {
+                    component_mapping_key(manifest, component): quality_component_name(component)
+                    for component in manifest["components"]
+                }
+                bindings = bind_quality_cells(
+                    manifest,
+                    verified_export,
+                    verified["remote_snapshot"],
+                    mapping,
+                    final_snapshot,
+                    quality_language,
+                )
+                data["export_version_id"] = immutable_record_id(
+                    store, owner, "export", "export:" + run_id, verified_export
+                )
+                quality_artifact = build_quality_artifacts(
+                    run_id=run_id,
+                    export_id=data["export_version_id"],
+                    exported=verified_export,
+                    manifest=manifest,
+                    final_snapshot=final_snapshot,
+                    unit_results=quality_unit_census(store, cycle["id"]),
+                    bindings=bindings,
+                )
+                from app.services.quality_artifact_files import serialize_quality_bundle
+
+                # Validate both deliverables before publishing a ready result.
+                serialize_quality_bundle(quality_artifact, verified_export)
+                data["quality_artifact_id"] = immutable_record_id(
+                    store, owner, "quality_artifact", "quality-artifact:" + run_id, quality_artifact
+                )
+                if verified["remote_snapshot"] is not None:
+                    data["remote_snapshot"] = verified["remote_snapshot"]
+                cycle = get_quality_cycle(store, owner, cycle["id"])
+                data["quality"].update(
+                    status=cycle["status"],
+                    counts=cycle["counts"],
+                    provenance=provenance,
+                    units=quality_unit_census(store, cycle["id"]),
+                )
+                checkpoint()
+            else:
+                translations = download_quality_translations()
         data["phase"] = "export"
         checkpoint()
         if (
@@ -558,19 +825,24 @@ def process_once(store, settings, remote=None):
             from app.services.project_links import snapshot_project
 
             data["remote_snapshot"] = snapshot_project(client, project)
-        exported = build_export(manifest, translations, data.get("reuse_project", False))
-        from app.services.exports import component_exports
+        if verified_export is not None:
+            exported = verified_export
+        else:
+            exported = build_export(manifest, translations, data.get("reuse_project", False))
+            from app.services.exports import component_exports
 
-        exported["components"] = component_exports(
-            manifest, translations, data.get("reuse_project", False)
-        )
-        if snapshot.get("change_plan"):
-            from app.services.exports import version_export
-
-            exported = version_export(
-                manifest, data["remote_snapshot"], snapshot["change_plan"]["mapping"]
+            exported["components"] = component_exports(
+                manifest, translations, data.get("reuse_project", False)
             )
-        export_id = "export:" + run_id
+            if snapshot.get("change_plan"):
+                from app.services.exports import version_export
+
+                exported = version_export(
+                    manifest, data["remote_snapshot"], snapshot["change_plan"]["mapping"]
+                )
+        from app.services.quality_artifacts import immutable_record_id
+
+        export_id = immutable_record_id(store, owner, "export", "export:" + run_id, exported)
         completed_data = {
             **copy.deepcopy(data),
             "export_id": export_id,
@@ -612,18 +884,29 @@ def process_once(store, settings, remote=None):
                 from app.services.project_links import update_project_url
 
                 update_project_url(s, owner, data["project"], project)
-            for kind, key, value in [
+            records = [
                 ("export", export_id, exported),
                 (
                     "export_pointer",
                     "export-pointer:" + data["project"],
                     {"export_id": export_id, "run_id": run_id},
                 ),
-            ]:
+            ]
+            if data.get("quality_artifact_id"):
+                records.append(("quality_artifact", data["quality_artifact_id"], quality_artifact))
+            for kind, key, value in records:
                 record = s.get(Record, key)
                 if record:
                     if record.owner != owner or record.kind != kind:
                         raise DomainError("not_found", "Not found", 404)
+                    if kind in {"export", "quality_artifact"} and record.revision != revision(
+                        value
+                    ):
+                        raise DomainError(
+                            "immutable_result",
+                            "Published result changed; create a new version",
+                            409,
+                        )
                     record.data, record.revision = value, revision(value)
                 else:
                     s.add(

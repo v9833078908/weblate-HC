@@ -4,6 +4,9 @@ import { Link, useParams } from "react-router-dom";
 import type { ProducerApi, ProducerRun } from "../api/client";
 import { AppShell } from "../components/AppShell";
 import { AsyncNotice } from "../components/AsyncNotice";
+import { QualitySummary } from "../components/QualitySummary";
+import { ExistingVerification } from "../components/ExistingVerification";
+import { QualityArtifactReport } from "../components/QualityArtifactReport";
 import { t } from "../i18n";
 
 interface RunCardProps {
@@ -54,6 +57,12 @@ function stageRows(value: unknown): StageRow[] {
       id,
       label,
       status: typeof item.status === "string" ? item.status : "pending",
+      detail:
+        item.counts && typeof item.counts === "object"
+          ? Object.entries(item.counts as Record<string, unknown>)
+              .map(([name, count]) => `${name}: ${String(count)}`)
+              .join(" · ")
+          : undefined,
     };
   });
 }
@@ -155,8 +164,10 @@ export function RunCard({ api }: RunCardProps) {
           <div className="page-heading">
             <div>
               <p className="eyebrow">{t("Localization run")}</p>
-              <h1 id="run-heading">{t("First localization")}</h1>
+              <h1 id="run-heading">{run.requested_mode === "quality" ? t("Quality-only review") : t("First localization")}</h1>
               <p className="lead">{t(run.status)}</p>
+              {run.execution_mode === "verify_only" ? <p>{t("Verify only — without changing translations")}</p> : null}
+              {run.requested_mode === "quality" ? <p>{t("Machine translation is not run. The original completed job and its file are preserved.")}</p> : null}
             </div>
             {run.resume_allowed ? (
               <button
@@ -180,6 +191,15 @@ export function RunCard({ api }: RunCardProps) {
             <AsyncNotice kind="error">{t(run.failure)}</AsyncNotice>
           ) : null}
           <MTObservation run={run} />
+          <button type="button" className="secondary-button" onClick={() => void load()}>{t("Check status")}</button>
+          {run.translation_coverage || run.judge_coverage ? <section className="run-panel" aria-label={t("Quality execution mode")}>
+            <dl className="quality-counts">
+              {run.translation_coverage ? <div><dt>{t("Translated rows")}</dt><dd>{run.translation_coverage.filled} / {run.translation_coverage.total}</dd></div> : null}
+              {run.judge_coverage ? <><div><dt>{t("Rows with both judge responses")}</dt><dd>{run.judge_coverage.both_parsed} / {run.judge_coverage.total}</dd></div>
+                <div><dt>{t("Rows with PASS")}</dt><dd>{run.judge_coverage.pass} / {run.judge_coverage.total}</dd></div></> : null}
+              {run.payment_outcome ? <div><dt>{t("MT payment outcome unknown")}</dt><dd>{run.payment_outcome.unknown}</dd></div> : null}
+            </dl>
+          </section> : null}
           <a href={`/api/producer/runs/${encodeURIComponent(run.id)}/diagnostics/`} download>{t("Download diagnostic report")}</a>
           {["queued", "running", "no-update", "unknown"].includes(run.status) ? <div>
             <button type="button" disabled={resuming} onClick={async () => {
@@ -192,7 +212,7 @@ export function RunCard({ api }: RunCardProps) {
           <section className="run-panel" aria-labelledby="run-stages-heading">
             <h2 id="run-stages-heading">{t("Stages")}</h2>
             <ol className="run-stages">
-              {rows.map((row) => (
+              {rows.filter((row) => run.requested_mode !== "quality" || row.id === "checks").map((row) => (
                 <li data-status={row.status} key={row.id}>
                   <span aria-hidden="true" className="stage-dot" />
                   <span>{row.label}</span>
@@ -201,6 +221,16 @@ export function RunCard({ api }: RunCardProps) {
               ))}
             </ol>
           </section>
+          <QualitySummary
+            runId={run.id}
+            value={
+              run.stages && typeof run.stages === "object"
+                ? (run.stages as Record<string, unknown>).checks
+                : undefined
+            }
+          />
+          {run.status === "completed" && run.result_bundle_available ? <QualityArtifactReport runId={run.id} /> : null}
+          {run.status === "completed" ? <ExistingVerification api={api} runId={run.id} /> : null}
           {run.warnings &&
           Array.isArray(run.warnings) &&
           run.warnings.length ? (
@@ -218,11 +248,15 @@ export function RunCard({ api }: RunCardProps) {
               <p>
                 {run.outcome === "ready"
                   ? t("Ready for export")
+                  : run.outcome === "ready_with_exceptions"
+                    ? t("Ready for export with isolated quality exceptions")
                   : t("Needs attention before export")}
               </p>
-              <Link to={`/projects/${slug}/download`}>
+              {run.result_bundle_available ? null : run.requested_mode === "quality" ? <a href={`/api/producer/runs/${encodeURIComponent(run.id)}/export/?format=xlsx`} download>
                 {t("Review and download")}
-              </Link>
+              </a> : <Link to={`/projects/${slug}/download`}>
+                {t("Review and download")}
+              </Link>}
             </div>
           ) : null}
         </article>

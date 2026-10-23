@@ -182,7 +182,9 @@ def test_saved_five_minute_intent_adopts_longer_window_without_a_post(tmp_path, 
 def test_legacy_observation_uses_durable_run_start_as_conservative_bound(
     tmp_path, monkeypatch, legacy
 ):
-    store, owner, run, remote, settings, clock = waiting_run(tmp_path, monkeypatch)
+    store, owner, run, remote, settings, clock = waiting_run(
+        tmp_path, monkeypatch, mt_max_observation_seconds=7200
+    )
     origin = clock[0]
     state = {"state": "intent"}
     if legacy == "accepted-task":

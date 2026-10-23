@@ -22,7 +22,10 @@ def test_read_only_policy_and_historic_download_are_owner_scoped(tmp_path):
             "/api/producer/projects/", json={"name": "Game"}, headers={"X-CSRFToken": csrf}
         ).json()
         assert set(project) == {"slug", "name", "advanced_url"}
-        assert client.get("/api/producer/integration-policy/").json() == {"external_writes": False}
+        assert client.get("/api/producer/integration-policy/").json() == {
+            "external_writes": False,
+            "quality_cycle": False,
+        }
         assert (
             client.post(
                 f"/api/producer/projects/{project['slug']}/localization/",

@@ -1,0 +1,45 @@
+[
+  {
+    "id": "dead-shell-synthetic",
+    "game_title": "Dead Shell",
+    "answers": {
+      "genre": "RPG, Roguelike",
+      "setting": "Пиксельная фантастика",
+      "audience": "Взрослые",
+      "register_ui": "Кратко",
+      "register_dialogue": "Сдержанно",
+      "profanity": "Не усиливать оригинал"
+    }
+  },
+  {
+    "id": "ambermaze-synthetic",
+    "game_title": "Lord Ambermaze",
+    "answers": {
+      "genre": "Puzzle, Adventure",
+      "setting": "Фэнтези",
+      "register_ui": "Кратко",
+      "register_dialogue": "Естественно",
+      "profanity": "Без добавлений"
+    }
+  },
+  {
+    "id": "unknown-synthetic",
+    "game_title": null,
+    "answers": {}
+  },
+  {
+    "id": "conflict-synthetic",
+    "game_title": "Synthetic conflicting game",
+    "answers": {
+      "genre": "RPG",
+      "register_ui": "Кратко",
+      "register_dialogue": "Естественно"
+    },
+    "locale_rules": {
+      "zh_Hant": [
+        "Использовать традиционное письмо",
+        "Использовать упрощённое письмо"
+      ]
+    }
+  }
+]

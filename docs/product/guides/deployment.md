@@ -25,6 +25,8 @@ sudo install -m 0640 /path/to/release/.env.example /opt/bdhc/weblate-wizard/shar
 
 В `wizard.env` зафиксировать фактический origin, bind и порт. Существующие БДХК/Weblate токены передать в `shared/secrets/bdhc_readonly_token` и `shared/secrets/weblate_api_token` отдельным защищённым способом. Не передавать значения аргументами команды, через Git, отчёты или журналы. Не переносить SSH/Git-инструкцию. `PROFILE_LLM_*` можно оставить пустыми: ручные инструкции предусмотрены.
 
+Автоматический цикл качества управляется отдельным флагом `WIZARD_QUALITY_CYCLE_ENABLED`. До проверки совместимого Producer API держать его равным `0`. Для согласованной локальной приёмки указать `WEBLATE_API_BASE_URL`, включить одновременно `WIZARD_EXTERNAL_WRITES=1` и `WIZARD_QUALITY_CYCLE_ENABLED=1`, затем проверить `/api/producer/integration-policy/`: оба признака должны быть `true`. Токен Weblate должен иметь `translation.auto` и `unit.review`; проект — ровно два доступных места судей и настроенный MT-движок. Включение флага само по себе ничего не запускает: цикл явно выбирается пользователем для конкретного задания.
+
 После разрешения на deployment:
 
 ```bash

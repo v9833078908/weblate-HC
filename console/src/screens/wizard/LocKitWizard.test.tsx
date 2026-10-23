@@ -401,6 +401,49 @@ it("loads named language cards for selected sheets and saves canonical new targe
 });
 
 describe("LocKitWizard", () => {
+  it("sends the explicit German dual-judge quality policy", async () => {
+    const user = userEvent.setup();
+    const ready = {
+      ...structuredClone(draft),
+      current_step: "confirm" as const,
+      answers: {
+        ...draft.answers,
+        source_language: "en",
+        included_target_languages: ["de"],
+      },
+      analysis: {
+        ...draft.analysis,
+        confirmation: {
+          totals: { input_rows: 20, imported_rows: 20, quarantined_rows: 0, skipped_rows: 0 },
+          components: [],
+          quarantine_reasons: {},
+        },
+      },
+    } satisfies ProducerUploadAnalysis;
+    const api = apiMock({
+      getUpload: vi.fn().mockResolvedValue(ready),
+      startLocalization: vi.fn().mockResolvedValue({ id: "run-quality" }),
+    });
+    renderWizard(api, `/projects/pirate-ships/localize?u=${draft.token}&step=4`);
+
+    await user.click(await screen.findByRole("checkbox", { name: /двух судей/ }));
+    expect(screen.getByRole("combobox", { name: "Язык проверки качества" })).toHaveValue("de");
+    await user.click(screen.getByRole("button", { name: "Запустить локализацию" }));
+
+    expect(api.startLocalization).toHaveBeenCalledWith(
+      "pirate-ships",
+      expect.objectContaining({
+        quality: {
+          enabled: true,
+          execution_mode: "repair",
+          language: "de",
+          max_repair_rounds: 2,
+          consistency: ["repeat-drift", "glossary"],
+        },
+      }),
+    );
+  });
+
   it.each([
     [Object.assign(new Error("Update instructions for the selected languages"), { status: 400, code: "profile_languages" }), "Языки сохранённых инструкций не совпадают с выбранными. Вернитесь на шаг «Контекст и термины» и нажмите «Сохранить инструкции»."],
     [new Error("Network unavailable"), "Не удалось запустить локализацию. Проверьте условия запуска и повторите попытку."],

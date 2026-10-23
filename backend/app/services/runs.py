@@ -87,6 +87,12 @@ def ensure_project_available(session, owner, slug, except_id=None, remote_slug=N
     for job in failed:
         if job.id == except_id or not same_project(job):
             continue
+        from app.services.quality_reservations import has_unsettled_quality
+
+        if has_unsettled_quality(session, job.id):
+            raise DomainError(
+                "run_active", "A previous remote quality operation is still unconfirmed", 409
+            )
         if any(
             key.removeprefix("delta:").startswith("mt:")
             and operation["state"] in {"intent", "accepted"}
@@ -100,6 +106,9 @@ def ensure_project_available(session, owner, slug, except_id=None, remote_slug=N
 
 
 def start_run(store, owner, slug, body, engine):
+    body = copy.deepcopy(body)
+    if body.get("quality", {}).get("execution_mode") == "verify_only":
+        body["quality"]["max_repair_rounds"] = 0
     project = store.get("project", slug, owner)
     draft = get_draft(store, body["upload_id"], owner)
     if draft["project"] != slug or draft["kind"] != "string":
@@ -166,6 +175,15 @@ def start_run(store, owner, slug, body, engine):
         "name": project["name"],
         "engine": engine,
         "persistent": project.get("persistent", False),
+        "quality": copy.deepcopy(
+            body.get("quality")
+            or {
+                "enabled": False,
+                "language": "de",
+                "max_repair_rounds": 2,
+                "consistency": ["repeat-drift", "glossary"],
+            }
+        ),
     }
     from app.services.project_links import get_link
 
@@ -258,8 +276,10 @@ def start_run(store, owner, slug, body, engine):
 
 def public_run(job):
     from app.services.mt_batches import public_mt_observation
+    from app.services.run_outcomes import run_outcomes
 
     data = job.data
+    outcomes = run_outcomes(data)
     status = job.status
     if status == "running" and job.lease_until < time.time():
         status = "no-update"
@@ -278,7 +298,13 @@ def public_run(job):
     return {
         "id": job.id,
         "status": status,
-        "requested_mode": "translate",
+        "requested_mode": "quality" if data.get("mode") == "quality_only" else "translate",
+        "execution_mode": data.get("snapshot", {})
+        .get("quality", {})
+        .get("execution_mode", "repair"),
+        **outcomes,
+        "result_bundle_available": job.status == "completed"
+        and bool(data.get("quality_artifact_id")),
         "created": data["created"],
         "started": data["started"],
         "finished": data["finished"],
@@ -292,11 +318,30 @@ def public_run(job):
             "languages": stages("language:"),
             "glossary": stages("glossary:"),
             "translate": stages("mt:"),
-            "checks": {"status": "completed" if data["export_id"] else "pending"},
+            "checks": {
+                "status": (
+                    data.get("quality", {}).get("status", "completed")
+                    if data["export_id"]
+                    else "running"
+                    if data.get("quality_cycle_id")
+                    else "pending"
+                ),
+                "phase": data.get("quality", {}).get("phase"),
+                "execution_mode": data.get("snapshot", {})
+                .get("quality", {})
+                .get("execution_mode", "repair"),
+                "counts": data.get("quality", {}).get("counts", {}),
+            },
             "execution": {"attempt": data["attempt"]},
         },
         "liveness": "no-update" if status == "no-update" else status,
-        "outcome": ("ready" if not data["warnings"] else "attention")
+        "outcome": (
+            "ready_with_exceptions"
+            if outcomes["has_exceptions"]
+            else "ready"
+            if not data["warnings"]
+            else "attention"
+        )
         if data["export_id"]
         else None,
         "resume_allowed": status in {"failed", "unknown"},
@@ -354,8 +399,8 @@ def cancel_run(store, owner, run_id):
         if job.status in {"queued", "running", "unknown"}:
             job.status = "cancel_requested"
             if not job.lease_owner and job.data.get("rate_limit", {}).get("waiting"):
-                # A deferred job has no owner; cancellation must not wait
-                # for Retry-After and sends no request to Weblate.
+                # No worker owns a deferred job: cancellation need not wait
+                # for a long Retry-After, and sends no request to Weblate.
                 job.lease_until = 0
         return public_run(job)
 

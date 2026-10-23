@@ -465,7 +465,7 @@ def test_retry_after_does_not_extend_absolute_observation_deadline(tmp_path, mon
     assert not advance(args)
     scope = data["mt_batches"]["kit-1:de"]
     scope["next_poll_at"] = clock[0] + 10000
-    clock[0] += 7201
+    clock[0] += Settings().mt_max_observation_seconds + 1
     scope["last_progress"] = clock[0] - 1
     with pytest.raises(DomainError) as caught:
         advance(args)

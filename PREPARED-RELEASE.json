@@ -1,0 +1,15 @@
+{
+  "component": "wizard",
+  "source_release": "9d985aafc02d",
+  "prepared_wizard_source": "6eaa96fde3e214c6b645f5c6ec0592490f1ff9d7",
+  "production_inferred_source": "12c43e255c57d1e83167c239a6ea98f16c01423c",
+  "production_source_match": "All 271 common installed authoring files match 12c43e2 after LF/CRLF normalization; five extra built UI files are preserved in the production snapshot.",
+  "installed": false,
+  "requires_new_production_approval": true,
+  "production_preparation_fixes": [
+    "Closed additive SQLite rollback from 0001/0002/0003 to 0004",
+    "Schema and index fingerprints; all quality journals preserved",
+    "Both migration inventories validated; actual production rollback test",
+    "No deployment or worker startup authorized"
+  ]
+}

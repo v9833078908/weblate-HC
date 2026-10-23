@@ -19,6 +19,7 @@ import { LanguageSelection } from "./LanguageSelection";
 import { codeKey, languageCode } from "./languages";
 import { ProfileIntegration } from "./ProfileIntegration";
 import { ChangeReview } from "../../components/ChangeReview";
+import { QualityModeSelection } from "../../components/QualityModeSelection";
 import type { ChangePlan, ProjectConnection } from "../../api/client";
 import { t } from "../../i18n";
 import {
@@ -113,10 +114,23 @@ export function LocKitWizard({ api }: LocKitWizardProps) {
   const [changePlan, setChangePlan] = useState<ChangePlan | null>(null);
   const [connectionError, setConnectionError] = useState(false);
   const [writesEnabled, setWritesEnabled] = useState(typeof api.getIntegrationPolicy !== "function");
+  const [qualityAvailable, setQualityAvailable] = useState(
+    typeof api.getIntegrationPolicy !== "function",
+  );
   useEffect(() => {
     let active = true;
     if (typeof api.getIntegrationPolicy !== "function") return;
-    api.getIntegrationPolicy().then(value => {if (active) setWritesEnabled(value.external_writes);}).catch(() => {if (active) setWritesEnabled(false);});
+    api.getIntegrationPolicy().then(value => {
+      if (active) {
+        setWritesEnabled(value.external_writes);
+        setQualityAvailable(value.quality_cycle ?? true);
+      }
+    }).catch(() => {
+      if (active) {
+        setWritesEnabled(false);
+        setQualityAvailable(false);
+      }
+    });
     return () => {active = false;};
   },[api]);
   useEffect(() => {
@@ -152,6 +166,9 @@ export function LocKitWizard({ api }: LocKitWizardProps) {
   const [structureOpen, setStructureOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [qualityEnabled, setQualityEnabled] = useState(false);
+  const [qualityMode, setQualityMode] = useState<"repair" | "verify_only">("repair");
+  const [qualityLanguage, setQualityLanguage] = useState("de");
   const [error, setError] = useState<string>();
   const [preUploadMode, setPreUploadMode] = useState<ProducerUiMode>("quick");
   const stepParam = search.get("step");
@@ -171,6 +188,12 @@ export function LocKitWizard({ api }: LocKitWizardProps) {
   const body = draft ? analysisBody(draft) : undefined;
   const files = body?.loc_kit?.files ?? [];
   const answers = useMemo(() => (draft ? completeAnswers(draft) : undefined), [draft]);
+  useEffect(() => {
+    const targets = answers?.included_target_languages ?? [];
+    if (targets.length && !targets.includes(qualityLanguage)) {
+      setQualityLanguage(targets.includes("de") ? "de" : targets[0]);
+    }
+  }, [answers?.included_target_languages, qualityLanguage]);
 
   const announceError = useCallback((message: string) => {
     setError(message);
@@ -505,6 +528,13 @@ export function LocKitWizard({ api }: LocKitWizardProps) {
           glossary_revision: glossaryDraft.revision,
           glossary_confirmed: glossaryConfirmed,
         } : {}),
+        quality: {
+          enabled: qualityEnabled,
+          execution_mode: qualityMode,
+          language: qualityLanguage,
+          max_repair_rounds: qualityMode === "verify_only" ? 0 : 2,
+          consistency: ["repeat-drift", "glossary"],
+        },
       });
       navigate(`/projects/${encodeURIComponent(slug)}/runs/${run.id}`);
     } catch (reason: unknown) {
@@ -844,6 +874,36 @@ export function LocKitWizard({ api }: LocKitWizardProps) {
         ) : null}
         {connection && glossaryDraft && changePlan?.glossary_preview ? <label className="check-row"><input type="checkbox" checked={glossaryConfirmed} onChange={event=>setGlossaryConfirmed(event.target.checked)} />Отдельно подтверждаю публикацию показанного глоссария в новый компонент. Прежние глоссарии сохраняются.</label> : null}
         {!writesEnabled ? <p role="status">Запись во внешний Weblate отключена. Подключение, сравнение и скачивание доступны; запуск перевода заблокирован.</p> : null}
+        <fieldset className="quality-policy">
+          <legend>{t("Automatic quality cycle")}</legend>
+          <label className="check-row">
+            <input
+              checked={qualityEnabled}
+              disabled={!qualityAvailable}
+              onChange={(event) => setQualityEnabled(event.target.checked)}
+              type="checkbox"
+            />
+            {t("Run deterministic checks, two judges, consistency repair and recheck before export")}
+          </label>
+          {!qualityAvailable ? (
+            <p role="status">{t("Automatic quality cycle is disabled by the operator.")}</p>
+          ) : null}
+          {qualityEnabled ? (
+            <><QualityModeSelection value={qualityMode} onChange={setQualityMode} />
+            <p className="helper-note">{t("This mode applies to the quality phase after localization. Existing completed translations can be reviewed separately.")}</p>
+            <label className="field-stack">
+              <span>{t("Quality check language")}</span>
+              <select value={qualityLanguage} onChange={(event) => setQualityLanguage(event.target.value)}>
+                {(answers?.included_target_languages ?? []).map((language) => (
+                  <option key={language} value={language}>{language}</option>
+                ))}
+              </select>
+            </label></>
+          ) : null}
+          <p className="helper-note">
+            {t("Only candidates verified by both judges are applied. Approved, stale and terminology-conflict strings remain unchanged and are reported as exceptions.")}
+          </p>
+        </fieldset>
         {totals?.imported_rows === 0 ? <p role="status">{t("Нет строк для перевода. Проверьте исходные тексты и структуру колонок.")}</p> : null}
         <button className="primary-button" disabled={!writesEnabled || busy || !body?.confirmation || totals?.imported_rows === 0 || errors.length > 0 || connectionError || !!connection && (connection.read_only || !changePlan?.confirmed || !!glossaryDraft && !glossaryConfirmed)} onClick={start} type="button">
           {busy ? t("Starting localization…") : t("Start localization")}

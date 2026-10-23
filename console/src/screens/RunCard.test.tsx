@@ -56,7 +56,45 @@ function renderRun(api: ProducerApi) {
 
 afterEach(() => vi.useRealTimers());
 
+it("shows verified input coverage and explicitly scopes payment uncertainty to MT", async () => {
+  const api = apiMock({ ...running, requested_mode: "quality", execution_mode: "verify_only", translation_coverage: { filled: 1662, total: 1662, missing: 0 }, payment_outcome: { unknown: 0, automatic_paid_replay_allowed: false } });
+  renderRun(api);
+  expect(await screen.findByText("1662 / 1662")).toBeVisible();
+  expect(screen.getByText("Неопределённая оплата машинного перевода")).toBeVisible();
+});
+
 describe("RunCard", () => {
+  it("shows immutable verification and refreshes using GET only", async () => {
+    const api = apiMock({...running, execution_mode:"verify_only"});
+    renderRun(api);
+    expect(await screen.findByText("Только проверка — без изменения переводов")).toBeVisible();
+    await userEvent.setup().click(screen.getByRole("button", {name:"Проверить состояние"}));
+    expect(api.getRun).toHaveBeenCalledTimes(2);
+    expect(api.resumeRun).not.toHaveBeenCalled();
+  });
+  it("offers a saved report for completed bundles only", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ok: false}));
+    const view = renderRun(apiMock({...running, status: "completed", outcome: "ready_with_exceptions",
+      result_bundle_available: true}));
+    expect(await screen.findByRole("heading", {name: "Отчёт качества"})).toBeVisible();
+    view.unmount();
+    renderRun(apiMock({...running, result_bundle_available: true}));
+    await screen.findByRole("heading", {name: "Первая локализация"});
+    expect(screen.queryByRole("heading", {name: "Отчёт качества"})).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+  it("identifies quality-only work without presenting an MT stage", async () => {
+    renderRun(apiMock({ ...running, requested_mode: "quality" }));
+    expect(await screen.findByRole("heading", { name: "Проверка качества готового перевода" })).toBeVisible();
+    expect(screen.getByText("Машинный перевод не запускается. Исходное завершённое задание и его файл сохранены.")).toBeVisible();
+    expect(screen.queryByText("Машинный перевод", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Первая локализация" })).not.toBeInTheDocument();
+  });
+  it("downloads the immutable quality run file rather than a cached project snapshot", async () => {
+    renderRun(apiMock({ ...running, requested_mode: "quality", status: "completed", outcome: "ready" }));
+    const link = await screen.findByRole("link", { name: "Проверить и скачать" });
+    expect(link).toHaveAttribute("href", `/api/producer/runs/${running.id}/export/?format=xlsx`);
+  });
   it("shows persisted MT reconciliation progress without claiming a new request", async () => {
     const run = { ...running, stages: { ...runningStages, mt_observation: {
       translated: 550, total: 1662, scopes: { "kit-1:de": {
@@ -111,5 +149,27 @@ describe("RunCard", () => {
         ["serious", "critical"].includes(impact ?? ""),
       ),
     ).toEqual([]);
+  });
+
+  it("shows automatic repair progress and the quality report", async () => {
+    const qualityRun = {
+      ...running,
+      stages: {
+        ...runningStages,
+        checks: {
+          status: "running",
+          phase: "safe-apply",
+          counts: { major: 2, applied: 1 },
+        },
+      },
+    };
+    renderRun(apiMock(qualityRun));
+
+    expect(await screen.findByRole("heading", { name: "Автоматический цикл качества" })).toBeVisible();
+    expect(screen.getByText("Ошибки проверяются и исправляются автоматически.")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Открыть машиночитаемый отчёт о качестве" })).toHaveAttribute(
+      "href",
+      `/api/producer/runs/${running.id}/quality/`,
+    );
   });
 });

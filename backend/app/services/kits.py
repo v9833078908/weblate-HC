@@ -128,7 +128,22 @@ def analyze_file(path: Path, name: str):
     except (ReaderError, ValueError) as e:
         raise DomainError("invalid_kit", str(e)) from e
     sheets = []
-    for sheet, rows in inspection.sheets.items():
+    normalized_sheets: dict[str, list[list[str]]] = {}
+    for sheet, original_rows in inspection.sheets.items():
+        # Excel keeps its used range after cells are cleared. Ignore that
+        # historical extent, but retain row positions and interior columns.
+        populated_rows = [row for row in original_rows if any(value.strip() for value in row)]
+        content_width = max(
+            (
+                index + 1
+                for row in populated_rows
+                for index, value in enumerate(row)
+                if value.strip()
+            ),
+            default=0,
+        )
+        rows = [row[:content_width] for row in original_rows]
+        normalized_sheets[sheet] = rows
         columns = rows[0] if rows else []
         candidates = []
         unresolved = []
@@ -200,7 +215,7 @@ def analyze_file(path: Path, name: str):
                 "name": sheet,
                 "classification": kind,
                 "selected": False,
-                "rows": len(rows),
+                "rows": len(populated_rows),
                 "columns": columns,
                 "languages": [],
                 "source_language": None,
@@ -213,7 +228,7 @@ def analyze_file(path: Path, name: str):
         )
     return (
         {"path": name, "format": path.suffix.lstrip("."), "selected": False, "sheets": sheets},
-        inspection.sheets,
+        normalized_sheets,
         excluded_sheets(path),
     )
 
