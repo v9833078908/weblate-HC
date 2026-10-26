@@ -12,12 +12,18 @@ import httpx2
 from django.conf import settings
 from django.utils import timezone
 from rest_framework.test import APIClient
+from weblate_customization.checks import GameMarkupCheck
+from weblate_customization.machinery import RoutedLLMTranslation
 
+from weblate.checks import models as check_models
+from weblate.machinery.openai import BaseOpenAITranslation
 from weblate.trans.llm_delivery import dispatch_exchange
 from weblate.trans.models import ProducerMTOperation, Unit
 from weblate.trans.models.judge import compute_decision_revision
+from weblate.trans.models.llm_delivery import ProducerLLMExchange
+from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.models.producer_mt import unit_revision
-from weblate.trans.mt_operations import build_engine
+from weblate.trans.mt_operations import build_engine, process_mt_operation
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.tests import http_mock
 
@@ -69,6 +75,133 @@ class MTReconciliationTest(http_mock.MockDNSMixin, ViewTestCase):
 
     def reconcile(self):
         return self.api.post(self.url + self.key + "/reconcile/", {}, format="json")
+
+    @http_mock.activate
+    def test_real_producer_recovers_protected_string_after_stored_reply_interruption(
+        self,
+    ):
+        self.enterContext(
+            patch.dict(check_models.CHECKS.data, {"game-markup": GameMarkupCheck()})
+        )
+        # Establish this synthetic source revision before its first provider call.
+        source = 'Collect {0} <sprite name="fire"> coins\n'
+        Unit.objects.filter(pk__in=[self.unit.pk, self.unit.source_unit_id]).update(
+            source=source,
+            extra_flags="python-brace-format",
+            last_updated=timezone.now(),
+        )
+        self.unit.refresh_from_db()
+        key = str(uuid4())
+        payload = {
+            **self.payload,
+            "units": [{"unit_id": self.unit.pk, "revision": unit_revision(self.unit)}],
+        }
+        with patch("weblate.trans.tasks.publish_producer_run_dispatch"):
+            accepted = self.api.post(
+                self.url, payload, format="json", HTTP_IDEMPOTENCY_KEY=key
+            )
+        self.assertEqual(accepted.status_code, 202)
+        operation = ProducerMTOperation.objects.get(key=key)
+        engine = build_engine(operation)
+        sent_payloads = []
+
+        def respond(request):
+            sent_payloads.append(json.loads(request.content))
+            inputs = json.loads(json.loads(request.content)["messages"][-1]["content"])[
+                "strings"
+            ]
+            item = inputs[0]
+            self.assertIn("@@PH", item["source"])
+            text = [""]
+            placements = {}
+            for part in item["parts"]:
+                if part["type"] == "text":
+                    text[-1] += (
+                        part["text"]
+                        .replace("Collect", "Sbírej")
+                        .replace("coins", "mincí")
+                    )
+                else:
+                    placement = {"position": len(text)}
+                    if part["translatable"]:
+                        placement["text"] = part["text"]
+                    placements[f"p{len(placements)}"] = placement
+                    text.append("")
+            reply = {
+                "translations": {
+                    item["id"]: {
+                        "text": text,
+                        "placeholders": placements,
+                    }
+                }
+            }
+            return httpx2.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": json.dumps(reply)}}],
+                    "usage": {
+                        "prompt_tokens": 9,
+                        "completion_tokens": 2,
+                        "total_tokens": 11,
+                    },
+                },
+            )
+
+        http_mock.register_callback(
+            "POST", engine.get_chat_completions_url(), callback=respond
+        )
+        validated = []
+        original_parser = RoutedLLMTranslation._parse_llm_translations  # ruff: ignore[private-member-access]
+
+        def interrupt_after_parse(machine, *args, **kwargs):
+            result = original_parser(machine, *args, **kwargs)
+            validated.append(result)
+            msg = "synthetic interruption after storage"
+            raise RuntimeError(msg)
+
+        with patch.object(
+            RoutedLLMTranslation, "_parse_llm_translations", new=interrupt_after_parse
+        ):
+            result = process_mt_operation(operation.run_id)
+        self.assertEqual(result["state"], "provider_unknown")
+        self.assertEqual(len(validated), 1)
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "")
+        saved = ProducerLLMExchange.objects.get()
+        witness = (saved.pk, saved.request_digest, saved.response_digest)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+        replayed_payloads = []
+        original_request = BaseOpenAITranslation.request
+
+        def observe_request(machine, method, url, **kwargs):
+            replayed_payloads.append(kwargs.get("json"))
+            return original_request(machine, method, url, **kwargs)
+
+        with (
+            patch.object(BaseOpenAITranslation, "request", new=observe_request),
+            patch(
+                "weblate.machinery.base.fetch_validated_url",
+                side_effect=AssertionError("paid request forbidden"),
+            ) as outbound,
+        ):
+            response = self.api.post(self.url + key + "/reconcile/", {}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(replayed_payloads, sent_payloads)
+        self.unit.refresh_from_db()
+        self.assertEqual(
+            self.unit.target,
+            'Sbírej {0} <sprite name="fire"> mincí\n',
+            response.data["reconciliation"],
+        )
+        self.assertEqual(self.unit.source, source)
+        self.assertEqual(response.data["reconciliation"]["ready"], [self.unit.pk])
+        self.assertEqual(outbound.call_count, 0)
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+        saved.refresh_from_db()
+        self.assertEqual(
+            (saved.pk, saved.request_digest, saved.response_digest), witness
+        )
 
     def test_unknown_and_never_sent_are_distinct_without_provider_calls(self):
         with patch("weblate.trans.mt_operations.build_engine") as outbound:
@@ -169,8 +302,12 @@ class MTReconciliationTest(http_mock.MockDNSMixin, ViewTestCase):
         http_mock.register_callback(
             "POST", engine.get_chat_completions_url(), callback=respond
         )
-        engine.download_multiple_translations(
-            "en", "cs", [(self.unit.get_source_plurals()[0], self.unit)]
+        engine._translate_sources(  # ruff: ignore[private-member-access]
+            "en",
+            "cs",
+            [(self.unit.get_source_plurals()[0], self.unit)],
+            user=self.user,
+            threshold=self.operation.payload["threshold"],
         )
         with patch(
             "weblate.machinery.base.fetch_validated_url",

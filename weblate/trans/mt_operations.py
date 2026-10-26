@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections import Counter
 from datetime import timedelta
 from typing import TYPE_CHECKING, cast
 from uuid import UUID, uuid4
@@ -60,9 +59,6 @@ def _recover_saved_bodies(operation) -> None:
     """Re-run only the local parser on original, scope-bound saved replies."""
     from weblate.machinery.base import (  # ruff: ignore[import-outside-top-level]
         MachineTranslationError,
-    )
-    from weblate.machinery.llm import (  # ruff: ignore[import-outside-top-level]
-        PartialLLMReplyError,
     )
     from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
         DeliveryUnresolved,
@@ -125,16 +121,15 @@ def _recover_saved_bodies(operation) -> None:
             engine.delivery_replay_only = True
             engine.cache_translations = False
             sources = [(unit.get_source_plurals()[0], unit) for unit in original]
-            try:
-                # Reconstruct and validate the original request digest and codec;
-                # direct parsing would bypass the semantic spend fence.
-                results = engine.download_multiple_translations(
-                    operation.translation.component.source_language.code,
-                    operation.translation.language.code,
-                    sources,
-                )
-            except PartialLLMReplyError as partial:
-                results = partial.translations
+            # Follow the original producer path: cleanup, context grouping,
+            # exact request replay and protected-token restoration in order.
+            results = engine._translate_sources(  # ruff: ignore[private-member-access]
+                operation.translation.component.source_language.code,
+                operation.translation.language.code,
+                sources,
+                user=operation.actor,
+                threshold=operation.payload["threshold"],
+            )
         except (
             DeliveryUnresolved,
             MachineTranslationError,
@@ -143,22 +138,18 @@ def _recover_saved_bodies(operation) -> None:
             TypeError,
         ):
             continue
-        occurrences = Counter()
-        for unit in original:
-            source = unit.get_source_plurals()[0]
-            index = occurrences[source]
-            occurrences[source] += 1
-            answers = results.get(source, [])
+        for index, unit in enumerate(original):
+            answers = results[index] if index < len(results) else []
             if (
-                index >= len(answers)
-                or answers[index].get("quality", 0) < operation.payload["threshold"]
+                not answers
+                or answers[0].get("quality", 0) < operation.payload["threshold"]
             ):
                 continue
             operation.units.filter(
                 unit=unit,
                 state__in={"requesting", "provider_unknown", "failed"},
                 audit_revision=compute_decision_revision(unit),
-            ).update(state="received", answer=answers[index]["text"])
+            ).update(state="received", answer=answers[0]["text"])
 
 
 def build_engine(operation: ProducerMTOperation) -> BaseLLMTranslation:
