@@ -9,6 +9,9 @@
 План: `docs/product/plans/2026-10-26-weblate-wizard-single-sign-on.md`.
 Функция выключена по умолчанию и не обновляет Weblate до upstream 2026.11.
 
+Локальная проверка и исправления security review:
+`docs/operations/reports/2026-10-26-wizard-sso-local-validation.md`.
+
 ## Подготовка Weblate
 
 Установить extra `wizard-sso` (производственный extra `all` его включает).

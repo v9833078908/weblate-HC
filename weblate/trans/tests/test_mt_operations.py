@@ -13,8 +13,10 @@ import httpx2
 from django.conf import settings
 from django.test import override_settings
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIClient
 
+from weblate.auth.models import User
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.llm import PartialLLMReplyError
 from weblate.trans.models import Unit
@@ -22,6 +24,7 @@ from weblate.trans.models.producer_mt import ProducerMTOperation, ProducerMTUnit
 from weblate.trans.mt_operations import (
     build_engine,
     process_mt_operation,
+    reconcile_mt_operation,
     recover_expired_mt_operations,
 )
 from weblate.trans.tasks import (
@@ -32,6 +35,8 @@ from weblate.trans.tasks import (
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.util import join_plural
+from weblate.wizard_auth.grants import WizardAuthorizationRequired
+from weblate.wizard_auth.models import DelegationFamily
 
 
 def revision(unit):
@@ -183,6 +188,159 @@ class ProducerMTTest(ViewTestCase):
         self.assertEqual(self.unit.target, "Translated\n")
         self.assertEqual(operation.state, "completed")
         self.assertEqual(paid, [self.unit.pk])
+
+    def delegated_operation(self):
+        operation = self.operation()
+        family = DelegationFamily.objects.create(
+            user=self.user,
+            client_id="synthetic",
+            expires=timezone.now() + timedelta(hours=24),
+        )
+        run = operation.run
+        run.execution_options = {
+            **run.execution_options,
+            "_wizard_delegation": str(family.pk),
+        }
+        run.save(update_fields=["execution_options"])
+        return operation, family
+
+    @override_settings(WIZARD_SSO_ENABLED=True)
+    def test_delegation_pause_before_dispatch_releases_only_unsent_after_explicit_reauthorization(
+        self,
+    ):
+        operation, family = self.delegated_operation()
+        family.revoked = True
+        family.save(update_fields=["revoked"])
+        engine, paid = self.engine()
+        with patch("weblate.trans.mt_operations.build_engine", return_value=engine):
+            result = process_mt_operation(operation.run_id)
+        self.assertEqual(result["state"], "auth_required")
+        self.assertEqual(operation.units.get().state, "pending")
+        self.assertEqual(paid, [])
+        renewed = DelegationFamily.objects.create(
+            user=self.user,
+            client_id="synthetic",
+            expires=timezone.now() + timedelta(hours=24),
+        )
+        groups = reconcile_mt_operation(operation.pk, reauthorize_family=renewed)
+        self.assertEqual(groups["never_sent"], [self.unit.pk])
+        self.assertEqual(operation.units.get().state, "released")
+        self.assertEqual(str(operation.key), self.key)
+        self.assertEqual(operation.actor_id, self.user.pk)
+        response = self.submit(key=str(uuid4()))
+        self.assertEqual(response.status_code, 202)
+        remaining = ProducerMTOperation.objects.get(run_id=response.data["run_id"])
+        with patch("weblate.trans.mt_operations.build_engine", return_value=engine):
+            self.assertEqual(
+                process_mt_operation(remaining.run_id)["state"], "completed"
+            )
+        self.assertEqual(paid, [self.unit.pk])
+
+    @override_settings(WIZARD_SSO_ENABLED=True)
+    def test_delegation_refusal_at_transport_guard_is_not_a_paid_unknown(self):
+        operation, family = self.delegated_operation()
+        engine = build_engine(operation)
+
+        def refuse(*args, **kwargs):
+            DelegationFamily.objects.filter(pk=family.pk).update(revoked=True)
+            msg = "No transport was admitted"
+            raise WizardAuthorizationRequired(msg)
+
+        with (
+            patch.object(
+                engine, "download_pending_translations", side_effect=refuse
+            ) as no_transport,
+            patch("weblate.trans.mt_operations.build_engine", return_value=engine),
+        ):
+            result = process_mt_operation(operation.run_id)
+        no_transport.assert_called_once()
+        self.assertEqual(result["state"], "auth_required")
+        self.assertEqual(operation.units.get().state, "pending")
+
+    @override_settings(WIZARD_SSO_ENABLED=True)
+    def test_reply_after_logout_is_saved_and_applied_only_after_same_actor_reauthorization(
+        self,
+    ):
+        operation, family = self.delegated_operation()
+        engine, paid = self.engine()
+        translate = engine._translate_sources  # ruff: ignore[private-member-access]
+
+        def reply(*args, **kwargs):
+            values = translate(*args, **kwargs)
+            DelegationFamily.objects.filter(pk=family.pk).update(revoked=True)
+            return values
+
+        engine._translate_sources = reply  # ruff: ignore[private-member-access]
+        with patch("weblate.trans.mt_operations.build_engine", return_value=engine):
+            process_mt_operation(operation.run_id)
+        self.assertEqual(operation.units.get().state, "received")
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "")
+        renewed = DelegationFamily.objects.create(
+            user=self.user,
+            client_id="synthetic",
+            expires=timezone.now() + timedelta(hours=24),
+        )
+        groups = reconcile_mt_operation(operation.pk, reauthorize_family=renewed)
+        self.assertEqual(groups["ready"], [self.unit.pk])
+        self.assertEqual(paid, [self.unit.pk])
+
+    @override_settings(WIZARD_SSO_ENABLED=True)
+    def test_logout_between_chunks_keeps_reply_and_unsent_tail_separate(self):
+        other = self.unit.translation.unit_set.exclude(pk=self.unit.pk).first()
+        Unit.objects.filter(pk=other.pk).update(
+            target="", state=0, source=self.unit.source
+        )
+        other.refresh_from_db()
+        self.payload["units"].append({"unit_id": other.pk, "revision": revision(other)})
+        operation, family = self.delegated_operation()
+        engine, paid = self.engine()
+        engine.batch_size = 1
+        translate = engine._translate_sources  # ruff: ignore[private-member-access]
+
+        def reply(*args, **kwargs):
+            values = translate(*args, **kwargs)
+            DelegationFamily.objects.filter(pk=family.pk).update(revoked=True)
+            return values
+
+        engine._translate_sources = reply  # ruff: ignore[private-member-access]
+        with patch("weblate.trans.mt_operations.build_engine", return_value=engine):
+            self.assertEqual(
+                process_mt_operation(operation.run_id)["state"], "auth_required"
+            )
+        self.assertEqual(len(paid), 1)
+        self.assertCountEqual(
+            operation.units.values_list("state", flat=True), ["received", "pending"]
+        )
+
+    @override_settings(WIZARD_SSO_ENABLED=True)
+    def test_reauthorization_cannot_adopt_legacy_or_another_actor_and_preserves_unknown(
+        self,
+    ):
+        operation, family = self.delegated_operation()
+        other = User.objects.create_user(
+            "other-delegated-actor", "other@example.org", "synthetic-long-password"
+        )
+        foreign = DelegationFamily.objects.create(
+            user=other,
+            client_id="synthetic",
+            expires=timezone.now() + timedelta(hours=24),
+        )
+        with self.assertRaises(PermissionDenied):
+            reconcile_mt_operation(operation.pk, reauthorize_family=foreign)
+        run = operation.run
+        run.execution_options = {}
+        run.save(update_fields=["execution_options"])
+        with self.assertRaises(PermissionDenied):
+            reconcile_mt_operation(operation.pk, reauthorize_family=family)
+        run.execution_options = {"_wizard_delegation": str(family.pk)}
+        run.save(update_fields=["execution_options"])
+        operation.state = "provider_unknown"
+        operation.save(update_fields=["state"])
+        operation.units.update(state="provider_unknown")
+        groups = reconcile_mt_operation(operation.pk, reauthorize_family=family)
+        self.assertEqual(groups["paid_unknown"], [self.unit.pk])
+        self.assertEqual(groups["never_sent"], [])
 
     def test_cached_answer_is_applied_without_provider_call(self):
         operation = self.operation()

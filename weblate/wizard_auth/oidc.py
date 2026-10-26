@@ -6,7 +6,9 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
-from oauth2_provider.oauth2_validators import OAuth2Validator
+from oauth2_provider.oauth2_validators import (  # type: ignore[import-untyped]
+    OAuth2Validator,
+)
 
 from weblate.wizard_auth.grants import checksum, family_for, subject_for
 from weblate.wizard_auth.models import DelegationFamily, TokenBinding
@@ -74,7 +76,7 @@ class WizardValidator(OAuth2Validator):
     def _save_bearer_token(self, token, request, *args, **kwargs):
         # Called inside the toolkit's atomic issuance transaction.
         family = None
-        old_refresh = getattr(request, "refresh_token", None)
+        old_refresh = getattr(request, "refresh_token", "") or ""
         if request.grant_type == "refresh_token":
             family = family_for(old_refresh, "refresh")
         if family is None:

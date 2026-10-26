@@ -23,13 +23,17 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.judge import compute_decision_revision
 from weblate.trans.models.producer_mt import unit_revision
-from weblate.wizard_auth.grants import run_delegation_active
+from weblate.wizard_auth.grants import (
+    WizardAuthorizationRequired,
+    delegation_active,
+    run_delegation_active,
+)
 
 if TYPE_CHECKING:
     from weblate.machinery.llm import BaseLLMTranslation
     from weblate.machinery.types import TranslationResultDict
 
-TERMINAL = {"completed", "partial", "failed", "provider_unknown"}
+TERMINAL = {"completed", "partial", "failed", "provider_unknown", "auth_required"}
 
 
 def _attempt_current(attempt, unit):
@@ -184,7 +188,7 @@ def _owned(operation_id, owner):
     return operation
 
 
-def _receive_pending(operation, owner, engine, translation, actor, pending) -> None:
+def _receive_pending(operation, owner, engine, translation, actor, pending) -> bool:
     """Persist each engine-sized reply before authorizing another outbound chunk."""
     size = max(1, min(20, getattr(engine, "batch_size", 20)))
     for offset in range(0, len(pending), size):
@@ -192,7 +196,7 @@ def _receive_pending(operation, owner, engine, translation, actor, pending) -> N
         with transaction.atomic():
             _owned(operation.pk, owner)
             if _cancelled(operation.run_id):
-                return
+                return False
             translation.refresh_from_db()
             translation.component.refresh_from_db()
             current_actor = (
@@ -207,6 +211,11 @@ def _receive_pending(operation, owner, engine, translation, actor, pending) -> N
                 and not translation.component.locked
                 and not translation.is_readonly
             )
+            if (
+                operation.run.execution_options.get("_wizard_delegation")
+                and not permitted
+            ):
+                return True
             for attempt, _unit in pending[offset : offset + size]:
                 saved = ProducerMTUnitAttempt.objects.select_for_update().get(
                     pk=attempt.pk
@@ -229,6 +238,7 @@ def _receive_pending(operation, owner, engine, translation, actor, pending) -> N
             (unit.get_source_plurals()[0], unit) for _a, unit in chunk
         ]
         recovered: list[list[TranslationResultDict]] = [[] for _ in chunk]
+        authorization_refused = False
         try:
             answers = engine._translate_sources(  # ruff: ignore[private-member-access]
                 translation.component.source_language.code,
@@ -237,7 +247,12 @@ def _receive_pending(operation, owner, engine, translation, actor, pending) -> N
                 user=current_actor,
                 threshold=operation.payload["threshold"],
             )
-        except Exception:
+        except Exception as error:
+            # Native machinery wraps domain exceptions once while preserving
+            # __cause__; keep the typed pre-transport refusal through that seam.
+            authorization_refused = isinstance(
+                error, WizardAuthorizationRequired
+            ) or isinstance(error.__cause__, WizardAuthorizationRequired)
             # Some internal context groups can already have a free cached answer.
             answers = None
             recovered = engine._prepare_translation_download(  # ruff: ignore[private-member-access]
@@ -246,7 +261,7 @@ def _receive_pending(operation, owner, engine, translation, actor, pending) -> N
                 sources,
                 operation.payload["threshold"],
             ).output
-        for index, (attempt, _unit) in enumerate(chunk):
+        for index, (attempt, target_unit) in enumerate(chunk):
             results = answers[index] if answers is not None else recovered[index]
             with transaction.atomic():
                 _owned(operation.pk, owner)
@@ -261,10 +276,23 @@ def _receive_pending(operation, owner, engine, translation, actor, pending) -> N
                     saved.state = "received"
                 else:
                     saved.state = "provider_unknown" if answers is None else "failed"
+                    if authorization_refused:
+                        # A context group may have completed before the refused
+                        # group. Only absence of its durable delivery claim proves
+                        # that this individual unit never entered paid transport.
+                        # ruff: ignore[import-outside-top-level]
+                        from weblate.trans.models.llm_delivery import ProducerLLMWork
+
+                        identity = f"mt:{saved.unit_id}:{translation.language.code}:{compute_decision_revision(target_unit.source_unit)}"
+                        if not ProducerLLMWork.objects.filter(
+                            identity=identity
+                        ).exists():
+                            saved.state = "pending"
                 saved.save(update_fields=["state", "answer"])
         if answers is None:
             # Do not label the unrequested tail paid/unknown or silently retry it.
-            return
+            return authorization_refused
+    return False
 
 
 # Keep the state transitions together; row locks end before every provider call.
@@ -315,6 +343,8 @@ def process_mt_operation(run_id: str | UUID) -> dict:
         and not translation.is_readonly
         and not translation.is_source
     )
+    delegated = bool(run.execution_options.get("_wizard_delegation"))
+    authorization_paused = delegated and not permitted
     engine = build_engine(operation) if permitted and not cancelled else None
     selected = []
     # Each unit is checked independently; no row lock survives provider I/O.
@@ -341,7 +371,8 @@ def process_mt_operation(run_id: str | UUID) -> dict:
             elif not _attempt_current(attempt, unit) or unit.readonly:
                 attempt.state = "stale"
             elif not permitted or cancelled or _cancelled(run_id):
-                attempt.state = "failed"
+                if not delegated or cancelled or _cancelled(run_id):
+                    attempt.state = "failed"
             else:
                 selected.append((attempt, unit))
                 continue
@@ -382,7 +413,9 @@ def process_mt_operation(run_id: str | UUID) -> dict:
                     pending.append((saved, unit))
                 saved.save(update_fields=["state", "answer"])
         if pending:
-            _receive_pending(operation, owner, engine, translation, actor, pending)
+            authorization_paused = _receive_pending(
+                operation, owner, engine, translation, actor, pending
+            )
 
     for ident in operation.units.filter(state="received").values_list("pk", flat=True):
         with transaction.atomic():
@@ -398,6 +431,14 @@ def process_mt_operation(run_id: str | UUID) -> dict:
                 if actor
                 else None
             )
+            if delegated and (
+                authorization_paused
+                or not run_delegation_active(operation.run)
+                or actor is None
+                or not actor.has_perm("translation.auto", translation)
+            ):
+                authorization_paused = True
+                break
             saved = ProducerMTUnitAttempt.objects.select_for_update().get(pk=ident)
             unit = Unit.objects.select_for_update().get(pk=saved.unit_id)
             if any(unit.get_target_plurals()):
@@ -442,6 +483,8 @@ def process_mt_operation(run_id: str | UUID) -> dict:
         )
         if cancelled:
             state = "failed"
+        elif authorization_paused:
+            state = "auth_required"
         current.state = state
         current.lease_owner = ""
         current.lease_until = None
@@ -471,7 +514,7 @@ def process_mt_operation(run_id: str | UUID) -> dict:
     return {"state": state, "warnings": []}
 
 
-def reconcile_mt_operation(operation_id) -> dict:
+def reconcile_mt_operation(operation_id, *, reauthorize_family=None) -> dict:
     """Separate coverage from financial history; never dispatch provider work."""
     groups = {
         name: []
@@ -488,10 +531,30 @@ def reconcile_mt_operation(operation_id) -> dict:
     with transaction.atomic():
         operation = ProducerMTOperation.objects.select_for_update().get(pk=operation_id)
         run = ProducerRun.objects.select_for_update().get(pk=operation.run_id)
+        if reauthorize_family is not None:
+            # Explicit current-user reconciliation may renew an existing SSO
+            # binding, never adopt a legacy service-account run or change actor.
+            # ruff: ignore[import-outside-top-level]
+            from rest_framework.exceptions import PermissionDenied
+
+            if (
+                not run.execution_options.get("_wizard_delegation")
+                or reauthorize_family.user_id != operation.actor_id
+                or not delegation_active(reauthorize_family.pk, operation.actor_id)
+            ):
+                msg = "Only the original delegated actor may reauthorize this batch"
+                raise PermissionDenied(msg)
+            run.execution_options = {
+                **run.execution_options,
+                "_wizard_delegation": str(reauthorize_family.pk),
+            }
+            run.save(update_fields=["execution_options"])
         translation = operation.translation
         actor = operation.actor
-        permitted = actor is not None and actor.has_perm(
-            "translation.auto", translation
+        permitted = (
+            actor is not None
+            and run_delegation_active(run)
+            and actor.has_perm("translation.auto", translation)
         )
         permitted = (
             permitted

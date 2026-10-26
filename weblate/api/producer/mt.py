@@ -334,7 +334,10 @@ class ProducerMTBatchReconcile(ProducerMTBatchDetail):
             key=key,
         )
         _check_access(request.user, operation.translation)
-        reconciliation = reconcile_mt_operation(operation.pk)
+        reconciliation = reconcile_mt_operation(
+            operation.pk,
+            reauthorize_family=getattr(request, "wizard_delegation", None),
+        )
         operation.refresh_from_db()
         return Response(
             {**operation_result(operation), "reconciliation": reconciliation}

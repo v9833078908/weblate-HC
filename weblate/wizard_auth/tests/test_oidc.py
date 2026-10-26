@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 from datetime import timedelta
+from typing import Any
 from unittest.mock import Mock
 from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -12,8 +13,8 @@ from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
-from jwcrypto.jwk import JWK
-from oauth2_provider.models import get_application_model
+from jwcrypto.jwk import JWK  # type: ignore[import-untyped]
+from oauth2_provider.models import get_application_model  # type: ignore[import-untyped]
 from rest_framework.exceptions import PermissionDenied
 
 from weblate.auth.models import User
@@ -25,6 +26,9 @@ from weblate.wizard_auth.models import DelegationFamily
 
 
 class WizardOIDCTest(TestCase):
+    user: User
+    application: Any
+
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
@@ -131,10 +135,10 @@ class WizardOIDCTest(TestCase):
         )
         with override_settings(
             OAUTH2_PROVIDER={
-                **settings.OAUTH2_PROVIDER,
+                **getattr(settings, "OAUTH2_PROVIDER", {}),
                 "OIDC_RSA_PRIVATE_KEY": replacement,
                 "OIDC_RSA_PRIVATE_KEYS_INACTIVE": [
-                    settings.OAUTH2_PROVIDER["OIDC_RSA_PRIVATE_KEY"]
+                    getattr(settings, "OAUTH2_PROVIDER", {})["OIDC_RSA_PRIVATE_KEY"]
                 ],
             }
         ):

@@ -47,7 +47,8 @@ class WizardOAuthAuthentication(BaseAuthentication):
             or not token.user.is_active
             or token.user_id != family.user_id
             or not token.application
-            or token.application.client_id != settings.WIZARD_SSO_CLIENT_ID
+            or token.application.client_id
+            != getattr(settings, "WIZARD_SSO_CLIENT_ID", "")
             or family.client_id != token.application.client_id
         ):
             msg = "Wizard authorization expired or was revoked"

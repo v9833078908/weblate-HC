@@ -9,8 +9,11 @@ from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.http import HttpResponseForbidden, JsonResponse
 from django_otp import DEVICE_ID_SESSION_KEY
-from oauth2_provider.models import get_application_model
-from oauth2_provider.views import AuthorizationView, ConnectDiscoveryInfoView
+from oauth2_provider.models import get_application_model  # type: ignore[import-untyped]
+from oauth2_provider.views import (  # type: ignore[import-untyped]
+    AuthorizationView,
+    ConnectDiscoveryInfoView,
+)
 
 
 class WizardDiscoveryView(ConnectDiscoveryInfoView):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from django.urls import path
-from oauth2_provider import views
+from oauth2_provider import views  # type: ignore[import-untyped]
 
 from weblate.wizard_auth.views import WizardAuthorizationView, WizardDiscoveryView
 

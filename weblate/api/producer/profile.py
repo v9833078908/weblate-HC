@@ -21,7 +21,7 @@ ENGINES = {"openrouter", "litellm"}
 
 class TranslatorInstructionsSerializer(serializers.Serializer):
     persona = serializers.CharField(required=False, max_length=20000)
-    style = serializers.CharField(required=False, max_length=20000)
+    style = serializers.CharField(required=False, max_length=20000)  # type: ignore[assignment]
     language_instructions = serializers.DictField(
         child=serializers.CharField(max_length=20000), required=False
     )

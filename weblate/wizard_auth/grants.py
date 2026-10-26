@@ -14,6 +14,10 @@ from rest_framework.exceptions import PermissionDenied
 from weblate.wizard_auth.models import DelegationFamily, SubjectIdentity, TokenBinding
 
 
+class WizardAuthorizationRequired(PermissionDenied):
+    """The current transport was refused before its paid delivery reservation."""
+
+
 def subject_for(user) -> str:
     identity, _ = SubjectIdentity.objects.get_or_create(user=user)
     return str(identity.subject)
@@ -78,7 +82,7 @@ def guard_paid_run(run_id) -> None:
     run = apps.get_model("trans", "ProducerRun").objects.filter(pk=run_id).first()
     if run and not run_delegation_active(run):
         msg = "Wizard authorization expired or was revoked; no paid request sent"
-        raise PermissionDenied(msg)
+        raise WizardAuthorizationRequired(msg)
     if run and run.execution_options.get("_wizard_delegation"):
         # Reuse the native scope/mode permission policy with a fresh actor,
         # rather than the worker's potentially cached authorization state.
@@ -98,4 +102,4 @@ def guard_paid_run(run_id) -> None:
             permitted = False
         if not permitted:
             msg = "Wizard scope permission changed; no paid request sent"
-            raise PermissionDenied(msg)
+            raise WizardAuthorizationRequired(msg)
