@@ -1844,6 +1844,7 @@ class BillingTest(BaseTestCase):
         )
 
 
+@override_settings(SITE_TITLE="Weblate", EMAIL_SUBJECT_PREFIX="[Weblate] ")
 class HostingTest(RepoTestCase):
     def get_user(self):
         user = User.objects.create_user(

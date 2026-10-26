@@ -307,6 +307,7 @@ ignore = [
   ".claude/*",
   ".claude/*/*",
   ".claude/*/*/*",
+  ".claude/*/*/*/*",
   ".clusterfuzzlite/*",
   ".dclintrc",
   ".dockerignore",
@@ -315,6 +316,8 @@ ignore = [
   ".imgbotconfig",
   ".omp/*",
   ".omp/*/*",
+  ".omp/*/*/*",
+  ".omp/*/*/*/*",
   ".reuse/dep5",
   ".weblate",
   ".well-known/*",
@@ -330,16 +333,19 @@ ignore = [
   "client/*/*",
   "deploy/*",
   "deploy/*/*",
+  "DESIGN.md",
   "dev-docker/*",
   "dev-docker/*/*",
   "docs/*",
   "docs/*/*",
   "docs/*/*/*",
   "docs/*/*/*/*",
+  "frontend-wizard/**",
   "fuzzing/*",
   "fuzzing/*/*",
   "fuzzing/*/*/*",
   "LICENSES/*",
+  "PRODUCT.md",
   "rundev.sh",
   "scripts/*",
   "scripts/*/*",
@@ -701,6 +707,10 @@ notice-rgx = "(?i)Copyright\\s+©\\s+"
 max-complexity = 16  # TODO: should be lower
 
 [tool.ruff.lint.per-file-ignores]
+# Standalone offline operator CLI and its database-free tests.
+"deploy/check-import-capacity.py" = ["implicit-namespace-package", "suspicious-subprocess-import"]
+"tests/test_release_capacity.py" = ["implicit-namespace-package", "assert", "suspicious-subprocess-import"]
+"tests/test_deploy_retention.py" = ["implicit-namespace-package", "assert", "suspicious-subprocess-import"]
 # One-off operator scripts piped into `weblate shell`, not importable modules
 "analysis/probes/*.py" = [
   # The remaining rules are suppressed because fixing them would change the
@@ -817,7 +827,7 @@ exclude = [
   "weblate.tests",
   "weblate.tests.*"
 ]
-include = ["weblate*"]
+include = ["weblate", "weblate.*"]
 namespaces = true
 
 [tool.tomlsort]

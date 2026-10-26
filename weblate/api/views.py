@@ -4065,6 +4065,10 @@ class UnitViewSet(viewsets.ReadOnlyModelViewSet, UpdateModelMixin, DestroyModelM
             # validation deliberately stays pure so a concurrent membership
             # change cannot slip between validation and Unit.translate().
             unit = Unit.objects.select_for_update().get(pk=unit.pk)
+            # DRF renders serializer.instance after perform_update. Keep it
+            # on the locked object that receives the audited write, not the
+            # earlier queryset snapshot with the old target and state.
+            serializer.instance = unit
             if new_target != unit.get_target_plurals():
                 # ruff: ignore[import-outside-top-level]
                 from weblate.trans.repeats import (

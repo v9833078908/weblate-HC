@@ -100,19 +100,17 @@ parked-случай, где у перехода флага источника н
 
 ### Модель: `Unit.count_read_only_overrides()`
 
-```python
-def count_read_only_overrides(self) -> int:
-    """Number of target units carrying ``read-only`` in their own extra_flags."""
-    if not self.is_source:
-        return 0
-    return sum(
-        1
-        for ef in self.unit_set.exclude(pk=self.pk).values_list(
-            "extra_flags", flat=True
+    def count_read_only_overrides(self) -> int:
+        """Number of target units carrying ``read-only`` in their own extra_flags."""
+        if not self.is_source:
+            return 0
+        return sum(
+            1
+            for ef in self.unit_set.exclude(pk=self.pk).values_list(
+                "extra_flags", flat=True
+            )
+            if "read-only" in Flags(ef)
         )
-        if "read-only" in Flags(ef)
-    )
-```
 
 Парсинг `Flags` точнее `extra_flags__contains`-фильтра (подстрока могла бы
 совпасть с именем параметризованного флага). Один запрос; вызывается из меню
@@ -121,36 +119,34 @@ def count_read_only_overrides(self) -> int:
 
 ### Модель: `Unit._strip_read_only_overrides(user) -> int` — единственный исполнитель
 
-```python
-def _strip_read_only_overrides(self, user: User) -> int:
-    """Strip ``read-only`` from every target unit's own extra_flags.
+    def _strip_read_only_overrides(self, user: User) -> int:
+        """Strip ``read-only`` from every target unit's own extra_flags.
 
-    The single executor of cross-language unlocking; call only on a source
-    unit, inside the caller's transaction. For each target (excluding self)
-    whose own ``Flags`` contain ``read-only``: remove the flag via
-    ``update_extra_flags`` (records an ``EXTRA_FLAGS`` change for that unit),
-    then restore the pre-parking state and re-run checks. Shares the
-    in-memory source and component with every target so that state
-    recomputation sees the caller's already-mutated source flags even when
-    the source row has not been persisted yet (``save=False`` writers).
-    Returns the number of target units changed.
-    """
-    changed = 0
-    for unit in self.unit_set.select_for_update().exclude(pk=self.pk):
-        unit.source_unit = self
-        unit.translation.component = self.translation.component
-        flags = Flags(unit.extra_flags)
-        if "read-only" not in flags:
-            continue
-        flags.remove("read-only")
-        unit.update_extra_flags(flags.format(), user)
-        unit.update_state()
-        unit.run_checks()
-        changed += 1
-    if changed and not self.is_batch_update:
-        self.translation.component.invalidate_cache()
-    return changed
-```
+        The single executor of cross-language unlocking; call only on a source
+        unit, inside the caller's transaction. For each target (excluding self)
+        whose own ``Flags`` contain ``read-only``: remove the flag via
+        ``update_extra_flags`` (records an ``EXTRA_FLAGS`` change for that unit),
+        then restore the pre-parking state and re-run checks. Shares the
+        in-memory source and component with every target so that state
+        recomputation sees the caller's already-mutated source flags even when
+        the source row has not been persisted yet (``save=False`` writers).
+        Returns the number of target units changed.
+        """
+        changed = 0
+        for unit in self.unit_set.select_for_update().exclude(pk=self.pk):
+            unit.source_unit = self
+            unit.translation.component = self.translation.component
+            flags = Flags(unit.extra_flags)
+            if "read-only" not in flags:
+                continue
+            flags.remove("read-only")
+            unit.update_extra_flags(flags.format(), user)
+            unit.update_state()
+            unit.run_checks()
+            changed += 1
+        if changed and not self.is_batch_update:
+            self.translation.component.invalidate_cache()
+        return changed
 
 Корректность:
 
@@ -183,29 +179,27 @@ def _strip_read_only_overrides(self, user: User) -> int:
 
 ### Модель: `Unit.unmark_string_read_only(user) -> int` — одновходовая оркестрация
 
-```python
-def unmark_string_read_only(self, user: User) -> int:
-    """Remove ``read-only`` from this string in every language.
+    def unmark_string_read_only(self, user: User) -> int:
+        """Remove ``read-only`` from this string in every language.
 
-    Strips the flag from the source unit's own extra_flags (if present) and
-    from every translation unit that carries it in its own extra_flags,
-    then restores states and re-runs checks. Works when called on any unit
-    of the string. Returns the number of unlocked target units (excluding
-    the source itself).
-    """
-    verify_in_transaction()
-    source = self if self.is_source else self.source_unit
-    count = source.count_read_only_overrides()
-    own = Flags(source.extra_flags)
-    if "read-only" in own:
-        own.remove("read-only")
-        # update_extra_flags cascades: _strip runs exactly once inside it.
-        source.update_extra_flags(own.format(), user)
-    elif count:
-        # Parked case: the source carries no flag, only the overrides lock.
-        source._strip_read_only_overrides(user)
-    return count
-```
+        Strips the flag from the source unit's own extra_flags (if present) and
+        from every translation unit that carries it in its own extra_flags,
+        then restores states and re-runs checks. Works when called on any unit
+        of the string. Returns the number of unlocked target units (excluding
+        the source itself).
+        """
+        verify_in_transaction()
+        source = self if self.is_source else self.source_unit
+        count = source.count_read_only_overrides()
+        own = Flags(source.extra_flags)
+        if "read-only" in own:
+            own.remove("read-only")
+            # update_extra_flags cascades: _strip runs exactly once inside it.
+            source.update_extra_flags(own.format(), user)
+        elif count:
+            # Parked case: the source carries no flag, only the overrides lock.
+            source._strip_read_only_overrides(user)
+        return count
 
 Ветвки непересекающиеся: `_strip` исполняется ровно один раз на вызов — либо
 через каскад `update_extra_flags` (флаг источника был), либо напрямую
@@ -220,14 +214,12 @@ def unmark_string_read_only(self, user: User) -> int:
 
 В конце `update_extra_flags` (`unit.py:2930-2956`), после записи изменений:
 
-```python
-if (
-    self.is_source
-    and "read-only" in Flags(old)
-    and "read-only" not in Flags(extra_flags)
-):
-    self._strip_read_only_overrides(user)
-```
+    if (
+        self.is_source
+        and "read-only" in Flags(old)
+        and "read-only" not in Flags(extra_flags)
+    ):
+        self._strip_read_only_overrides(user)
 
 - `old` уже вычислен в теле (`old = self.old_unit["extra_flags"]`, `:2935`);
   ранний возврат при `old == extra_flags` (`:2936-2937`) гарантирует, что в
@@ -253,33 +245,31 @@ if (
 
 В `weblate/trans/views/source.py:62-68` ветка снятия для `read-only`
 направляется в модельный метод; **редирект на `:43-49` и гейт 404 на
-` :33-35` не трогаются** (для не-глоссария редирект — мёртвый код: POST на
+`:33-35` не трогаются** (для не-глоссария редирект — мёртвый код: POST на
 таргет не доходит до него):
 
-```python
-if do_add:
-    flags.merge(flag)
-    new_flags = flags.format()
-    if new_flags != unit.extra_flags:
-        unit.update_extra_flags(new_flags, request.user)
-elif flag == "read-only":
-    unlocked = unit.unmark_string_read_only(request.user)
-    if unlocked:
-        messages.success(
-            request,
-            ngettext(
-                "Unlocked the string in one language.",
-                "Unlocked the string in %(count)d languages.",
-                unlocked,
+    if do_add:
+        flags.merge(flag)
+        new_flags = flags.format()
+        if new_flags != unit.extra_flags:
+            unit.update_extra_flags(new_flags, request.user)
+    elif flag == "read-only":
+        unlocked = unit.unmark_string_read_only(request.user)
+        if unlocked:
+            messages.success(
+                request,
+                ngettext(
+                    "Unlocked the string in one language.",
+                    "Unlocked the string in %(count)d languages.",
+                    unlocked,
+                )
+                % {"count": unlocked},
             )
-            % {"count": unlocked},
-        )
-else:
-    flags.remove(flag)
-    new_flags = flags.format()
-    if new_flags != unit.extra_flags:
-        unit.update_extra_flags(new_flags, request.user)
-```
+    else:
+        flags.remove(flag)
+        new_flags = flags.format()
+        if new_flags != unit.extra_flags:
+            unit.update_extra_flags(new_flags, request.user)
 
 Импорт: `from django.utils.translation import gettext, ngettext`.
 Шаблон не меняется: `translate.html:204-235` рендерит `flag_actions` через
@@ -290,23 +280,18 @@ else:
 
 В `weblate/trans/models/unit.py:2787-2797` (ветка `is_source`, не-глоссарий):
 
-```python
-if self.is_source:
-    inherited = (
-        "read-only" in translation.all_flags
-        or "read-only" in component.all_flags
-    )
-    overrides = (
-        0 if inherited or "read-only" in flags else self.count_read_only_overrides()
-    )
-    if "read-only" in flags or overrides:
-        if overrides or not inherited:
-            result.append(
-                ("removeflag", "read-only", gettext("Unmark as read-only"))
-            )
-    else:
-        result.append(("addflag", "read-only", gettext("Mark as read-only")))
-```
+    if self.is_source:
+        inherited = (
+            "read-only" in translation.all_flags or "read-only" in component.all_flags
+        )
+        overrides = (
+            0 if inherited or "read-only" in flags else self.count_read_only_overrides()
+        )
+        if "read-only" in flags or overrides:
+            if overrides or not inherited:
+                result.append(("removeflag", "read-only", gettext("Unmark as read-only")))
+        else:
+            result.append(("addflag", "read-only", gettext("Mark as read-only")))
 
 Матрица поведения (с учётом `flags = self.all_flags`, `:2783`):
 
@@ -414,6 +399,7 @@ if self.is_source:
 `original_state == 0` (STATE_EMPTY).
 
 ### Задача 1. Модель: методы, каскад, меню
+
 **Outcome.** `unmark_string_read_only(user)` на любом юните строки снимает
 `read-only` с собственных флагов источника (если есть) и с каждого таргета,
 несущего собственный `read-only`, восстанавливает `original_state`, гоняет

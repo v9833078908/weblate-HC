@@ -672,7 +672,11 @@ class OwnershipBoundaryTest(SimpleTestCase):
                 ),
             ):
                 with self.subTest(check=check.check_id):
-                    unit3 = make_unit(**unit_kwargs)
+                    unit3 = make_unit(
+                        code=unit_kwargs["code"],
+                        source=unit_kwargs["source"],
+                        target=unit_kwargs["target"],
+                    )
                     repaired3 = apply_fixup(check.get_fixup(unit3), unit3.target)
                     self.assertEqual(repaired3, expected)
                     fixed3, applied3 = fix_target([repaired3], unit3)
@@ -694,7 +698,7 @@ class TerminalSourcePolicyTest(SimpleTestCase):
         return terminal_source_edit(check, unit)
 
     def _apply(self, edit: TerminalEdit | None, target: str) -> str:
-        self.assertIsNotNone(edit)
+        assert edit is not None
         return apply_fixup([edit.fixup], target)
 
     # -- Worked examples from the plan ----------------------------------
@@ -708,7 +712,7 @@ class TerminalSourcePolicyTest(SimpleTestCase):
             target="这个书架空空如也，购买一些书籍供工人阅读。",
         )
         edit = self._edit(EndExclamationCheck(), unit)
-        self.assertIsNotNone(edit)
+        assert edit is not None
         self.assertEqual(edit.operation, "replace")
         self.assertEqual(
             self._apply(edit, unit.target), "这个书架空空如也，购买一些书籍供工人阅读！"
@@ -717,6 +721,7 @@ class TerminalSourcePolicyTest(SimpleTestCase):
     def test_replace_en_question_source_stop_target(self) -> None:
         unit = make_unit(code="en", source="Save it?", target="Text.")
         edit = self._edit(EndQuestionCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "replace")
         self.assertEqual(self._apply(edit, unit.target), "Text?")
 
@@ -725,6 +730,7 @@ class TerminalSourcePolicyTest(SimpleTestCase):
         # bug this task also fixes (`_terminal_mark`).
         unit = make_unit(code="ko", source="Save it.", target="내용!")
         edit = self._edit(EndStopCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "replace")
         self.assertEqual(self._apply(edit, unit.target), "내용.")
 
@@ -733,12 +739,14 @@ class TerminalSourcePolicyTest(SimpleTestCase):
         # contraction must not look like a 1-3 letter abbreviation.
         unit = make_unit(code="en", source="I can't.", target="I can't!")
         edit = self._edit(EndStopCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "replace")
         self.assertEqual(self._apply(edit, unit.target), "I can't.")
 
     def test_append_ko_stop_stays_ascii_not_fullwidth(self) -> None:
         unit = make_unit(code="ko", source="General settings.", target="게임 설정")
         edit = self._edit(EndStopCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "append")
         fixed = self._apply(edit, unit.target)
         self.assertEqual(fixed, "게임 설정.")
@@ -748,12 +756,14 @@ class TerminalSourcePolicyTest(SimpleTestCase):
         # CoL4/data/fr's dominant shape: pure removal.
         unit = make_unit(code="fr", source="Enregistrer", target="Enregistrer.")
         edit = self._edit(EndStopCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "remove")
         self.assertEqual(self._apply(edit, unit.target), "Enregistrer")
 
     def test_remove_fullwidth_stop_when_source_has_no_mark(self) -> None:
         unit = make_unit(code="zh_Hans", source="购买一些书籍", target="购买一些书籍。")
         edit = self._edit(EndStopCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "remove")
         self.assertEqual(self._apply(edit, unit.target), "购买一些书籍")
 
@@ -765,6 +775,7 @@ class TerminalSourcePolicyTest(SimpleTestCase):
             code="en", source="Save immediately", target="Save immediately!"
         )
         edit = self._edit(EndExclamationCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "remove")
         self.assertEqual(self._apply(edit, unit.target), "Save immediately")
 
@@ -834,6 +845,7 @@ class TerminalSourcePolicyTest(SimpleTestCase):
             target="Le scientifique entre dans la pièce.",
         )
         edit = self._edit(EndStopCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "remove")
         self.assertEqual(
             self._apply(edit, unit.target), "Le scientifique entre dans la pièce"
@@ -849,6 +861,7 @@ class TerminalSourcePolicyTest(SimpleTestCase):
         # class limited to it measured three letters and refused.
         unit = make_unit(code="uk", source="Він виїхав", target="Він виїхав.")
         edit = self._edit(EndStopCheck(), unit)
+        assert edit is not None
         self.assertEqual(edit.operation, "remove")
         self.assertEqual(self._apply(edit, unit.target), "Він виїхав")
 
@@ -883,7 +896,7 @@ class TerminalSourcePolicyTest(SimpleTestCase):
     def test_only_source_family_check_proposes_replace(self) -> None:
         unit = make_unit(code="en", source="Save it.", target="Text!")
         edit = self._edit(EndStopCheck(), unit)
-        self.assertIsNotNone(edit)
+        assert edit is not None
         self.assertEqual(edit.operation, "replace")
         self.assertIsNone(self._edit(EndExclamationCheck(), unit))
         self.assertIsNone(self._edit(EndQuestionCheck(), unit))

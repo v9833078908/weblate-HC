@@ -15,6 +15,7 @@ from datetime import UTC, date, datetime, timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import yaml
@@ -30,6 +31,7 @@ from django.db.models.deletion import RestrictedError
 from django.templatetags.static import static
 from django.test.utils import modify_settings, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework.test import APITestCase, APITransactionTestCase
 from weblate_language_data.languages import LANGUAGES
@@ -76,7 +78,11 @@ from weblate.trans.component_copy import (
 )
 from weblate.trans.exceptions import FailedCommitError, FileParseError
 from weblate.trans.judge import JUDGE_SEATS, validate_judge_configuration
-from weblate.trans.judge_loop import build_request
+from weblate.trans.judge_loop import (
+    accept_judge_candidate,
+    build_request,
+    judge_project_context,
+)
 from weblate.trans.models import (
     Announcement,
     Category,
@@ -104,6 +110,14 @@ from weblate.trans.models.judge import (
     compute_target_hash,
     compute_target_storage_hash,
 )
+from weblate.trans.models.producer_quality import ProducerQualityOperation
+from weblate.trans.models.repeat import (
+    RepeatBulkRun,
+    RepeatDecisionEvent,
+    RepeatGroup,
+    RepeatRecommendationRun,
+)
+from weblate.trans.repeat_bulk import process_apply_items
 from weblate.trans.tests.utils import (
     RepoTestMixin,
     clear_users_cache,
@@ -12166,7 +12180,9 @@ class TranslationAPITest(APIBaseTest):
     JUDGE_FALLBACK_MODEL_SEAT_2="",
     JUDGE_MAY_APPROVE=False,
 )
-class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase):
+class TranslationJudgeAutotranslateAPITest(
+    http_mock.MockDNSMixin, RepoTestMixin, APITransactionTestCase
+):
     """
     REST ``mode=judge`` autotranslate creates linked ProducerRun history.
 
@@ -12193,6 +12209,7 @@ class TranslationJudgeAutotranslateAPITest(RepoTestMixin, APITransactionTestCase
     CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
     def setUp(self) -> None:
+        super().setUp()
         Language.objects.flush_object_cache()
         self.clone_test_repos()
         self.component = self.create_component()
@@ -14345,6 +14362,9 @@ class SuggestionAPITest(APIBaseTest):
                 candidate_target_hash=candidate_hash,
                 target_hash=candidate_hash,
                 context_hash=context_hash,
+                project_context_hash=compute_target_hash(
+                    [judge_project_context(unit.translation.component.project)]
+                ),
                 run_id=candidate_run_id,
                 seat=seat,
                 judge_model=f"vendor-{seat}/model",
@@ -14600,6 +14620,11 @@ class SuggestionAPITest(APIBaseTest):
         self.assertIn((approved_unit.pk, "needs_individual_confirmation"), outcomes)
         self.assertIn((stale_unit.pk, "stale"), outcomes)
         self.assertIn((900010, "forbidden"), outcomes)
+        applied_result = next(
+            row for row in response.data if row["unit"] == applied_unit.pk
+        )
+        self.assertTrue(applied_result["revision"])
+        self.assertIsNotNone(applied_result["application_id"])
         applied_unit.refresh_from_db()
         approved_unit.refresh_from_db()
         self.assertEqual(applied_unit.state, STATE_TRANSLATED)
@@ -15005,7 +15030,11 @@ class SuggestionAPITest(APIBaseTest):
             superuser=True,
             code=200,
         )
-        self.assertEqual(bulk_response.data, [{"unit": unit.pk, "outcome": "applied"}])
+        self.assertEqual(len(bulk_response.data), 1)
+        self.assertEqual(bulk_response.data[0]["unit"], unit.pk)
+        self.assertEqual(bulk_response.data[0]["outcome"], "applied")
+        self.assertTrue(bulk_response.data[0]["revision"])
+        self.assertIsNotNone(bulk_response.data[0]["application_id"])
         unit.refresh_from_db()
         self.assertEqual(unit.target, "E2E fix\n")
         self.assertEqual(unit.state, STATE_TRANSLATED)
@@ -18071,7 +18100,22 @@ class ProducerAPITest(APIBaseTest):
         response = self.do_request("api:producer-me")
         self.assertEqual(
             response.data["capabilities"],
-            {"judge": False, "glossary_profile_analysis": False},
+            {
+                "mt_async_batches": 1,
+                "mt_reconciliation": 1,
+                "quality_execution_policy": 1,
+                "verify_only_immutable": 1,
+                "judge": False,
+                "judge_seats": 0,
+                "quality_api_version": 2,
+                "candidate_quality_gate": True,
+                "glossary_direct_scan": True,
+                "quality_group_recheck": True,
+                "quality_repeat_plan": True,
+                "quality_final_snapshot": True,
+                "quality_idempotency": True,
+                "glossary_profile_analysis": False,
+            },
         )
 
     @override_settings(
@@ -18085,8 +18129,60 @@ class ProducerAPITest(APIBaseTest):
         response = self.do_request("api:producer-me")
         self.assertEqual(
             response.data["capabilities"],
-            {"judge": True, "glossary_profile_analysis": True},
+            {
+                "mt_async_batches": 1,
+                "mt_reconciliation": 1,
+                "quality_execution_policy": 1,
+                "verify_only_immutable": 1,
+                "judge": True,
+                "judge_seats": 2,
+                "quality_api_version": 2,
+                "candidate_quality_gate": True,
+                "glossary_direct_scan": True,
+                "quality_group_recheck": True,
+                "quality_repeat_plan": True,
+                "quality_final_snapshot": True,
+                "quality_idempotency": True,
+                "glossary_profile_analysis": True,
+            },
         )
+
+    def test_producer_advertises_full_quality_contract(self) -> None:
+        capabilities = self.do_request("api:producer-me").data["capabilities"]
+        self.assertEqual(capabilities.get("quality_api_version"), 2)
+        for name in (
+            "candidate_quality_gate",
+            "glossary_direct_scan",
+            "quality_group_recheck",
+            "quality_repeat_plan",
+            "quality_final_snapshot",
+            "quality_idempotency",
+        ):
+            self.assertIs(capabilities.get(name), True)
+
+    def test_producer_quality_schema_exposes_recovery_key_header(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from drf_spectacular.generators import SchemaGenerator
+
+        schema = SchemaGenerator().get_schema(public=True)
+        if schema is None:
+            self.fail("The API schema could not be generated.")
+        for path, required in (
+            ("/api/producer/projects/{slug}/quality/repeats/plan/", True),
+            ("/api/producer/repeat-plans/{token}/apply/", True),
+            ("/api/producer/projects/{slug}/quality/recheck/", False),
+            ("/api/producer/projects/{slug}/decisions/apply/", False),
+            ("/api/producer/projects/{slug}/runs/", False),
+        ):
+            parameters = schema["paths"][path]["post"].get("parameters", [])
+            header = next(
+                (item for item in parameters if item["name"] == "Idempotency-Key"), None
+            )
+            if header is None:
+                self.fail(path)
+            self.assertEqual(header["in"], "header")
+            self.assertEqual(header["schema"]["format"], "uuid")
+            self.assertEqual(header.get("required", False), required)
 
     def test_projects_require_authentication(self) -> None:
         self.do_request("api:producer-projects", authenticated=False, code=401)
@@ -18168,6 +18264,1450 @@ class ProducerAPITest(APIBaseTest):
 
         self.assertEqual(detail.data["coverage"]["recorded"], 0)
         self.assertFalse(detail.data["coverage"]["scope_complete"])
+
+    def _make_project_judge_decision(
+        self: Any,
+        *,
+        complete_candidate: bool = True,
+        chosen_unit=None,
+        candidate_target="Zdravím světe!\n",
+    ):
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        translation = self.component.translation_set.get(language_code="cs")
+        unit = chosen_unit or translation.unit_set.get(source="Hello, world!\n")
+        translation = unit.translation
+        unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+        request = build_request(unit)
+        context_hash = compute_context_hash(
+            source=request.source,
+            note=request.note,
+            explanation=request.explanation,
+            glossary_terms=request.glossary_terms,
+        )
+        target_hash = compute_target_hash(unit.get_target_plurals())
+        run = ProducerRun.objects.create(
+            actor=self.user,
+            scope_type=ProducerRun.ScopeType.PROJECT,
+            scope_id=str(self.component.project.pk),
+            scope_label=str(self.component.project),
+            scope_path=self.component.project.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+            status=ProducerRun.Status.COMPLETED,
+            scope_snapshot=[unit.pk],
+            execution_version=1,
+            scope_cursor=1,
+        )
+        live = [
+            JudgeVerdict.objects.create(
+                unit=unit,
+                run_id=run.pk,
+                seat=seat,
+                judge_model=f"vendor-{seat}/model",
+                model_verdict=JudgeVerdict.Verdict.FLAG,
+                max_severity=JudgeVerdict.Severity.MAJOR,
+                errors=[
+                    {
+                        "span": "Ahoj",
+                        "category": "meaning",
+                        "severity": "major",
+                        "description": "Meaning needs repair.",
+                    }
+                ],
+                target_hash=target_hash,
+                target_storage_hash=compute_target_storage_hash(unit.target),
+                context_hash=context_hash,
+                project_context_hash=compute_target_hash(
+                    [judge_project_context(self.component.project)]
+                ),
+            )
+            for seat in JUDGE_SEATS
+        ]
+        run_unit = JudgeRunUnit.objects.create(
+            run=run,
+            unit=unit,
+            unit_id_snapshot=unit.pk,
+            translation_id=translation.pk,
+            component_id=self.component.pk,
+            project_id=self.component.project.pk,
+            input_target=unit.get_target_plurals(),
+            input_target_hash=target_hash,
+            context_hash=context_hash,
+            verdict=live[0],
+            outcome=JudgeRunUnit.Outcome.MAJOR,
+            initial_severity=JudgeVerdict.Severity.MAJOR,
+            final_severity=JudgeVerdict.Severity.MAJOR,
+            attempt_count=1,
+            before_target=unit.get_target_plurals(),
+            after_target=unit.get_target_plurals(),
+        )
+        candidate, _ = Suggestion.objects.add(
+            unit,
+            [candidate_target],
+            request=None,
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": live[0].pk,
+                "judge_run_id": str(run.pk),
+                "target_hash": target_hash,
+                "context_hash": context_hash,
+                "engine": "openrouter",
+            },
+        )
+        candidate_hash = compute_target_hash(candidate.target_list)
+        seats = JUDGE_SEATS if complete_candidate else JUDGE_SEATS[:1]
+        for seat in seats:
+            JudgeVerdict.objects.create(
+                unit=unit,
+                subject=JudgeVerdict.Subject.CANDIDATE,
+                candidate_target_hash=candidate_hash,
+                target_hash=candidate_hash,
+                context_hash=context_hash,
+                run_id=run.pk,
+                attempt=1,
+                seat=seat,
+                judge_model=f"candidate-{seat}/model",
+                project_context_hash=compute_target_hash(
+                    [judge_project_context(self.component.project)]
+                ),
+                model_verdict=JudgeVerdict.Verdict.PASS,
+                max_severity=JudgeVerdict.Severity.NONE,
+            )
+        run_unit.candidate_target_hash = candidate_hash
+        run_unit.candidate_verdict_ids = list(
+            JudgeVerdict.objects.filter(
+                unit=unit,
+                subject=JudgeVerdict.Subject.CANDIDATE,
+                candidate_target_hash=candidate_hash,
+            ).values_list("pk", flat=True)
+        )
+        run_unit.repair_status = JudgeRunUnit.RepairStatus.CANDIDATE_STORED
+        run_unit.save(
+            update_fields=[
+                "candidate_target_hash",
+                "candidate_verdict_ids",
+                "repair_status",
+            ]
+        )
+        return run, unit, candidate
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_project_judge_decisions_list_exposes_safe_apply_guards(self) -> None:
+        run, unit, candidate = self._make_project_judge_decision()
+
+        response = self.do_request(
+            "api:producer-project-decisions",
+            kwargs={"slug": self.component.project.slug},
+            request={"kind": "judge", "run": str(run.pk)},
+            superuser=True,
+        )
+
+        self.assertEqual(response.data["count"], 1)
+        decision = response.data["results"][0]
+        self.assertEqual(decision["unit_id"], unit.pk)
+        self.assertEqual(decision["candidate_id"], candidate.pk)
+        self.assertTrue(decision["candidate_verified"])
+        self.assertTrue(decision["candidate_acceptable"])
+        self.assertEqual(decision["live_seat_results"], {"1": "parsed", "2": "parsed"})
+        self.assertEqual(decision["seat_results"], {"1": "parsed", "2": "parsed"})
+        self.assertEqual(decision["applicability"], "ready")
+        self.assertEqual(decision["revision"], compute_decision_revision(unit))
+        self.assertNotIn("target", decision)
+        self.assertNotIn("source", decision)
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_project_judge_decisions_never_marks_one_seat_candidate_ready(self) -> None:
+        run, _unit, candidate = self._make_project_judge_decision(
+            complete_candidate=False
+        )
+
+        response = self.do_request(
+            "api:producer-project-decisions",
+            kwargs={"slug": self.component.project.slug},
+            request={"kind": "judge", "run": str(run.pk)},
+            superuser=True,
+        )
+
+        decision = response.data["results"][0]
+        self.assertEqual(decision["candidate_id"], candidate.pk)
+        self.assertFalse(decision["candidate_verified"])
+        self.assertEqual(decision["seat_results"], {"1": "parsed", "2": "missing"})
+        self.assertEqual(decision["applicability"], "not_verified")
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_auto_apply_rejects_parsed_but_failing_candidate(self) -> None:
+        run, unit, candidate = self._make_project_judge_decision()
+        JudgeVerdict.objects.filter(
+            unit=unit, subject=JudgeVerdict.Subject.CANDIDATE, seat=2
+        ).update(max_severity=JudgeVerdict.Severity.MAJOR)
+        before = unit.target
+        decision = self.do_request(
+            "api:producer-project-decisions",
+            kwargs={"slug": self.component.project.slug},
+            request={"kind": "judge", "run": str(run.pk)},
+            superuser=True,
+        ).data["results"][0]
+        self.assertEqual(decision["applicability"], "not_verified")
+        self.assertTrue(decision["candidate_verified"])
+        self.assertFalse(decision["candidate_acceptable"])
+        response = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": unit.pk,
+                        "candidate_id": candidate.pk,
+                        "revision": compute_decision_revision(unit),
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        )
+        self.assertEqual(response.data[0]["outcome"], "not_verified")
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, before)
+        self.assertFalse(JudgeApplication.objects.filter(unit=unit).exists())
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_auto_apply_rejects_candidate_with_newline_failure(self) -> None:
+        _run, unit, candidate = self._make_project_judge_decision()
+        candidate.target = "Zdravím světe!"
+        candidate.save(update_fields=["target"])
+        JudgeVerdict.objects.filter(
+            unit=unit, subject=JudgeVerdict.Subject.CANDIDATE
+        ).update(
+            candidate_target_hash=compute_target_hash(candidate.target_list),
+            target_hash=compute_target_hash(candidate.target_list),
+        )
+        before = unit.target
+        response = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": unit.pk,
+                        "candidate_id": candidate.pk,
+                        "revision": compute_decision_revision(unit),
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        )
+        self.assertEqual(response.data[0]["outcome"], "not_verified")
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, before)
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_auto_apply_rejects_locked_component(self) -> None:
+        _run, unit, candidate = self._make_project_judge_decision()
+        self.component.locked = True
+        self.component.save(update_fields=["locked"])
+        before = unit.target
+        response = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": unit.pk,
+                        "candidate_id": candidate.pk,
+                        "revision": compute_decision_revision(unit),
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        )
+        self.assertNotEqual(response.data[0]["outcome"], "applied")
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, before)
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_auto_apply_detects_aba_between_precheck_and_lock(self) -> None:
+        _run, unit, candidate = self._make_project_judge_decision()
+        original = unit.get_target_plurals()
+        revision = compute_decision_revision(unit)
+
+        def edit_then_apply(candidate, request, **kwargs):
+            unit.translate(self.user, ["Jiný text!\n"], STATE_TRANSLATED)
+            unit.translate(self.user, original, STATE_TRANSLATED)
+            return accept_judge_candidate(candidate, request, **kwargs)
+
+        with patch(
+            "weblate.api.producer.views.accept_judge_candidate",
+            side_effect=edit_then_apply,
+        ):
+            response = self.do_request(
+                "api:producer-project-decisions-apply",
+                kwargs={"slug": self.component.project.slug},
+                method="post",
+                request={
+                    "items": [
+                        {
+                            "unit": unit.pk,
+                            "candidate_id": candidate.pk,
+                            "revision": revision,
+                        }
+                    ]
+                },
+                format="json",
+                superuser=True,
+            )
+        self.assertEqual(response.data[0]["outcome"], "stale")
+        unit.refresh_from_db()
+        self.assertEqual(unit.get_target_plurals(), original)
+        self.assertFalse(JudgeApplication.objects.filter(unit=unit).exists())
+
+    def test_project_quality_issues_exposes_structured_glossary_issue(self) -> None:
+        self._quality_term()
+        translation = self.component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+
+        response = self.do_request(
+            "api:producer-project-quality-issues",
+            kwargs={"slug": self.component.project.slug},
+            request={"language": "cs", "kind": "glossary"},
+            superuser=True,
+        )
+
+        self.assertEqual(len(response.data["issues"]), 1)
+        issue = response.data["issues"][0]
+        self.assertEqual(issue["kind"], "glossary")
+        self.assertEqual(issue["unit_ids"], [unit.pk])
+        self.assertEqual(
+            issue["revisions"], {str(unit.pk): compute_decision_revision(unit)}
+        )
+        self.assertNotIn("source", issue)
+        self.assertNotIn("target", issue)
+        self.assertEqual(len(response.data["snapshot_hash"]), 64)
+
+    def test_project_quality_recheck_continues_after_stale_item(self) -> None:
+        translation = self.component.translation_set.get(language_code="cs")
+        units = list(translation.unit_set.order_by("pk")[:2])
+        valid_revision = compute_decision_revision(units[1])
+
+        with patch.object(Unit, "run_checks") as run_checks:
+            response = self.do_request(
+                "api:producer-project-quality-recheck",
+                kwargs={"slug": self.component.project.slug},
+                method="post",
+                request={
+                    "items": [
+                        {"unit_id": units[0].pk, "revision": "stale"},
+                        {"unit_id": units[1].pk, "revision": valid_revision},
+                    ]
+                },
+                format="json",
+                superuser=True,
+            )
+
+        self.assertEqual(
+            [item["outcome"] for item in response.data["items"]],
+            ["stale", "rechecked"],
+        )
+        run_checks.assert_called_once_with()
+        self.assertEqual(len(response.data["snapshot_hash"]), 64)
+
+    def _quality_term(self):
+        glossary = self.component.project.glossaries[0].translation_set.get(
+            language_code="cs"
+        )
+        term = glossary.add_unit(
+            None,
+            "quality-term",
+            "Hello",
+            "Nazdar",
+            extra_flags="exact",
+            author=self.user,
+        )
+        self.component.project.invalidate_glossary_cache()
+        return term
+
+    def test_producer_glossary_scan_works_without_ui_check(self) -> None:
+        self._quality_term()
+        translation = self.component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+        self.assertNotIn("check-glossary", unit.all_flags)
+        Check.objects.filter(unit=unit, name="check_glossary").delete()
+        response = self.do_request(
+            "api:producer-project-quality-issues",
+            kwargs={"slug": self.component.project.slug},
+            request={"language": "cs", "kind": "glossary"},
+            superuser=True,
+        )
+        matches = [
+            issue for issue in response.data["issues"] if unit.pk in issue["unit_ids"]
+        ]
+        self.assertEqual(len(matches), 1)
+        self.assertTrue(matches[0]["hard"])
+        self.assertFalse(
+            Check.objects.filter(unit=unit, name="check_glossary").exists()
+        )
+
+    def test_producer_quality_snapshot_covers_closed_scope_without_writing(
+        self,
+    ) -> None:
+        self._quality_term()
+        translation = self.component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+        before = unit.target
+        revision = compute_decision_revision(unit)
+        response = self.do_request(
+            f"/api/producer/projects/{self.component.project.slug}/quality/snapshot/",
+            method="post",
+            request={"language": "cs", "scope": {"unit_ids": [unit.pk]}},
+            format="json",
+            superuser=True,
+        )
+        self.assertTrue(response.data["complete"])
+        self.assertEqual(response.data["unit_ids"], [unit.pk])
+        self.assertEqual(response.data["revisions"], {str(unit.pk): revision})
+        self.assertEqual(response.data["judged_revisions"], {})
+        self.assertTrue(any(issue["hard"] for issue in response.data["issues"]))
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, before)
+        self.assertEqual(compute_decision_revision(unit), revision)
+
+    def test_producer_quality_snapshot_changes_when_glossary_changes(self) -> None:
+        term = self._quality_term()
+        translation = self.component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+        url = f"/api/producer/projects/{self.component.project.slug}/quality/snapshot/"
+        payload = {"language": "cs", "scope": {"unit_ids": [unit.pk]}}
+        before = self.do_request(
+            url, method="post", request=payload, format="json", superuser=True
+        ).data
+        term.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        after = self.do_request(
+            url, method="post", request=payload, format="json", superuser=True
+        ).data
+        self.assertEqual(before["revisions"], after["revisions"])
+        self.assertNotEqual(before["scope_revision"], after["scope_revision"])
+        self.assertFalse(
+            any(
+                issue["kind"] == "glossary" and issue["hard"]
+                for issue in after["issues"]
+            )
+        )
+
+    def test_producer_snapshot_revision_covers_project_judge_context(self) -> None:
+        project = self.component.project
+        project.machinery_settings = {"openrouter": {"persona": "First game context"}}
+        project.save(update_fields=["machinery_settings"])
+        unit = self.component.translation_set.get(language_code="cs").unit_set.first()
+        first = self._producer_snapshot([unit])
+        project.machinery_settings = {"openrouter": {"persona": "Second game context"}}
+        project.save(update_fields=["machinery_settings"])
+        second = self._producer_snapshot([unit])
+        self.assertEqual(first["revisions"], second["revisions"])
+        self.assertNotEqual(first["scope_revision"], second["scope_revision"])
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_auto_apply_rejects_changed_project_judge_context(self) -> None:
+        project = self.component.project
+        project.machinery_settings = {"openrouter": {"persona": "First game context"}}
+        project.save(update_fields=["machinery_settings"])
+        _run, unit, candidate = self._make_project_judge_decision()
+        JudgeVerdict.objects.filter(
+            unit=unit, subject=JudgeVerdict.Subject.CANDIDATE
+        ).update(project_context_hash=compute_target_hash(["First game context"]))
+        before = unit.target
+        project.machinery_settings = {"openrouter": {"persona": "Second game context"}}
+        project.save(update_fields=["machinery_settings"])
+        response = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": unit.pk,
+                        "revision": compute_decision_revision(unit),
+                        "candidate_id": candidate.pk,
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        ).data
+        self.assertEqual(response[0]["outcome"], "not_verified")
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, before)
+
+    def test_producer_quality_snapshot_rejects_missing_scope_member(self) -> None:
+        self.do_request(
+            f"/api/producer/projects/{self.component.project.slug}/quality/snapshot/",
+            method="post",
+            request={"language": "cs", "scope": {"unit_ids": [999999999]}},
+            format="json",
+            superuser=True,
+            code=400,
+        )
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_auto_apply_refuses_unbound_legacy_context_evidence(self) -> None:
+        _run, unit, candidate = self._make_project_judge_decision()
+        JudgeVerdict.objects.filter(
+            unit=unit, subject=JudgeVerdict.Subject.CANDIDATE
+        ).update(project_context_hash=None)
+        before = unit.target
+        response = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": unit.pk,
+                        "candidate_id": candidate.pk,
+                        "revision": compute_decision_revision(unit),
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        ).data
+        self.assertEqual(response[0]["outcome"], "not_verified")
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, before)
+
+    def test_producer_snapshot_rejects_project_context_change_during_scan(self) -> None:
+        unit = self.component.translation_set.get(language_code="cs").unit_set.earliest(
+            "pk"
+        )
+        # ruff: ignore[import-outside-top-level]
+        from weblate.api.producer.quality import quality_repeat_groups
+
+        calls = 0
+
+        def race(**kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                Project.objects.filter(pk=self.component.project.pk).update(
+                    machinery_settings={
+                        "openrouter": {"persona": "Changed during scan"}
+                    }
+                )
+            return quality_repeat_groups(**kwargs)
+
+        with patch(
+            "weblate.api.producer.quality.quality_repeat_groups", side_effect=race
+        ):
+            self.do_request(
+                "api:producer-project-quality-snapshot",
+                kwargs={"slug": self.component.project.slug},
+                method="post",
+                request={"language": "cs", "scope": {"unit_ids": [unit.pk]}},
+                format="json",
+                superuser=True,
+                code=400,
+            )
+
+    def test_producer_snapshot_rejects_edit_between_scope_and_peer_reads(self) -> None:
+        translation = self.component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+        # ruff: ignore[import-outside-top-level]
+        from weblate.api.producer.quality import (
+            quality_repeat_groups,
+        )
+
+        calls = 0
+
+        def race(**kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                edited = Unit.objects.get(pk=unit.pk)
+                edited.translate(self.user, ["Současná změna!\n"], STATE_TRANSLATED)
+            return quality_repeat_groups(**kwargs)
+
+        with patch(
+            "weblate.api.producer.quality.quality_repeat_groups", side_effect=race
+        ):
+            self.do_request(
+                "api:producer-project-quality-snapshot",
+                kwargs={"slug": self.component.project.slug},
+                method="post",
+                request={"language": "cs", "scope": {"unit_ids": [unit.pk]}},
+                format="json",
+                superuser=True,
+                code=400,
+            )
+
+    def _quality_repeat_pair(self):
+        translation = self.component.translation_set.get(language_code="cs")
+        first = translation.unit_set.get(source="Hello, world!\n")
+        first.translate(self.user, ["Ahoj světe!\n"], STATE_TRANSLATED)
+        second = translation.add_unit(
+            None, "quality-repeat", first.source, ["Zdravím světe!\n"], author=self.user
+        )
+        Check.objects.filter(unit__in=[first, second], name="repeat-drift").delete()
+        return first, second
+
+    def test_producer_quality_snapshot_finds_repeats_without_check_rows(self) -> None:
+        first, second = self._quality_repeat_pair()
+        response = self.do_request(
+            f"/api/producer/projects/{self.component.project.slug}/quality/snapshot/",
+            method="post",
+            request={"language": "cs", "scope": {"unit_ids": [first.pk, second.pk]}},
+            format="json",
+            superuser=True,
+        )
+        groups = [
+            issue
+            for issue in response.data["issues"]
+            if issue["kind"] == "repeat-drift"
+        ]
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(set(groups[0]["unit_ids"]), {first.pk, second.pk})
+        self.assertTrue(groups[0]["hard"])
+
+    def test_producer_snapshot_reports_disabled_repeat_coverage_without_writing(
+        self,
+    ) -> None:
+        first, second = self._quality_repeat_pair()
+        before = {unit.pk: unit.target for unit in (first, second)}
+        self.component.allow_translation_propagation = False
+        self.component.save(update_fields=["allow_translation_propagation"])
+        result = self._producer_snapshot([first, second])
+        blocked = [
+            issue
+            for issue in result["issues"]
+            if issue.get("check_id") == "repeat-coverage"
+        ]
+        self.assertEqual(
+            {pk for issue in blocked for pk in issue["unit_ids"]}, {first.pk, second.pk}
+        )
+        self.assertTrue(
+            all(issue["hard"] and not issue["advisory"] for issue in blocked)
+        )
+        self.assertTrue(all(issue["kind"] == "check" for issue in blocked))
+        for unit in (first, second):
+            unit.refresh_from_db()
+            self.assertEqual(unit.target, before[unit.pk])
+        self.component.refresh_from_db()
+        self.assertFalse(self.component.allow_translation_propagation)
+
+    def test_producer_recheck_returns_whole_affected_repeat_group(self) -> None:
+        first, second = self._quality_repeat_pair()
+        response = self.do_request(
+            "api:producer-project-quality-recheck",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {"unit_id": first.pk, "revision": compute_decision_revision(first)}
+                ]
+            },
+            format="json",
+            superuser=True,
+        )
+        self.assertEqual(set(response.data["affected_unit_ids"]), {first.pk, second.pk})
+        self.assertEqual(len(response.data["affected_repeat_group_ids"]), 1)
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_idempotent_apply_replays_and_observes_original_receipt(
+        self,
+    ) -> None:
+        _run, unit, candidate = self._make_project_judge_decision()
+        key = str(uuid.uuid4())
+        body = {
+            "items": [
+                {
+                    "unit": unit.pk,
+                    "candidate_id": candidate.pk,
+                    "revision": compute_decision_revision(unit),
+                }
+            ]
+        }
+        kwargs = {"slug": self.component.project.slug}
+        first = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs=kwargs,
+            method="post",
+            request=body,
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        ).data
+        second = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs=kwargs,
+            method="post",
+            request=body,
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        ).data
+        self.assertEqual(second, first)
+        self.assertEqual(first[0]["outcome"], "applied")
+        self.assertEqual(JudgeApplication.objects.filter(unit=unit).count(), 1)
+        observed = self.do_request(
+            f"/api/producer/projects/{self.component.project.slug}/quality/operations/{key}/",
+            superuser=True,
+        ).data
+        self.assertEqual(observed, {"state": "confirmed", "result": first})
+
+    def test_producer_idempotency_key_cannot_change_request(self) -> None:
+        translation = self.component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.earliest("pk")
+        key = str(uuid.uuid4())
+        body = {
+            "items": [{"unit_id": unit.pk, "revision": compute_decision_revision(unit)}]
+        }
+        self.do_request(
+            "api:producer-project-quality-recheck",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request=body,
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        )
+        body["items"][0]["revision"] = "different"
+        self.do_request(
+            "api:producer-project-quality-recheck",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request=body,
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+            code=409,
+        )
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_500_mixed_rows_finish_with_independent_outcomes(self) -> None:
+        _run, unit, candidate = self._make_project_judge_decision()
+        valid = {
+            "unit": unit.pk,
+            "candidate_id": candidate.pk,
+            "revision": compute_decision_revision(unit),
+        }
+        special = []
+        for number, complete in ((1, True), (2, False), (3, True)):
+            extra = unit.translation.add_unit(
+                None,
+                f"mixed-quality-{number}",
+                unit.source,
+                ["Ahoj světe!\n"],
+                author=self.user,
+            )
+            _run, extra, extra_candidate = self._make_project_judge_decision(
+                chosen_unit=extra, complete_candidate=complete
+            )
+            if number == 3:
+                extra.translate(self.user, extra.get_target_plurals(), STATE_APPROVED)
+            special.append(
+                {
+                    "unit": extra.pk,
+                    "candidate_id": extra_candidate.pk,
+                    "revision": "stale"
+                    if number == 1
+                    else compute_decision_revision(extra),
+                }
+            )
+        items = [
+            {
+                "unit": 1000000 + index,
+                "candidate_id": 1000000 + index,
+                "revision": "missing",
+            }
+            for index in range(496)
+        ]
+        items[250:250] = [valid, *special]
+        key = str(uuid.uuid4())
+        response = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={"items": items},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        ).data
+        self.assertEqual(len(response), 500)
+        self.assertEqual(sum(row["outcome"] == "forbidden" for row in response), 496)
+        self.assertEqual(sum(row["outcome"] == "applied" for row in response), 1)
+        self.assertEqual(
+            {row["outcome"] for row in response},
+            {
+                "forbidden",
+                "applied",
+                "stale",
+                "not_verified",
+                "needs_individual_confirmation",
+            },
+        )
+        replay = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={"items": items},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        ).data
+        self.assertEqual(replay, response)
+        self.assertEqual(JudgeApplication.objects.filter(actor=self.user).count(), 1)
+
+    def test_producer_operation_observer_is_actor_bound(self) -> None:
+        unit = self.component.translation_set.get(language_code="cs").unit_set.earliest(
+            "pk"
+        )
+        key = str(uuid.uuid4())
+        self.do_request(
+            "api:producer-project-quality-recheck",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {"unit_id": unit.pk, "revision": compute_decision_revision(unit)}
+                ]
+            },
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        )
+        self.user = User.objects.create_user(
+            "other-quality-actor", "other-quality@example.org", "x"
+        )
+        self.do_request(
+            "api:producer-quality-operation-detail",
+            kwargs={"slug": self.component.project.slug, "operation_id": key},
+            code=404,
+        )
+
+    def _producer_snapshot(self, units):
+        return self.do_request(
+            f"/api/producer/projects/{self.component.project.slug}/quality/snapshot/",
+            method="post",
+            request={
+                "language": "cs",
+                "scope": {"unit_ids": [unit.pk for unit in units]},
+            },
+            format="json",
+            superuser=True,
+        ).data
+
+    def _producer_repeat_plan(self, units, applications):
+        snapshot = self._producer_snapshot(units)
+        body = {
+            "language": "cs",
+            "scope": {"unit_ids": [unit.pk for unit in units]},
+            "issue_snapshot_hash": snapshot["snapshot_hash"],
+            "application_ids": applications,
+        }
+        key = str(uuid.uuid4())
+        url = f"/api/producer/projects/{self.component.project.slug}/quality/repeats/plan/"
+        response = self.do_request(
+            url,
+            method="post",
+            request=body,
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        ).data
+        replay = self.do_request(
+            url,
+            method="post",
+            request=body,
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        ).data
+        self.assertEqual(replay, response)
+        return response
+
+    def _apply_quality_candidate(self, unit):
+        _run, unit, candidate = self._make_project_judge_decision(chosen_unit=unit)
+        receipt = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": unit.pk,
+                        "candidate_id": candidate.pk,
+                        "revision": compute_decision_revision(unit),
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        ).data[0]
+        self.assertEqual(receipt["outcome"], "applied")
+        return receipt["application_id"]
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_judge_application_revision_survives_native_file_download(self) -> None:
+        first, _second = self._quality_repeat_pair()
+        application_id = self._apply_quality_candidate(first)
+        first.refresh_from_db()
+        application = JudgeApplication.objects.get(pk=application_id)
+        before_revision = compute_decision_revision(first)
+        before_updated = first.last_updated
+        before_target = first.target
+        self.assertEqual(application.applied_revision, before_revision)
+        self.assertTrue(first.pending_changes.exists())
+        response = self.do_request(
+            "api:translation-file",
+            kwargs=self.translation_kwargs,
+            superuser=True,
+        )
+        self.assertContains(response, "msgid")
+        first.refresh_from_db()
+        self.assertEqual(first.target, before_target)
+        self.assertEqual(first.last_updated, before_updated)
+        self.assertEqual(compute_decision_revision(first), application.applied_revision)
+        self.assertFalse(first.pending_changes.exists())
+        self.assertNotIn("disk_state", first.details)
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_download_preserves_real_edit_away_and_back_revision_fence(self) -> None:
+        first, _second = self._quality_repeat_pair()
+        application_id = self._apply_quality_candidate(first)
+        first.refresh_from_db()
+        application = JudgeApplication.objects.get(pk=application_id)
+        applied_target = first.target
+        first.translate(
+            self.user, ["Intervening real edit!\n"], STATE_TRANSLATED, propagate=False
+        )
+        first.translate(self.user, [applied_target], STATE_TRANSLATED, propagate=False)
+        first.refresh_from_db()
+        edited_revision = compute_decision_revision(first)
+        self.assertNotEqual(edited_revision, application.applied_revision)
+        response = self.do_request(
+            "api:translation-file",
+            kwargs=self.translation_kwargs,
+            superuser=True,
+        )
+        self.assertContains(response, "msgid")
+        first.refresh_from_db()
+        self.assertEqual(first.target, applied_target)
+        self.assertEqual(compute_decision_revision(first), edited_revision)
+        self.assertNotEqual(
+            compute_decision_revision(first), application.applied_revision
+        )
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_review_canonical_edit_before_manifest_never_overwrites_intervening_edit(
+        self,
+    ) -> None:
+        first, second = self._quality_repeat_pair()
+        second.translate(self.user, ["Jiný pozdrav!\n"], STATE_TRANSLATED)
+        receipt = self._apply_quality_candidate(first)
+        # ruff: ignore[import-outside-top-level]
+        from weblate.api.producer.repeat_quality import select_canonical_candidate
+
+        def edit_anchor(**kwargs):
+            choice = select_canonical_candidate(**kwargs)
+            edited = Unit.objects.get(pk=first.pk)
+            edited.translate(self.user, ["Ruční zásah!\n"], STATE_TRANSLATED)
+            return choice
+
+        with patch(
+            "weblate.api.producer.repeat_quality.select_canonical_candidate",
+            side_effect=edit_anchor,
+        ):
+            plan = self._producer_repeat_plan([first, second], [receipt])
+        started = self.do_request(
+            "api:producer-repeat-plan-apply",
+            kwargs={"token": plan["token"]},
+            method="post",
+            request={},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        ).data
+        for native_run in RepeatBulkRun.objects.all():
+            process_apply_items(native_run.pk)
+        result = self.do_request(
+            "api:producer-repeat-run-detail",
+            kwargs={"token": started["token"]},
+            superuser=True,
+        ).data
+        first.refresh_from_db()
+        self.assertEqual(first.target, "Ruční zásah!\n")
+        self.assertEqual(result["changed_unit_ids"], [])
+        self.assertNotEqual(plan["groups"][0]["outcome"], "ready")
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_review_snapshot_fences_context_loaded_before_first_fingerprint(
+        self,
+    ) -> None:
+        project = self.component.project
+        project.machinery_settings = {"openrouter": {"persona": "Before scan"}}
+        project.save(update_fields=["machinery_settings"])
+        unit = self.component.translation_set.get(language_code="cs").unit_set.get(
+            source="Hello, world!\n"
+        )
+        self._apply_quality_candidate(unit)
+        # ruff: ignore[import-outside-top-level]
+        from weblate.api.producer.quality import quality_repeat_groups
+
+        calls = 0
+
+        def race(**kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                Project.objects.filter(pk=project.pk).update(
+                    machinery_settings={"openrouter": {"persona": "During scan"}}
+                )
+            return quality_repeat_groups(**kwargs)
+
+        with patch(
+            "weblate.api.producer.quality.quality_repeat_groups", side_effect=race
+        ):
+            self.do_request(
+                "api:producer-project-quality-snapshot",
+                kwargs={"slug": project.slug},
+                method="post",
+                request={"language": "cs", "scope": {"unit_ids": [unit.pk]}},
+                format="json",
+                superuser=True,
+                code=400,
+            )
+
+    def test_review_excluded_scope_never_receives_outside_peer_issue(self) -> None:
+        self._quality_repeat_pair()
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.repeat import RepeatPolicy
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.repeats import (
+            create_membership,
+            get_or_create_group,
+            save_policy,
+        )
+
+        for mode in ("independent", "ignored", "nonpropagating"):
+            with self.subTest(mode=mode):
+                component = self.create_po(
+                    name=f"scope-{mode}",
+                    project=self.component.project,
+                    allow_translation_propagation=True,
+                )
+                selected = component.translation_set.get(
+                    language_code="cs"
+                ).unit_set.get(source="Hello, world!\n")
+                selected.translate(self.user, ["Einzelfall!\n"], STATE_TRANSLATED)
+                if mode == "independent":
+                    policy = RepeatPolicy(
+                        project=self.component.project,
+                        source_language=component.source_language,
+                        target_language=selected.translation.language,
+                    )
+                    save_policy(
+                        policy=policy,
+                        components=[self.component, component],
+                        labels=[],
+                        actor=self.user,
+                    )
+                    create_membership(
+                        group=get_or_create_group(policy, selected),
+                        unit=selected,
+                        mode="independent",
+                        reason="intentional",
+                    )
+                elif mode == "ignored":
+                    selected.extra_flags = "ignore-repeat-drift"
+                    selected.save(update_fields=["extra_flags"])
+                else:
+                    component.allow_translation_propagation = False
+                    component.save(update_fields=["allow_translation_propagation"])
+                result = self._producer_snapshot([selected])
+                self.assertFalse(
+                    any(issue["kind"] == "repeat-drift" for issue in result["issues"])
+                )
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_review_blocked_repeat_recipients_are_not_successful_no_change(
+        self,
+    ) -> None:
+        first, second = self._quality_repeat_pair()
+        second.translate(self.user, ["Jiný pozdrav!\n"], STATE_TRANSLATED)
+        locked_component = self.create_po(
+            name="locked-recipient",
+            project=self.component.project,
+            allow_translation_propagation=True,
+        )
+        locked = locked_component.translation_set.get(language_code="cs").unit_set.get(
+            source=first.source
+        )
+        locked.translate(self.user, ["Nezaměnit!\n"], STATE_TRANSLATED)
+        locked_component.locked = True
+        locked_component.save(update_fields=["locked"])
+        unsafe = first.translation.add_unit(
+            None, "too-short-quality", first.source, ["X\n"], author=self.user
+        )
+        if unsafe is None:
+            self.fail("Missing unsafe fixture")
+        unsafe.extra_flags = "max-length:2"
+        unsafe.save(update_fields=["extra_flags"])
+        receipt = self._apply_quality_candidate(first)
+        plan = self._producer_repeat_plan([first, second, locked, unsafe], [receipt])
+        started = self.do_request(
+            "api:producer-repeat-plan-apply",
+            kwargs={"token": plan["token"]},
+            method="post",
+            request={},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        ).data
+        for native_run in RepeatBulkRun.objects.all():
+            process_apply_items(native_run.pk)
+        result = self.do_request(
+            "api:producer-repeat-run-detail",
+            kwargs={"token": started["token"]},
+            superuser=True,
+        ).data
+        outcomes = {row["unit"]: row for row in result["results"]}
+        self.assertEqual(outcomes[locked.pk]["outcome"], "forbidden")
+        self.assertEqual(outcomes[unsafe.pk]["outcome"], "needs_review")
+        self.assertEqual(result["changed_unit_ids"], [second.pk])
+        self.assertEqual(result["status"], "partial")
+        locked.refresh_from_db()
+        unsafe.refresh_from_db()
+        self.assertEqual(locked.target, "Nezaměnit!\n")
+        self.assertEqual(unsafe.target, "X\n")
+
+    def test_review_schema_accepts_partial_rows_and_pending_operations(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from drf_spectacular.generators import SchemaGenerator
+
+        # ruff: ignore[import-outside-top-level]
+        from jsonschema import Draft202012Validator
+
+        # ruff: ignore[import-outside-top-level]
+        from referencing import Registry, Resource
+
+        # ruff: ignore[import-outside-top-level]
+        from referencing.jsonschema import DRAFT202012
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.api.producer.serializers import (
+            ProducerQualityOperationSerializer,
+            ProducerRepeatResultSerializer,
+        )
+
+        schema = SchemaGenerator().get_schema(public=True)
+        if schema is None:
+            self.fail("Missing schema")
+        registry = Registry().with_resource(
+            "urn:quality-schema",
+            Resource.from_contents(schema, default_specification=DRAFT202012),
+        )
+        for name, serializer, examples in (
+            (
+                "ProducerRepeatResult",
+                ProducerRepeatResultSerializer,
+                [
+                    {"unit": 1, "revision": "r", "outcome": "no_change"},
+                    {
+                        "unit": 2,
+                        "revision": "r",
+                        "outcome": "applied",
+                        "event_id": str(uuid.uuid4()),
+                    },
+                    {"unit": 3, "revision": "r", "outcome": "forbidden"},
+                ],
+            ),
+            (
+                "ProducerQualityOperation",
+                ProducerQualityOperationSerializer,
+                [
+                    {"state": "pending"},
+                    {"state": "confirmed", "result": []},
+                ],
+            ),
+        ):
+            validator = Draft202012Validator(
+                {"$ref": f"urn:quality-schema#/components/schemas/{name}"},
+                registry=registry,
+            )
+            for example in examples:
+                with self.subTest(name=name, example=example):
+                    validator.validate(serializer(example).data)
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_repeat_plan_does_not_pick_between_conflicting_judge_repairs(
+        self,
+    ) -> None:
+        first, second = self._quality_repeat_pair()
+        applications = []
+        for unit, target in ((first, "Dobrý den!\n"), (second, "Zdravím svět!\n")):
+            _run, unit, candidate = self._make_project_judge_decision(
+                chosen_unit=unit, candidate_target=target
+            )
+            receipt = self.do_request(
+                "api:producer-project-decisions-apply",
+                kwargs={"slug": self.component.project.slug},
+                method="post",
+                request={
+                    "items": [
+                        {
+                            "unit": unit.pk,
+                            "candidate_id": candidate.pk,
+                            "revision": compute_decision_revision(unit),
+                        }
+                    ]
+                },
+                format="json",
+                superuser=True,
+            ).data[0]
+            self.assertEqual(receipt["outcome"], "applied")
+            applications.append(receipt["application_id"])
+        plan = self._producer_repeat_plan([first, second], applications)
+        self.assertEqual(plan["status"], "ready")
+        self.assertEqual(plan["groups"][0]["outcome"], "needs_review")
+        self.assertTrue(plan["groups"][0]["reason"])
+        self.assertFalse(RepeatBulkRun.objects.exists())
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertNotEqual(first.target, second.target)
+
+    def test_producer_repeat_plan_preserves_conflicting_approved_targets(self) -> None:
+        first, second = self._quality_repeat_pair()
+        first.translate(self.user, first.get_target_plurals(), STATE_APPROVED)
+        second.translate(self.user, second.get_target_plurals(), STATE_APPROVED)
+        plan = self._producer_repeat_plan([first, second], [])
+        self.assertEqual(plan["groups"][0]["outcome"], "approved_conflict")
+        self.assertFalse(RepeatBulkRun.objects.exists())
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.state, STATE_APPROVED)
+        self.assertEqual(second.state, STATE_APPROVED)
+        self.assertNotEqual(first.target, second.target)
+
+    def test_producer_repeat_plan_resource_is_actor_bound(self) -> None:
+        first, second = self._quality_repeat_pair()
+        plan = self._producer_repeat_plan([first, second], [])
+        self.user = User.objects.create_superuser(
+            "other-plan-actor", "other-plan@example.org", "x"
+        )
+        self.do_request(
+            "api:producer-repeat-plan-detail",
+            kwargs={"token": plan["token"]},
+            superuser=True,
+            code=404,
+        )
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_repeat_plan_prefers_judge_repair_and_never_writes_outside_scope(
+        self,
+    ) -> None:
+        first, second = self._quality_repeat_pair()
+        second.translate(self.user, ["Jiný pozdrav!\n"], STATE_TRANSLATED)
+        outsider = first.translation.add_unit(
+            None,
+            "outside-quality-scope",
+            first.source,
+            ["Jiný pozdrav!\n"],
+            author=self.user,
+        )
+        _run, first, candidate = self._make_project_judge_decision(chosen_unit=first)
+        receipt = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": first.pk,
+                        "candidate_id": candidate.pk,
+                        "revision": compute_decision_revision(first),
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        ).data[0]
+        plan = self._producer_repeat_plan([first, second], [receipt["application_id"]])
+        self.assertEqual(plan["status"], "ready")
+        self.assertEqual(plan["groups"][0]["outcome"], "ready")
+        self.assertEqual(plan["groups"][0]["preferred_origin"], "judge_application")
+        key = str(uuid.uuid4())
+        url = f"/api/producer/repeat-plans/{plan['token']}/apply/"
+        applied = self.do_request(
+            url,
+            method="post",
+            request={},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        ).data
+        replay = self.do_request(
+            url,
+            method="post",
+            request={},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": key},
+        ).data
+        self.assertEqual(replay, applied)
+        for native_run in RepeatBulkRun.objects.all():
+            process_apply_items(native_run.pk)
+        applied = self.do_request(
+            f"/api/producer/repeat-runs/{applied['token']}/", superuser=True
+        ).data
+        self.assertEqual(applied["changed_unit_ids"], [second.pk])
+        self.assertEqual(RepeatDecisionEvent.objects.filter(action="apply").count(), 1)
+        second.refresh_from_db()
+        first.refresh_from_db()
+        outsider.refresh_from_db()
+        self.assertEqual(second.target, first.target)
+        self.assertEqual(second.state, STATE_NEEDS_CHECKING)
+        self.assertEqual(outsider.target, "Jiný pozdrav!\n")
+        snapshot = self._producer_snapshot([first, second])
+        self.assertNotIn(str(second.pk), snapshot["judged_revisions"])
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_producer_repeat_plan_skips_stale_group(self) -> None:
+        first, second = self._quality_repeat_pair()
+        second.translate(self.user, ["Jiný pozdrav!\n"], STATE_TRANSLATED)
+        _run, first, candidate = self._make_project_judge_decision(chosen_unit=first)
+        receipt = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs={"slug": self.component.project.slug},
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": first.pk,
+                        "candidate_id": candidate.pk,
+                        "revision": compute_decision_revision(first),
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        ).data[0]
+        plan = self._producer_repeat_plan([first, second], [receipt["application_id"]])
+        second.translate(self.user, ["Ručně změněno!\n"], STATE_TRANSLATED)
+        applied = self.do_request(
+            f"/api/producer/repeat-plans/{plan['token']}/apply/",
+            method="post",
+            request={},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        ).data
+        self.assertEqual(applied["changed_unit_ids"], [])
+        self.assertTrue(any(row["outcome"] == "stale" for row in applied["results"]))
+        second.refresh_from_db()
+        self.assertEqual(second.target, "Ručně změněno!\n")
+
+    def test_producer_repeat_plan_obeys_independent_paid_request_limit(self) -> None:
+        first, second = self._quality_repeat_pair()
+        snapshot = self._producer_snapshot([first, second])
+        body = {
+            "language": "cs",
+            "scope": {"unit_ids": [first.pk, second.pk]},
+            "issue_snapshot_hash": snapshot["snapshot_hash"],
+            "application_ids": [],
+        }
+        cache.clear()
+        with patch(
+            "weblate.api.throttling.ScopedRateThrottle.get_rate",
+            return_value="1/min",
+        ):
+            key = str(uuid.uuid4())
+            for expected_code in (200, 429):
+                self.do_request(
+                    "api:producer-project-repeat-plan",
+                    kwargs={"slug": self.component.project.slug},
+                    method="post",
+                    request=body,
+                    format="json",
+                    superuser=True,
+                    code=expected_code,
+                    headers={"Idempotency-Key": key},
+                )
+        self.assertEqual(ProducerQualityOperation.objects.filter(key=key).count(), 1)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_producer_repeat_apply_cannot_consume_a_pending_plan(self) -> None:
+        first, second = self._quality_repeat_pair()
+        plan = self._producer_repeat_plan([first, second], [])
+        self.assertEqual(plan["status"], "queued")
+        self.do_request(
+            "api:producer-repeat-plan-apply",
+            kwargs={"token": plan["token"]},
+            method="post",
+            request={},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+            code=409,
+        )
+        operation = ProducerQualityOperation.objects.get(pk=plan["token"])
+        self.assertNotIn("applied_token", operation.private_data)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test-no-real-provider",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_producer_repeat_poll_handles_removed_native_group(self) -> None:
+        first, second = self._quality_repeat_pair()
+        plan = self._producer_repeat_plan([first, second], [])
+        operation = ProducerQualityOperation.objects.get(pk=plan["token"])
+        entry = operation.private_data["groups"][0]
+        RepeatRecommendationRun.objects.filter(pk=entry["recommendation_run"]).update(
+            status=RepeatRecommendationRun.Status.COMPLETED
+        )
+        RepeatGroup.objects.filter(pk=entry["native_group_id"]).delete()
+        polled = self.do_request(
+            "api:producer-repeat-plan-detail",
+            kwargs={"token": plan["token"]},
+            superuser=True,
+        ).data
+        self.assertEqual(polled["status"], "ready")
+        self.assertEqual(polled["groups"][0]["outcome"], "stale")
+        self.assertEqual(polled["groups"][0]["reason"], "group_missing")
+
+    def test_producer_repeat_plan_expires_without_creating_a_new_paid_request(
+        self,
+    ) -> None:
+        first, second = self._quality_repeat_pair()
+        plan = self._producer_repeat_plan([first, second], [])
+        ProducerQualityOperation.objects.filter(pk=plan["token"]).update(
+            created=timezone.now() - timedelta(hours=5)
+        )
+        expired = self.do_request(
+            "api:producer-repeat-plan-detail",
+            kwargs={"token": plan["token"]},
+            superuser=True,
+        ).data
+        self.assertEqual(expired["status"], "failed")
+        self.assertTrue(all(group["outcome"] == "stale" for group in expired["groups"]))
 
     @override_settings(
         JUDGE_ENABLED=True,
@@ -18573,12 +20113,15 @@ class ProducerConsoleRealRunEndToEndTest(RepoTestMixin, APITransactionTestCase):
 
     CREATE_GLOSSARIES: bool = True
     authenticate = APIBaseTest.authenticate
-    do_request = APIBaseTest.do_request
+    do_request = cast("Any", APIBaseTest.do_request)
     grant_perm_to_user = APIBaseTest.grant_perm_to_user
     create_acl = APIBaseTest.create_acl
     CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
     def setUp(self) -> None:
+        # Transaction tests flush users, but the anonymous prototype cache
+        # survives that flush. Never reuse a user from the preceding test DB.
+        clear_users_cache()
         Language.objects.flush_object_cache()
         self.clone_test_repos()
         self.component = self.create_component()
@@ -18676,6 +20219,210 @@ class ProducerConsoleRealRunEndToEndTest(RepoTestMixin, APITransactionTestCase):
         ).data
         self.assertEqual(reconnected["id"], started["id"])
         self.assertEqual(reconnected["status"], ProducerRun.Status.COMPLETED)
+
+    @http_mock.activate
+    @patch(
+        "weblate.utils.requests.resolve_runtime_hostname",
+        return_value=("93.184.216.34",),
+    )
+    def test_german_repeat_cycle_requires_fresh_dual_judge_and_exports_current_file(
+        self,
+        _mock_resolver,
+    ) -> None:
+        translation = self.component.translation_set.filter(language__code="de").first()
+        if translation is None:
+            self.component.new_base = "po/hello.pot"
+            self.component.save(update_fields=["new_base"])
+            translation = self.component.add_new_language(
+                Language.objects.get(code="de"),
+                None,
+                send_signal=False,
+                show_messages=False,
+            )
+        if translation is None:
+            self.fail(
+                getattr(
+                    self.component, "new_lang_error_message", "German fixture missing"
+                )
+            )
+        first = translation.unit_set.get(source="Hello, world!\n")
+        first.translate(self.user, ["Alter Gruß!\n"], STATE_TRANSLATED)
+        second = translation.add_unit(
+            None,
+            "quality-e2e-repeat",
+            first.source,
+            ["Hallo Welt!\n"],
+            author=self.user,
+        )
+        if second is None:
+            self.fail("The German recipient fixture could not be created.")
+        self.serve_pass()
+        kwargs = {"slug": self.project.slug}
+
+        def judge_second():
+            scope = {"unit_ids": [second.pk]}
+            estimate = self.do_request(
+                "api:producer-project-judge-estimate",
+                kwargs=kwargs,
+                method="post",
+                request={"kind": "judge", "scope": scope},
+                format="json",
+                superuser=True,
+            ).data
+            started = self.do_request(
+                "api:producer-project-run-start",
+                kwargs=kwargs,
+                method="post",
+                request={
+                    "kind": "judge",
+                    "scope": scope,
+                    "estimate_id": estimate["estimate_id"],
+                },
+                format="json",
+                superuser=True,
+                code=201,
+                headers={"Idempotency-Key": str(uuid.uuid4())},
+            ).data
+            detail = self.do_request(
+                "api:producer-run-detail", kwargs={"pk": started["id"]}, superuser=True
+            ).data
+            self.assertEqual(detail["status"], ProducerRun.Status.COMPLETED)
+            return detail
+
+        def snapshot():
+            return self.do_request(
+                "api:producer-project-quality-snapshot",
+                kwargs=kwargs,
+                method="post",
+                request={
+                    "language": "de",
+                    "scope": {"unit_ids": [first.pk, second.pk]},
+                },
+                format="json",
+                superuser=True,
+            ).data
+
+        # Store real, cacheable same-target evidence BEFORE the repeat write.
+        judge_second()
+        second.translate(self.user, ["Alter Gruß!\n"], STATE_TRANSLATED)
+        # Reuse the native evidence fixture in this transaction-level API test.
+        # ruff: ignore[private-member-access]
+        _run, first, candidate = ProducerAPITest._make_project_judge_decision(
+            self, chosen_unit=first, candidate_target="Hallo Welt!\n"
+        )
+        receipt = self.do_request(
+            "api:producer-project-decisions-apply",
+            kwargs=kwargs,
+            method="post",
+            request={
+                "items": [
+                    {
+                        "unit": first.pk,
+                        "candidate_id": candidate.pk,
+                        "revision": compute_decision_revision(first),
+                    }
+                ]
+            },
+            format="json",
+            superuser=True,
+        ).data[0]
+        initial = snapshot()
+        plan = self.do_request(
+            "api:producer-project-repeat-plan",
+            kwargs=kwargs,
+            method="post",
+            request={
+                "language": "de",
+                "scope": {"unit_ids": [first.pk, second.pk]},
+                "issue_snapshot_hash": initial["snapshot_hash"],
+                "application_ids": [receipt["application_id"]],
+            },
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        ).data
+        started = self.do_request(
+            "api:producer-repeat-plan-apply",
+            kwargs={"token": plan["token"]},
+            method="post",
+            request={},
+            format="json",
+            superuser=True,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        ).data
+        applied = self.do_request(
+            "api:producer-repeat-run-detail",
+            kwargs={"token": started["token"]},
+            superuser=True,
+        ).data
+        self.assertEqual(applied["changed_unit_ids"], [second.pk])
+        second.refresh_from_db()
+        self.assertEqual(second.state, STATE_NEEDS_CHECKING)
+        self.assertNotIn(str(second.pk), snapshot()["judged_revisions"])
+        calls_before = len(http_mock.calls)
+        post_judge = judge_second()
+        self.assertEqual(
+            len(http_mock.calls) - calls_before,
+            2,
+            {
+                "run": post_judge,
+                "attempts": list(
+                    JudgeRequestAttempt.objects.filter(run_id=post_judge["id"]).values(
+                        "seat", "failure_kind", "http_status", "response_shape"
+                    )
+                ),
+            },
+        )
+        second.refresh_from_db()
+        self.assertEqual(second.state, STATE_TRANSLATED)
+        final = snapshot()
+        self.assertEqual(
+            set(final["judged_revisions"]), {str(first.pk), str(second.pk)}
+        )
+        self.assertFalse(any(issue["hard"] for issue in final["issues"]))
+        exported = self.do_request(
+            "api:translation-file",
+            kwargs={
+                "component__project__slug": self.project.slug,
+                "component__slug": self.component.slug,
+                "language__code": "de",
+            },
+            superuser=True,
+        )
+        content = (
+            b"".join(exported.streaming_content)
+            if exported.streaming
+            else exported.content
+        )
+        self.assertIn(b"Hallo Welt!", content)
+        self.assertNotIn("Alter Gruß!".encode(), content)
+        after_export = snapshot()
+        if final["scope_revision"] != after_export["scope_revision"]:
+            # Native export may flush pending repository/audit metadata. Use
+            # the same one-retry A/B barrier as the wizard, never ignore it.
+            final = after_export
+            self.assertEqual(
+                set(final["judged_revisions"]), {str(first.pk), str(second.pk)}
+            )
+            self.assertFalse(any(issue["hard"] for issue in final["issues"]))
+            exported = self.do_request(
+                "api:translation-file",
+                kwargs={
+                    "component__project__slug": self.project.slug,
+                    "component__slug": self.component.slug,
+                    "language__code": "de",
+                },
+                superuser=True,
+            )
+            content = (
+                b"".join(exported.streaming_content)
+                if exported.streaming
+                else exported.content
+            )
+            self.assertIn(b"Hallo Welt!", content)
+            self.assertNotIn("Alter Gruß!".encode(), content)
+            after_export = snapshot()
+        self.assertEqual(final["scope_revision"], after_export["scope_revision"])
 
 
 class OpenAPITest(APIBaseTest):

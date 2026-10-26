@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "kind": "locally-built-and-validated-image",
+  "production_updated": false,
+  "production_contacted": false,
+  "services_restarted": false,
+  "old_job_resumed": false,
+  "paid_requests": 0,
+  "source_commit": "2b8e7483275e59e5364521b31fbeaafdc3559dcb",
+  "wizard_candidate_commit": "680acc33e3c2d1fcddd2463441cce7c2c22283ca",
+  "base_digest": "sha256:81acc89b2a9742015f2ffdee77130d1c5fcdbf3eeae203b3ff665bc6d2f7a8aa",
+  "platform": "linux/amd64",
+  "image_manifest_digest": "sha256:8a2119cd8fd4cc49ba40a879947f579094e9520fe8f061cb944bf56882227675",
+  "image_config_digest": "sha256:78718f9e677bec49ab9a3c42d8439d975009283a43895ad1973c688b37614ae7",
+  "runtime_uid": 1000,
+  "numpy": "2.3.5",
+  "python": "3.14.6",
+  "archive_file": "image.tar",
+  "archive_size_bytes": 592066048,
+  "archive_sha256": "6eeabec94e4affd7e06513a027bfa2f71956074e945d8216158795ed2398df8b",
+  "source_archive_sha256": "d04c04d21bd6cc1d4cae02029b757a0c33c93bdb976dcc691115ac59fe7dbc3f",
+  "reported_image_size_bytes": 592047379,
+  "uncompressed_layer_bytes": 1909328384,
+  "uncompressed_layers_verified": 15,
+  "required_import_free_bytes": 8589934592,
+  "checks": {
+    "operator_tests": 25,
+    "django_cold_initialization": true,
+    "source_files_verified": 7,
+    "empty_database_migrations_applied": 524,
+    "models_check": true,
+    "no_model_drift": true,
+    "login_http": 200,
+    "anonymous_api_http": 401,
+    "authenticated_api_http": 200,
+    "projects_api_http": 200,
+    "dependencies_checked": 224,
+    "dependencies_compatible": true,
+    "empty_llm_mt_quality_journals": true,
+    "existing_local_containers_unchanged": 9,
+    "temporary_resources_removed": true,
+    "real_loopback_http": {
+      "anonymous": 401,
+      "invalid_token": 401,
+      "login": 200,
+      "valid_token": 200
+    }
+  },
+  "review": {
+    "critical": 0,
+    "important": 0,
+    "minor_scope_note_resolved": 1,
+    "deferred_minors": 0,
+    "rereview": false
+  },
+  "limitations": [
+    "No production deployment, target-engine import, or live-data migration performed.",
+    "OCI manifest and config IDs differ; target import must verify identity rather than bypass the gate.",
+    "This is a smoke and migration check, not full live LQA or a repeated full Django CI run.",
+    "Token authentication verified through isolated loopback WSGI HTTP; password login and deployed nginx/Granian/proxy settings not tested."
+  ]
+}

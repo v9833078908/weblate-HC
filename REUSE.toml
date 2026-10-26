@@ -29,6 +29,7 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 [[annotations]]
 path = [
   ".claude/skills/**.md",
+  ".omp/lsp.json",
   ".omp/skills/**.md",
   ".omp/skills/**/*.json",
   "analysis/**.baseline",
@@ -44,11 +45,14 @@ path = [
   "analysis/**.tbx",
   "analysis/**.tsv",
   "analysis/**.zip",
+  "DESIGN.md",
   "docs/**.md",
+  "frontend-wizard/**",
   "hcgameloc.egg-info/**",
   "loc_kit_ingest/.gitignore",
   "loc_kit_ingest/pytest.ini",
   "loc_kit_ingest/tests/fixtures/**",
+  "PRODUCT.md",
   "prototypes/**.html",
   "weblate/trans/judge_prompts/**.txt",
   "weblate/trans/prompts/**.txt",

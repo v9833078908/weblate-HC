@@ -731,7 +731,7 @@ class RepeatPolicyForm(forms.ModelForm):
         )
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() or {}
         source_language = cleaned_data.get("source_language")
         components = cleaned_data.get("components")
         if (

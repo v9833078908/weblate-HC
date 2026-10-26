@@ -61,6 +61,7 @@ CONTACT_DATA = {
 }
 
 
+@override_settings(SITE_TITLE="Weblate", EMAIL_SUBJECT_PREFIX="[Weblate] ")
 class ViewTest(RepoTestCase):
     """Test for views."""
 

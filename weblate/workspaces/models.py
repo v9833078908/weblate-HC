@@ -430,10 +430,11 @@ def workspace_pre_delete(sender, instance: Workspace, using: str, **kwargs) -> N
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models import Change
 
-    # Changes for projects moved elsewhere retain their historical workspace.
-    # Detach these before the workspace cascade so the surviving project's
-    # history is preserved. Workspace-only history is still removed.
+    # The workspace FK uses SET_NULL so the deletion collector never schedules
+    # a surviving project's historical changes for cascade deletion. Updating
+    # the FK here is too late: the collector already selected those rows.
+    # Workspace-only history still belongs to the deleted workspace.
     Change.objects.using(using).filter(
-        workspace=instance, project__isnull=False
-    ).update(workspace=None)
+        workspace=instance, project__isnull=True
+    ).delete()
     instance.delete_workspace_memory_scope()

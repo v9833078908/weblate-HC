@@ -66,7 +66,7 @@ jobs:
       continue-on-error: true
     - name: Install brew dependencies
       run: |
-        brew install python libyaml pkgconf zstd lz4 xxhash libxmlsec1 uv
+        brew install python@3.14 libyaml pkgconf zstd lz4 xxhash libxmlsec1 uv
     - name: Install test dependencies
       run: |
         brew install icu4c valkey postgresql
@@ -77,7 +77,7 @@ jobs:
         brew services start valkey
     - name: Install Weblate
       run: |
-        uv venv .venv
+        uv venv --python "$(brew --prefix python@3.14)/bin/python3.14" .venv
         source .venv/bin/activate
         uv sync --frozen --all-extras --dev --no-binary-package lxml --no-binary-package xmlsec
     - name: Test with Django

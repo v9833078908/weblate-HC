@@ -347,6 +347,8 @@ class BatchUpdateTest(ViewTestCase):
     def test_autotranslate(self) -> None:
         other = self.do_base()
         translation = other.translation_set.get(language_code="cs")
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         auto_translate(
             user_id=None,
             mode="translate",

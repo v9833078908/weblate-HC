@@ -128,7 +128,6 @@ def resample_job_vectors(
         msg = "Resampling requires at least one job."
         raise ValueError(msg)
     # Reproducible bootstrap sampling is intentionally non-cryptographic.
-    # ruff: ignore[suspicious-non-cryptographic-random-usage]
     randomizer = random.Random(seed)
     cluster_ids = sorted(jobs_by_cluster)
     resampled_jobs: list[dict[str, Any]] = []

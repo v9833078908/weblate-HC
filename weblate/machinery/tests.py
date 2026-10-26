@@ -413,7 +413,7 @@ AWS_LANGUAGES_RESPONSE = {
 }
 
 
-class BaseMachineTranslationTest(TestCase):
+class BaseMachineTranslationTest(http_mock.MockDNSMixin, TestCase):
     """Testing of machine translation core."""
 
     MACHINE_CLS: type[BatchMachineTranslation] = DummyTranslation
@@ -10388,7 +10388,7 @@ class CyrTranslitTranslationTest(ViewTestCase, BaseMachineTranslationTest):
         )
 
 
-class ViewsTest(FixtureTestCase):
+class ViewsTest(http_mock.MockDNSMixin, FixtureTestCase):
     """Testing of AJAX/JS views."""
 
     THIRD_PARTY_WARNING = (
@@ -11212,7 +11212,7 @@ class WeblateTranslationLookupTest(SimpleTestCase):
         self.assertEqual(machine.comparer.similarity.call_count, 2)
 
 
-class MachineryValidationTest(TestCase):
+class MachineryValidationTest(http_mock.MockDNSMixin, TestCase):
     def test_machinery_third_party_data_annotations(self) -> None:
         third_party_services = (
             AlibabaTranslation,

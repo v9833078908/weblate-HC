@@ -2634,9 +2634,21 @@ Translations
     :>json int failing_advisory: strings whose active checks are all advisory
     :>json array checks: per-check rows with ``check``, ``name``, ``advisory``, ``strings``, ``words`` and ``chars``
 
-    The same breakdown is available for a whole component at
-    :http:get:`/api/components/(string:project)/(string:component)/checks/`
-    and for a project at :http:get:`/api/projects/(string:project)/checks/`.
+.. http:get:: /api/components/(string:project)/(string:component)/checks/
+
+    Returns the same failing-check breakdown for a whole component.
+
+    :param project: Project URL slug
+    :type project: string
+    :param component: Component URL slug
+    :type component: string
+
+.. http:get:: /api/projects/(string:project)/checks/
+
+    Returns the same failing-check breakdown for a whole project.
+
+    :param project: Project URL slug
+    :type project: string
 
 .. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/announcements/
 
@@ -3619,6 +3631,61 @@ restore an ``Approved`` state, review permission
 ``423`` (:http:statuscode:`423`), the same code the rest of the API uses
 for a lock conflict, never a bare permission error.
 
+.. _api-producer-mt-batches:
+
+Durable empty-string MT batches
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Servers with ``mt_async_batches: 1`` in :http:get:`/api/producer/me/`
+support the following separate MT workflow. It does not change the existing
+``autotranslate`` endpoint or judge revision format.
+
+.. http:post:: /api/producer/projects/(string:slug)/mt/batches/
+
+    Requires authentication, project access and ``translation.auto`` on the
+    selected translation. Send a UUID ``Idempotency-Key`` header and an object
+    with ``component``, ``language``, the project's configured routed ``engine``
+    (``openrouter`` or ``litellm``), integer ``threshold`` (0–100), and ``units``:
+    1–20 unique objects with ``unit_id`` and ``revision``. Unknown top-level
+    fields, including overwrite options, are rejected. Plural source units
+    are currently refused instead of silently truncating their forms.
+
+    An MT revision is SHA-256 of UTF-8 JSON of ``id``, ``source`` (plural array),
+    ``context``, ``target`` (plural array), and integer ``state``, with sorted
+    keys, no ASCII escaping and separators ``,`` and ``:`` without whitespace.
+    It is not the judge decision revision described below.
+
+    Only empty, writable, current revisions are admitted. Acceptance atomically
+    stores a receipt, per-unit reservations and a background run before returning
+    ``202``; no provider is called by this HTTP request. Repeating the same
+    actor/project/key and payload returns the same run; a different payload or
+    an already reserved unit revision returns ``409``. Never generate a new key
+    merely because an HTTP response was lost.
+
+.. http:get:: /api/producer/projects/(string:slug)/mt/batches/(uuid:key)/
+
+    Returns only the requesting actor's receipt, subject to current project and
+    translation permissions. Fields are ``key``, ``run_id``, ``state``, ``total``,
+    ``applied`` and ``units`` with ``unit_id``, ``revision``, ``state`` and
+    ``after_revision``. Prompts, credentials and stored provider answers are
+    private. Receipt states are ``accepted``, ``running``, ``completed``,
+    ``partial``, ``failed`` and ``provider_unknown``.
+
+    Worker redelivery reuses a stored answer or the normal machinery cache.
+    An unresolved outbound intent without an answer becomes ``provider_unknown``;
+    neither polling nor another request key authorizes another paid attempt for
+    that revision. This is not an exactly-once billing promise from the provider.
+    The worker rechecks permissions, revision and empty target under a row lock
+    before saving through the normal audited translation path, without propagation.
+
+    Clients should persist keys and progress before POST, respect ``Retry-After``
+    on ``429``, poll the same receipt after transport failures, and verify current
+    unit revisions against ``after_revision`` before declaring completion.
+
+    Back up the database and translation files before rollout. Code rollback
+    must preserve receipts, per-unit intents and newly saved translations; do not
+    drop these tables or restore an older production database just to roll back code.
+
 .. _api-producer-revision:
 
 Revision, ``estimate_id``, and ``scope_hash``
@@ -3633,6 +3700,12 @@ invalidates every ``revision`` read before it, without a client needing to
 understand what changed. A stale ``revision`` on a write is a ``409``
 with ``code: stale-revision``; reload the unit and retry with its current
 ``revision``, never resend the old one.
+
+Flushing already-recorded pending translations to their native file only
+updates internal disk-state bookkeeping. Downloading that file does not
+advance the unit's edit timestamp or invalidate an otherwise current judge
+application receipt. Real edits and audit changes, including an edit away
+from and back to the same target, still invalidate the old revision.
 
 A judge cost estimate is durable, not a signed stateless token: creating
 one persists a snapshot of the exact matched string IDs, the requested
@@ -3795,6 +3868,240 @@ the string exists; it does not prevent deletion of the string itself.
     :statuscode 200: an identical prior resume request's run was returned unchanged
     :statuscode 409: the run is not in a resumable state, or the MT configuration drifted (``code: not-resumable`` or ``code: estimate-drift``)
 
+.. http:get:: /api/producer/projects/(string:slug)/decisions/
+
+    List the text-free, per-unit decisions of one completed or running judge
+    run. The caller supplies ``kind=judge`` and the run UUID. Each paginated
+    row identifies the unit and its opaque revision, reports the run outcome,
+    severity, parsed/missing state of both judge seats, disagreement and issue
+    categories, and names a stored candidate only when one exists. The
+    ``applicability`` field is one of ``ready``, ``no_candidate``, ``stale``,
+    ``not_verified``, ``needs_individual_confirmation``, or ``forbidden``.
+    Source, target, candidate, prompt, and evidence text are deliberately not
+    returned.
+
+    Quality API version 2 adds ``candidate_acceptable``,
+    ``candidate_glossary_status``, and ``live_seat_results``.
+    ``candidate_verified`` means both seats produced parsed evidence, not
+    that they approved the candidate. Automatic applicability additionally
+    requires a current collegial PASS and clean technical and mandatory
+    glossary checks; see :ref:`api-producer-quality-v2`.
+
+    :param slug: Project URL slug
+    :type slug: string
+    :query string kind: Run kind; only ``judge`` is accepted
+    :query string run: Producer run UUID belonging to this project
+
+.. http:get:: /api/producer/projects/(string:slug)/quality/issues/
+
+    Return active exact-repeat and glossary issues for one project language as
+    structured, text-free groups. ``kind`` is a comma-separated subset of
+    ``repeat-drift,glossary``. Targets are represented by hashes and unit IDs;
+    each unit carries an opaque revision. ``hard`` and ``advisory`` distinguish
+    mandatory glossary conflicts from inflectable recommendations, while an
+    approved repeat conflict is explicitly ineligible for automatic repair.
+
+    :param slug: Project URL slug
+    :type slug: string
+    :query string language: Target language code
+    :query string kind: ``repeat-drift``, ``glossary``, or both
+    :>json string snapshot_hash: Hash of the complete ordered issue response
+    :>json array issues: Structured repeat/glossary groups without translation text
+
+.. http:post:: /api/producer/projects/(string:slug)/quality/recheck/
+
+    Recompute normal Weblate checks for a bounded list of project units. Each
+    input row contains ``unit_id`` and the last observed opaque ``revision``.
+    Rows are independent: a missing, inaccessible, or stale unit does not stop
+    the others. A successful row returns ``rechecked``, its new revision, and
+    the active check IDs. This endpoint changes check results only; it never
+    writes a translation or calls a provider.
+
+    :param slug: Project URL slug
+    :type slug: string
+    :<json array items: ``[{unit_id: int, revision: string}]``
+    :>json string snapshot_hash: Hash of the complete ordered result
+    :>json array items: Per-row ``rechecked``, ``stale``, ``forbidden``, or ``missing`` outcome
+    :>json array affected_unit_ids: Visible members of affected exact-repeat groups, including read-only context outside the requested list
+    :>json array affected_repeat_group_ids: Opaque identities of affected exact-repeat groups
+
+    At most 1000 unique units can be submitted per request. Affected IDs are
+    observations, not permission to write outside the caller's original scope.
+
+.. _api-producer-quality-v2:
+
+Full quality cycle contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The capabilities returned by :http:get:`/api/producer/me/` advertise
+``quality_api_version: 2``, ``candidate_quality_gate``,
+``glossary_direct_scan``, ``quality_group_recheck``,
+``quality_repeat_plan``, ``quality_final_snapshot``, and
+``quality_idempotency``. These describe protocol support, not permission
+to edit a particular project or a guarantee of provider availability.
+Check ``judge`` and ``judge_seats`` separately before launching paid work.
+
+``quality_execution_policy: 1`` and ``verify_only_immutable: 1`` advertise
+immutable verification sessions. Send ``execution_mode: verify_only`` with
+both estimate and start; changing the mode after estimation returns 409.
+The executor disables preparatory translation, candidate generation, state
+projection, hold release and repair. Apply and repeat-apply requests carrying
+that run's ``execution_context`` are refused. Legacy requests default to
+``repair`` and retain their existing permission and revision guards.
+
+Verification checks content and audit revisions before and after execution.
+Independent human edits are preserved and make the result stale; verification
+does not freeze other actors or restore an older translation. Snapshot responses
+include ``protected_content_digest`` independently of changing judge evidence.
+Verification clients must keep it equal to the initial value through export.
+Response publication rechecks the actor, cancellation and protected source/target
+audit revisions under locks. Current-evidence and cache readers reject verdicts
+from an invalidated verification session, including edits away and back and
+glossary audit changes; retained response bodies never bypass this admission gate.
+
+``mt_reconciliation: 1`` enables the actor/project-bound
+``POST /api/producer/projects/{slug}/mt/batches/{key}/reconcile/`` endpoint.
+It uses stored responses and current units without another provider request,
+returning disjoint ``ready``, ``never_sent``, ``waiting``, ``paid_unknown``,
+``paid_invalid``, ``stale`` and ``forbidden`` groups. Only a terminal, released,
+provably unsent intent can enter a new paid batch. Financial history remains
+unchanged when a human fills a previously uncertain string.
+
+Stored routed responses carry an internal request/reply codec. New deliveries
+use source-owned protected slots; old parts responses are replay-only and
+require the exact original request digest, complete semantic scope and valid
+stored-body checksum. Changed settings or an unreproducible old prompt keep
+the operation unresolved. Reconciliation never falls back to a new paid call,
+and clients do not supply or override this codec.
+
+Durable MT and judge deliveries keep a semantic spend fence independently of
+client keys, request grouping and model changes. A complete private response
+is saved before status/JSON parsing. Redelivery reuses that response; missing,
+invalid or corrupt content does not authorize another charge. The current
+OpenRouter and LiteLLM routes advertise no verified complete-response lookup
+or billing-idempotency guarantee. Such work finishes with an explicit exception
+while independent unsent work can continue. This is conservative at-most-once
+dispatch, not a promise of exactly-once successful translation.
+
+Clients send a UUID ``Idempotency-Key`` with judge start, bulk candidate
+apply, recheck, repeat plan, and repeat apply. It is mandatory on the two
+repeat POST endpoints; the other endpoints keep their legacy unkeyed mode.
+A key is bound to the actor, project, action, URL, and request body. Reusing
+it with different data returns 409. An accepted local write and its durable
+response receipt commit together. Repeating the same accepted request
+returns its original response, not a second write. Refused operations
+commit neither their receipt nor local mutations. This is not a guarantee
+of exactly-once provider billing after worker loss.
+
+Quality responses contain IDs, hashes, classifications, and reasons, never
+translation text, prompts, raw judge evidence, credentials, or signed native
+manifests. Download translation content through the normal file endpoints.
+
+.. http:get:: /api/producer/projects/(string:slug)/quality/operations/(uuid:key)/
+
+    Observe an operation after an uncertain HTTP response, using the UUID
+    previously sent as ``Idempotency-Key``. Only its actor with continuing
+    project access can observe it. The response has ``state`` and, when
+    ``confirmed``, its original ``result``. Unknown or foreign keys
+    return 404. A currently uncommitted operation may not yet be visible;
+    a single 404 does not prove that it cannot still commit.
+
+.. http:post:: /api/producer/projects/(string:slug)/quality/snapshot/
+
+    Read the entire explicit scope in one bounded, synchronous scan.
+    Send ``language`` and ``scope: {unit_ids: [...]}``, containing
+    1–10000 unique, visible, non-source, non-glossary units of that language.
+    Any foreign or missing ID refuses the whole snapshot. Larger scopes are
+    not supported by this version; do not present independent partial
+    snapshots as one complete result.
+
+    The response contains ``complete``, ``unit_ids``, current
+    ``revisions``, ``judged_revisions``, ``issues``,
+    ``scope_revision``, and ``snapshot_hash``.
+    ``judged_revisions`` includes only current two-seat parsed PASS evidence.
+    The scan computes glossary and exact-repeat issues directly even when
+    their saved UI Check rows are absent or disabled. Mandatory glossary
+    failures are ``hard``; inflectable recommendations remain advisory.
+    Exact repeats mean identical source forms, not arbitrary shared words
+    in otherwise different sentences. Required terminology belongs in a
+    glossary.
+
+    Components with translation propagation disabled cannot be scanned for
+    exact repeats. Every selected unit in such a component returns a hard
+    ``check`` issue with ``check_id: repeat-coverage`` and
+    ``reason: translation_propagation_disabled``. This is a missing quality
+    prerequisite, not evidence that the translations agree. Clients must not
+    report a clean completion while it remains. The scan does not enable
+    propagation or change translations; configure new quality components
+    explicitly and leave existing administrator policies unchanged.
+
+    ``scope_revision`` binds unit and source audits, context, project judge
+    persona/style, protections, glossary content/audits, repeat policies,
+    memberships, and judge evidence. The server repeats the scope read and
+    refuses an unstable scan. Clients must also compare revisions before
+    and after file download, refreshing checks and retrying once on change;
+    an unstable file must not be published as checked.
+
+    Global judge model/profile settings must remain fixed during a cycle.
+    After rotating them, start a fresh judge cycle. This revision does not
+    promise detection of global configuration changes that are subsequently
+    reverted; it is not a global configuration epoch or a provider attestation.
+
+.. http:post:: /api/producer/projects/(string:slug)/quality/repeats/plan/
+
+    Send ``language``, ``scope``, the current snapshot's
+    ``issue_snapshot_hash``, and ``application_ids`` naming this
+    actor's judge repair receipts. Requires project-edit permission.
+    This endpoint shares the independent producer rate limit with judge
+    estimate/start/resume because preparation may create paid recommendations.
+    The returned plan has an opaque ``token``, ``status``, and
+    text-free ``groups`` with revision, member IDs, outcome, reason, and
+    ``preferred_origin``.
+
+    A current, dual-PASS judge repair takes priority as canonical target.
+    Conflicting repairs are not decided by row number: native bounded
+    recommendation work may choose a verified existing target, otherwise
+    the group receives an explained exception. Conflicting approved targets,
+    unsafe recipients, and unavailable recommendations never become an
+    unrestricted edit. Plans use native signed bulk manifests and expire
+    after four hours before application.
+
+.. http:get:: /api/producer/repeat-plans/(uuid:token)/
+
+    Poll the actor-owned plan. Pending native recommendations can advance
+    to ready groups or explained exceptions. Polling never resubmits a paid
+    provider request. Inspect each group, not only the plan's status.
+
+.. http:post:: /api/producer/repeat-plans/(uuid:token)/apply/
+
+    Apply the frozen plan with an empty JSON object and an idempotency key.
+    A pending or expired plan returns 409. The server creates native bulk
+    runs, rechecks permissions and revisions under locks, and returns a run
+    resource. An already-applied plan cannot create another bulk run even
+    with a new key. No target text can be supplied by the caller.
+
+    Only safe recipients inside the original scope may change. Approved,
+    locked, readonly, independent, or stale recipients are not overwritten.
+    Every written recipient enters Needs checking until a fresh two-seat
+    PASS and local mandatory checks release that exact revision. Old
+    same-target evidence cannot release this hold.
+
+.. http:get:: /api/producer/repeat-runs/(uuid:token)/
+
+    Return run status, exact ``changed_unit_ids``, and per-unit
+    ``results`` with outcome, revision, and native audit event ID when
+    available, plus an exclusion reason when applicable. Conditional
+    ``event_id`` and operation ``result`` fields may be absent.
+    A group or row failure does not disguise successful writes
+    or halt unrelated groups. Recheck changed recipients and judge them,
+    then request a fresh snapshot and plan after any further repair.
+
+The external orchestrator owns the bounded phase loop and final
+``completed``/``completed_with_exceptions`` decision. A complete scan
+alone does not mean success: require full current judge coverage, no hard
+residual issue, and a stable export. Keep remaining issues as explicit
+exceptions rather than bypassing protection with a direct target PATCH.
+
 .. http:post:: /api/producer/decisions/(int:id)/apply-candidate/
 
     Apply one already-verified judge repair candidate to its unit. The
@@ -3826,12 +4133,14 @@ the string exists; it does not prevent deletion of the string itself.
     project in a single request. Every row is an independent atomic
     operation: one row's failure never rolls back another, and every row
     reports its own honest outcome instead of one pass/fail for the whole
-    batch. A row that would remove an existing approval or touches a
-    possible terminology mismatch is never applied through this bulk
-    endpoint - it always reports ``needs_individual_confirmation`` so the
+    batch. A row that would remove an existing approval is never applied
+    through this bulk endpoint - it reports ``needs_individual_confirmation`` so the
     producer repeats exactly that one string through
     :http:post:`/api/producer/decisions/(int:id)/apply-candidate/` with an
-    explicit ``acknowledge``. A retried row whose candidate is already
+    explicit ``acknowledge``. Automatic candidates require a current dual-seat
+    collegial PASS and clean technical and mandatory glossary checks under
+    the same unit lock. A terminology problem on the old live target does
+    not block a candidate that passes those checks. A retried row whose candidate is already
     gone reports ``already_applied``, never a second write.
 
     :param slug: Project URL slug
@@ -3839,7 +4148,8 @@ the string exists; it does not prevent deletion of the string itself.
     :<json array items: ``[{unit: int, revision: string, candidate_id: int}]``
 
     The response body is a bare JSON array with one object per input row,
-    in the same order: ``[{unit: int, outcome: string}]``, where
+    in the same order: ``[{unit: int, outcome: string, revision: string,
+    application_id: int|null}]``, where
     ``outcome`` is one of ``applied``, ``already_applied``, ``stale``,
     ``forbidden``, ``needs_individual_confirmation``, ``not_verified``.
 
@@ -3983,7 +4293,7 @@ update individual repositories; see
 
         :ref:`Pagure notifications <code-hosting-pagure-notifications>`
             For instruction on setting up Pagure integration
-        https://docs.pagure.org/pagure/usage/using_webhooks.html
+        https://docs.pagure.org/pagure/usage/project_settings.html#web-hooks
             Generic information about Pagure Webhooks
         :setting:`ENABLE_HOOKS`
             For enabling hooks for whole Weblate

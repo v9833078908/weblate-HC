@@ -5,11 +5,13 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from decimal import Decimal
 from typing import Any, ClassVar
 from urllib.parse import quote, urljoin
 
+import httpx2
 from asgiref.sync import sync_to_async
 from django.core.cache import cache
 
@@ -29,11 +31,59 @@ from .llm import (
     llm_batch_project_id,
     llm_batch_target_language,
     llm_batch_unit_count,
+    llm_delivery_usage,
+    llm_delivery_work,
     llm_usage_record,
 )
 
 
 class BaseOpenAITranslation(BaseLLMTranslation):
+    def request(self, method, url, skip_auth=False, **kwargs):
+        work = llm_delivery_work.get()
+        if not self.durable_single_attempt or not work or method.lower() != "post":
+            return super().request(method, url, skip_auth=skip_auth, **kwargs)
+        from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+            dispatch_exchange,
+            encode_http_response,
+            exchange_for_work,
+        )
+
+        digest = hashlib.sha256(
+            json.dumps(
+                {"url": url, "method": method.lower(), "payload": kwargs.get("json")},
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+            ).encode()
+        ).hexdigest()
+        request = super().request
+
+        def send():
+            return encode_http_response(
+                request(method, url, skip_auth=skip_auth, **kwargs)
+            )
+
+        saved = json.loads(
+            dispatch_exchange(
+                work,
+                digest,
+                send,
+                run_id=self.usage_run_id,
+                request_codec=getattr(self, "delivery_request_codec", "opaque-v1"),
+                replay_only=getattr(self, "delivery_replay_only", False)
+                or getattr(self, "delivery_request_codec", None) == "routed-parts-v1",
+            )
+        )
+        llm_delivery_usage.set(exchange_for_work(work))
+        response = httpx2.Response(
+            saved["status"],
+            content=saved["body"].encode(),
+            headers=saved["headers"],
+            request=httpx2.Request(method, url),
+        )
+        self.check_failure(response)
+        return response
+
     def get_runtime_base_url(self) -> str:
         raise NotImplementedError
 
@@ -69,7 +119,8 @@ class BaseOpenAITranslation(BaseLLMTranslation):
     @staticmethod
     def _get_upstream_error_status(error: dict) -> int | None:
         try:
-            return int(error.get("code"))
+            code = error.get("code")
+            return int(code) if code is not None else None
         except (TypeError, ValueError):
             return None
 
@@ -170,8 +221,19 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         Never raises: a broken accounting write must not break a translation,
         and the exception is logged so a broken table is visible in the log.
         """
-        try:
-            self._write_llm_usage(payload, model, batch_size)
+        try:  # ruff: ignore[too-many-statements-in-try-clause]
+            delivery_id = llm_delivery_usage.get()
+            if self.durable_single_attempt and delivery_id is not None:
+                from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+                    record_usage_once,
+                )
+
+                record_usage_once(
+                    delivery_id,
+                    lambda: self._write_llm_usage(payload, model, batch_size),
+                )
+            else:
+                self._write_llm_usage(payload, model, batch_size)
         except Exception:
             LOGGER.exception("Failed to record LLM usage")
 

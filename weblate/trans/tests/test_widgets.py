@@ -84,10 +84,8 @@ class EngageTaskChecklistTest(SimpleTestCase):
 
     def test_judge_filter_queries_are_available(self) -> None:
         self.assertEqual(FILTERS.get_filter_query("judge-uncovered"), "NOT has:judge")
-        self.assertEqual(FILTERS.get_filter_query("judge-advisory"), "judge:pass")
-        self.assertEqual(
-            FILTERS.get_filter_query("judge-held"), "judge:flag OR judge:reject"
-        )
+        self.assertEqual(FILTERS.get_filter_query("judge-advisory"), "judge:flag")
+        self.assertEqual(FILTERS.get_filter_query("judge-held"), "judge:reject")
         self.assertEqual(FILTERS.get_filter_query("judge-stale"), "judge:stale")
         self.assertEqual(FILTERS.get_filter_query("judge-incomplete"), "judge:unparsed")
 

@@ -9,7 +9,7 @@ import hashlib
 import json
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from django.core import signing
 from django.core.exceptions import ValidationError
@@ -20,7 +20,12 @@ from django.utils.translation import gettext
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models import Unit
 from weblate.trans.util import join_plural, split_plural
-from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
+from weblate.utils.state import (
+    STATE_APPROVED,
+    STATE_NEEDS_CHECKING,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -70,9 +75,6 @@ def unit_fingerprint(unit: Unit) -> str:
 
 def policy_units(policy: RepeatPolicy):
     """Return the current writable-by-policy rows, without materializing membership."""
-    # ruff: ignore[import-outside-top-level]
-    from weblate.trans.models import Unit
-
     result = Unit.objects.filter(
         translation__component__project=policy.project,
         translation__component__in=policy.components.all(),
@@ -154,9 +156,7 @@ def save_policy(
         if overlaps:
             raise ValidationError(
                 {
-                    "components": "This scope overlaps active repeat policies: {}.".format(
-                        ", ".join(str(other.pk) for other in overlaps)
-                    )
+                    "components": f"This scope overlaps active repeat policies: {', '.join(str(other.pk) for other in overlaps)}."
                 }
             )
         policy.revision += 1
@@ -268,7 +268,7 @@ def reconcile_membership(membership: RepeatMembership) -> bool:
             membership.stale_at = timezone.now()
             membership.save(update_fields=["stale_at", "updated"])
         return False
-    unit = membership.unit
+    unit = cast("Unit", membership.unit)
     current = (
         membership.translation_id_snapshot == unit.translation_id
         and membership.id_hash_snapshot == unit.id_hash
@@ -464,7 +464,7 @@ def share_translations(units: Iterable[Unit]) -> None:
 
 
 def preview_group(
-    *, group: RepeatGroup, target: list[str], actor: User
+    *, group: RepeatGroup, target: list[str], actor: User, automatic: bool = False
 ) -> RepeatPreview:
     """Create a signed, current snapshot for an explicit shared target."""
     members: list[RepeatPreviewMember] = []
@@ -480,6 +480,20 @@ def preview_group(
         if tuple(unit.get_source_plurals()) != tuple(group.source_forms):
             continue
         reason = blocked_reason(unit, target, overlapping)
+        if automatic and not reason:
+            from weblate.trans.judge_quality import (  # ruff: ignore[import-outside-top-level]
+                automatic_candidate_allowed,
+                evaluate_target_quality,
+            )
+
+            if unit.repeat_memberships.filter(
+                mode="independent", stale_at__isnull=True
+            ).exists():
+                reason = "independent"
+            elif not automatic_candidate_allowed(unit, actor):
+                reason = "protected"
+            elif not evaluate_target_quality(unit, target).clean:
+                reason = "quality"
         members.append(
             RepeatPreviewMember(
                 unit_id=unit.pk,
@@ -492,12 +506,17 @@ def preview_group(
         )
     payload = {
         "actor": actor.pk,
+        "automatic": automatic,
         "group": group.pk,
         "group_revision": group.revision,
         "policy_revision": group.policy.revision,
         "target": target,
         "members": [
-            {"id": member.unit_id, "fingerprint": member.fingerprint}
+            {
+                "id": member.unit_id,
+                "fingerprint": member.fingerprint,
+                **({"reason": member.reason} if automatic else {}),
+            }
             for member in members
         ],
     }
@@ -558,6 +577,17 @@ def _load_preview(token: str, actor: User) -> dict[str, Any]:
     return preview
 
 
+def _unselected_repeat_reason(
+    unit: Unit, *, target: list[str], automatic: bool, preview_reason: str
+) -> str:
+    """Keep a blocked automatic recipient distinct from a successful no-op."""
+    if unit.get_target_plurals() == target:
+        return "already-matches"
+    if automatic and preview_reason != "already-matches":
+        return preview_reason
+    return "not-selected"
+
+
 def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = None):
     """Apply a fresh preview atomically through Unit.translate without propagation."""
     # ruff: ignore[import-outside-top-level]
@@ -610,13 +640,18 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
             snapshot=snapshot,
         )
         result: dict[str, list[dict[str, object]]] = {"written": [], "skipped": []}
-        translations = {}
+        preview_reasons = {
+            member["id"]: member.get("reason", "not-selected")
+            for member in snapshot["members"]
+        }
+        translations: dict[int, Translation] = {}
         for unit in units:
             if selected is not None and unit.pk not in selected:
-                reason = (
-                    "already-matches"
-                    if unit.get_target_plurals() == snapshot["target"]
-                    else "not-selected"
+                reason = _unselected_repeat_reason(
+                    unit,
+                    target=snapshot["target"],
+                    automatic=snapshot.get("automatic", False),
+                    preview_reason=preview_reasons.get(unit.pk, "not-selected"),
                 )
                 result["skipped"].append({"unit": unit.pk, "reason": reason})
             elif (
@@ -628,7 +663,26 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
                 "unit.edit", unit
             ):
                 result["skipped"].append({"unit": unit.pk, "reason": "protected"})
+            elif (
+                snapshot.get("automatic")
+                and unit.get_target_plurals() == snapshot["target"]
+            ):
+                result["skipped"].append({"unit": unit.pk, "reason": "already-matches"})
             else:
+                if snapshot.get("automatic"):
+                    from weblate.trans.judge_quality import (  # ruff: ignore[import-outside-top-level]
+                        automatic_candidate_allowed,
+                        evaluate_target_quality,
+                    )
+
+                    if not automatic_candidate_allowed(unit, actor):
+                        result["skipped"].append(
+                            {"unit": unit.pk, "reason": "protected"}
+                        )
+                        continue
+                    if not evaluate_target_quality(unit, snapshot["target"]).clean:
+                        result["skipped"].append({"unit": unit.pk, "reason": "quality"})
+                        continue
                 old = unit.get_target_plurals()
                 # Unit.save_backend schedules a full stats recount through
                 # translation.invalidate_cache(), which deduplicates per
@@ -641,7 +695,9 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
                 unit.translate(
                     actor,
                     snapshot["target"],
-                    STATE_TRANSLATED,
+                    STATE_NEEDS_CHECKING
+                    if snapshot.get("automatic")
+                    else STATE_TRANSLATED,
                     change_action=ActionEvents.REPEAT_APPLY,
                     propagate=False,
                     select_for_update=False,
@@ -657,11 +713,20 @@ def apply_preview(*, token: str, actor: User, unit_ids: Iterable[int] | None = N
             translation.store_update_changes()
             translation.invalidate_cache()
         group.shared_target = snapshot["target"]
-        group.decision_origin = "manual"
+        group.decision_origin = "producer" if snapshot.get("automatic") else "manual"
         group.decision_author = actor
         group.decided_at = timezone.now()
         group.revision += 1
         group.save()
+        if snapshot.get("automatic"):
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.models.judge import (
+                compute_decision_revision,
+            )
+
+            for row in result["written"]:
+                written = next(unit for unit in units if unit.pk == row["unit"])
+                row["applied_revision"] = compute_decision_revision(written)
         event.result = result
         event.save(update_fields=["result"])
     return event
@@ -683,9 +748,6 @@ def keep_group_independent(
         if group_id is None:
             msg = "A repeat group is required."
             raise ValueError(msg)
-        # ruff: ignore[import-outside-top-level]
-        from weblate.trans.models.repeat import RepeatGroup
-
         group = RepeatGroup.objects.select_related("policy").get(pk=group_id)
     if not actor.has_perm("project.edit", group.policy.project):
         msg = "You cannot change this repeat policy."
@@ -754,9 +816,6 @@ def keep_group_independent(
 def undo_event(*, token: str, actor: User):
     """Restore only recipients still unchanged since one repeat-apply event."""
     # ruff: ignore[import-outside-top-level]
-    from weblate.trans.models import Unit
-
-    # ruff: ignore[import-outside-top-level]
     from weblate.trans.models.repeat import RepeatDecisionEvent
 
     with transaction.atomic():
@@ -781,7 +840,7 @@ def undo_event(*, token: str, actor: User):
             .select_related("translation__component", "translation__plural")
         }
         outcome: dict[str, list[dict[str, object]]] = {"restored": [], "conflicts": []}
-        translations = {}
+        translations: dict[int, Translation] = {}
         for item in written:
             unit = units.get(item["unit"])
             if unit is None or unit.state == STATE_APPROVED:

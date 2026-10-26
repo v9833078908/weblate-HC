@@ -227,11 +227,11 @@ class Command(BaseCommand):
             writer.writerow(HEADER)
             writer.writerows(data)
             return
+        table: list[list[str | int]] = [list(HEADER), *data]
         widths = [
-            max(len(str(line[index])) for line in [HEADER, *data])
-            for index in range(len(HEADER))
+            max(len(str(line[index])) for line in table) for index in range(len(HEADER))
         ]
-        for line in [HEADER, *data]:
+        for line in table:
             self.stdout.write(
                 "  ".join(
                     str(cell).ljust(widths[index]) for index, cell in enumerate(line)

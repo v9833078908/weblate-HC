@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from weblate.accounts.models import AuditLog
 
 
+@override_settings(SITE_TITLE="Weblate", EMAIL_SUBJECT_PREFIX="[Weblate] ")
 class ACLTest(FixtureTestCase, RegistrationTestMixin):
     def setUp(self) -> None:
         super().setUp()

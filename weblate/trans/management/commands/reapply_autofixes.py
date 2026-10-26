@@ -37,6 +37,7 @@ from weblate.trans.models import Component, Unit
 from weblate.trans.models.pending import PendingUnitChange
 from weblate.utils.management.base import WeblateComponentCommand
 from weblate.utils.state import STATE_READONLY
+from weblate.vcs.base import RepositoryError
 
 if TYPE_CHECKING:
     from django.core.management.base import CommandParser
@@ -255,12 +256,18 @@ class Command(WeblateComponentCommand):
                     "repairs stay pending and are not committed"
                 )
                 return False
-            if not root.commit_pending_subset(
-                "autofix backfill",
-                user,
-                pending_change_ids,
-                skip_push=True,
-            ):
+            try:
+                committed = root.commit_pending_subset(
+                    "autofix backfill",
+                    user,
+                    pending_change_ids,
+                    skip_push=True,
+                )
+            except RepositoryError:
+                # A VCS failure must leave the repaired rows pending; catching
+                # it outside this transaction would roll those repairs back.
+                committed = False
+            if not committed:
                 self.stderr.write(
                     f"{root}: failed to commit autofix repairs; repairs stay pending"
                 )

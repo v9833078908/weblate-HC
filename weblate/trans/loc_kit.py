@@ -1906,12 +1906,6 @@ def append_glossary_terms(
     skips reported per language, not failures.
     """
     # ruff: ignore[import-outside-top-level]
-    from django.db import transaction
-
-    # ruff: ignore[import-outside-top-level]
-    from weblate.checks.flags import Flags
-
-    # ruff: ignore[import-outside-top-level]
     from weblate.utils.errors import report_error
 
     user = request.user

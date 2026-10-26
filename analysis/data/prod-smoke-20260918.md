@@ -1,10 +1,12 @@
 Smoke: producer judge run on prod after deploy a1ccdafb
 =======================================================
+
 Scope: pirate-ships / localization-json / fr, 6 units (1 empty + 5 translated fr).
 Estimate -> POST runs/ -> REST poll -> JudgeRunUnit/LLMUsageLog audit.
 
 What was exercised (all correct on prod):
-1. Estimate   : preparation payload {missing:1, per_language:{fr:1}, engine:openrouter, blockers:[]}.
+
+1. Estimate : preparation payload {missing:1, per_language:{fr:1}, engine:openrouter, blockers:[]}.
 2. Mandatory MT barrier: run d1aefe9d started 18:41:00; OpenRouter REFUSED the
    MT call ("The provider refused the request"); preparation phase=blocked,
    written=0; run FAILED 4.3s later with
@@ -19,6 +21,7 @@ What was exercised (all correct on prod):
 5. Unit 411118 '+{0}/ch' -> target '+{0}/h', state=20 (translated). Correct.
 
 Cost (LLMUsageLog, project_slug=pirate-ships, window 18:41:04-18:41:53):
+
 - 2 MT calls op=translation openrouter google/gemini-3.7-flash:
   1 refused (cost 0.0043 reported) + 1 applied (cost 0.0037) = $0.0081 total.
 - 17 judge calls op=judge via litellm (seat1 qwen3.8-max batch=1 reasoning off,

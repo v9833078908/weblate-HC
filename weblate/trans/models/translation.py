@@ -1654,7 +1654,10 @@ class Translation(
                 "explanation": pounit.explanation,
                 "automatically_translated": pending_change.automatically_translated,
             }
-            unit.save(update_fields=["details"], only_save=True)
+            # Flushing an existing translation to disk is bookkeeping, not a
+            # new edit. Unit.save() would advance last_updated and invalidate
+            # judge receipts and other revision guards during a file download.
+            Unit.objects.filter(pk=unit.pk).update(details=unit.details)
 
         # Did we do any updates?
         if not updated:

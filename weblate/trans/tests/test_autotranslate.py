@@ -182,10 +182,9 @@ def _run_guarded_auto_translate_process(
         # Block before the batch advances to the next translation or
         # finalizes the run: the durable judge rows of the first
         # translation stay, the producer run is left RUNNING.
-        result = real_process_judge(self, **kwargs)
+        real_process_judge(self, **kwargs)
         if len(seen) >= hold_after:
             os._exit(0)
-        return result
 
     try:
         with (
@@ -929,6 +928,8 @@ class AutoTranslationTest(ViewTestCase):
         target_unit = self.get_unit("Hello, world!\n", translation=translation)
         initial_pending = PendingUnitChange.objects.filter(unit=target_unit).count()
 
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate(
             translation_id=translation.id,
             user_id=self.user.id,
@@ -993,6 +994,8 @@ class AutoTranslationTest(ViewTestCase):
         self.translate_plural_source()
         activity_log = self.create_autotranslate_activity_log()
 
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate(
             translation_id=self.component2.translation_set.get(language_code="cs").id,
             user_id=self.user.id,
@@ -1029,6 +1032,8 @@ class AutoTranslationTest(ViewTestCase):
         translation_id = translation.id
         translation.delete()
 
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate(
             translation_id=translation_id,
             user_id=self.user.id,
@@ -1085,6 +1090,8 @@ class AutoTranslationTest(ViewTestCase):
         self.assertFalse(limited_user.has_perm("unit.review", unit))
 
         self.make_different()
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate(
             translation_id=translation.id,
             user_id=limited_user.id,
@@ -1364,6 +1371,8 @@ class AutoTranslationTest(ViewTestCase):
         project.machinery_settings[identifier] = {}
         project.save(update_fields=["machinery_settings"])
 
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate(
             workspace_id=str(workspace.pk),
             user_id=self.user.id,
@@ -1432,6 +1441,8 @@ class AutoTranslationTest(ViewTestCase):
                 "weblate.trans.autotranslate.run_judge_batch", return_value={}
             ) as run,
         ):
+            # Celery supplies self for this bind=True task.
+            # pylint: disable-next=no-value-for-parameter
             auto_translate(
                 workspace_id=str(workspace.pk),
                 user_id=self.user.id,
@@ -1455,6 +1466,8 @@ class AutoTranslationTest(ViewTestCase):
         self.component.save(update_fields=["source_language"])
 
         self.make_different()
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate(
             workspace_id=str(workspace.pk),
             user_id=self.user.id,
@@ -1488,6 +1501,8 @@ class AutoTranslationTest(ViewTestCase):
         self.component.save(update_fields=["source_language"])
 
         self.make_different()
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate(
             workspace_id=str(workspace.pk),
             user_id=self.user.id,
@@ -1551,6 +1566,8 @@ class AutoTranslationTest(ViewTestCase):
 
         # test invalid arguments
         with self.assertRaises(ValueError):
+            # Celery supplies self for this bind=True task.
+            # pylint: disable-next=no-value-for-parameter
             auto_translate(
                 user_id=None,
                 mode="suggest",
@@ -1566,6 +1583,8 @@ class AutoTranslationTest(ViewTestCase):
             "weblate.trans.tasks.BatchAutoTranslate.perform",
             return_value="completed",
         ) as perform:
+            # Celery supplies self for this bind=True task.
+            # pylint: disable-next=no-value-for-parameter
             result = auto_translate(
                 user_id=self.user.id,
                 mode="judge",
@@ -1588,6 +1607,8 @@ class AutoTranslationTest(ViewTestCase):
     )
     def test_judge_task_result_and_report_url_share_the_same_run(self) -> None:
         with patch("weblate.trans.autotranslate.run_judge_batch", return_value={}):
+            # Celery supplies self for this bind=True task.
+            # pylint: disable-next=no-value-for-parameter
             result = auto_translate(
                 user_id=self.user.id,
                 mode="judge",
@@ -1606,6 +1627,8 @@ class AutoTranslationTest(ViewTestCase):
         )
 
     def test_non_judge_task_result_links_to_its_report(self) -> None:
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate(
             user_id=self.user.id,
             mode="translate",
@@ -1630,6 +1653,8 @@ class AutoTranslationTest(ViewTestCase):
     )
     def test_auto_translate_component_task_result_carries_report_url(self) -> None:
         with patch("weblate.trans.autotranslate.run_judge_batch", return_value={}):
+            # Celery supplies self for this bind=True task.
+            # pylint: disable-next=no-value-for-parameter
             result = auto_translate_component(
                 self.component.id,
                 mode="judge",
@@ -1713,6 +1738,8 @@ class AutoTranslationTest(ViewTestCase):
         self.make_different()
         translation = self.component2.translation_set.get(language_code="cs")
 
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         auto_translate_component(
             self.component2.id,
             mode="translate",
@@ -1741,6 +1768,8 @@ class AutoTranslationTest(ViewTestCase):
         self.make_different()
         activity_log = self.create_autotranslate_activity_log()
 
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate_component(
             self.component2.id,
             mode="translate",
@@ -1765,6 +1794,8 @@ class AutoTranslationTest(ViewTestCase):
     def test_autotranslate_component_records_empty_engine_warning(self) -> None:
         activity_log = self.create_autotranslate_activity_log()
 
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         result = auto_translate_component(
             self.component2.id,
             mode="translate",
@@ -1874,7 +1905,7 @@ class AutoTranslationCrossProjectTest(AutoTranslationTest):
 class _FakeOpenRouterMachinery:
     name = "OpenRouter"
 
-    def __init__(self, settings) -> None:
+    def __init__(self, configuration) -> None:
         pass
 
     @classmethod
@@ -1885,7 +1916,7 @@ class _FakeOpenRouterMachinery:
 class _FakeLiteLLMMachinery:
     name = "LiteLLM"
 
-    def __init__(self, settings) -> None:
+    def __init__(self, configuration) -> None:
         pass
 
     @classmethod
@@ -2302,9 +2333,9 @@ class ProducerRunCreationTest(ViewTestCase):
     def test_swallowed_mt_failure_finalizes_the_run_as_failed(self) -> None:
         """AutoTranslate records expected provider errors instead of raising."""
 
-        def fail(auto_translate, **_kwargs) -> str:
-            auto_translate.failure_message = "provider unavailable"
-            return auto_translate.failure_message
+        def fail(translation_job, **_kwargs) -> str:
+            translation_job.failure_message = "provider unavailable"
+            return translation_job.failure_message
 
         with (
             mock.patch.object(
@@ -2486,8 +2517,8 @@ class ProducerRunRefusalAggregationTest(ViewTestCase):
         class RefusingTranslation(DummyTranslation):
             """Writes a refused usage record then raises, like the OpenAI layer."""
 
-            def __init__(self, settings):
-                super().__init__(settings)
+            def __init__(self, configuration):
+                super().__init__(configuration)
                 self.usage_run_id = None
 
             def batch_translate(self, units, user=None, threshold=75, **kwargs):
@@ -2996,9 +3027,9 @@ class PersistentTaskProgressTest(ViewTestCase):
             self.assertEqual(len(get_user_tasks(self.user.id)), 1)
 
             key = get_user_tasks_key(self.user.id)
-            tasks = cache.get(key)
-            tasks[0]["started"] -= PENDING_TASK_MAX_AGE + 1
-            cache.set(key, tasks, 60)
+            stored_tasks = cache.get(key)
+            stored_tasks[0]["started"] -= PENDING_TASK_MAX_AGE + 1
+            cache.set(key, stored_tasks, 60)
 
             self.assertEqual(get_user_tasks(self.user.id), [])
 
@@ -3010,9 +3041,9 @@ class PersistentTaskProgressTest(ViewTestCase):
         pending = SimpleNamespace(ready=lambda: False, state="PENDING")
         with patch("weblate.utils.celery.AsyncResult", return_value=pending):
             key = get_user_tasks_key(self.user.id)
-            tasks = cache.get(key)
-            tasks[0]["started"] -= PENDING_TASK_MAX_AGE + 1
-            cache.set(key, tasks, 60)
+            stored_tasks = cache.get(key)
+            stored_tasks[0]["started"] -= PENDING_TASK_MAX_AGE + 1
+            cache.set(key, stored_tasks, 60)
 
             self.assertEqual(len(get_user_tasks(self.user.id)), 1)
             self.assertEqual(get_task_liveness(self.task_id), "queued")

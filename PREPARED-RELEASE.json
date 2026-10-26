@@ -1,0 +1,14 @@
+{
+  "component": "weblate",
+  "status": "local-candidate-not-installed",
+  "integrated_main": "a554cebea17c390da027ec7e2b8c67ac65397df3",
+  "prepared_delta_source": "19cc555a60e63047d55ba7253b1074d04fff4700",
+  "delta_base": "e7520b439f69294923f86895a3a63b5bc8d386d3",
+  "migration_leaf": "0154_llm_exchange_request_codec",
+  "release_identity_authority": "external manifest.json generated from the exact committed source by deploy/check-import-capacity.py",
+  "historical_snapshot": "docs/operations/reports/2026-10-23-imported-production-snapshot.json",
+  "legacy_run_resume_allowed": false,
+  "automatic_docker_prune": false,
+  "installed": false,
+  "requires_new_production_approval": true
+}

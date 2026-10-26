@@ -19,7 +19,7 @@ From the project or component dashboard, translatable files can be downloaded
 in the :guilabel:`Files` menu.
 
 Multilingual component spreadsheets
-----------------------------------
+-----------------------------------
 
 Components can export every language in one CSV or XLSX file through
 :guilabel:`Files`. The first column is ``key`` followed by Weblate language

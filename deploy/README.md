@@ -249,13 +249,15 @@ command is safe. Each run ends with the health status, the commit baked into
 the image (`org.opencontainers.image.revision`) and the HTTP code of the login
 page, and fails loudly with the last 30 log lines if any of them is wrong.
 
-A rebuild first tags the running image `hcgameloc:previous` as the rollback
-target, and a successful deploy then runs `docker image prune -f`, so the
-server keeps `hcgameloc:latest`, `hcgameloc:previous` and explicitly tagged
-images instead of one untagged ~650 MB image per rebuild. It also drops build
-cache unused for 14 days (`docker builder prune -f --filter until=336h`);
-newer cache stays so the next rebuild remains incremental. A failed deploy
-prunes nothing.
+A rebuild first resolves the running container's exact image ID and tags it
+`hcgameloc:previous`. Failure to inspect or pin that image stops the rebuild.
+The tag is an additional rollback reference, not a replacement for a verified
+image archive and database backup. Deploy reports Docker storage usage and never
+prunes images, build cache or volumes. On a shared host, cleanup needs its own
+reviewed allowlist and authorization. The offline producer rollout and web-only
+rollback procedure is documented in
+`docs/product/guides/run-isolation-and-offline-release.md`; it does not use this
+script's ordinary worker-starting deployment path.
 
 Editing `.env` is not a code change and stays manual - the file lives only on
 the server:
