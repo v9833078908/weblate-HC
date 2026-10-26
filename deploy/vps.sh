@@ -427,6 +427,8 @@ echo "queued (translate): \$queued"
 # may already have been picked up by a fresh worker by the time this runs.
 if [ "\$health" = healthy ] && [ "\$login" = 200 ] && [ "\$stale" = 0 ]; then
     docker image prune -f > /dev/null || echo "image prune failed"
+    # Recent cache keeps the next rebuild incremental; older cache only grows.
+    docker builder prune -f --filter until=336h > /dev/null || echo "build cache prune failed"
     echo DEPLOY-OK
 else
     docker compose logs --tail 30 weblate
