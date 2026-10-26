@@ -249,6 +249,12 @@ command is safe. Each run ends with the health status, the commit baked into
 the image (`org.opencontainers.image.revision`) and the HTTP code of the login
 page, and fails loudly with the last 30 log lines if any of them is wrong.
 
+A rebuild first tags the running image `hcgameloc:previous` as the rollback
+target, and a successful deploy then runs `docker image prune -f`, so the
+server keeps `hcgameloc:latest`, `hcgameloc:previous` and explicitly tagged
+images instead of one untagged ~650 MB image per rebuild. A failed deploy
+prunes nothing.
+
 Editing `.env` is not a code change and stays manual - the file lives only on
 the server:
 

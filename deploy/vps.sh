@@ -382,7 +382,12 @@ export GIT_SHA=$target
 cd deploy
 started=\$(date +%s)
 case $action in
-build) docker compose up -d --build weblate ;;
+build)
+    # Keep the image being replaced as the rollback target; a successful
+    # deploy then prunes every older untagged build instead of leaving it.
+    docker tag hcgameloc:latest hcgameloc:previous 2> /dev/null || true
+    docker compose up -d --build weblate
+    ;;
 compose) docker compose up -d ;;
 none) docker compose up -d weblate ;;
 esac
@@ -421,6 +426,7 @@ echo "queued (translate): \$queued"
 # task; this script never claims a specific task id came back, because it
 # may already have been picked up by a fresh worker by the time this runs.
 if [ "\$health" = healthy ] && [ "\$login" = 200 ] && [ "\$stale" = 0 ]; then
+    docker image prune -f > /dev/null || echo "image prune failed"
     echo DEPLOY-OK
 else
     docker compose logs --tail 30 weblate
