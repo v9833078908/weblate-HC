@@ -4359,6 +4359,30 @@ update individual repositories; see
         :setting:`ENABLE_HOOKS`
             For enabling hooks for whole Weblate
 
+.. _api-producer-translation-profile:
+
+Producer translation instructions
+++++++++++++++++++++++++++++++++
+
+.. http:get:: /api/producer/projects/(string:project)/translation-profile/
+
+    Return only ``persona``, ``style`` and ``language_instructions`` for the
+    project's routed services. The actor must be able to access the project.
+    Keys, provider endpoints and model routing are never returned.
+
+.. http:patch:: /api/producer/projects/(string:project)/translation-profile/
+
+    Update translator instructions for ``service`` (``openrouter`` or ``litellm``)
+    with a ``configuration`` object containing only the fields above. Existing
+    infrastructure settings are retained under a project row lock. Requires
+    ``project.edit``; unknown fields are rejected rather than ignored.
+
+With :ref:`wizard-sign-in` enabled, ``/api/producer/me/`` additionally returns
+``subject`` for comparison with the verified OIDC identity. Delegated access
+tokens are accepted only for the closed Wizard route/method contract with the
+corresponding scope and current native object permissions. ID tokens do not
+authenticate REST requests. Existing API tokens keep their existing behavior.
+
 .. _rss:
 
 RSS feeds

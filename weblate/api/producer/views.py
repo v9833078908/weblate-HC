@@ -103,6 +103,7 @@ from weblate.trans.quality_execution import (
 from weblate.trans.tasks import publish_producer_run_dispatch
 from weblate.trans.views.judge import _get_scope, user_can_view_producer_run
 from weblate.utils.state import STATE_APPROVED
+from weblate.wizard_auth.grants import request_binding, subject_for
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -155,6 +156,8 @@ class ProducerMe(APIView):
             },
             "advanced_url": request.build_absolute_uri(reverse("profile")),
         }
+        if getattr(settings, "WIZARD_SSO_ENABLED", False):
+            payload["subject"] = subject_for(user)
         return Response(ProducerMeSerializer(payload).data)
 
 
@@ -467,6 +470,7 @@ class ProducerProjectRunStart(APIView):
             )
 
         execution_options = {
+            **request_binding(request),
             "mode": "judge",
             "q": estimate.requested_query,
             "auto_source": "mt",
@@ -779,6 +783,17 @@ class ProducerRunResume(ProducerRunDetail):
         serializer = ProducerRunResumeRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         run = self._get_run(pk)
+        if request_binding(request) and (
+            run.actor_id != request.user.pk
+            or not run.execution_options.get("_wizard_delegation")
+        ):
+            return Response(
+                {
+                    "detail": "Legacy or other-actor runs cannot be resumed through Wizard delegation.",
+                    "code": "legacy-run-isolated",
+                },
+                status=409,
+            )
         if run.status != ProducerRun.Status.FAILED:
             return Response(
                 {
@@ -815,6 +830,10 @@ class ProducerRunResume(ProducerRunDetail):
             with transaction.atomic():
                 resumed = ProducerRun.objects.create(
                     actor=self.request.user,
+                    execution_options={
+                        **run.execution_options,
+                        **request_binding(request),
+                    },
                     dispatch_task_id=uuid4(),
                     dispatch_phase=run.dispatch_phase,
                     dispatch_requested_at=timezone.now(),

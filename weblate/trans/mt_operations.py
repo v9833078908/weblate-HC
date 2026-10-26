@@ -23,6 +23,7 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.judge import compute_decision_revision
 from weblate.trans.models.producer_mt import unit_revision
+from weblate.wizard_auth.grants import run_delegation_active
 
 if TYPE_CHECKING:
     from weblate.machinery.llm import BaseLLMTranslation
@@ -201,6 +202,7 @@ def _receive_pending(operation, owner, engine, translation, actor, pending) -> N
             )
             permitted = (
                 current_actor is not None
+                and run_delegation_active(operation.run)
                 and current_actor.has_perm("translation.auto", translation)
                 and not translation.component.locked
                 and not translation.is_readonly
@@ -302,7 +304,11 @@ def process_mt_operation(run_id: str | UUID) -> dict:
     actor = operation.actor
     run = operation.run
     cancelled = _cancelled(run_id)
-    permitted = actor is not None and actor.has_perm("translation.auto", translation)
+    permitted = (
+        actor is not None
+        and run_delegation_active(run)
+        and actor.has_perm("translation.auto", translation)
+    )
     permitted = (
         permitted
         and not translation.component.locked
@@ -400,6 +406,7 @@ def process_mt_operation(run_id: str | UUID) -> dict:
                 saved.state = "stale"
             elif (
                 actor is None
+                or not run_delegation_active(operation.run)
                 or not actor.has_perm("translation.auto", translation)
                 or translation.component.locked
                 or translation.is_readonly

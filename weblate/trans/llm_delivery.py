@@ -19,6 +19,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from weblate.trans.models.llm_delivery import ProducerLLMExchange, ProducerLLMWork
+from weblate.wizard_auth.grants import guard_paid_run
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -302,6 +303,8 @@ def dispatch_exchange(
     request_codec: str | None = None,
     replay_only: bool = False,
 ) -> str:
+    if not replay_only:
+        guard_paid_run(run_id)
     reference = reserve_exchange(
         identity,
         request_digest,

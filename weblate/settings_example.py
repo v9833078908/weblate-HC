@@ -444,6 +444,7 @@ INSTALLED_APPS = [
     "weblate.machinery",
     "weblate.workspaces",
     "weblate.trans",
+    "weblate.wizard_auth",
     "weblate.lang",
     "weblate_language_data",
     "weblate.memory",

@@ -860,3 +860,27 @@ two-factor authentication for all users by enabling it on the default
 :ref:`automatic team assignment <autoteam>`.
 
 The permissions of a team with enforced two-factor authentication won't be applied to users who do not have it configured.
+
+.. _wizard-sign-in:
+
+Wizard sign-in through Weblate
+-----------------------------
+
+The HCGameLoc fork can optionally authenticate its separate Wizard through
+Weblate using OpenID Connect authorization code flow with S256 PKCE. Install the
+``wizard-sso`` extra, configure a private RSA signing key and a confidential
+client with an exact HTTPS callback, and enable ``WIZARD_SSO_ENABLED``. Apply
+migrations with the optional provider enabled before starting login-serving
+processes. Docker settings use the ``WEBLATE_WIZARD_SSO_`` prefix.
+
+The existing login and second-factor policy remain authoritative. Identity uses
+issuer and an immutable subject; matching a login name does not merge an existing
+Wizard account. Delegated API scopes restrict permitted routes in addition to
+ordinary Weblate permissions. Tokens do not grant administrative access or expose
+machine-translation credentials. The feature is disabled by default and does not
+change authentication for independent API clients.
+
+The fork deployment and account-linking contract is documented in
+:file:`docs/product/guides/weblate-wizard-single-sign-on.md`. Shared logout is not
+provided. During a network outage, local logout does not prove that already
+accepted remote processing has stopped.

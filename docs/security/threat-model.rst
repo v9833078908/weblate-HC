@@ -37,6 +37,31 @@ datastore, local filesystem repositories, and external code-hosting systems.
 Scope and intended use
 ----------------------
 
+The optional Wizard sign-in provider adds OIDC authorization-code endpoints and
+client-bound OAuth API delegation. It is disabled by default and uses S256 PKCE,
+state/nonce validation, a fixed HTTPS issuer and exact registered callbacks. The
+provider authenticates through the existing Weblate login and second-factor
+policy. Only the authorization response extends form-action CSP, using origins
+from the registered client rather than an incoming redirect parameter.
+Wizard links issuer/immutable subject explicitly; matching login names do not
+merge accounts. Delegated scopes restrict a closed API route/method list and
+never replace current native object permissions. Translator-profile access
+excludes credentials, endpoints and routing. Existing API credentials keep their
+authentication model. Wizard encrypts access/refresh tokens server-side, keeps
+its encryption key separately, limits login attempts durably and never falls
+back to a service token after failed authentication. Backups containing OAuth
+tokens, signing/encryption keys or identities require private handling.
+
+An authorization family has a non-sliding 24-hour lifetime and refresh rotation
+with reuse protection. Workers check the actor and delegation before new paid
+delivery; already accepted responses and financial witnesses survive expiry or
+revocation. A network partition can delay remote revocation: a durable Wizard
+outbox retries revocation only, and local logout is not proof that accepted
+remote work stopped. Shared logout is not claimed. Legacy service-account runs
+are not rebound to a newly signed-in user or automatically resumed. Code rollback
+retains the journals and disables SSO, workers and fallback credentials.
+See ``docs/product/guides/weblate-wizard-single-sign-on.md`` for the fork contract.
+
 The producer MT batch API (:ref:`api-producer-mt-batches`) is an authenticated,
 permission-scoped outbound translation surface. A UUID key is actor/project
 bound and payload bound; a separate unique unit/revision reservation prevents a

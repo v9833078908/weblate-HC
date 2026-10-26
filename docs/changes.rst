@@ -7,6 +7,8 @@ Weblate 2026.8.1
 
 .. rubric:: New features
 
+* Added optional :ref:`Wizard sign-in through Weblate <wizard-sign-in>` with user-scoped API delegation, existing second-factor authentication and guarded background delivery without automatic paid replay.
+
 * The producer API supports immutable verification sessions and free MT receipt reconciliation; durable provider response storage prevents automatic paid replay after uncertain delivery. See :ref:`api-producer-quality-v2`.
 
 * Added :ref:`durable empty-string MT batches <api-producer-mt-batches>` with actor-bound idempotent acceptance, background execution, saved answers and explicit unknown-provider outcomes; client timeouts no longer own the translation operation.

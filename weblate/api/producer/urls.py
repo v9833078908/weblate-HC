@@ -11,6 +11,7 @@ from weblate.api.producer.mt import (
     ProducerMTBatchDetail,
     ProducerMTBatchReconcile,
 )
+from weblate.api.producer.profile import ProducerTranslationProfile
 from weblate.api.producer.repeat_views import (
     ProducerProjectRepeatPlan,
     ProducerRepeatPlanApply,
@@ -37,6 +38,11 @@ from weblate.api.producer.views import (
 )
 
 urlpatterns = [
+    path(
+        "projects/<slug:slug>/translation-profile/",
+        ProducerTranslationProfile.as_view(),
+        name="producer-translation-profile",
+    ),
     path(
         "projects/<slug:slug>/mt/batches/<uuid:key>/reconcile/",
         ProducerMTBatchReconcile.as_view(),

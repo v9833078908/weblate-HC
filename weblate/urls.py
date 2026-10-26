@@ -1401,6 +1401,9 @@ if "djangosaml2idp" in settings.INSTALLED_APPS:
         path("idp/", include("djangosaml2idp.urls")),
     )
 
+if getattr(settings, "WIZARD_SSO_ENABLED", False):
+    real_patterns.append(path("oidc/", include("weblate.wizard_auth.urls")))
+
 # Handle URL prefix configuration
 if not URL_PREFIX:
     urlpatterns = real_patterns

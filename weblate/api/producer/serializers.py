@@ -60,6 +60,7 @@ class ProducerMeSerializer(serializers.Serializer):
     """Identity and capabilities for the authenticated producer."""
 
     username = serializers.CharField()
+    subject = serializers.CharField(required=False)
     full_name = serializers.CharField()
     is_superuser = serializers.BooleanField()
     capabilities = ProducerCapabilitiesSerializer()

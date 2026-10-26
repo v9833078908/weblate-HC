@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block content %}
+  <h1>{% translate "Sign in to HCGameLoc Wizard" %}</h1>
+  {% if not error %}
+    <p>{% translate "Allow Wizard to act on your behalf within your Weblate permissions?" %}</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.errors }}
+      {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+      <button class="btn btn-primary" type="submit" name="allow" value="true">{% translate "Continue to Wizard" %}</button>
+      <button class="btn btn-default" type="submit" name="allow" value="false">{% translate "Cancel" %}</button>
+    </form>
+  {% else %}
+    <p role="alert">{{ error.description }}</p>
+  {% endif %}
+{% endblock content %}

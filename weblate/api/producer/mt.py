@@ -32,6 +32,7 @@ from weblate.trans.models import (
 from weblate.trans.models.judge import compute_decision_revision
 from weblate.trans.models.producer_mt import unit_revision
 from weblate.trans.mt_operations import machinery_config_digest, reconcile_mt_operation
+from weblate.wizard_auth.grants import request_binding
 
 
 class MTUnitSerializer(serializers.Serializer):
@@ -264,6 +265,7 @@ class ProducerMTBatch(APIView):
                 dispatch_phase="mt-batch",
                 dispatch_requested_at=timezone.now(),
                 execution_options={
+                    **request_binding(request),
                     "mode": "translate",
                     "auto_source": "mt",
                     "engines": [payload["engine"]],
