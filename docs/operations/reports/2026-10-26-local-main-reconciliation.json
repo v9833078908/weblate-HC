@@ -1,0 +1,110 @@
+{
+  "status": "local-implementation-verified-not-deployed",
+  "source_commit": "ebd0333b1fb256343c0e7039a85d34acb7e7e62d",
+  "main_base": "a554cebea17c390da027ec7e2b8c67ac65397df3",
+  "wizard_runtime_unchanged": true,
+  "image_id": "sha256:1903e9260b27350eee2cb83df567ee983bef4a2f3c549162ac5b12f6c517510a",
+  "archive_sha256": "e14801d04139269c2b02391d2dda8dc3068d2b76689018b607e575df8a8eb89e",
+  "archive_bytes": 592133632,
+  "tests": {
+    "related_before_review_fix": 1971,
+    "related_skipped": 53,
+    "producer_native_api": 176,
+    "review_fix_related": 60,
+    "operator": 29,
+    "wizard_existing_compatibility": 124,
+    "wizard_new_client_observation": 1,
+    "wizard_full_cycle": 12
+  },
+  "image_validation": {
+    "anonymous_api_status": 401,
+    "authenticated_api_status": 200,
+    "capabilities": {
+      "mt_async_batches": 1,
+      "mt_reconciliation": 1,
+      "verify_only_immutable": 1
+    },
+    "codec_replay": true,
+    "django_initialized": true,
+    "empty_llm_mt_quality_journals": {
+      "ProducerLLMExchange": 0,
+      "ProducerLLMWork": 0,
+      "ProducerMTOperation": 0,
+      "ProducerQualityOperation": 0
+    },
+    "legacy_transport_forbidden": true,
+    "login_status": 200,
+    "matplotlib": "3.11.1",
+    "migration_leaf": [
+      [
+        "trans",
+        "0154_llm_exchange_request_codec"
+      ]
+    ],
+    "migrations_applied": 525,
+    "mode": "functional",
+    "models_check": true,
+    "no_model_drift": true,
+    "numpy": "2.3.5",
+    "paid_requests": 0,
+    "placeholder_checks": 2,
+    "production_data": false,
+    "projects_status": 200,
+    "real_loopback_http": {
+      "anonymous": 401,
+      "invalid_token": 401,
+      "login": 200,
+      "valid_token": 200
+    },
+    "source_files_verified": 15,
+    "transport_count": 1,
+    "usage_count": 1
+  },
+  "restore": {
+    "backup_sha256": "17ee41fe46b206f19f25b7e8c03e887c401579a83d3e06e9cfa219509ae12c97",
+    "protected_tables": {
+      "trans_judgeapplication": {
+        "count": 79,
+        "digest": "6a157006a07fb2808933404a8566c203"
+      },
+      "trans_judgerequestattempt": {
+        "count": 50797,
+        "digest": "135e2c12b2f5635af1db5c019015b1ad"
+      },
+      "trans_judgerun": {
+        "count": 6414,
+        "digest": "63eee47a0f34512944066890e0868ca7"
+      },
+      "trans_llmusagelog": {
+        "count": 76752,
+        "digest": "550fcffa5d6a3a23db22bc1879c0ea05"
+      },
+      "trans_producermtoperation": {
+        "count": 39,
+        "digest": "18272d7ff9cb6df76d193ccf4315237b"
+      },
+      "trans_producermtunitattempt": {
+        "count": 770,
+        "digest": "7e416046095281fcedd31bb110752bbe"
+      },
+      "trans_unit": {
+        "count": 406858,
+        "digest": "634fab3cfee876770388fce86a14f5a5"
+      }
+    },
+    "existing_fields_unchanged": true
+  },
+  "review": {
+    "critical": 0,
+    "important_found": 1,
+    "important_fixed": 1,
+    "minor": 0
+  },
+  "production_contacted": false,
+  "production_deployed": false,
+  "production_services_changed": false,
+  "old_job_resumed": false,
+  "paid_provider_requests": 0,
+  "exact_production_image_rollback_verified": false,
+  "production_transfer_authorized_by_this_result": false
+}

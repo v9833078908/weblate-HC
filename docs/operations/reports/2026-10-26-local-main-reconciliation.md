@@ -1,6 +1,6 @@
 # Локальное согласование Weblate и Wizard с main a554cebe
 
-Статус: реализация подготовлена; замечание независимого ревью исправлено; финальная сборка выполняется.
+Статус: реализация подготовлена; **локальная реализация, проверки и финальная сборка завершены; production не обновлён**.
 Production не обновлялся и в ходе реализации не опрашивался. Службы production
 не перезапускались, старое задание не возобновлялось, платных запросов нет.
 
@@ -93,3 +93,32 @@ ordering и обратной подстановкой protected tokens. Испр
 датированным свидетельством. Текущие production health/capacity/image behavior
 не проверяются в локальном этапе. Нормализация Wizard archival JSON отдельно
 проверена на структурное равенство, runtime Wizard не меняется.
+
+## Финальный локальный выпуск
+
+- Runtime source commit: `ebd0333b1fb256343c0e7039a85d34acb7e7e62d`.
+- Image: `sha256:1903e9260b27350eee2cb83df567ee983bef4a2f3c549162ac5b12f6c517510a` (linux/amd64).
+- Архив image.tar: 592133632 байт; SHA-256 `e14801d04139269c2b02391d2dda8dc3068d2b76689018b607e575df8a8eb89e`.
+- Артефакты: `D:/Weblate/weblate-HC/.superpowers/production-rollout-20261023/artifacts/main-reconciliation-image-ebd0333-20261026/`.
+- Установленные файлы: 15 хешей совпали с Git; NumPy 2.3.5; migration leaf 0154.
+- Изолированный image smoke: модели без drift, 525 миграций на новой синтетической
+  БД, login 200, анонимный/неверный token 401, верный token 200; capabilities
+  mt_async_batches / mt_reconciliation / verify_only_immutable = 1.
+- Journal smoke в самом образе: один synthetic transport, один usage callback,
+  повторное чтение без новой отправки, новый legacy transport запрещён.
+- Временные контейнеры и сеть image-проверки удалены с проверкой их ID/labels.
+
+Связанный регресс 1971 PASS относится к исходному интегрированному состоянию;
+последующее исправление recovery покрыто 60 PASS затронутых MT/journal/routed
+сценариев. Неизменённые проверки повторно не запускались. Дополнительно Wizard
+full-cycle/partial suite: 12 PASS; сначала восстановлена только локальная
+tracking-ссылка на прежний опубликованный production snapshot, необходимая
+rollback fixture. Первый сбой этого набора был отсутствием ref, не runtime.
+Контроль старого helper без активных highlights проходил; значимый RED использует
+python-brace flags и зарегистрированный GameMarkupCheck, реально меняющие source
+при cleanup. Этот RED подтверждён до итогового PASS, исходные логи сохранены.
+
+Декларация выпуска в репозитории и внешний manifest разделены: сам image ссылается
+на точный runtime commit выше; последующие документационные коммиты описывают
+его результаты, не подменяя image revision текущим HEAD отчётной ветки.
+Архив и секретные/приватные backup в Git не отправляются.
