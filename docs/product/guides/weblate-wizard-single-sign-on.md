@@ -20,6 +20,7 @@
 
 ```ini
 WEBLATE_WIZARD_SSO_ENABLED=1
+WEBLATE_WIZARD_PUBLIC_URL=https://wizard.example.com/console/projects
 WEBLATE_WIZARD_SSO_ISSUER=https://weblate.example.com/oidc
 WEBLATE_WIZARD_SSO_CLIENT_ID=wizard-production
 WEBLATE_WIZARD_SSO_PRIVATE_KEY_FILE=/run/secrets/wizard-oidc-signing.pem
@@ -27,6 +28,11 @@ WEBLATE_WIZARD_SSO_PRIVATE_KEY_FILE=/run/secrets/wizard-oidc-signing.pem
 
 В недокерной конфигурации эквиваленты называются `WIZARD_SSO_ENABLED`,
 `WIZARD_SSO_ISSUER`, `WIZARD_SSO_CLIENT_ID`, `WIZARD_SSO_PRIVATE_KEY_FILE`.
+Для ссылки «Визард локализации» в верхнем меню также задайте
+`WIZARD_PUBLIC_URL` с HTTPS-адресом страницы проектов Wizard. Ссылка видна
+вошедшим пользователям при включённом SSO; пустой или некорректный адрес её скрывает.
+Адрес должен указывать на тот же экземпляр Wizard, что и зарегистрированный
+OAuth callback. Учётные данные, параметры запроса и фрагменты в нём не допускаются.
 После их определения вызвать `weblate.wizard_auth.config.configure(globals())`.
 Этот вызов добавляет optional OAuth app только при включённой функции.
 Миграции выполнять с включённой конфигурацией до запуска процессов с SSO;

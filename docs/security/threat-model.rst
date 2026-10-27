@@ -43,6 +43,9 @@ state/nonce validation, a fixed HTTPS issuer and exact registered callbacks. The
 provider authenticates through the existing Weblate login and second-factor
 policy. Only the authorization response extends form-action CSP, using origins
 from the registered client rather than an incoming redirect parameter.
+An optional navigation link uses an operator-configured HTTPS URL without user
+credentials, query or fragment; it is hidden unless Wizard SSO is enabled and
+the user is signed in. The link does not contain OAuth tokens.
 Wizard links issuer/immutable subject explicitly; matching login names do not
 merge accounts. Delegated scopes restrict a closed API route/method list and
 never replace current native object permissions. Translator-profile access

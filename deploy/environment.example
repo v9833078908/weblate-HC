@@ -261,6 +261,7 @@ CELERY_TRANSLATE_OPTIONS=--concurrency 2 --prefetch-multiplier 1
 # Optional Wizard OIDC provider. Configure private files and exact HTTPS origins
 # before enabling; apply migrations with the provider enabled before startup.
 WEBLATE_WIZARD_SSO_ENABLED=0
+WEBLATE_WIZARD_PUBLIC_URL=
 WEBLATE_WIZARD_SSO_ISSUER=
 WEBLATE_WIZARD_SSO_CLIENT_ID=
 WEBLATE_WIZARD_SSO_PRIVATE_KEY_FILE=

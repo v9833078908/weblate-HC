@@ -104,6 +104,11 @@
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'dashboard' %}">{% translate "Dashboard" %}</a>
               </li>
+              {% if user.is_authenticated and wizard_navigation_url %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{{ wizard_navigation_url }}">{% translate "Localization wizard" %}</a>
+                </li>
+              {% endif %}
               <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle"
                    href="#"

@@ -1089,6 +1089,8 @@ PASSWORD_RESET_URL = None
 
 # Optional identity/delegation provider for the separate Wizard.
 WIZARD_SSO_ENABLED = False
+# Public HTTPS page for the optional navigation link; empty hides the link.
+WIZARD_PUBLIC_URL = ""
 WIZARD_SSO_ISSUER = ""
 WIZARD_SSO_CLIENT_ID = ""
 WIZARD_SSO_PRIVATE_KEY_FILE = ""
