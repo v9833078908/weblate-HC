@@ -11,6 +11,7 @@ from django.http import Http404
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
+from weblate.trans.delivery_policy import WIZARD_DELIVERY_POLICY
 from weblate.wizard_auth.models import DelegationFamily, SubjectIdentity, TokenBinding
 
 
@@ -62,7 +63,14 @@ def delegation_active(family_id, user_id) -> bool:
 
 def request_binding(request) -> dict:
     family = getattr(request, "wizard_delegation", None)
-    return {"_wizard_delegation": str(family.pk)} if family else {}
+    return (
+        {
+            "_wizard_delegation": str(family.pk),
+            "delivery_policy": WIZARD_DELIVERY_POLICY,
+        }
+        if family
+        else {}
+    )
 
 
 def run_delegation_active(run) -> bool:

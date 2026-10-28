@@ -240,7 +240,12 @@ def repair_targets(
     setting = settings_map[engine_id]
     engine = MACHINERY[engine_id](setting)
     engine.usage_run_id = str(run_id) if run_id is not None else None
-    if run_id is not None:
+    from weblate.trans.delivery_policy import (  # ruff: ignore[import-outside-top-level]
+        uses_durable_delivery,
+    )
+
+    delivery_run = ProducerRun.objects.filter(pk=run_id).first() if run_id else None
+    if uses_durable_delivery(delivery_run):
         engine.durable_single_attempt = True
         engine.retry_attempts = 0
         engine.delivery_purpose = "repair"
@@ -2031,6 +2036,10 @@ def _select_drain_requests(
     deadline starting now is left alone for `_release_judge_deferrals` to
     hand back to a later pass.
     """
+    from weblate.trans.delivery_policy import (  # ruff: ignore[import-outside-top-level]
+        has_durable_verdict_origin,
+    )
+
     unit_ids = {deferral.unit_id for deferral in deferrals}
     units = list(
         type(deferrals[0].unit)
@@ -2047,6 +2056,19 @@ def _select_drain_requests(
     for unit in units:
         request = build_request(unit)
         for deferral in (item for item in deferrals if item.unit_id == unit.id):
+            if has_durable_verdict_origin(
+                unit.pk, deferral.seat, deferral.request_identity
+            ):
+                # Financially fenced work belongs to explicit reconciliation,
+                # never to a new unmarked background run with native retries.
+                JudgeDeferral.objects.filter(pk=deferral.pk, claim_token=token).update(
+                    state=JudgeDeferral.State.CLOSED,
+                    closed_at=timezone.now(),
+                    claim_token="",
+                    claimed_at=None,
+                    claim_expires_at=None,
+                )
+                continue
             profile = profiles.get(deferral.seat)
             if profile is None or (
                 _request_identity(unit, request, profile, project_context)

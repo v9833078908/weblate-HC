@@ -21,6 +21,7 @@ from weblate.api.throttling import (
     ScopedRateThrottle,
     UserRateThrottle,
 )
+from weblate.trans.delivery_policy import WIZARD_DELIVERY_POLICY
 from weblate.trans.forms import configured_routed_engine
 from weblate.trans.models import (
     ProducerMTOperation,
@@ -265,6 +266,7 @@ class ProducerMTBatch(APIView):
                 dispatch_phase="mt-batch",
                 dispatch_requested_at=timezone.now(),
                 execution_options={
+                    "delivery_policy": WIZARD_DELIVERY_POLICY,
                     **request_binding(request),
                     "mode": "translate",
                     "auto_source": "mt",

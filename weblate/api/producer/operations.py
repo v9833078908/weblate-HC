@@ -19,6 +19,7 @@ from drf_spectacular.utils import OpenApiParameter
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from weblate.trans.delivery_policy import durable_admission
 from weblate.trans.models.producer_quality import ProducerQualityOperation
 
 
@@ -70,7 +71,8 @@ def execute_quality_operation(*, request, project, action: str, callback) -> Res
             if operation.state != "confirmed":
                 return Response({"code": "operation-pending"}, status=409)
             return Response(operation.result, status=operation.response_status)
-        response = callback(operation)
+        with durable_admission():
+            response = callback(operation)
         if response.status_code >= 400:
             # A refused operation is not accepted: no receipt or partial local
             # mutation may survive an explicit 401/403/429/validation refusal.

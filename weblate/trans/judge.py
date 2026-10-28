@@ -1907,7 +1907,11 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
     ordinal: int,
     retry_deadline: float | None = None,
 ) -> list[JudgeResult]:
-    durable = run is not None
+    from weblate.trans.delivery_policy import (  # ruff: ignore[import-outside-top-level]
+        uses_durable_delivery,
+    )
+
+    durable = uses_durable_delivery(run)
     if durable:
         # Durable full JSON bodies can be saved before schema decoding; a
         # streamed partial body must not trigger an automatically paid fallback.

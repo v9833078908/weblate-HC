@@ -70,6 +70,11 @@ from weblate.api.throttling import (
 )
 from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD
 from weblate.trans.autotranslate import BatchAutoTranslate, PreparationScope
+from weblate.trans.delivery_policy import (
+    WIZARD_DELIVERY_POLICY,
+    admitted_delivery_options,
+    uses_durable_delivery,
+)
 from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import (
     JUDGE_SEATS,
@@ -470,6 +475,7 @@ class ProducerProjectRunStart(APIView):
             )
 
         execution_options = {
+            **admitted_delivery_options(),
             **request_binding(request),
             "mode": "judge",
             "q": estimate.requested_query,
@@ -833,6 +839,11 @@ class ProducerRunResume(ProducerRunDetail):
                     execution_options={
                         **run.execution_options,
                         **request_binding(request),
+                        **(
+                            {"delivery_policy": WIZARD_DELIVERY_POLICY}
+                            if uses_durable_delivery(run)
+                            else {}
+                        ),
                     },
                     dispatch_task_id=uuid4(),
                     dispatch_phase=run.dispatch_phase,
