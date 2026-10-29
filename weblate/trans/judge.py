@@ -51,13 +51,14 @@ PROMPT_SCHEMA_REVISION = "judge-verdict-v3"
 # LiteLLM aliases declare the exact reasoning control they support, so the
 # accepted values are a closed set rather than a free-form effort level.
 # `""` sends no field and leaves the alias on its own default.
-# LiteLLM must forward each model's own control inside `extra_body`: DeepSeek
-# uses `thinking.type=disabled`, while Qwen uses `enable_thinking=false`.
-# A top-level `thinking` can be accepted and silently dropped by the proxy.
-# See docs/product/measurements/2026-09-03-judge-thinking-passthrough.md.
+# Native routes can require an `extra_body` toggle; OpenAI-compatible routes
+# can instead accept an explicit top-level `reasoning_effort`.
+# Controls are selected explicitly, never inferred from the model name.
 _LITELLM_REASONING_VALUES = frozenset(
     {
         "",
+        "reasoning_effort.none",
+        "reasoning_effort.low",
         "thinking.disabled",
         "enable_thinking=false",
         "extra_body.enable_thinking=false",
@@ -1656,6 +1657,10 @@ def _log_attempt(
 
 def _reasoning_payload(profile: JudgeSeatProfile) -> dict:
     if profile.provider == "litellm":
+        if profile.reasoning == "reasoning_effort.none":
+            return {"reasoning_effort": "none"}
+        if profile.reasoning == "reasoning_effort.low":
+            return {"reasoning_effort": "low"}
         if profile.reasoning == "thinking.disabled":
             return {"thinking": {"type": "disabled"}}
         if profile.reasoning == "enable_thinking=false":
