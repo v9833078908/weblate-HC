@@ -137,9 +137,11 @@ if (
     WIZARD_SSO_ISSUER = "https://example.com/oidc"
     WIZARD_SSO_CLIENT_ID = "synthetic-wizard-client"
     WIZARD_SSO_PRIVATE_KEY_FILE = "in-memory-test-key"
-    test_oidc_key = JWK.generate(kty="RSA", size=2048).export_to_pem(
-        private_key=True, password=None
-    ).decode()
+    test_oidc_key = (
+        JWK.generate(kty="RSA", size=2048)
+        .export_to_pem(private_key=True, password=None)
+        .decode()
+    )
     with patch("weblate.wizard_auth.config.Path") as key_path:
         key_path.return_value.read_text.return_value = test_oidc_key
         configure_wizard_sso(globals())

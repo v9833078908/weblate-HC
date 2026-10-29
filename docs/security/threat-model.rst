@@ -532,12 +532,12 @@ Reachability preconditions:
   complete scope revision on both sides of export. *(documented)*
   (source: :ref:`api-producer-quality-v2`)
 * Durable producer MT and judge dispatches reserve semantic work before outbound
-    I/O and store complete responses before parsing. Durable judge delivery is
-    selected by server-persisted operation admission, not merely by the presence
-    of a producer run or a client-supplied policy field. Ordinary Weblate runs
-    retain their configured streaming, retries and fallback. Existing delegated
-    runs, MT receipts and delivery journals retain their financial fences even
-    without the new policy marker. The private
+  I/O and store complete responses before parsing. Durable judge delivery is
+  selected by server-persisted operation admission, not merely by the presence
+  of a producer run or a client-supplied policy field. Ordinary Weblate runs
+  retain their configured streaming, retries and fallback. Existing delegated
+  runs, MT receipts and delivery journals retain their financial fences even
+  without the new policy marker. The private
   ``DATA_DIR/private-llm-delivery`` files contain translation text and provider
   output, require the same protection and private backup handling as project
   content, and are never serialized by producer endpoints. Each body is capped

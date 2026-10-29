@@ -841,7 +841,8 @@ spaces_before_inline_comment = 2
 [tool.typos.default]
 extend-ignore-re = [
   "(?Rm)^.*# codespell:ignore.*$",
-  "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on"
+  "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on",
+  "\\b2abd6e6\\b"
 ]
 
 [tool.typos.default.extend-identifiers]

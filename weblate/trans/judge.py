@@ -1392,7 +1392,7 @@ def _decode_non_stream(
         return None, "empty-response", "", byte_count, first_byte, ""
     try:
         payload = json.loads(raw, parse_float=Decimal)
-    except ValueError:
+    except (ValueError, InvalidOperation):
         return None, "invalid-json", "", byte_count, first_byte, ""
     if not isinstance(payload, dict):
         return None, "invalid-envelope", "", byte_count, first_byte, ""

@@ -7,9 +7,9 @@ services:
     environment:
       WEBLATE_SERVICE: web-only
     volumes:
-      - ./rollback-web-only.conf:/etc/supervisor/conf.d/web-only.conf:ro
+    - ./rollback-web-only.conf:/etc/supervisor/conf.d/web-only.conf:ro
     networks:
-      - rollback-isolated
+    - rollback-isolated
 
 networks:
   rollback-isolated:
