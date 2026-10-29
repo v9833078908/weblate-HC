@@ -46,6 +46,7 @@ RUN set -eux; \
     mkdir -p "$PYLIB"; \
     cp -r weblate_customization/src/weblate_customization "$PYLIB/"; \
     cp -r loc_kit_ingest "$PYLIB/"; \
+    chmod -R a+rX "$PYLIB"; \
     rm -rf "$PYLIB/loc_kit_ingest/tests" "$PYLIB/loc_kit_ingest/pytest.ini"; \
     find "$PYLIB" -name __pycache__ -type d -prune -exec rm -rf {} +; \
     SITE_PACKAGES="$(/app/venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
