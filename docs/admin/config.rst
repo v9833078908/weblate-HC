@@ -2094,9 +2094,18 @@ structured verdict.
 
 The accepted values depend on the provider behind :setting:`JUDGE_BASE_URL`.
 On OpenRouter this is an ``effort`` level (``minimal``, ``low``, ``medium`` or
-``high``). On a LiteLLM endpoint an effort level is meaningless, because each
-alias declares the control it supports, so the value is instead one of a
-closed set naming the exact request field to send:
+``high``). On a LiteLLM endpoint each alias declares the control it supports,
+so the value is instead one of a closed set naming the exact request field
+to send:
+
+``reasoning_effort.none``
+    Sends top-level ``reasoning_effort: "none"``. The corporate
+    ``openrouter/deepseek-v4.1-flash`` route accepts this to disable thinking.
+``reasoning_effort.low``
+    Sends top-level ``reasoning_effort: "low"``. The corporate ``Kimi K3.1 Pro``
+    route accepts this; it reduces reasoning but does not disable it.
+    Configure that seat's temperature as ``1`` to match its fixed sampling
+    contract.
 
 ``thinking.disabled``
     Sends ``thinking: {"type": "disabled"}`` at the top level.

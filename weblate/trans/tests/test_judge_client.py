@@ -2935,6 +2935,42 @@ class JudgeLiteLLMPayloadTest(http_mock.MockDNSMixin, TestCase):
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="openrouter/deepseek-v4.1-flash",
+        JUDGE_MODEL_SEAT_2="Kimi K3.1 Pro",
+        JUDGE_REASONING_EFFORT_SEAT_1="reasoning_effort.none",
+        JUDGE_REASONING_EFFORT_SEAT_2="reasoning_effort.low",
+        JUDGE_TEMPERATURE_SEAT_1=0,
+        JUDGE_TEMPERATURE_SEAT_2=1,
+        JUDGE_STREAM_SEAT_1=False,
+        JUDGE_STREAM_SEAT_2=False,
+    )
+    @http_mock.activate
+    def test_flash_and_kimi_accept_explicit_standard_reasoning_controls(self) -> None:
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        for seat, model, effort, temperature in (
+            (1, "openrouter/deepseek-v4.1-flash", "none", 0),
+            (2, "Kimi K3.1 Pro", "low", 1),
+        ):
+            with self.subTest(seat=seat):
+                [result] = request_verdicts([REQ], seat=seat)
+                self.assertFalse(result.unparsed)
+                self.assertEqual(result.model_verdict, "pass")
+                body = json.loads(self._post_calls()[-1].request.content)
+                self.assertEqual(body["model"], model)
+                self.assertEqual(body["reasoning_effort"], effort)
+                self.assertEqual(body["temperature"], temperature)
+                self.assertNotIn("reasoning", body)
+                self.assertNotIn("extra_body", body)
+                self.assertNotIn("thinking", body)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
         JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
         JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
     )
