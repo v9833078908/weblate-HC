@@ -31,6 +31,13 @@ class ProducerLLMExchange(models.Model):
     response_digest = models.CharField(max_length=64, blank=True)
     response_id = models.CharField(max_length=200, blank=True)
     usage_recorded = models.BooleanField(default=False)
+    judge_attempt = models.OneToOneField(
+        "trans.JudgeRequestAttempt",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="delivery_exchange",
+    )
     run = models.ForeignKey(
         "trans.ProducerRun", null=True, blank=True, on_delete=models.PROTECT
     )

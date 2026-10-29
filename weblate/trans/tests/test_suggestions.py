@@ -13,7 +13,12 @@ from django.urls import reverse
 
 from weblate.auth.models import Group, Permission, Role
 from weblate.auth.results import Denied
-from weblate.trans.judge_loop import build_request
+from weblate.trans.judge import JudgeResult, resolve_judge_seat_profile
+from weblate.trans.judge_loop import (
+    _write_verdict,
+    build_request,
+    judge_project_context,
+)
 from weblate.trans.models import Suggestion, Vote, WorkflowSetting
 from weblate.trans.models.judge import (
     JudgeApplication,
@@ -630,15 +635,22 @@ class JudgeCandidateSuggestionTest(ViewTestCase):
         unit = self.get_unit()
         verdict = self.make_verdict(unit)
         candidate = self.make_candidate(unit, verdict, target="Better translation\n")
+        request_for_candidate = build_request(
+            unit, target_plurals=candidate.target_list
+        )
         for seat in (1, 2):
-            JudgeVerdict.objects.create(
-                unit=unit,
+            _write_verdict(
+                unit,
+                request_for_candidate,
                 seat=seat,
+                attempt=1,
+                run_id=verdict.run_id,
+                result=JudgeResult("none", "pass", [], ""),
+                profile=resolve_judge_seat_profile(seat),
+                project_context=judge_project_context(
+                    unit.translation.component.project
+                ),
                 subject=JudgeVerdict.Subject.CANDIDATE,
-                candidate_target_hash=compute_target_hash(candidate.target_list),
-                target_hash=verdict.target_hash,
-                context_hash=verdict.context_hash,
-                max_severity="none",
             )
         request = self.get_request()
         request.user = self.user
@@ -672,6 +684,40 @@ class JudgeCandidateSuggestionTest(ViewTestCase):
         self.assertEqual((unit.target, unit.state), before)
         self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
         self.assertFalse(JudgeApplication.objects.filter(unit=unit).exists())
+
+    def test_accept_rejects_two_seats_with_fallback_provenance(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict)
+        request_for_candidate = build_request(
+            unit, target_plurals=candidate.target_list
+        )
+        for seat in (1, 2):
+            _write_verdict(
+                unit,
+                request_for_candidate,
+                seat=seat,
+                attempt=1,
+                run_id=verdict.run_id,
+                result=JudgeResult("none", "pass", [], ""),
+                profile=resolve_judge_seat_profile(seat),
+                project_context=judge_project_context(
+                    unit.translation.component.project
+                ),
+                subject=JudgeVerdict.Subject.CANDIDATE,
+            )
+        JudgeVerdict.objects.filter(
+            unit=unit, subject=JudgeVerdict.Subject.CANDIDATE, seat=1
+        ).update(profile_fingerprint="fallback-profile")
+        request = self.get_request()
+        request.user = self.user
+        before = (unit.target, unit.state)
+        with self.assertRaisesMessage(JudgeCandidateError, "not been fully verified"):
+            candidate.accept(request)
+        unit.refresh_from_db()
+        self.assertEqual((unit.target, unit.state), before)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
 
     def test_accept_without_review_permission_raises_and_is_untouched(self) -> None:
         unit = self.get_unit()

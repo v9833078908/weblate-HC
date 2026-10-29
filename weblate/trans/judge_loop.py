@@ -16,6 +16,8 @@ is judged, never rewritten.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
 import queue
@@ -30,6 +32,7 @@ from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, connections, transaction
 from django.db.models import Max, Q
@@ -47,6 +50,7 @@ from weblate.machinery.base import (
 )
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
+from weblate.trans.delivery_policy import uses_durable_delivery
 from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import (
     JUDGE_SEATS,
@@ -55,8 +59,11 @@ from weblate.trans.judge import (
     JudgeResult,
     OnBatch,
     RetryBudget,
+    _delivery_identity,
+    _run_batch,
     judge_configuration_snapshot,
     request_verdicts,
+    resolve_judge_fallback_profile,
     resolve_judge_seat_profile,
     validate_judge_configuration,
 )
@@ -92,6 +99,7 @@ from weblate.trans.models.judge import (
     state_for_verdict,
     unit_clarification_answer,
 )
+from weblate.trans.models.llm_delivery import ProducerLLMWork
 from weblate.trans.models.unit import Unit
 from weblate.trans.quality_execution import (
     QualityExecutionPolicy,
@@ -103,9 +111,10 @@ from weblate.trans.quality_execution import (
 )
 from weblate.trans.util import join_plural
 from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
+from weblate.wizard_auth.grants import guard_paid_run
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Iterable, Mapping, Sequence
 
     from weblate.api.producer.views import AuthenticatedRequest
     from weblate.auth.models import AuthenticatedHttpRequest, User
@@ -404,11 +413,7 @@ def _write_verdict(
         clarification=request.clarification,
     )
     project_context_hash = compute_target_hash([project_context])
-    # Prefer the profile that actually served this result: after a
-    # fallback attempt it differs from the requesting seat's bound
-    # `profile`, which is always the primary (see `make_seat_job`). Every
-    # pre-failover path leaves `result.served_*` blank and behaves exactly
-    # as before.
+    # Record the actual serving profile, including the single pair fallback.
     judge_model = result.served_model or profile.model
     judge_provider = result.served_provider or profile.provider
     profile_fingerprint = (
@@ -612,6 +617,7 @@ class _SeatJob:
     # changed after the barrier stops further dispatch without discarding the
     # results of batches already sent.
     scope_guard: Callable[[Sequence[JudgeRequest]], bool] | None = None
+    profile: JudgeSeatProfile | None = None
 
 
 @dataclass
@@ -812,9 +818,11 @@ def _prepare_round_unit(
     # verdicts select the candidate path regardless of writable state or
     # remaining attempts. A producer re-check turns mutating repairs off
     # entirely, so max-length there neither mutates nor stores.
+    complete_primary = has_complete_current_evidence(current, seats=JUDGE_SEATS)
     max_length_active = _has_active_check(current, "max-length")
     needs_mutating_repair = (
         mutating_repairs
+        and complete_primary
         and verdict.verdict != JudgeVerdict.Verdict.UNPARSED
         and max_length_active
         and attempt < attempts
@@ -826,7 +834,8 @@ def _prepare_round_unit(
     # mutating repairs off entirely) must all still leave the unit on the
     # deterministic path with no preview stored (invariant 9).
     needs_candidate = (
-        verdict.verdict in candidate_verdicts
+        complete_primary
+        and verdict.verdict in candidate_verdicts
         and not needs_mutating_repair
         and not max_length_active
     )
@@ -1192,14 +1201,17 @@ def _persist_verdict_batches(
     attempt_started_at: datetime | None = None,
     subject: str = JudgeVerdict.Subject.LIVE,
     producer_run: ProducerRun | None = None,
+    sync_deferrals: bool = True,
 ) -> OnBatch:
-    cursor = 0
+    unit_by_id = {unit.pk: unit for unit in request_units}
 
     def persist(batch_requests, batch_results) -> None:
-        nonlocal cursor
-        batch_units = request_units[cursor : cursor + len(batch_requests)]
-        cursor += len(batch_requests)
-        if batch_results:
+        batch_units = [unit_by_id[request.unit_id] for request in batch_requests]
+        if (
+            batch_results
+            and sync_deferrals
+            and batch_results[0].failure_kind != "not-sent-auth"
+        ):
             _record_deferral_circuit_outcome(
                 profile,
                 next(
@@ -1243,7 +1255,11 @@ def _persist_verdict_batches(
                     request_round=request_round,
                     subject=subject,
                 )
-                if subject == JudgeVerdict.Subject.LIVE:
+                if (
+                    subject == JudgeVerdict.Subject.LIVE
+                    and sync_deferrals
+                    and result.failure_kind != "not-sent-auth"
+                ):
                     _sync_deferral(
                         unit,
                         request,
@@ -1314,6 +1330,7 @@ def _run_seats(  # ruff: ignore[complex-structure]
                 project_context=project_context,
                 on_batch=publish,
                 seat=job.seat,
+                profile=job.profile or resolve_judge_seat_profile(job.seat),
                 run=job.run,
                 persist_attempts=True,
                 retry_budget=job.retry_budget,
@@ -1422,6 +1439,364 @@ def _run_seats(  # ruff: ignore[complex-structure]
         raise fatal_error
 
 
+_CONFIRMED_PROVIDER_FAILURES = frozenset(
+    {
+        "http-auth",
+        "http-other",
+        "http-rate-limit",
+        "http-server",
+        "empty-response",
+        "invalid-json",
+        "invalid-envelope",
+        "segment-count",
+        "invalid-segment",
+        "finish-length",
+    }
+)
+
+
+def _pair_has_confirmed_failures(
+    unit: Unit,
+    request: JudgeRequest,
+    profiles: Mapping[int, JudgeSeatProfile],
+    context: str,
+    subject: str,
+    run: ProducerRun | None,
+) -> bool:
+    """Require complete current evidence of both primary provider failures."""
+    from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+        DeliveryUnresolved,
+        read_response,
+    )
+
+    for seat, profile in profiles.items():
+        identity = _request_identity(unit, request, profile, context)
+        rows = unit.judge_verdicts.filter(
+            seat=seat,
+            subject=subject,
+            request_identity=identity,
+            profile_fingerprint=profile.profile_fingerprint,
+            prompt_schema_version=profile.prompt_schema_version,
+        )
+        if rows.filter(unparsed=False).exists():
+            return False
+        if uses_durable_delivery(run):
+            rows = rows.filter(
+                request_attempt__failure_kind__in=_CONFIRMED_PROVIDER_FAILURES
+            )
+        row = (
+            annotate_verification_origin(rows)
+            .select_related("request_attempt")
+            .order_by("-timestamp", "-pk")
+            .first()
+        )
+        if (
+            row is None
+            or row.request_attempt is None
+            or not verification_evidence_allowed(row)
+        ):
+            return False
+        attempt = row.request_attempt
+        if (
+            not row.unparsed
+            or attempt.failure_kind not in _CONFIRMED_PROVIDER_FAILURES
+            or attempt.http_status is None
+            or attempt.profile_fingerprint != profile.profile_fingerprint
+            or attempt.prompt_schema_version != profile.prompt_schema_version
+        ):
+            return False
+        if not uses_durable_delivery(run) and not attempt.response_complete:
+            return False
+        if uses_durable_delivery(run):
+            work_identity = _delivery_identity(
+                request, profile, context, phase="primary"
+            )
+            key = hashlib.sha256(work_identity.encode()).hexdigest()
+            work = (
+                ProducerLLMWork.objects.select_related("exchange")
+                .filter(semantic_key=key)
+                .first()
+            )
+            if work is None or work.exchange.judge_attempt_id != attempt.pk:
+                return False
+            try:
+                receipt = json.loads(read_response(work.exchange_id))
+            except (DeliveryUnresolved, ValueError, TypeError):
+                return False
+            if not isinstance(receipt, dict) or "body" not in receipt:
+                return False
+            if receipt.get("status") != attempt.http_status:
+                return False
+    return True
+
+
+def _pair_fallback_batches(
+    requests: Iterable[JudgeRequest],
+    fallback: JudgeSeatProfile,
+    context: str,
+    run: ProducerRun | None,
+    candidate_targets: dict[int, list[str]] | None,
+) -> list[tuple[list[JudgeRequest], bool]]:
+    """Reconstruct each saved membership before batching never-sent work."""
+    saved_groups: dict[uuid.UUID, None] = {}
+    unsent = []
+    for request in requests:
+        identity = _delivery_identity(request, fallback, context, phase="fallback")
+        key = hashlib.sha256(identity.encode()).hexdigest()
+        work = (
+            ProducerLLMWork.objects.filter(semantic_key=key).first()
+            if uses_durable_delivery(run)
+            else None
+        )
+        if work is None:
+            unsent.append(request)
+        else:
+            saved_groups.setdefault(work.exchange_id, None)
+    batches = []
+    for exchange_id in saved_groups:
+        members = list(
+            ProducerLLMWork.objects.filter(exchange_id=exchange_id)
+            .select_related("exchange")
+            .order_by("position")
+        )
+        if [member.position for member in members] != list(range(len(members))):
+            continue
+        batch: list[JudgeRequest] = []
+        for member in members:
+            parts = member.identity.split(":")
+            if len(parts) != 7 or parts[0] != "judge" or parts[-1] != "pair-fallback":
+                batch = []
+                break
+            try:
+                unit_id = int(parts[1])
+                unit = _refresh_unit(Unit.objects.get(pk=unit_id))
+            except (ValueError, Unit.DoesNotExist):
+                batch = []
+                break
+            if candidate_targets is not None and unit_id not in candidate_targets:
+                batch = []
+                break
+            request = build_request(
+                unit,
+                target_plurals=candidate_targets[unit_id]
+                if candidate_targets is not None
+                else None,
+            )
+            if (
+                _delivery_identity(request, fallback, context, phase="fallback")
+                != member.identity
+            ):
+                batch = []
+                break
+            batch.append(request)
+        if batch:
+            batches.append((batch, members[0].exchange.state == "reserved"))
+    batches.extend(
+        (unsent[offset : offset + fallback.batch_size], True)
+        for offset in range(0, len(unsent), fallback.batch_size)
+    )
+    return batches
+
+
+def _pair_fallback_preflight(
+    batch: Sequence[JudgeRequest],
+    snapshot: dict[str, object],
+    run: ProducerRun | None,
+    user: User | None,
+    cancelled: Callable[[], bool],
+    retry_deadline: float | None,
+    scope_guard: Callable[[Sequence[JudgeRequest]], bool] | None,
+) -> tuple[bool, User | None]:
+    """Revalidate cancellation, frozen configuration, delegation and actor."""
+    if cancelled() or (
+        retry_deadline is not None and time.monotonic() >= retry_deadline
+    ):
+        return False, None
+    if judge_configuration_snapshot() != snapshot:
+        return False, None
+    if run is not None:
+        run.refresh_from_db(
+            fields=["configuration_snapshot", "status", "scope_snapshot"]
+        )
+        if run.configuration_snapshot != snapshot or cancelled():
+            return False, None
+        guard_paid_run(run.pk)
+    actor = None
+    if user is not None:
+        actor = get_user_model().objects.filter(pk=user.pk, is_active=True).first()
+        if actor is None:
+            msg = "Judge actor is no longer active"
+            raise PermissionDenied(msg)
+    if scope_guard is not None and scope_guard(batch):
+        return False, None
+    return True, actor
+
+
+def _pair_fallback_member_current(
+    request: JudgeRequest,
+    profiles: Mapping[int, JudgeSeatProfile],
+    context: str,
+    subject: str,
+    run: ProducerRun | None,
+    actor: User | None,
+    candidate_targets: dict[int, list[str]] | None,
+) -> bool:
+    """Revalidate one current member before an eligible fallback send."""
+    unit = _refresh_unit(Unit.objects.get(pk=cast("int", request.unit_id)))
+    if actor is not None and not (
+        actor.has_perm("translation.auto", unit.translation)
+        and actor.has_perm("unit.review", unit)
+    ):
+        msg = "Judge scope permission changed"
+        raise PermissionDenied(msg)
+    if judge_project_context(unit.translation.component.project) != context:
+        return False
+    if candidate_targets is not None:
+        candidate = active_judge_candidate(unit, current_verdict(unit))
+        if candidate is None or candidate.target_list != candidate_targets[unit.pk]:
+            return False
+    current = build_request(
+        unit,
+        target_plurals=candidate_targets[unit.pk]
+        if candidate_targets is not None
+        else None,
+    )
+    return current == request and _pair_has_confirmed_failures(
+        unit, current, profiles, context, subject, run
+    )
+
+
+def _run_pair_fallback(  # ruff: ignore[too-many-arguments]
+    units: list[Unit],
+    requests: Mapping[int, JudgeRequest],
+    profiles: Mapping[int, JudgeSeatProfile],
+    *,
+    context: str,
+    project_slug: str,
+    run: ProducerRun | None,
+    run_id: uuid.UUID,
+    attempt: int,
+    subject: str,
+    candidate_targets: dict[int, list[str]] | None,
+    retry_budget: RetryBudget,
+    retry_deadline: float | None,
+    cancelled: Callable[[], bool],
+    scope_guard: Callable[[Sequence[JudgeRequest]], bool] | None,
+    on_batch: OnBatch | None,
+    user: User | None = None,
+) -> None:
+    """Replay original paid memberships before constructing any new OR batch."""
+    fallback = resolve_judge_fallback_profile(profiles[1])
+    if (
+        fallback is None
+        or fallback.provider != "openrouter"
+        or fallback.model != "deepseek/deepseek-v4-pro"
+        or fallback.reasoning != "none"
+        or cancelled()
+    ):
+        return
+    snapshot = judge_configuration_snapshot()
+    if (
+        snapshot.get("profile_fingerprint")
+        != [profiles[seat].profile_fingerprint for seat in JUDGE_SEATS]
+        or snapshot.get("fallback_profile_fingerprint") != fallback.profile_fingerprint
+    ):
+        return
+    if run is not None and run.configuration_snapshot != snapshot:
+        return
+    eligible = {}
+    for unit in units:
+        request = requests[unit.pk]
+        if not _pair_has_confirmed_failures(
+            unit, request, profiles, context, subject, run
+        ):
+            continue
+        identity = _request_identity(unit, request, fallback, context)
+        if unit.judge_verdicts.filter(
+            seat=1,
+            subject=subject,
+            request_identity=identity,
+            profile_fingerprint=fallback.profile_fingerprint,
+        ).exists():
+            continue
+        eligible[unit.pk] = (unit, request)
+    if not eligible:
+        return
+
+    # Saved exchanges retain their full ordered membership even for a pending subset.
+    batches = _pair_fallback_batches(
+        (request for _unit, request in eligible.values()),
+        fallback,
+        context,
+        run,
+        candidate_targets,
+    )
+
+    persist = _persist_verdict_batches(
+        [item[0] for item in eligible.values()],
+        seat=1,
+        attempt=attempt,
+        request_round=_allocate_request_round(run_id, run),
+        run_id=run_id,
+        profile=fallback,
+        project_context=context,
+        on_batch=on_batch,
+        producer_run=run,
+        subject=subject,
+        sync_deferrals=False,
+    )
+    for batch, requires_full_preflight in batches:
+        admissible, actor = _pair_fallback_preflight(
+            batch, snapshot, run, user, cancelled, retry_deadline, scope_guard
+        )
+        if not admissible:
+            return
+        selected = [request for request in batch if request.unit_id in eligible]
+        if not selected:
+            continue
+        if (
+            run is not None
+            and run.scope_snapshot
+            and not {request.unit_id for request in batch} <= set(run.scope_snapshot)
+        ):
+            msg = "Judge scope changed"
+            raise PermissionDenied(msg)
+        # A reserved batch can still incur a new charge for every saved member.
+        # A captured receipt instead replays without billing; only its pending
+        # results need current primary-failure evidence.
+        for request in batch if requires_full_preflight else selected:
+            if not _pair_fallback_member_current(
+                request, profiles, context, subject, run, actor, candidate_targets
+            ):
+                return
+        results = _run_batch(
+            batch,
+            profile=fallback,
+            project_slug=project_slug,
+            project_context=context,
+            persistence=True,
+            run=run,
+            retry_budget=retry_budget,
+            adaptive=False,
+            isolate=False,
+            ordinal=attempt,
+            phase="fallback",
+            retry_deadline=retry_deadline,
+        )
+        selected_pairs = [
+            (request, result)
+            for request, result in zip(batch, results, strict=True)
+            if request.unit_id in eligible
+        ]
+        if selected_pairs:
+            persist(
+                [pair[0] for pair in selected_pairs],
+                [pair[1] for pair in selected_pairs],
+            )
+        if results and results[0].http_status in {401, 402, 403}:
+            return
+
+
 class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builtin]
     """Final verdicts plus producer-run participation metadata."""
 
@@ -1436,7 +1811,7 @@ class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builti
 
 
 @verification_session
-def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-many-locals, too-many-statements]
+def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-many-branches, too-many-locals, too-many-statements]
     units: list[Unit],
     *,
     writable_ids: set[int],
@@ -1521,6 +1896,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
                 on_batch=on_batch,
                 attempt_started_at=started_at,
                 producer_run=run,
+                sync_deferrals=not uses_durable_delivery(run),
                 subject=(
                     JudgeVerdict.Subject.CANDIDATE
                     if candidate_targets is not None
@@ -1533,6 +1909,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
             retry_deadline=retry_deadline,
             cancelled=is_cancelled,
             scope_guard=scope_guard,
+            profile=profile,
         )
 
     def is_cancelled() -> bool:
@@ -1612,7 +1989,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
                 project_context=project_context,
                 run_id=run_id,
             )
-        if unparsed_rounds and request_units:
+        if unparsed_rounds and request_units and not uses_durable_delivery(run):
             # Retry only a round in which every selected seat failed. Use
             # its persisted rows directly: reader-side per-seat joining may
             # legitimately retain an older opinion after a transport loss,
@@ -1634,6 +2011,11 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
                     for unit_id, rows in rows_by_unit.items()
                     if len({row.seat for row in rows}) == len(selected_seats)
                     and all(row.unparsed for row in rows)
+                    and all(
+                        row.request_attempt is not None
+                        and row.request_attempt.http_status not in {401, 402, 403}
+                        for row in rows
+                    )
                 }
                 if not unparsed_ids or is_cancelled():
                     break
@@ -1661,6 +2043,29 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
                         project_context=project_context,
                         run_id=run_id,
                     )
+        if request_units:
+            _run_pair_fallback(
+                request_units,
+                round_requests,
+                profiles,
+                context=project_context,
+                project_slug=project_slug,
+                run=run,
+                run_id=run_id,
+                attempt=attempt,
+                subject=(
+                    JudgeVerdict.Subject.CANDIDATE
+                    if candidate_targets is not None
+                    else JudgeVerdict.Subject.LIVE
+                ),
+                candidate_targets=candidate_targets,
+                retry_budget=retry_budget,
+                retry_deadline=retry_deadline,
+                cancelled=is_cancelled,
+                scope_guard=scope_guard,
+                on_batch=on_batch,
+                user=user,
+            )
         prepared = [
             _prepare_round_unit(
                 unit,
@@ -1964,7 +2369,11 @@ def _finalize_drain_run(
             )
             if stale_conflict:
                 outcome = JudgeRunUnit.Outcome.STALE_CONFLICT
-            elif verdict is None or verdict.unparsed:
+            elif (
+                verdict is None
+                or verdict.unparsed
+                or not has_complete_current_evidence(locked, seats=JUDGE_SEATS)
+            ):
                 outcome = (
                     JudgeRunUnit.Outcome.DEFERRED
                     if still_open
@@ -2483,9 +2892,9 @@ def accept_judge_candidate(
             )
 
         candidate_evidence = candidate_round(locked_unit, locked_candidate.target_list)
-        if {row.seat for row in candidate_evidence} != set(JUDGE_SEATS) or any(
-            row.unparsed for row in candidate_evidence
-        ):
+        if not candidate_quality(
+            locked_unit, locked_candidate.target_list, evidence=candidate_evidence
+        ).two_seat_verified:
             raise JudgeCandidateError(
                 gettext("This candidate has not been fully verified.")
             )

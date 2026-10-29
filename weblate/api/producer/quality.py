@@ -106,14 +106,12 @@ def project_judge_decision(run_unit: JudgeRunUnit, user: User) -> dict[str, obje
         candidate_round(unit, candidate.target_list) if candidate else []
     )
     candidate_seats = _seat_results(candidate_evidence)
-    candidate_verified = all(
-        candidate_seats[str(seat)] == "parsed" for seat in JUDGE_SEATS
-    )
     quality = (
         candidate_quality(unit, candidate.target_list, evidence=candidate_evidence)
         if candidate
         else None
     )
+    candidate_verified = bool(quality and quality.two_seat_verified)
     categories = _issue_categories(live_evidence)
     terminology_conflict = "terminology" in categories
     may_apply = user.has_perm("unit.review", unit) and user.has_perm(

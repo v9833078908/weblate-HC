@@ -96,6 +96,8 @@ _SAFE_CONFIGURATION_SNAPSHOT_KEYS = frozenset(
         "fallback_model",
         "fallback_reasoning",
         "fallback_response_format",
+        "fallback_endpoint_fingerprint",
+        "fallback_profile_fingerprint",
     }
 )
 
@@ -612,6 +614,7 @@ class JudgeRequestAttempt(models.Model):
     batch_digest = models.CharField(max_length=64)
     batch_size = models.PositiveSmallIntegerField()
     transport_succeeded = models.BooleanField(default=False)
+    response_complete = models.BooleanField(default=False)
     parsed = models.BooleanField(default=False)
     failure_kind = models.CharField(
         max_length=24, choices=FailureKind, blank=True, db_index=True
@@ -1262,6 +1265,7 @@ def _current_snapshot_hashes(unit: Unit) -> tuple[str, str]:
             note=unit.source_unit.note,
             explanation=unit.source_unit.explanation,
             glossary_terms=_glossary_prompt_entries(unit),
+            clarification=unit_clarification_answer(unit),
         ),
     )
 
@@ -1442,13 +1446,82 @@ def active_verdicts(units: Sequence[Unit]) -> dict[int, JudgeVerdict | None]:
     }
 
 
+def _complete_primary_evidence(
+    unit: Unit,
+    targets: Sequence[str],
+    rows: Sequence[JudgeVerdict],
+    *,
+    subject: str,
+) -> bool:
+    """Require each opinion to identify the current primary request exactly."""
+    from weblate.trans.judge import (  # ruff: ignore[import-outside-top-level]
+        JUDGE_SEATS,
+        JudgeError,
+        resolve_judge_seat_profile,
+    )
+    from weblate.trans.judge_loop import (  # ruff: ignore[import-outside-top-level]
+        _request_identity,
+        build_request,
+        judge_project_context,
+    )
+
+    if len(rows) != len(JUDGE_SEATS) or {row.seat for row in rows} != set(JUDGE_SEATS):
+        return False
+    request = build_request(unit, target_plurals=targets)
+    context = judge_project_context(unit.translation.component.project)
+    target_hash = compute_target_hash(targets)
+    project_context_hash = compute_target_hash([context])
+    context_hash = compute_context_hash(
+        source=request.source,
+        note=request.note,
+        explanation=request.explanation,
+        glossary_terms=request.glossary_terms,
+        clarification=request.clarification,
+    )
+    for row in rows:
+        try:
+            profile = resolve_judge_seat_profile(row.seat)
+        except JudgeError:
+            return False
+        if (
+            row.unit_id != unit.pk
+            or row.unparsed
+            or row.subject != subject
+            or row.target_hash != target_hash
+            or row.context_hash != context_hash
+            or row.project_context_hash != project_context_hash
+        ):
+            return False
+        if (
+            row.source_language != request.source_language
+            or row.target_language != request.target_language
+            or (
+                subject == JudgeVerdict.Subject.CANDIDATE
+                and row.candidate_target_hash != target_hash
+            )
+        ):
+            return False
+        if (
+            row.profile_fingerprint != profile.profile_fingerprint
+            or row.prompt_schema_version != profile.prompt_schema_version
+            or row.request_identity
+            != _request_identity(unit, request, profile, context)
+        ):
+            return False
+    return True
+
+
 def has_complete_current_evidence(unit: Unit, *, seats: Sequence[int]) -> bool:
-    """Whether every configured seat has parsed the current snapshot."""
-    rows = current_round(unit)
-    return (
-        {row.seat for row in rows} == set(seats)
-        and len(rows) == len(seats)
-        and all(not row.unparsed for row in rows)
+    """Require both current primary profiles to have parsed the current snapshot."""
+    from weblate.trans.judge import (  # ruff: ignore[import-outside-top-level]
+        JUDGE_SEATS,
+    )
+
+    return set(seats) == set(JUDGE_SEATS) and _complete_primary_evidence(
+        unit,
+        unit.get_target_plurals(),
+        current_round(unit),
+        subject=JudgeVerdict.Subject.LIVE,
     )
 
 

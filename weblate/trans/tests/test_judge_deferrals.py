@@ -82,7 +82,7 @@ class JudgeDeferralTest(ViewTestCase):
             "weblate.trans.judge._post_batch",
             return_value=_BatchResponse(None, None, "transport"),
         ) as outbound:
-            result = request_verdicts([request], model=profile.model, run=run)[0]
+            result = request_verdicts([request], profile=profile, run=run)[0]
             self.assertTrue(result.unparsed)
             _write_verdict(
                 unit,

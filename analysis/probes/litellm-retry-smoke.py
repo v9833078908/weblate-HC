@@ -39,7 +39,11 @@ django.setup()
 
 from django.conf import settings
 
-from weblate.trans.judge import JudgeRequest, request_verdicts
+from weblate.trans.judge import (
+    JudgeRequest,
+    request_verdicts,
+    resolve_judge_seat_profile,
+)
 
 ENV = Path(
     "/Users/eli/Documents/PythonProjects/gamedev tools/weblate/deploy/.env.local"
@@ -108,10 +112,16 @@ def main() -> None:
     settings.JUDGE_REQUEST_SLEEP = 0.0
     settings.JUDGE_REQUEST_DEADLINE = 300.0
     settings.JUDGE_REASONING_EFFORT = os.environ.get("EFFORT", "none")
+    profile = resolve_judge_seat_profile(1)
 
     unparsed_batches = 0
     for index in range(runs):
-        results = request_verdicts(REQUESTS, model=model, project_slug="control")
+        results = request_verdicts(
+            REQUESTS,
+            profile=profile,
+            model=model,
+            project_slug="control",
+        )
         failed = sum(r.unparsed for r in results) == len(results)
         unparsed_batches += failed
         print(f"  run {index + 1}/{runs}: {'UNPARSED' if failed else 'ok'}")

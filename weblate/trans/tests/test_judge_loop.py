@@ -9,11 +9,16 @@ import json
 import threading
 import uuid
 from dataclasses import replace
+from datetime import timedelta
+from tempfile import TemporaryDirectory
 from unittest import mock
 
+import httpx2
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.db import connections
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 
 from weblate.auth.models import Group, setup_project_groups
 from weblate.checks.models import Check
@@ -27,21 +32,28 @@ from weblate.trans.judge import (
     JudgeRequest,
     JudgeResult,
     RetryBudget,
+    _run_batch,
     _write_llm_usage,
+    judge_configuration_snapshot,
+    resolve_judge_fallback_profile,
     resolve_judge_seat_profile,
 )
 from weblate.trans.judge_loop import (
+    _allocate_request_round,
     _has_active_check,
+    _run_pair_fallback,
     _run_seats,
     _SeatJob,
     _select_repair_texts,
     _write_verdict,
     active_judge_candidate,
     build_request,
+    judge_project_context,
     repair_targets,
     run_judge_batch,
     unsupported_repair_language,
 )
+from weblate.trans.llm_delivery import reserve_exchange
 from weblate.trans.models.judge import (
     JudgeDeferral,
     JudgeRequestAttempt,
@@ -52,6 +64,7 @@ from weblate.trans.models.judge import (
     compute_target_storage_hash,
     has_complete_current_evidence,
 )
+from weblate.trans.models.llm_delivery import ProducerLLMExchange
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import RepoTestMixin, create_test_user
@@ -304,6 +317,12 @@ class JudgeSeatConnectionCleanupTest(TransactionTestCase):
         self.assert_worker_connections_closed(self._run_seats(RuntimeError("worker")))
 
 
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-1/model",
+    JUDGE_MODEL_SEAT_2="vendor-2/model",
+)
 class SeatCancellationThreadingTest(TransactionTestCase):
     """G4: each seat's own cancellation predicate reaches ``request_verdicts``."""
 
@@ -2095,7 +2114,23 @@ class JudgeServingIdentityPersistenceTest(ViewTestCase):
 class JudgeUnparsedRetryRoundTest(ViewTestCase):
     def test_all_unparsed_round_is_retried_without_overwriting_history(self) -> None:
         unit = self.get_unit()
-        client = mock_request_verdicts([[DEAD], [DEAD], [PASS], [PASS]])
+        failures = []
+        for seat in (1, 2):
+            profile = resolve_judge_seat_profile(seat)
+            attempt = JudgeRequestAttempt.objects.create(
+                seat=seat,
+                provider=profile.provider,
+                model=profile.model,
+                endpoint_fingerprint=profile.endpoint_fingerprint,
+                model_fingerprint=profile.model_fingerprint,
+                profile_fingerprint=profile.profile_fingerprint,
+                prompt_schema_version=profile.prompt_schema_version,
+                batch_digest="offline",
+                batch_size=1,
+                failure_kind="transport",
+            )
+            failures.append(replace(DEAD, request_attempt_id=attempt.pk))
+        client = mock_request_verdicts([[failures[0]], [failures[1]], [PASS], [PASS]])
 
         with mock.patch("weblate.trans.judge_loop.request_verdicts", client):
             verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
@@ -2481,6 +2516,7 @@ _FAILOVER_LITELLM_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/complet
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
+    JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_BATCH_SIZE_SEAT_1=1,
@@ -2491,19 +2527,14 @@ _FAILOVER_LITELLM_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/complet
     JUDGE_TRANSPORT_RETRIES=0,
     JUDGE_TRANSIENT_HTTP_RETRIES=0,
     JUDGE_PROTOCOL_RETRIES=0,
-    JUDGE_FALLBACK_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+    JUDGE_FALLBACK_BASE_URL="https://openrouter.ai/api/v1",
     JUDGE_FALLBACK_API_KEY="sk-fallback",
-    JUDGE_FALLBACK_MODEL_SEAT_1="vendor-c/model",
-    JUDGE_FALLBACK_MODEL_SEAT_2="vendor-d/model",
-    JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1="",
-    JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2="",
+    JUDGE_FALLBACK_MODEL_SEAT_1="deepseek/deepseek-v4-pro",
+    JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1="none",
     JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1="json_schema",
-    JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2="json_schema",
 )
-class JudgeFailoverSeatIsolationTest(
-    http_mock.MockDNSMixin, RepoTestMixin, TransactionTestCase
-):
-    """Seat 1 failing over must not change which endpoint serves seat 2."""
+class JudgePairFallbackTest(http_mock.MockDNSMixin, RepoTestMixin, TransactionTestCase):
+    """A fallback is one opinion only after two confirmed primary failures."""
 
     def setUp(self) -> None:
         self.clone_test_repos()
@@ -2511,6 +2542,8 @@ class JudgeFailoverSeatIsolationTest(
         component = self.create_component()
         component.create_path()
         self.project = component.project
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
         setup_project_groups(self, self.project)
         self.translation = component.translation_set.get(language_code="cs")
         self.user = create_test_user()
@@ -2521,44 +2554,935 @@ class JudgeFailoverSeatIsolationTest(
     def get_unit(self):
         return self.translation.unit_set.get(source="Hello, world!\n")
 
-    @http_mock.activate
-    def test_seat_one_failover_does_not_affect_seat_two(self) -> None:
-        def match_model(model_name, message):
-            return [
-                lambda request: (
-                    json.loads(request.content)["model"] == model_name,
-                    message,
-                )
-            ]
+    @staticmethod
+    def match_model(model):
+        return [lambda request: (json.loads(request.content)["model"] == model, model)]
 
-        http_mock.register(
+    @http_mock.activate
+    def test_two_confirmed_failures_get_one_fallback(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register(
             "POST",
             CHAT_URL,
-            status_code=500,
-            json={},
-            match=match_model("vendor-a/model", "not seat1 primary"),
+            json=_seat_reply(),
+            match=self.match_model("deepseek/deepseek-v4-pro"),
         )
-        seat_one_fallback = http_mock.register(
+        unit = self.get_unit()
+        run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 1)
+        rows = list(JudgeVerdict.objects.filter(unit=unit))
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(sum(not row.unparsed for row in rows), 1)
+        self.assertFalse(has_complete_current_evidence(unit, seats=JUDGE_SEATS))
+
+    @http_mock.activate
+    def test_one_healthy_primary_suppresses_fallback(self):
+        http_mock.register(
+            "POST",
+            _FAILOVER_LITELLM_URL,
+            status_code=403,
+            json={},
+            match=self.match_model("vendor-a/model"),
+        )
+        http_mock.register(
             "POST",
             _FAILOVER_LITELLM_URL,
             json=_seat_reply(),
-            match=match_model("vendor-c/model", "not seat1 fallback"),
+            match=self.match_model("vendor-b/model"),
         )
-        seat_two_primary = http_mock.register(
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 0)
+        rows = list(JudgeVerdict.objects.filter(unit=unit))
+        self.assertEqual(sum(not row.unparsed for row in rows), 1)
+
+    @http_mock.activate
+    def test_seat_two_failure_keeps_healthy_seat_one(self):
+        http_mock.register(
             "POST",
-            CHAT_URL,
+            _FAILOVER_LITELLM_URL,
             json=_seat_reply(),
-            match=match_model("vendor-b/model", "not seat2 primary"),
+            match=self.match_model("vendor-a/model"),
+        )
+        http_mock.register(
+            "POST",
+            _FAILOVER_LITELLM_URL,
+            status_code=403,
+            json={},
+            match=self.match_model("vendor-b/model"),
+        )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 0)
+        self.assertFalse(JudgeVerdict.objects.get(unit=unit, seat=1).unparsed)
+
+    @http_mock.activate
+    def test_two_healthy_primary_opinions_are_complete(self):
+        http_mock.register("POST", _FAILOVER_LITELLM_URL, json=_seat_reply())
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 0)
+        self.assertTrue(has_complete_current_evidence(unit, seats=JUDGE_SEATS))
+
+    @http_mock.activate
+    def test_two_timeouts_never_open_fallback(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register_exception(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                httpx2.ReadTimeout("unknown"),
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 0)
+        self.assertTrue(
+            all(row.unparsed for row in JudgeVerdict.objects.filter(unit=unit))
+        )
+
+    @http_mock.activate
+    def test_durable_two_timeouts_never_call_fallback_on_resume(self):
+        routes = [
+            http_mock.register_exception(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                httpx2.ReadTimeout("unknown"),
+                match=self.match_model(model),
+            )
+            for model in ("vendor-a/model", "vendor-b/model")
+        ]
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        with TemporaryDirectory() as directory, override_settings(DATA_DIR=directory):
+            run = ProducerRun.objects.create(
+                scope_type="component",
+                scope_id=str(self.translation.component_id),
+                scope_label="Synthetic",
+                scope_path="/",
+                requested_mode="judge",
+                cap=1,
+                execution_options={"delivery_policy": "wizard-v1"},
+                configuration_snapshot=judge_configuration_snapshot(),
+            )
+            for _ in range(2):
+                run_judge_batch([unit], writable_ids=set(), user=self.user, run=run)
+        self.assertEqual([len(route.calls) for route in routes], [1, 1])
+        self.assertEqual(len(fallback.calls), 0)
+        self.assertEqual(JudgeRequestAttempt.objects.filter(run=run).count(), 2)
+
+    @http_mock.activate
+    def test_two_complete_invalid_responses_open_one_fallback(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                content=b"not json",
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 1)
+        self.assertEqual(JudgeRequestAttempt.objects.filter(parsed=False).count(), 2)
+
+    @override_settings(JUDGE_STREAM_SEAT_1=True, JUDGE_STREAM_SEAT_2=True)
+    @http_mock.activate
+    def test_early_stream_parse_failures_do_not_prove_complete_responses(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                content=b"data: not-json\n\n",
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        run_judge_batch([self.get_unit()], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 0)
+        self.assertEqual(
+            JudgeRequestAttempt.objects.filter(response_complete=False).count(), 2
+        )
+
+    @http_mock.activate
+    def test_single_seat_recheck_cannot_infer_peer_failure(self):
+        http_mock.register("POST", _FAILOVER_LITELLM_URL, status_code=403, json={})
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        run_judge_batch([unit], writable_ids=set(), user=self.user, seats=(1,))
+        self.assertEqual(len(fallback.calls), 0)
+        self.assertEqual(JudgeRequestAttempt.objects.count(), 1)
+
+    @http_mock.activate
+    def test_saved_exact_peer_failure_allows_single_seat_recheck(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        request = build_request(unit)
+        context = judge_project_context(self.project)
+        peer = resolve_judge_seat_profile(2)
+        [failure] = _run_batch(
+            [request],
+            profile=peer,
+            project_slug=self.project.slug,
+            project_context=context,
+            persistence=True,
+            run=None,
+            retry_budget=RetryBudget(maximum=0),
+            adaptive=False,
+            isolate=False,
+            ordinal=0,
+        )
+        _write_verdict(
+            unit,
+            request,
+            seat=2,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=failure,
+            profile=peer,
+            project_context=context,
+        )
+        run_judge_batch([unit], writable_ids=set(), user=self.user, seats=(1,))
+        self.assertEqual(len(fallback.calls), 1)
+
+    @override_settings(JUDGE_TEMPERATURE_SEAT_2=0.75)
+    @http_mock.activate
+    def test_noncurrent_peer_failures_cannot_authorize_a_fallback(self) -> None:
+        primary = http_mock.register(
+            "POST", _FAILOVER_LITELLM_URL, status_code=403, json={}
+        )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        units = list(self.translation.unit_set.order_by("pk")[:3])
+        cases = ("profile", "context", "subject")
+        for index, (unit, case) in enumerate(zip(units, cases, strict=True), start=1):
+            with self.subTest(case=case):
+                request = build_request(unit)
+                context = judge_project_context(self.project)
+                peer = resolve_judge_seat_profile(2)
+                subject = JudgeVerdict.Subject.LIVE
+                if case == "profile":
+                    with override_settings(JUDGE_TEMPERATURE_SEAT_2=0.25):
+                        peer = resolve_judge_seat_profile(2)
+                    self.assertNotEqual(
+                        peer.profile_fingerprint,
+                        resolve_judge_seat_profile(2).profile_fingerprint,
+                    )
+                elif case == "context":
+                    context = "Previous project instructions."
+                else:
+                    subject = JudgeVerdict.Subject.CANDIDATE
+                [failure] = _run_batch(
+                    [request],
+                    profile=peer,
+                    project_slug=self.project.slug,
+                    project_context=context,
+                    persistence=True,
+                    run=None,
+                    retry_budget=RetryBudget(maximum=0),
+                    adaptive=False,
+                    isolate=False,
+                    ordinal=0,
+                )
+                _write_verdict(
+                    unit,
+                    request,
+                    seat=2,
+                    attempt=0,
+                    run_id=uuid.uuid4(),
+                    result=failure,
+                    profile=peer,
+                    project_context=context,
+                    subject=subject,
+                )
+                run_judge_batch([unit], writable_ids=set(), user=self.user, seats=(1,))
+                self.assertEqual(len(primary.calls), index * 2)
+                self.assertEqual(len(fallback.calls), 0)
+
+    @http_mock.activate
+    def test_older_healthy_opinion_suppresses_later_pair_failures(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        request = build_request(unit)
+        _write_verdict(
+            unit,
+            request,
+            seat=2,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=JudgeResult("none", "pass", [], ""),
+            profile=resolve_judge_seat_profile(2),
+            project_context=judge_project_context(self.project),
+        )
+        run_judge_batch([unit], writable_ids=set(), user=self.user, use_cache=False)
+        self.assertEqual(len(fallback.calls), 0)
+
+    @http_mock.activate
+    def test_other_project_context_opinion_cannot_suppress_fallback(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        _write_verdict(
+            unit,
+            build_request(unit),
+            seat=2,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=JudgeResult("none", "pass", [], ""),
+            profile=resolve_judge_seat_profile(2),
+            project_context="old project context",
+        )
+        run_judge_batch([unit], writable_ids=set(), user=self.user, use_cache=False)
+        self.assertEqual(len(fallback.calls), 1)
+
+    @http_mock.activate
+    def test_scope_change_after_primary_refusals_stops_fallback(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        run_judge_batch(
+            [self.get_unit()],
+            writable_ids=set(),
+            user=self.user,
+            scope_guard=lambda _batch: (
+                JudgeRequestAttempt.objects.filter(parsed=False).count() >= 2
+            ),
+        )
+        self.assertEqual(len(fallback.calls), 0)
+
+    @http_mock.activate
+    def test_review_revoked_after_primary_refusals_stops_fallback(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        completed = []
+
+        def revoke_review(_requests, _results):
+            completed.append(1)
+            if len(completed) == 2:
+                type(self.project).objects.filter(pk=self.project.pk).update(
+                    translation_review=False
+                )
+
+        with self.assertRaises(PermissionDenied):
+            run_judge_batch(
+                [self.get_unit()],
+                writable_ids=set(),
+                user=self.user,
+                on_batch=revoke_review,
+            )
+        self.assertEqual(len(completed), 2)
+        self.assertEqual(len(fallback.calls), 0)
+
+    @http_mock.activate
+    def test_cancellation_after_primary_refusals_stops_fallback(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        run = ProducerRun.objects.create(
+            scope_type="component",
+            scope_id=str(self.translation.component_id),
+            scope_label="Synthetic",
+            scope_path="/",
+            requested_mode="judge",
+            cap=1,
+            configuration_snapshot=judge_configuration_snapshot(),
+        )
+        completed = []
+
+        def cancel_after_both(_requests, _results):
+            completed.append(1)
+            if len(completed) == 2:
+                ProducerRun.objects.filter(pk=run.pk).update(
+                    status=ProducerRun.Status.CANCEL_REQUESTED
+                )
+
+        run_judge_batch(
+            [unit],
+            writable_ids=set(),
+            user=self.user,
+            run=run,
+            on_batch=cancel_after_both,
+        )
+        self.assertEqual(len(completed), 2)
+        self.assertEqual(len(fallback.calls), 0)
+
+    @override_settings(JUDGE_BATCH_SIZE_SEAT_1=1, JUDGE_BATCH_SIZE_SEAT_2=2)
+    @http_mock.activate
+    def test_mismatched_widths_and_unsent_tail_do_not_stop_healthy_seat(self):
+        units = list(self.translation.unit_set.order_by("pk")[:2])
+        self.assertEqual(len(units), 2)
+        refused = http_mock.register(
+            "POST",
+            _FAILOVER_LITELLM_URL,
+            status_code=403,
+            json={},
+            match=self.match_model("vendor-a/model"),
+        )
+        reply = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "segments": [
+                                    {
+                                        "id": index,
+                                        "verdict": "pass",
+                                        "errors": [],
+                                        "back_translation": "",
+                                    }
+                                    for index in range(2)
+                                ]
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        healthy = http_mock.register(
+            "POST",
+            _FAILOVER_LITELLM_URL,
+            json=reply,
+            match=self.match_model("vendor-b/model"),
+        )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        run_judge_batch(units, writable_ids=set(), user=self.user)
+        self.assertEqual(
+            (len(refused.calls), len(healthy.calls), len(fallback.calls)), (1, 1, 0)
+        )
+        self.assertEqual(JudgeRequestAttempt.objects.filter(seat=1).count(), 1)
+        self.assertEqual(
+            JudgeVerdict.objects.filter(unit__in=units, seat=2, unparsed=False).count(),
+            2,
+        )
+
+    @override_settings(
+        JUDGE_BATCH_SIZE_SEAT_1=2,
+        JUDGE_BATCH_SIZE_SEAT_2=2,
+        JUDGE_RETRY_BUDGET_RATIO=0,
+    )
+    @http_mock.activate
+    def test_partial_reply_opinion_suppresses_fallback_only_for_its_unit(self):
+        units = list(self.translation.unit_set.order_by("pk")[:2])
+        self.assertEqual(len(units), 2)
+        first = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "segments": [
+                                    {
+                                        "id": 0,
+                                        "verdict": "pass",
+                                        "errors": [],
+                                        "back_translation": "",
+                                    },
+                                    {
+                                        "id": 1,
+                                        "verdict": "invalid",
+                                        "errors": [],
+                                        "back_translation": "",
+                                    },
+                                ]
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        second = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "segments": [
+                                    {
+                                        "id": index,
+                                        "verdict": "invalid",
+                                        "errors": [],
+                                        "back_translation": "",
+                                    }
+                                    for index in range(2)
+                                ]
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        http_mock.register(
+            "POST",
+            _FAILOVER_LITELLM_URL,
+            json=first,
+            match=self.match_model("vendor-a/model"),
+        )
+        http_mock.register(
+            "POST",
+            _FAILOVER_LITELLM_URL,
+            json=second,
+            match=self.match_model("vendor-b/model"),
+        )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        run_judge_batch(units, writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 1)
+        self.assertFalse(JudgeVerdict.objects.get(unit=units[0], seat=1).unparsed)
+        self.assertFalse(
+            JudgeVerdict.objects.filter(
+                unit=units[0], judge_model="deepseek/deepseek-v4-pro"
+            ).exists()
+        )
+        self.assertTrue(
+            JudgeVerdict.objects.filter(
+                unit=units[1], judge_model="deepseek/deepseek-v4-pro", unparsed=False
+            ).exists()
+        )
+
+    @http_mock.activate
+    def test_quota_failures_open_only_one_fallback(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=402,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        run_judge_batch([self.get_unit()], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 1)
+
+    @override_settings(JUDGE_FALLBACK_MODEL_SEAT_1="qwen/qwen3.8-max-0902")
+    @http_mock.activate
+    def test_incompatible_fallback_model_is_not_sent(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        run_judge_batch([self.get_unit()], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 0)
+
+    @http_mock.activate
+    def test_fallback_bad_request_is_fatal_without_retry(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, status_code=400, json={})
+        with self.assertRaises(JudgeError):
+            run_judge_batch([self.get_unit()], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 1)
+
+    @http_mock.activate
+    def test_fallback_timeout_remains_unparsed_without_retry(self):
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register_exception(
+            "POST", CHAT_URL, httpx2.ReadTimeout("unknown")
         )
         unit = self.get_unit()
-        run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
-        self.assertGreaterEqual(len(seat_one_fallback.calls), 1)
-        self.assertGreaterEqual(len(seat_two_primary.calls), 1)
-        seat1_verdict = JudgeVerdict.objects.get(unit=unit, seat=1)
-        seat2_verdict = JudgeVerdict.objects.get(unit=unit, seat=2)
-        self.assertFalse(seat1_verdict.unparsed)
-        self.assertFalse(seat2_verdict.unparsed)
-        self.assertEqual(seat1_verdict.judge_provider, "litellm")
-        self.assertEqual(seat1_verdict.judge_model, "vendor-c/model")
-        self.assertEqual(seat2_verdict.judge_provider, "openrouter")
-        self.assertEqual(seat2_verdict.judge_model, "vendor-b/model")
+        run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 1)
+        self.assertFalse(
+            JudgeVerdict.objects.filter(unit=unit, unparsed=False).exists()
+        )
+
+    @http_mock.activate
+    def test_capture_failure_is_fatal_and_never_opens_fallback(self):
+        http_mock.register("POST", _FAILOVER_LITELLM_URL, json=_seat_reply())
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        with (
+            mock.patch(
+                "weblate.trans.llm_delivery.capture_transport_response",
+                side_effect=RuntimeError("capture failed"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "capture failed"),
+        ):
+            run_judge_batch([self.get_unit()], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 0)
+
+    @http_mock.activate
+    def test_attempt_failure_is_fatal_and_never_opens_fallback(self):
+        http_mock.register("POST", _FAILOVER_LITELLM_URL, json=_seat_reply())
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        with (
+            mock.patch.object(
+                JudgeRequestAttempt.objects,
+                "create",
+                side_effect=RuntimeError("attempt failed"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "attempt failed"),
+        ):
+            run_judge_batch([self.get_unit()], writable_ids=set(), user=self.user)
+        self.assertEqual(len(fallback.calls), 0)
+
+    @http_mock.activate
+    def test_capture_link_crash_cannot_authorize_fallback_after_resume(self):
+        routes = [
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+            for model in ("vendor-a/model", "vendor-b/model")
+        ]
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+        unit = self.get_unit()
+        original_save = ProducerLLMExchange.save
+
+        def fail_binding(exchange, *args, **kwargs):
+            if exchange.judge_attempt_id is not None:
+                msg = "association failed"
+                raise RuntimeError(msg)
+            return original_save(exchange, *args, **kwargs)
+
+        with TemporaryDirectory() as directory, override_settings(DATA_DIR=directory):
+            run = ProducerRun.objects.create(
+                scope_type="component",
+                scope_id=str(self.translation.component_id),
+                scope_label="Synthetic",
+                scope_path="/",
+                requested_mode="judge",
+                cap=1,
+                execution_options={"delivery_policy": "wizard-v1"},
+                configuration_snapshot=judge_configuration_snapshot(),
+            )
+            with (
+                mock.patch.object(ProducerLLMExchange, "save", new=fail_binding),
+                self.assertRaisesRegex(RuntimeError, "association failed"),
+            ):
+                run_judge_batch([unit], writable_ids=set(), user=self.user, run=run)
+            run_judge_batch([unit], writable_ids=set(), user=self.user, run=run)
+        self.assertEqual(len(fallback.calls), 0)
+        self.assertTrue(all(len(route.calls) <= 1 for route in routes))
+
+    @override_settings(JUDGE_BATCH_SIZE_SEAT_1=3, JUDGE_BATCH_SIZE_SEAT_2=3)
+    @http_mock.activate
+    def test_saved_fallback_batch_replays_after_subset_order_and_width_change(self):
+        units = list(self.translation.unit_set.order_by("pk")[:3])
+        self.assertEqual(len(units), 3)
+        context = judge_project_context(self.project)
+        profiles = {seat: resolve_judge_seat_profile(seat) for seat in JUDGE_SEATS}
+        fallback_profile = resolve_judge_fallback_profile(profiles[1])
+        requests = [build_request(unit) for unit in units]
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "segments": [
+                                    {
+                                        "id": index,
+                                        "verdict": "pass",
+                                        "errors": [],
+                                        "back_translation": "",
+                                    }
+                                    for index in range(3)
+                                ]
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=payload)
+        with TemporaryDirectory() as directory, override_settings(DATA_DIR=directory):
+            run = ProducerRun.objects.create(
+                scope_type="component",
+                scope_id=str(self.translation.component_id),
+                scope_label="Synthetic",
+                scope_path="/",
+                requested_mode="judge",
+                cap=3,
+                execution_options={"delivery_policy": "wizard-v1"},
+                configuration_snapshot=judge_configuration_snapshot(),
+            )
+            primary_round = _allocate_request_round(run.pk, run)
+            for seat, profile in profiles.items():
+                results = _run_batch(
+                    requests,
+                    profile=profile,
+                    project_slug=self.project.slug,
+                    project_context=context,
+                    persistence=True,
+                    run=run,
+                    retry_budget=RetryBudget(maximum=0),
+                    adaptive=False,
+                    isolate=False,
+                    ordinal=0,
+                )
+                for unit, request, result in zip(units, requests, results, strict=True):
+                    _write_verdict(
+                        unit,
+                        request,
+                        seat=seat,
+                        attempt=0,
+                        run_id=run.pk,
+                        request_round=primary_round,
+                        result=result,
+                        profile=profile,
+                        project_context=context,
+                    )
+            # Simulate a crash after the paid reply and one persisted verdict.
+            fallback_results = _run_batch(
+                requests,
+                profile=fallback_profile,
+                project_slug=self.project.slug,
+                project_context=context,
+                persistence=True,
+                run=run,
+                retry_budget=RetryBudget(maximum=0),
+                adaptive=False,
+                isolate=False,
+                ordinal=0,
+                phase="fallback",
+            )
+            fallback_round = _allocate_request_round(run.pk, run)
+            _write_verdict(
+                units[0],
+                requests[0],
+                seat=1,
+                attempt=0,
+                run_id=run.pk,
+                request_round=fallback_round,
+                result=fallback_results[0],
+                profile=fallback_profile,
+                project_context=context,
+            )
+            # A later healthy primary must not prevent replay of the already
+            # captured full reply for the remaining compatible members.
+            _write_verdict(
+                units[0],
+                requests[0],
+                seat=2,
+                attempt=0,
+                run_id=uuid.uuid4(),
+                result=JudgeResult("none", "pass", [], ""),
+                profile=profiles[2],
+                project_context=context,
+            )
+            with mock.patch("weblate.trans.judge._adaptive_budget", return_value=1):
+                _run_pair_fallback(
+                    [units[2], units[1]],
+                    {units[2].pk: requests[2], units[1].pk: requests[1]},
+                    profiles,
+                    context=context,
+                    project_slug=self.project.slug,
+                    run=run,
+                    run_id=run.pk,
+                    attempt=0,
+                    subject=JudgeVerdict.Subject.LIVE,
+                    candidate_targets=None,
+                    retry_budget=RetryBudget(maximum=0),
+                    retry_deadline=None,
+                    cancelled=lambda: False,
+                    scope_guard=None,
+                    on_batch=None,
+                )
+        self.assertEqual(len(fallback.calls), 1)
+        self.assertEqual(JudgeRequestAttempt.objects.filter(run=run).count(), 3)
+        for unit in units:
+            self.assertEqual(
+                JudgeVerdict.objects.filter(
+                    unit=unit, judge_model="deepseek/deepseek-v4-pro", unparsed=False
+                ).count(),
+                1,
+            )
+
+    @override_settings(JUDGE_BATCH_SIZE_SEAT_1=2, JUDGE_BATCH_SIZE_SEAT_2=2)
+    @http_mock.activate
+    def test_unsent_saved_fallback_is_fenced_when_another_member_becomes_healthy(self):
+        units = list(self.translation.unit_set.order_by("pk")[:2])
+        context = judge_project_context(self.project)
+        profiles = {seat: resolve_judge_seat_profile(seat) for seat in JUDGE_SEATS}
+        fallback_profile = resolve_judge_fallback_profile(profiles[1])
+        requests = [build_request(unit) for unit in units]
+        for model in ("vendor-a/model", "vendor-b/model"):
+            http_mock.register(
+                "POST",
+                _FAILOVER_LITELLM_URL,
+                status_code=403,
+                json={},
+                match=self.match_model(model),
+            )
+        fallback = http_mock.register("POST", CHAT_URL, json=_seat_reply())
+
+        def reserve_before_crash(identities, digest, _send, *, run_id, **_kwargs):
+            reserve_exchange(identities, digest, run_id=run_id)
+            msg = "crash before first fallback POST"
+            raise RuntimeError(msg)
+
+        with TemporaryDirectory() as directory, override_settings(DATA_DIR=directory):
+            run = ProducerRun.objects.create(
+                scope_type="component",
+                scope_id=str(self.translation.component_id),
+                scope_label="Synthetic",
+                scope_path="/",
+                requested_mode="judge",
+                cap=2,
+                execution_options={"delivery_policy": "wizard-v1"},
+                configuration_snapshot=judge_configuration_snapshot(),
+            )
+            primary_round = _allocate_request_round(run.pk, run)
+            for seat, profile in profiles.items():
+                results = _run_batch(
+                    requests,
+                    profile=profile,
+                    project_slug=self.project.slug,
+                    project_context=context,
+                    persistence=True,
+                    run=run,
+                    retry_budget=RetryBudget(maximum=0),
+                    adaptive=False,
+                    isolate=False,
+                    ordinal=0,
+                )
+                for unit, request, outcome in zip(
+                    units, requests, results, strict=True
+                ):
+                    _write_verdict(
+                        unit,
+                        request,
+                        seat=seat,
+                        attempt=0,
+                        run_id=run.pk,
+                        request_round=primary_round,
+                        result=outcome,
+                        profile=profile,
+                        project_context=context,
+                    )
+            with (
+                mock.patch(
+                    "weblate.trans.llm_delivery.dispatch_exchange",
+                    side_effect=reserve_before_crash,
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError, "crash before first fallback POST"
+                ),
+            ):
+                _run_batch(
+                    requests,
+                    profile=fallback_profile,
+                    project_slug=self.project.slug,
+                    project_context=context,
+                    persistence=True,
+                    run=run,
+                    retry_budget=RetryBudget(maximum=0),
+                    adaptive=False,
+                    isolate=False,
+                    ordinal=0,
+                    phase="fallback",
+                )
+            exchange = ProducerLLMExchange.objects.get(run=run, state="reserved")
+            ProducerLLMExchange.objects.filter(pk=exchange.pk).update(
+                lease_until=timezone.now() - timedelta(seconds=1)
+            )
+            _write_verdict(
+                units[0],
+                requests[0],
+                seat=2,
+                attempt=0,
+                run_id=uuid.uuid4(),
+                result=JudgeResult("none", "pass", [], ""),
+                profile=profiles[2],
+                project_context=context,
+            )
+            _run_pair_fallback(
+                [units[1]],
+                {units[1].pk: requests[1]},
+                profiles,
+                context=context,
+                project_slug=self.project.slug,
+                run=run,
+                run_id=run.pk,
+                attempt=0,
+                subject=JudgeVerdict.Subject.LIVE,
+                candidate_targets=None,
+                retry_budget=RetryBudget(maximum=0),
+                retry_deadline=None,
+                cancelled=lambda: False,
+                scope_guard=None,
+                on_batch=None,
+                user=self.user,
+            )
+            self.assertEqual(len(fallback.calls), 0)
+            exchange.refresh_from_db()
+            self.assertEqual(exchange.state, "reserved")

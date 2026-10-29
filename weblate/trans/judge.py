@@ -86,27 +86,6 @@ FAILURE_KINDS = frozenset(
         "unknown",
     }
 )
-# Deliberately independent of `_AVAILABILITY_FAILURE_KINDS`
-# (weblate/trans/judge_loop.py), which the circuit breaker owns. The two
-# differ in both directions and each difference is load-bearing:
-# `http-other` means the request itself is wrong for this endpoint (a
-# configuration defect), so failing it over would double every batch's
-# calls while hiding the defect; `http-auth` is here because a different
-# key presented to a different provider is exactly one warranted fallback
-# call, even though it raises before reaching the retry branch below;
-# `segment-count` is here because a completed primary reply with the wrong
-# cardinality already exhausted its protocol-recovery opportunity, while it
-# must not open the shared availability circuit.
-_FAILOVER_FAILURE_KINDS = frozenset(
-    {
-        "transport",
-        "deadline",
-        "http-rate-limit",
-        "http-server",
-        "http-auth",
-        "segment-count",
-    }
-)
 CATEGORIES = (
     "terminology",
     "mistranslation",
@@ -229,9 +208,8 @@ class JudgeResult:
     unparsed: bool = False
     request_attempt_id: int | None = None
     failure_kind: str = ""
-    #: The profile that actually produced this result, which the requesting
-    #: seat's bound profile may differ from after a fallback attempt. Blank
-    #: means "use the caller's profile argument" (every pre-failover path).
+    http_status: int | None = None
+    #: Actual serving profile; blank uses the explicitly selected profile.
     served_model: str = ""
     served_provider: str = ""
     served_profile_fingerprint: str = ""
@@ -590,9 +568,7 @@ _FALLBACK_REQUIRED_SETTING_NAMES = (
     "JUDGE_FALLBACK_BASE_URL",
     "JUDGE_FALLBACK_API_KEY",
     "JUDGE_FALLBACK_MODEL_SEAT_1",
-    "JUDGE_FALLBACK_MODEL_SEAT_2",
     "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1",
-    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2",
 )
 
 
@@ -600,11 +576,8 @@ def judge_fallback_endpoint() -> JudgeEndpoint | None:
     """
     Return the configured fallback endpoint, or None when unconfigured.
 
-    Raise when the operator asked for a fallback but the pair is unusable:
-    incomplete, or resolving to the primary's own endpoint. This is the only
-    place that decides whether a fallback exists, so the direct
-    ``request_verdicts`` API is gated exactly like a producer-launched run
-    rather than half-enabling a second paid endpoint.
+    Reject partial configuration or an endpoint equal to the primary.
+    The caller, not this resolver, decides whether the pair permits a request.
     """
     configured = [
         isinstance(value, str) and bool(value.strip())
@@ -612,7 +585,8 @@ def judge_fallback_endpoint() -> JudgeEndpoint | None:
             getattr(settings, name) for name in _FALLBACK_REQUIRED_SETTING_NAMES
         )
     ]
-    if not any(configured):
+    reasoning = settings.JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1
+    if not any(configured) and isinstance(reasoning, str) and not reasoning:
         return None
     if not all(configured):
         raise JudgeError(_("The LLM judge is not configured."))
@@ -628,10 +602,10 @@ def judge_fallback_endpoint() -> JudgeEndpoint | None:
 
 
 def _resolve_fallback_profile(
-    seat: int, primary: JudgeSeatProfile, endpoint: JudgeEndpoint
+    primary: JudgeSeatProfile, endpoint: JudgeEndpoint
 ) -> JudgeSeatProfile:
     """
-    Resolve one seat's fallback profile.
+    Resolve the single fallback profile.
 
     Transport shape (``stream``, ``batch_size``, ``request_deadline``,
     ``temperature``, ``max_tokens``) inherits the primary seat's resolved
@@ -640,11 +614,9 @@ def _resolve_fallback_profile(
     no "inherit": mixing one provider's reasoning control into the other's
     payload would silently corrupt the request.
     """
-    model = getattr(settings, f"JUDGE_FALLBACK_MODEL_SEAT_{seat}", "")
-    reasoning = getattr(settings, f"JUDGE_FALLBACK_REASONING_EFFORT_SEAT_{seat}", "")
-    response_format = getattr(
-        settings, f"JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_{seat}", ""
-    )
+    model = settings.JUDGE_FALLBACK_MODEL_SEAT_1
+    reasoning = settings.JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1
+    response_format = settings.JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1
     if not isinstance(model, str) or not model.strip():
         raise JudgeError(_("The LLM judge is not configured."))
     model = model.strip()
@@ -682,7 +654,7 @@ def _resolve_fallback_profile(
         _prompt_schema_version(),
     )
     return JudgeSeatProfile(
-        seat=seat,
+        seat=1,
         model=model,
         base_url=endpoint.base_url,
         api_key=endpoint.api_key,
@@ -703,33 +675,24 @@ def _resolve_fallback_profile(
     )
 
 
-def resolve_judge_fallback_seat_profile(
-    seat: int, primary: JudgeSeatProfile
+def resolve_judge_fallback_profile(
+    primary: JudgeSeatProfile,
 ) -> JudgeSeatProfile | None:
-    """Return this seat's fallback profile, or None when unconfigured."""
-    if seat not in JUDGE_SEATS:
-        return None
+    """Resolve the single logical seat-one pair fallback."""
     endpoint = judge_fallback_endpoint()
     if endpoint is None:
         return None
-    return _resolve_fallback_profile(seat, primary, endpoint)
+    return _resolve_fallback_profile(primary, endpoint)
 
 
 def _validate_fallback_configuration(
     primary_profiles: tuple[JudgeSeatProfile, JudgeSeatProfile],
 ) -> None:
-    """
-    Validate the fallback pair with the same rules as the primary.
-
-    Completeness and the distinct-endpoint rule are enforced by
-    `judge_fallback_endpoint`, so every caller shares one contract; this adds
-    the per-seat profile resolution a run needs before its first paid POST.
-    """
+    """Validate the optional single fallback before any paid request."""
     endpoint = judge_fallback_endpoint()
     if endpoint is None:
         return
-    for seat, primary in zip(JUDGE_SEATS, primary_profiles, strict=True):
-        _resolve_fallback_profile(seat, primary, endpoint)
+    _resolve_fallback_profile(primary_profiles[0], endpoint)
 
 
 def judge_configuration_snapshot() -> dict[str, object]:
@@ -762,17 +725,16 @@ def _fallback_configuration_snapshot(
     endpoint = judge_fallback_endpoint()
     if endpoint is None:
         return {}
-    profiles = [
-        _resolve_fallback_profile(seat, primary, endpoint)
-        for seat, primary in zip(JUDGE_SEATS, primary_profiles, strict=True)
-    ]
+    profile = _resolve_fallback_profile(primary_profiles[0], endpoint)
     return {
         # A bare hostname (no scheme, path or query) distinguishes providers
         # for an audit trail without recording the request URL.
         "fallback_hostname": urlsplit(endpoint.base_url).hostname or "",
-        "fallback_model": [profile.model for profile in profiles],
-        "fallback_reasoning": [profile.reasoning for profile in profiles],
-        "fallback_response_format": [profile.response_format for profile in profiles],
+        "fallback_model": [profile.model],
+        "fallback_reasoning": [profile.reasoning],
+        "fallback_response_format": [profile.response_format],
+        "fallback_endpoint_fingerprint": profile.endpoint_fingerprint,
+        "fallback_profile_fingerprint": profile.profile_fingerprint,
     }
 
 
@@ -996,35 +958,35 @@ def _parse_reply(payload: object, size: int) -> _ParseOutcome:
     segments = decoded["segments"]
     if not isinstance(segments, list):
         return _ParseOutcome(None, "invalid-envelope", shape="segments")
-    if len(segments) != size:
-        return _ParseOutcome(None, "segment-count", len(segments), "segments")
+    failure = "segment-count" if len(segments) != size else ""
     results: list[JudgeResult | None] = [None] * size
     seen: set[int] = set()
     core_fields = {"id", "verdict", "errors", "back_translation"}
     for segment in segments:
+        identifier = segment.get("id") if isinstance(segment, dict) else None
         if (
-            not isinstance(segment, dict)
-            or not core_fields.issubset(segment)
-            or set(segment) - core_fields - {"instruction"}
+            not isinstance(identifier, int)
+            or isinstance(identifier, bool)
+            or not 0 <= identifier < size
         ):
-            return _ParseOutcome(None, "invalid-segment", len(segments), "segment")
-        identifier = segment["id"]
-        valid_identifier = (
-            isinstance(identifier, int)
-            and not isinstance(identifier, bool)
-            and 0 <= identifier < size
-            and identifier not in seen
-        )
-        valid_contents = (
-            isinstance(segment["verdict"], str)
-            and segment["verdict"] in {"pass", "flag", "reject"}
-            and isinstance(segment["errors"], list)
-            and all(_valid_error(error) for error in segment["errors"])
-            and isinstance(segment["back_translation"], str)
-        )
-        if not valid_identifier or not valid_contents:
-            return _ParseOutcome(None, "invalid-segment", len(segments), "segment")
+            failure = failure or "invalid-segment"
+            continue
+        if identifier in seen:
+            results[identifier] = None
+            failure = failure or "invalid-segment"
+            continue
         seen.add(identifier)
+        if (
+            not core_fields.issubset(segment)
+            or set(segment) - core_fields - {"instruction"}
+            or not isinstance(segment["verdict"], str)
+            or segment["verdict"] not in {"pass", "flag", "reject"}
+            or not isinstance(segment["errors"], list)
+            or not all(_valid_error(error) for error in segment["errors"])
+            or not isinstance(segment["back_translation"], str)
+        ):
+            failure = failure or "invalid-segment"
+            continue
         errors = segment["errors"]
         results[identifier] = JudgeResult(
             _max_severity(errors),
@@ -1032,8 +994,24 @@ def _parse_reply(payload: object, size: int) -> _ParseOutcome:
             errors,
             segment["back_translation"],
         )
-    if len(seen) != size or any(result is None for result in results):
-        return _ParseOutcome(None, "segment-count", len(segments), "segments")
+    if any(result is None for result in results):
+        failure = failure or "segment-count"
+    if not any(result is not None for result in results):
+        return _ParseOutcome(
+            None, failure or "invalid-segment", len(segments), "segments"
+        )
+    if failure:
+        return _ParseOutcome(
+            [
+                result
+                if result is not None
+                else replace(UNPARSED, failure_kind=failure)
+                for result in results
+            ],
+            failure,
+            len(segments),
+            "segments",
+        )
     return _ParseOutcome(
         cast("list[JudgeResult]", results), segment_count=size, shape="chat"
     )
@@ -1053,6 +1031,7 @@ class _BatchResponse:
     transport_succeeded: bool = False
     provider_cost: Decimal | None = None
     delivery_id: str = ""
+    response_complete: bool = False
 
 
 def _retry_after(headers: object) -> float | None:
@@ -1099,7 +1078,7 @@ def _read_body(
             chunk = next(chunks)
         except StopIteration:
             break
-        except Exception as error:
+        except httpx2.TransportError as error:
             return (
                 None,
                 "deadline"
@@ -1267,6 +1246,7 @@ def _read_sse(
     *,
     started: float,
     request_deadline: float | None = None,
+    complete: list[bool] | None = None,
 ) -> tuple[dict | None, str, str, int, int | None, str]:
     deadline = started + (
         float(settings.JUDGE_REQUEST_DEADLINE)
@@ -1284,8 +1264,10 @@ def _read_sse(
         try:
             chunk = next(chunks)
         except StopIteration:
+            if complete is not None:
+                complete[0] = True
             break
-        except Exception as error:
+        except httpx2.TransportError as error:
             return (
                 _sse_accounting_payload(state),
                 "deadline"
@@ -1372,6 +1354,7 @@ def _decode_non_stream(
     *,
     started: float,
     request_deadline: float | None = None,
+    complete: list[bool] | None = None,
 ) -> tuple[dict | None, str, str, int, int | None, str]:
     raw, failure, first_byte, byte_count, exception_class = _read_body(
         response,
@@ -1380,14 +1363,20 @@ def _decode_non_stream(
     )
     if raw is None:
         return None, failure, "", byte_count, first_byte, exception_class
+    if complete is not None:
+        complete[0] = True
     from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
         capture_transport_response,
         encode_http_response,
     )
 
-    capture_transport_response(
-        encode_http_response(response, body=raw.decode("utf-8", errors="replace"))
-    )
+    try:
+        capture_transport_response(
+            encode_http_response(response, body=raw.decode("utf-8", errors="replace"))
+        )
+    except httpx2.TransportError as error:
+        msg = "Failed to capture judge response"
+        raise RuntimeError(msg) from error
     if not raw:
         return None, "empty-response", "", byte_count, first_byte, ""
     try:
@@ -1429,10 +1418,12 @@ def _post_response(
         follow_redirects=False,
     ) as response:
         reader = _read_sse if profile.stream else _decode_non_stream
+        complete = [False]
         body, failure, finish, byte_count, first_byte, exception_class = reader(
             response,
             started=started,
             request_deadline=profile.request_deadline,
+            complete=complete,
         )
         return _BatchResponse(
             response.status_code,
@@ -1446,6 +1437,7 @@ def _post_response(
             _retry_after(response.headers),
             200 <= response.status_code < 300,
             _response_cost(response.headers),
+            response_complete=complete[0],
         )
 
 
@@ -1472,7 +1464,7 @@ def _post_batch(
     started = time.monotonic()
     try:
         return _post_response(payload, profile, started, title=title)
-    except Exception as error:
+    except httpx2.TransportError as error:
         return _BatchResponse(
             None,
             None,
@@ -1616,45 +1608,40 @@ def _persist_attempt(
 ) -> object | None:
     if not enabled:
         return None
-    try:
-        usage = _usage_values(response.payload)
-        completion_details = usage.get("completion_tokens_details")
-        if not isinstance(completion_details, dict):
-            completion_details = {}
-        return JudgeRequestAttempt.objects.create(
-            run=run,
-            seat=profile.seat,
-            attempt=ordinal,
-            provider=profile.provider,
-            endpoint_fingerprint=profile.endpoint_fingerprint,
-            model=profile.model,
-            model_fingerprint=profile.model_fingerprint,
-            profile_fingerprint=profile.profile_fingerprint,
-            prompt_schema_version=profile.prompt_schema_version,
-            batch_digest=_batch_digest(batch),
-            batch_size=len(batch),
-            transport_succeeded=response.transport_succeeded,
-            parsed=parsed,
-            failure_kind=failure_kind,
-            http_status=response.status_code,
-            exception_class=response.exception_class,
-            finish_reason=response.finish_reason,
-            response_shape=response_shape[:64],
-            response_segment_count=segment_count,
-            elapsed_ms=response.elapsed_ms,
-            first_byte_ms=response.first_byte_ms,
-            response_bytes=response.response_bytes,
-            prompt_tokens=_usage_token_count(usage.get("prompt_tokens")),
-            completion_tokens=_usage_token_count(usage.get("completion_tokens")),
-            total_tokens=_usage_token_count(usage.get("total_tokens")),
-            reasoning_tokens=_usage_token_count(
-                completion_details.get("reasoning_tokens")
-            ),
-            response_id=str((response.payload or {}).get("id") or ""),
-        )
-    except Exception:
-        LOGGER.exception("Failed to record judge request attempt")
-        return None
+    usage = _usage_values(response.payload)
+    completion_details = usage.get("completion_tokens_details")
+    if not isinstance(completion_details, dict):
+        completion_details = {}
+    return JudgeRequestAttempt.objects.create(
+        run=run,
+        seat=profile.seat,
+        attempt=ordinal,
+        provider=profile.provider,
+        endpoint_fingerprint=profile.endpoint_fingerprint,
+        model=profile.model,
+        model_fingerprint=profile.model_fingerprint,
+        profile_fingerprint=profile.profile_fingerprint,
+        prompt_schema_version=profile.prompt_schema_version,
+        batch_digest=_batch_digest(batch),
+        batch_size=len(batch),
+        transport_succeeded=response.transport_succeeded,
+        response_complete=response.response_complete,
+        parsed=parsed,
+        failure_kind=failure_kind,
+        http_status=response.status_code,
+        exception_class=response.exception_class,
+        finish_reason=response.finish_reason,
+        response_shape=response_shape[:64],
+        response_segment_count=segment_count,
+        elapsed_ms=response.elapsed_ms,
+        first_byte_ms=response.first_byte_ms,
+        response_bytes=response.response_bytes,
+        prompt_tokens=_usage_token_count(usage.get("prompt_tokens")),
+        completion_tokens=_usage_token_count(usage.get("completion_tokens")),
+        total_tokens=_usage_token_count(usage.get("total_tokens")),
+        reasoning_tokens=_usage_token_count(completion_details.get("reasoning_tokens")),
+        response_id=str((response.payload or {}).get("id") or ""),
+    )
 
 
 def _record_usage(
@@ -1668,12 +1655,9 @@ def _record_usage(
 ) -> None:
     if payload is None and header_cost is None:
         return
-    try:
-        _write_llm_usage(
-            payload or {}, service, model, project_slug, batch, attempt, header_cost
-        )
-    except Exception:
-        LOGGER.exception("Failed to record LLM usage")
+    _write_llm_usage(
+        payload or {}, service, model, project_slug, batch, attempt, header_cost
+    )
 
 
 def _log_attempt(
@@ -1868,44 +1852,57 @@ def _update_adaptive(profile: JudgeSeatProfile, enabled: bool, failure: str) -> 
         LOGGER.exception("Failed to update judge adaptive state")
 
 
-def _durable_judge_response(batch, payload, profile, project_context, run):
+def _delivery_identity(
+    request: JudgeRequest,
+    profile: JudgeSeatProfile,
+    project_context: str,
+    *,
+    phase: str,
+) -> str:
+    from weblate.trans.models import Unit  # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+        compute_decision_revision,
+    )
+
+    content = hashlib.sha256(
+        json.dumps(
+            {
+                "source": request.source,
+                "target": request.target,
+                "note": request.note,
+                "explanation": request.explanation,
+                "glossary": request.glossary_terms,
+                "context": project_context,
+                "clarification": request.clarification,
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+        ).encode()
+    ).hexdigest()
+    revision = (
+        compute_decision_revision(Unit.objects.get(pk=request.unit_id))
+        if request.unit_id
+        else request.unit_key
+    )
+    identity = f"judge:{request.unit_id or request.unit_key}:{revision}:{request.target_language}:{profile.seat}:{content}"
+    return identity if phase == "primary" else f"{identity}:pair-fallback"
+
+
+def _durable_judge_response(
+    batch, payload, profile, project_context, run, *, phase, bind_attempt
+):
     from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
         DeliveryUnresolved,
         captured_response,
         dispatch_exchange,
         exchange_for_work,
     )
-    from weblate.trans.models import Unit  # ruff: ignore[import-outside-top-level]
-    from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
-        compute_decision_revision,
-    )
 
-    identities = []
-    for request in batch:
-        content = hashlib.sha256(
-            json.dumps(
-                {
-                    "source": request.source,
-                    "target": request.target,
-                    "note": request.note,
-                    "explanation": request.explanation,
-                    "glossary": request.glossary_terms,
-                    "context": project_context,
-                    "clarification": request.clarification,
-                },
-                sort_keys=True,
-                ensure_ascii=False,
-                default=str,
-            ).encode()
-        ).hexdigest()
-        revision = (
-            compute_decision_revision(Unit.objects.get(pk=request.unit_id))
-            if request.unit_id
-            else request.unit_key
-        )
-        identities.append(
-            f"judge:{request.unit_id or request.unit_key}:{revision}:{request.target_language}:{profile.seat}:{content}"
-        )
+    identities = [
+        _delivery_identity(request, profile, project_context, phase=phase)
+        for request in batch
+    ]
     digest = hashlib.sha256(
         json.dumps(
             {
@@ -1918,14 +1915,37 @@ def _durable_judge_response(batch, payload, profile, project_context, run):
             default=str,
         ).encode()
     ).hexdigest()
+    sent = False
+    sent_response = None
 
     def send():
-        response = _post_batch(payload, profile)
-        raw = captured_response()
+        nonlocal sent, sent_response
+        sent = True
+        try:
+            response = _post_batch(payload, profile)
+            sent_response = response
+            raw = captured_response()
+        except DeliveryUnresolved as error:
+            msg = "Failed to capture judge response"
+            raise RuntimeError(msg) from error
+        if raw is None and response.response_complete:
+            msg = "Complete judge response was not captured"
+            raise RuntimeError(msg)
         return raw if raw is not None else json.dumps(asdict(response), default=str)
 
+    def bind(exchange, receipt):
+        if sent_response is None:
+            msg = "Judge response is missing from the sending transaction"
+            raise RuntimeError(msg)
+        response = sent_response
+        if "body" not in json.loads(receipt):
+            response = replace(response, status_code=None, failure_kind="unknown")
+        bind_attempt(exchange, response)
+
     try:  # ruff: ignore[too-many-statements-in-try-clause]
-        saved = json.loads(dispatch_exchange(identities, digest, send, run_id=run.pk))
+        saved = json.loads(
+            dispatch_exchange(identities, digest, send, run_id=run.pk, on_response=bind)
+        )
         if "body" in saved:
             response = httpx2.Response(
                 saved["status"],
@@ -1946,17 +1966,21 @@ def _durable_judge_response(batch, payload, profile, project_context, run):
                 retry_after=_retry_after(response.headers),
                 transport_succeeded=200 <= saved["status"] < 300,
                 provider_cost=_response_cost(response.headers),
+                response_complete=True,
             )
         else:
-            if saved.get("provider_cost") is not None:
-                saved["provider_cost"] = Decimal(saved["provider_cost"])
-            result = _BatchResponse(**saved)
+            # Legacy journals may contain a serialized client-side timeout.
+            # Only a complete captured HTTP response proves a provider outcome.
+            result = _BatchResponse(None, None, "unknown")
         return replace(result, delivery_id=str(exchange_for_work(identities)))
-    except DeliveryUnresolved:
+    except DeliveryUnresolved as error:
+        if sent:
+            msg = "Failed to persist judge delivery after sending"
+            raise RuntimeError(msg) from error
         return _BatchResponse(None, None, "unknown")
 
 
-def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements]
+def _run_batch(  # ruff: ignore[complex-structure]
     batch: Sequence[JudgeRequest],
     *,
     profile: JudgeSeatProfile,
@@ -1968,6 +1992,7 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
     adaptive: bool,
     isolate: bool,
     ordinal: int,
+    phase: str = "primary",
     retry_deadline: float | None = None,
 ) -> list[JudgeResult]:
     from weblate.trans.delivery_policy import (  # ruff: ignore[import-outside-top-level]
@@ -2002,53 +2027,89 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
         )
     else:
         payload = _payload(batch, profile, project_context)
-    fallback_profile = resolve_judge_fallback_seat_profile(profile.seat, profile)
     transport_left = _setting_retries("JUDGE_TRANSPORT_RETRIES", 1)
     transient_left = _setting_retries("JUDGE_TRANSIENT_HTTP_RETRIES", 1)
     protocol_left = _setting_retries("JUDGE_PROTOCOL_RETRIES", 1)
-    if durable:
+    if durable or phase == "fallback":
         transport_left = transient_left = protocol_left = 0
-        fallback_profile = None
     last_failure, last_attempt, last_profile = "unknown", None, profile
     retries_used = 0
 
     def send_once(
         target_profile: JudgeSeatProfile, target_payload: dict, target_ordinal: int
-    ) -> tuple[_BatchResponse, str, _ParseOutcome, object | None, bool]:
+    ) -> tuple[_BatchResponse, str, _ParseOutcome, object | None]:
         """POST once, persist the attempt and usage, and classify the outcome."""
+
+        def classify(response):
+            failure = (
+                response.failure_kind
+                if response.failure_kind
+                in {"transport", "deadline", "response-too-large"}
+                else _failure_for_http(response.status_code) or response.failure_kind
+            )
+            outcome = _ParseOutcome(None, failure)
+            if not failure and response.payload is not None:
+                outcome = _parse_reply(response.payload, len(batch))
+                failure = outcome.failure_kind
+            if (
+                response.finish_reason == "length"
+                and not response.failure_kind
+                and not _failure_for_http(response.status_code)
+            ):
+                failure = "finish-length"
+            return failure, outcome, outcome.results is not None and not failure
+
+        def create_attempt(response):
+            failure, outcome, parsed = classify(response)
+            return _persist_attempt(
+                enabled=persistence,
+                run=run,
+                profile=target_profile,
+                batch=batch,
+                ordinal=target_ordinal,
+                response=response,
+                parsed=parsed,
+                failure_kind=failure,
+                segment_count=outcome.segment_count,
+                response_shape=(
+                    f"{'stream' if target_profile.stream else 'chat'}:"
+                    f"{outcome.shape or 'raw'}"
+                ),
+            )
+
+        def bind_attempt(exchange, response):
+            attempt = create_attempt(response)
+            if attempt is None:
+                msg = "Durable judge attempt must be persisted"
+                raise RuntimeError(msg)
+            exchange.judge_attempt = attempt
+            exchange.save(update_fields=["judge_attempt", "updated"])
+
         if durable:
             response = _durable_judge_response(
-                batch, target_payload, target_profile, project_context, run
+                batch,
+                target_payload,
+                target_profile,
+                project_context,
+                run,
+                phase=phase,
+                bind_attempt=bind_attempt,
             )
+            if response.delivery_id:
+                from weblate.trans.models.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+                    ProducerLLMExchange,
+                )
+
+                exchange = ProducerLLMExchange.objects.select_related(
+                    "judge_attempt"
+                ).get(pk=response.delivery_id)
+                attempt = exchange.judge_attempt
+            else:
+                attempt = None
         else:
             response = _post_batch(target_payload, target_profile)
-        failure = _failure_for_http(response.status_code) or response.failure_kind
-        outcome = _ParseOutcome(None, failure)
-        if not failure and response.payload is not None:
-            outcome = _parse_reply(response.payload, len(batch))
-            failure = outcome.failure_kind
-        if (
-            response.finish_reason == "length"
-            and not _failure_for_http(response.status_code)
-            and not response.failure_kind
-        ):
-            failure = "finish-length"
-        parsed = outcome.results is not None and not failure
-        attempt = _persist_attempt(
-            enabled=persistence,
-            run=run,
-            profile=target_profile,
-            batch=batch,
-            ordinal=target_ordinal,
-            response=response,
-            parsed=parsed,
-            failure_kind=failure,
-            segment_count=outcome.segment_count,
-            response_shape=(
-                f"{'stream' if target_profile.stream else 'chat'}:"
-                f"{outcome.shape or 'raw'}"
-            ),
-        )
+            attempt = create_attempt(response)
+        failure, outcome, parsed = classify(response)
         if persistence:
 
             def write_usage():
@@ -2085,7 +2146,7 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
             parsed=parsed,
             failure_kind=failure,
         )
-        return response, failure, outcome, attempt, parsed
+        return response, failure, outcome, attempt
 
     def served(result: JudgeResult, target_profile: JudgeSeatProfile) -> JudgeResult:
         return replace(
@@ -2096,86 +2157,17 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
             served_prompt_schema_version=target_profile.prompt_schema_version,
         )
 
-    def try_fallback(
-        target_ordinal: int,
-    ) -> tuple[list[JudgeResult] | None, str, object | None, bool]:
-        """
-        One additional attempt on the fallback endpoint, never retried itself.
-
-        Returns ``(results, failure, attempt, attempted)``. ``results`` is set
-        only when the fallback parsed. ``attempted`` distinguishes "no
-        fallback is configured" from "the fallback attempt was not persisted"
-        (``attempt`` is ``None`` in both, since persistence can be off).
-        """
-        if fallback_profile is None:
-            return None, "", None, False
-        fallback_payload = _payload(batch, fallback_profile, project_context)
-        response, failure, outcome, attempt, parsed = send_once(
-            fallback_profile, fallback_payload, target_ordinal
-        )
-        if failure == "http-request-invalid":
-            raise JudgeError(
-                _("The LLM judge endpoint refused the request (HTTP %s).")
-                % response.status_code
-            )
-        if not parsed:
-            return None, failure, attempt, True
-        # ruff: ignore[assert]
-        assert outcome.results is not None
-        return (
-            [
-                served(
-                    replace(result, request_attempt_id=getattr(attempt, "pk", None)),
-                    fallback_profile,
-                )
-                for result in outcome.results
-            ],
-            failure,
-            attempt,
-            True,
-        )
-
     while True:
-        response, failure, outcome, attempt, parsed = send_once(
-            profile, payload, ordinal
-        )
+        response, failure, outcome, attempt = send_once(profile, payload, ordinal)
         last_attempt, last_failure, last_profile = attempt, failure, profile
-        if parsed:
-            # ruff: ignore[assert]
-            assert outcome.results is not None
-            _update_adaptive(profile, adaptive, "")
+        if outcome.results is not None:
+            _update_adaptive(profile, adaptive, failure)
             return [
                 served(
                     replace(result, request_attempt_id=getattr(attempt, "pk", None)),
                     profile,
                 )
                 for result in outcome.results
-            ]
-        if failure == "http-auth":
-            # The fallback attempt must run before this raises: a different
-            # key presented to a different provider is exactly one warranted
-            # call, even though `http-auth` never reaches the retry branch.
-            fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(ordinal + 1)
-            if fb_results is not None:
-                return fb_results
-            if not fb_attempted:
-                raise JudgeError(_("The LLM judge is not configured."))
-            # ruff: ignore[assert]
-            assert fallback_profile is not None
-            if fb_failure == "http-auth":
-                # Both endpoints reject our credentials: a real configuration
-                # error, not unavailability. Fail fast without a third call.
-                raise JudgeError(_("The LLM judge is not configured."))
-            return [
-                served(
-                    replace(
-                        UNPARSED,
-                        request_attempt_id=getattr(fb_attempt, "pk", None),
-                        failure_kind=fb_failure,
-                    ),
-                    fallback_profile,
-                )
-                for _ in batch
             ]
         if failure == "http-request-invalid":
             # The endpoint will refuse this request every time: no verdict,
@@ -2227,28 +2219,9 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
             ordinal += 1
             continue
         break
-    # The primary's own outcome, kept for adaptive/circuit bookkeeping and for
-    # the width-one isolation trigger below: a fallback attempt (whichever
-    # way it goes) must never corrupt what the primary itself observed.
+    # Preserve the primary outcome for adaptive and isolation bookkeeping.
     primary_failure = last_failure
     _update_adaptive(profile, adaptive, primary_failure)
-    # A parser-failed multi-item batch gets one fallback at the original batch
-    # boundary. If that fallback also fails, width-one isolation below may
-    # retry the primary per item, but must not multiply paid fallback calls.
-    if primary_failure in _FAILOVER_FAILURE_KINDS and (
-        primary_failure != "segment-count" or isolate
-    ):
-        fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(ordinal + 1)
-        if fb_results is not None:
-            return fb_results
-        if fb_attempted:
-            # ruff: ignore[assert]
-            assert fallback_profile is not None
-            last_attempt, last_failure, last_profile = (
-                fb_attempt,
-                fb_failure,
-                fallback_profile,
-            )
     if (
         isolate
         and len(batch) > 1
@@ -2291,6 +2264,7 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
                 UNPARSED,
                 request_attempt_id=getattr(last_attempt, "pk", None),
                 failure_kind=last_failure,
+                http_status=response.status_code,
             ),
             last_profile,
         )
@@ -2301,11 +2275,13 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
 def request_verdicts(  # ruff: ignore[too-many-arguments]
     requests: Sequence[JudgeRequest],
     *,
+    profile: JudgeSeatProfile,
     model: str | None = None,
     project_slug: str = "",
     project_context: str = "",
     on_batch: OnBatch | None = None,
     seat: int | None = None,
+    phase: str = "primary",
     run: ProducerRun | None = None,
     persist_attempts: bool = False,
     retry_budget: RetryBudget | None = None,
@@ -2318,8 +2294,7 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
     """
     Return one result per request without ever persisting prompt or response text.
 
-    Pass ``seat`` from the judge loop to use a frozen per-seat profile. The
-    no-seat form remains a database-free compatibility API for direct callers.
+    The caller chooses an immutable endpoint profile before dispatch.
     ``cancelled`` is polled before every batch (G4): once it reports a
     cancellation, no further batch is dispatched, but a batch already sent
     still completes and its result is kept and reported to ``on_batch``.
@@ -2328,12 +2303,10 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
     already sent batch keeps its results.
     """
     validate_request_settings()
-    profile = (
-        resolve_judge_seat_profile(seat)
-        if seat is not None
-        else _resolve_profile(0, legacy_model=model)
-    )
-    if model is not None and seat is not None and model != profile.model:
+    judge_fallback_endpoint()
+    if (model is not None and model != profile.model) or (
+        seat is not None and seat != profile.seat
+    ):
         raise JudgeError(_("The LLM judge is not configured."))
     if not requests:
         return []
@@ -2360,12 +2333,23 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
             retry_budget=budget,
             adaptive=adaptive,
             retry_deadline=retry_deadline,
-            isolate=True,
+            isolate=phase == "primary",
             ordinal=attempt,
+            phase=phase,
         )
         results.extend(batch_results)
         if on_batch is not None:
             on_batch(batch, batch_results)
+        if batch_results and batch_results[0].http_status in {401, 402, 403}:
+            unsent = list(requests[start + len(batch) :])
+            if unsent:
+                stopped = [
+                    replace(UNPARSED, failure_kind="not-sent-auth") for _ in unsent
+                ]
+                results.extend(stopped)
+                if on_batch is not None:
+                    on_batch(unsent, stopped)
+            break
         start += batch_size
         if start < len(requests) and settings.JUDGE_REQUEST_SLEEP:
             time.sleep(settings.JUDGE_REQUEST_SLEEP)

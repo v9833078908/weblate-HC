@@ -77,8 +77,13 @@ from weblate.trans.component_copy import (
     replace_component_checkout,
 )
 from weblate.trans.exceptions import FailedCommitError, FileParseError
-from weblate.trans.judge import JUDGE_SEATS, validate_judge_configuration
+from weblate.trans.judge import (
+    JUDGE_SEATS,
+    resolve_judge_seat_profile,
+    validate_judge_configuration,
+)
 from weblate.trans.judge_loop import (
+    _request_identity,
     accept_judge_candidate,
     build_request,
     judge_project_context,
@@ -118,6 +123,7 @@ from weblate.trans.models.repeat import (
     RepeatRecommendationRun,
 )
 from weblate.trans.repeat_bulk import process_apply_items
+from weblate.trans.repeat_recommendations import execute_attempt
 from weblate.trans.tests.utils import (
     RepoTestMixin,
     clear_users_cache,
@@ -12177,7 +12183,6 @@ class TranslationAPITest(APIBaseTest):
     JUDGE_FALLBACK_BASE_URL="",
     JUDGE_FALLBACK_API_KEY="",
     JUDGE_FALLBACK_MODEL_SEAT_1="",
-    JUDGE_FALLBACK_MODEL_SEAT_2="",
     JUDGE_MAY_APPROVE=False,
 )
 class TranslationJudgeAutotranslateAPITest(
@@ -18074,6 +18079,11 @@ class AnnouncementAPITest(APIBaseTest):
         )
 
 
+@override_settings(
+    JUDGE_API_KEY="test-judge-key",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
 class ProducerAPITest(APIBaseTest):
     """
     The producer console contract.
@@ -18284,6 +18294,7 @@ class ProducerAPITest(APIBaseTest):
             note=request.note,
             explanation=request.explanation,
             glossary_terms=request.glossary_terms,
+            clarification=request.clarification,
         )
         target_hash = compute_target_hash(unit.get_target_plurals())
         run = ProducerRun.objects.create(
@@ -18324,6 +18335,23 @@ class ProducerAPITest(APIBaseTest):
             )
             for seat in JUDGE_SEATS
         ]
+        context = judge_project_context(self.component.project)
+        for row in live:
+            profile = resolve_judge_seat_profile(row.seat)
+            row.profile_fingerprint = profile.profile_fingerprint
+            row.prompt_schema_version = profile.prompt_schema_version
+            row.request_identity = _request_identity(unit, request, profile, context)
+            row.source_language = request.source_language
+            row.target_language = request.target_language
+            row.save(
+                update_fields=[
+                    "profile_fingerprint",
+                    "prompt_schema_version",
+                    "request_identity",
+                    "source_language",
+                    "target_language",
+                ]
+            )
         run_unit = JudgeRunUnit.objects.create(
             run=run,
             unit=unit,
@@ -18359,8 +18387,10 @@ class ProducerAPITest(APIBaseTest):
             },
         )
         candidate_hash = compute_target_hash(candidate.target_list)
+        candidate_request = build_request(unit, target_plurals=candidate.target_list)
         seats = JUDGE_SEATS if complete_candidate else JUDGE_SEATS[:1]
         for seat in seats:
+            profile = resolve_judge_seat_profile(seat)
             JudgeVerdict.objects.create(
                 unit=unit,
                 subject=JudgeVerdict.Subject.CANDIDATE,
@@ -18370,6 +18400,13 @@ class ProducerAPITest(APIBaseTest):
                 run_id=run.pk,
                 attempt=1,
                 seat=seat,
+                profile_fingerprint=profile.profile_fingerprint,
+                prompt_schema_version=profile.prompt_schema_version,
+                request_identity=_request_identity(
+                    unit, candidate_request, profile, context
+                ),
+                source_language=candidate_request.source_language,
+                target_language=candidate_request.target_language,
                 judge_model=f"candidate-{seat}/model",
                 project_context_hash=compute_target_hash(
                     [judge_project_context(self.component.project)]
@@ -18418,6 +18455,24 @@ class ProducerAPITest(APIBaseTest):
         self.assertEqual(decision["revision"], compute_decision_revision(unit))
         self.assertNotIn("target", decision)
         self.assertNotIn("source", decision)
+
+    @override_settings(JUDGE_ENABLED=True)
+    def test_project_decision_rejects_two_seats_with_fallback_provenance(self):
+        run, unit, _candidate = self._make_project_judge_decision()
+        JudgeVerdict.objects.filter(
+            unit=unit, subject=JudgeVerdict.Subject.CANDIDATE, seat=1
+        ).update(profile_fingerprint="fallback-profile")
+        response = self.do_request(
+            "api:producer-project-decisions",
+            kwargs={"slug": self.component.project.slug},
+            request={"kind": "judge", "run": str(run.pk)},
+            superuser=True,
+        )
+        decision = response.data["results"][0]
+        self.assertEqual(decision["seat_results"], {"1": "parsed", "2": "parsed"})
+        self.assertFalse(decision["candidate_verified"])
+        self.assertFalse(decision["candidate_acceptable"])
+        self.assertEqual(decision["applicability"], "not_verified")
 
     @override_settings(JUDGE_ENABLED=True)
     def test_project_judge_decisions_never_marks_one_seat_candidate_ready(self) -> None:
@@ -19479,6 +19534,51 @@ class ProducerAPITest(APIBaseTest):
             self.assertEqual(receipt["outcome"], "applied")
             applications.append(receipt["application_id"])
         plan = self._producer_repeat_plan([first, second], applications)
+        self.assertEqual(plan["status"], "queued")
+        self.assertEqual(plan["groups"][0]["outcome"], "pending")
+        self.assertFalse(RepeatBulkRun.objects.exists())
+        operation = ProducerQualityOperation.objects.get(pk=plan["token"])
+        entry = operation.private_data["groups"][0]
+        run = RepeatRecommendationRun.objects.get(pk=entry["recommendation_run"])
+        # Both applied repairs have current dual-primary evidence. Complete the
+        # asynchronous recommendation without choosing either conflicting anchor.
+        response = SimpleNamespace(
+            payload={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "results": [
+                                        {
+                                            "group": entry["native_group_id"],
+                                            "action": "needs_human",
+                                            "target": [],
+                                            "exclusions": [],
+                                            "rationale": "The repairs conflict.",
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ],
+                "usage": {},
+            },
+            transport_succeeded=True,
+            provider_cost=None,
+            failure_kind="",
+        )
+        with patch(
+            "weblate.trans.repeat_recommendations.post_chat_completion",
+            return_value=response,
+        ):
+            execute_attempt(attempt=run.attempts.get())
+        plan = self.do_request(
+            "api:producer-repeat-plan-detail",
+            kwargs={"token": plan["token"]},
+            superuser=True,
+        ).data
         self.assertEqual(plan["status"], "ready")
         self.assertEqual(plan["groups"][0]["outcome"], "needs_review")
         self.assertTrue(plan["groups"][0]["reason"])
@@ -19486,6 +19586,8 @@ class ProducerAPITest(APIBaseTest):
         first.refresh_from_db()
         second.refresh_from_db()
         self.assertNotEqual(first.target, second.target)
+        self.assertEqual(first.target, "Dobrý den!\n")
+        self.assertEqual(second.target, "Zdravím svět!\n")
 
     def test_producer_repeat_plan_preserves_conflicting_approved_targets(self) -> None:
         first, second = self._quality_repeat_pair()
@@ -20090,7 +20192,6 @@ class ProducerAPITest(APIBaseTest):
     JUDGE_FALLBACK_BASE_URL="",
     JUDGE_FALLBACK_API_KEY="",
     JUDGE_FALLBACK_MODEL_SEAT_1="",
-    JUDGE_FALLBACK_MODEL_SEAT_2="",
     JUDGE_MAY_APPROVE=False,
 )
 class ProducerConsoleRealRunEndToEndTest(RepoTestMixin, APITransactionTestCase):

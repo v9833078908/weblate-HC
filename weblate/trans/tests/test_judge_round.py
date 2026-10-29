@@ -5,17 +5,29 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from types import SimpleNamespace
+from unittest import mock
 
 from django.db import IntegrityError, transaction
 from django.test import override_settings
+from django.utils import timezone
 
 from weblate.glossary.models import (
     get_glossary_terms,
     get_matched_glossary_prompt_entries,
 )
-from weblate.trans.judge import JudgeResult
-from weblate.trans.judge_loop import _write_verdict, build_request
+from weblate.trans.judge import JudgeResult, resolve_judge_seat_profile
+from weblate.trans.judge_loop import (
+    _write_verdict,
+    build_request,
+    judge_project_context,
+)
+from weblate.trans.judge_quality import (
+    TargetQuality,
+    candidate_quality,
+    may_release_automatic_repeat_hold,
+)
 from weblate.trans.models.judge import (
     JudgeVerdict,
     active_round,
@@ -23,6 +35,7 @@ from weblate.trans.models.judge import (
     candidate_round,
     collegium_severity,
     compute_context_hash,
+    compute_decision_revision,
     compute_target_hash,
     compute_target_storage_hash,
     current_round,
@@ -36,7 +49,7 @@ from weblate.trans.models.judge import (
 from weblate.trans.models.variant import Variant
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
-from weblate.utils.state import STATE_TRANSLATED
+from weblate.utils.state import STATE_NEEDS_CHECKING, STATE_TRANSLATED
 
 
 class JudgeRoundTest(ViewTestCase):
@@ -468,6 +481,131 @@ class JudgeRoundTest(ViewTestCase):
         )
 
         self.assertFalse(has_complete_current_evidence(unit, seats=(1, 2)))
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="offline-only",
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+    )
+    def test_complete_evidence_requires_current_primary_profiles(self) -> None:
+        unit = self.get_unit()
+        request = build_request(unit)
+        context = judge_project_context(unit.translation.component.project)
+        for seat in (1, 2):
+            _write_verdict(
+                unit,
+                request,
+                seat=seat,
+                attempt=0,
+                run_id=uuid.uuid4(),
+                result=JudgeResult("none", "pass", [], ""),
+                profile=resolve_judge_seat_profile(seat),
+                project_context=context,
+            )
+        self.assertTrue(has_complete_current_evidence(unit, seats=(1, 2)))
+        JudgeVerdict.objects.filter(unit=unit, seat=1).update(
+            profile_fingerprint="other-profile"
+        )
+        self.assertFalse(has_complete_current_evidence(unit, seats=(1, 2)))
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="offline-only",
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+    )
+    def test_candidate_evidence_requires_primary_provenance(self) -> None:
+        unit = self.get_unit()
+        targets = ["Candidate"]
+        request = build_request(unit, target_plurals=targets)
+        context = judge_project_context(unit.translation.component.project)
+        for seat in (1, 2):
+            _write_verdict(
+                unit,
+                request,
+                seat=seat,
+                attempt=0,
+                run_id=uuid.uuid4(),
+                result=JudgeResult("none", "pass", [], ""),
+                profile=resolve_judge_seat_profile(seat),
+                project_context=context,
+                subject=JudgeVerdict.Subject.CANDIDATE,
+            )
+        rows = candidate_round(unit, targets)
+        self.assertTrue(
+            candidate_quality(unit, targets, evidence=rows).two_seat_verified
+        )
+        for field, value in (
+            ("profile_fingerprint", "fallback-profile"),
+            ("prompt_schema_version", "other-schema"),
+            ("project_context_hash", "other-project"),
+            ("request_identity", "other-identity"),
+            ("source_language", "other-language"),
+            ("subject", JudgeVerdict.Subject.LIVE),
+            ("target_hash", "other-target"),
+        ):
+            with self.subTest(field=field):
+                original = getattr(rows[0], field)
+                setattr(rows[0], field, value)
+                self.assertFalse(
+                    candidate_quality(unit, targets, evidence=rows).two_seat_verified
+                )
+                setattr(rows[0], field, original)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="offline-only",
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+    )
+    def test_repeat_hold_requires_two_current_primary_opinions(self) -> None:
+        unit = self.get_unit()
+        unit.state = STATE_NEEDS_CHECKING
+        unit.save(update_fields=["state"])
+        request = build_request(unit)
+        context = judge_project_context(unit.translation.component.project)
+        event = SimpleNamespace(
+            result={
+                "written": [
+                    {
+                        "unit": unit.pk,
+                        "applied_revision": compute_decision_revision(unit),
+                    }
+                ]
+            }
+        )
+        change = SimpleNamespace(timestamp=timezone.now() - timedelta(days=1))
+        for seat in (1, 2):
+            _write_verdict(
+                unit,
+                request,
+                seat=seat,
+                attempt=0,
+                run_id=uuid.uuid4(),
+                result=JudgeResult("none", "pass", [], ""),
+                profile=resolve_judge_seat_profile(seat),
+                project_context=context,
+            )
+        with (
+            mock.patch(
+                "weblate.trans.judge_quality.automatic_repeat_change",
+                return_value=(change, event),
+            ),
+            mock.patch(
+                "weblate.trans.judge_quality.automatic_candidate_allowed",
+                return_value=True,
+            ),
+            mock.patch(
+                "weblate.trans.judge_quality.evaluate_target_quality",
+                return_value=TargetQuality((), False, False),
+            ),
+        ):
+            self.assertTrue(may_release_automatic_repeat_hold(unit, self.user))
+            JudgeVerdict.objects.filter(unit=unit, seat=1).update(
+                profile_fingerprint="fallback-profile"
+            )
+            self.assertFalse(may_release_automatic_repeat_hold(unit, self.user))
 
     def test_a_verdict_for_other_text_is_not_active(self) -> None:
         unit = self.get_unit()

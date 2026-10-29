@@ -215,13 +215,17 @@ application of this procedure requires a separate approved maintenance window.
      - Database (verdicts; each resolution transition permanently appends
        its own history entry, though the verdict's current resolution can
        move again through an allowed transition, and bounded request-attempt
-       diagnostics), outbound request per batch to the provider configured by
-       :setting:`JUDGE_BASE_URL`, bounded by
-       :setting:`JUDGE_REQUEST_DEADLINE` when enabled, and at most one further
-       request per batch to the second endpoint configured by
-       :setting:`JUDGE_FALLBACK_BASE_URL`, under its own separate credential
-       :setting:`JUDGE_FALLBACK_API_KEY`, after an availability failure -
-       never on a parsed-but-unusable response. Attempts retain only
+       diagnostics), outbound requests for both primary seats to the provider
+       configured by :setting:`JUDGE_BASE_URL`, bounded by
+       :setting:`JUDGE_REQUEST_DEADLINE` when enabled. Only confirmed failures
+       of both current primary requests permit one fallback opinion through
+       :setting:`JUDGE_FALLBACK_BASE_URL` and its separate credential
+       :setting:`JUDGE_FALLBACK_API_KEY`. One usable primary opinion suppresses
+       fallback; a valid rejection is an opinion, not an availability failure.
+       Unknown billing, incomplete capture, missing provenance, cancellation
+       and local persistence failures do not authorize another paid request.
+       A completely captured but malformed provider reply can prove failure.
+       Attempts retain only
        status, timing, response shape, hashes, and token counters, never
        source/target text, prompts, completions, reasoning, headers, or keys.
        A stored candidate's ``Suggestion.userdetails`` records only its
@@ -370,11 +374,11 @@ repository state, background tasks, outbound requests, and rendered UI.
        question about that exact target unit, glossary terms, and failing
        check names to the provider
        host configured by :setting:`JUDGE_BASE_URL` under separate site-wide
-       credentials, and once per batch to a second configured host and
-       credential (:setting:`JUDGE_FALLBACK_BASE_URL`) only after the primary
-       is unavailable; users cannot supply an endpoint, key, or model for
-       either. The
-       provider response is
+       credentials. Only strings with confirmed failures from both current
+       primary profiles may be sent to the single fallback model at
+       :setting:`JUDGE_FALLBACK_BASE_URL`; users cannot supply an endpoint,
+       key, or model for either host. Unknown paid outcomes remain fenced,
+       and fallback has no automatic retry or split isolation. The provider response is
        untrusted input parsed against a strict schema; a batch that exceeds
        :setting:`JUDGE_REQUEST_DEADLINE`, or is malformed, is recorded as
        unparsed and never treated as a favorable verdict. A judge run also
@@ -466,9 +470,11 @@ Reachability preconditions:
   without the checkbox never rewrites an existing human translation, judges
   it instead, storing a previewable repair candidate rather than an
   automatic rewrite.
-  Applying a stored candidate is refused unless every configured judge
-  seat already verified that exact candidate text against the unit's
-  current target and context before it was ever stored - a
+  Applying a stored candidate is refused unless both current primary
+  profiles verified that exact candidate text against the unit's
+  current target and context before it was ever stored. A single primary
+  or fallback opinion, even alongside a stale second seat, cannot authorize
+  candidate application, automatic approval or repeat-hold release. This is a
   verified-before-write guarantee, not only a staleness check performed
   at apply time - and requires unit-review and automatic-translation
   permission together; a plain suggestion-accept permission alone cannot
@@ -535,9 +541,11 @@ Reachability preconditions:
   I/O and store complete responses before parsing. Durable judge delivery is
   selected by server-persisted operation admission, not merely by the presence
   of a producer run or a client-supplied policy field. Ordinary Weblate runs
-  retain their configured streaming, retries and fallback. Existing delegated
-  runs, MT receipts and delivery journals retain their financial fences even
-  without the new policy marker. The private
+  retain their configured streaming and bounded primary retries. Both paths
+  use the same per-string two-primary-failure fallback gate; durable delivery
+  does not gain hidden retries. Existing delegated runs, MT receipts and
+  delivery journals retain their financial fences even without the new policy
+  marker. The private
   ``DATA_DIR/private-llm-delivery`` files contain translation text and provider
   output, require the same protection and private backup handling as project
   content, and are never serialized by producer endpoints. Each body is capped
@@ -546,6 +554,14 @@ Reachability preconditions:
   are pruned 30 days after successful terminal processing; unresolved bodies
   remain available for reconciliation. Provider result lookup and billing
   idempotency are not claimed for unverified routes. *(maintainer)*
+  A judge exchange links atomically to its actual HTTP attempt while the
+  complete receipt is captured under the exchange lock. Linked attempts are
+  retained for replay and fallback admission; historical null associations
+  and incomplete-response metadata are not inferred or backfilled. Saved
+  fallback exchanges replay their complete original membership and request
+  digest, not a reordered or narrower pending subset. Before an expired,
+  provably unsent reservation can incur a charge, every original member must
+  still satisfy the current two-primary-failure gate.
   Routed deliveries also bind a closed request/reply codec to the spend fence.
   New requests use source-owned protected slots. A historical parts reply can
   only enter the replay-only path after its complete work set, reconstructed
@@ -564,10 +580,10 @@ Reachability preconditions:
   by trusted application code. *(maintainer)*
 * Producer quality operation receipts, judge verdicts, producer runs (including cost estimates and applied
   candidate receipts), and the durable per-application undo record are
-  retained without an automatic expiry; only high-volume transport
-  diagnostics - raw provider request/response records and closed retry
-  rows - are pruned automatically by ``cleanup_judge_observability`` on
-  the schedule an administrator configures. A deployment with sustained
+  retained without an automatic expiry. Unlinked high-volume transport
+  diagnostics and closed retry rows are pruned automatically by
+  ``cleanup_judge_observability`` on the schedule an administrator configures;
+  attempts linked to a delivery exchange are excluded. A deployment with sustained
   producer traffic should size storage and its own housekeeping for
   accumulating run and receipt history; this is a capacity planning
   concern, not a data-integrity one, since none of these rows are
@@ -1278,11 +1294,12 @@ transport or parse failure is recorded as unparsed rather than defaulting to
 a favorable verdict. A batch may be sent to a second endpoint
 (:setting:`JUDGE_FALLBACK_BASE_URL`) under its own separate site-wide
 credential (:setting:`JUDGE_FALLBACK_API_KEY`, the second secret to rotate)
-after the primary
-is unavailable; that credential is never shared with the primary, the two
-endpoints must differ once canonicalized, and the
-fallback can only substitute for a missing response, never resend a parsed
-reply the run disliked to a different model. Its bounded request-attempt
+only after both current primary requests have confirmed unusable outcomes.
+One healthy primary suppresses fallback; a parsed rejection never opens it.
+Unknown billing or incomplete capture blocks fallback rather than authorizing
+a new charge. The credential is never shared with the primary, the endpoints
+must differ once canonicalized, and one fallback opinion is never presented as
+two independent primary opinions. Its bounded request-attempt
 records contain only redacted metadata and keyed digests, and are not an API
 or report confirmation oracle for a source or translation supplied by a
 user. *(maintainer)*

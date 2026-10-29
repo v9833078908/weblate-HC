@@ -210,13 +210,17 @@ def format_judge_summary(summary: JudgeSummary) -> str:
 
 
 def _summarize_verdicts(
-    verdicts: dict[int, JudgeVerdict], *, cap_remainder: int, untranslated: int = 0
+    verdicts: dict[int, JudgeVerdict],
+    *,
+    cap_remainder: int,
+    untranslated: int = 0,
+    incomplete: set[int] | None = None,
 ) -> JudgeSummary:
     """Tally one judge run's retained verdicts into producer-facing buckets."""
     nothing_blocking = minor_noted = major_not_fixed = critical_held = 0
     unparsed = repaired = 0
-    for verdict in verdicts.values():
-        if verdict.unparsed:
+    for unit_id, verdict in verdicts.items():
+        if verdict.unparsed or (incomplete is not None and unit_id in incomplete):
             unparsed += 1
         elif verdict.effective_severity == JudgeVerdict.Severity.CRITICAL:
             critical_held += 1
@@ -1325,6 +1329,16 @@ class AutoTranslate(BaseAutoTranslate):
 
         def tick(_requests, _results) -> None:
             nonlocal completed_batches
+            if any(
+                getattr(result, "failure_kind", "") == "not-sent-auth"
+                for result in _results
+            ):
+                self.add_warning(
+                    gettext(
+                        "A judge seat stopped after an authentication or quota refusal; "
+                        "the remaining strings were not sent to that seat."
+                    )
+                )
             completed_batches += 1
             phase, phase_current, phase_total = _judge_phase(
                 completed_batches,
@@ -1431,6 +1445,7 @@ class AutoTranslate(BaseAutoTranslate):
         }
         projections: set[int] = set()
         stale_conflicts: set[int] = set()
+        incomplete_primary: set[int] = set()
         unparsed = 0
         for unit in (
             self.translation.unit_set.filter(pk__in=verdicts)
@@ -1454,6 +1469,9 @@ class AutoTranslate(BaseAutoTranslate):
                     or (locked.target, locked.state) != final_snapshots[unit.id]
                 ):
                     stale_conflicts.add(unit.id)
+                    continue
+                if not has_complete_current_evidence(locked, seats=JUDGE_SEATS):
+                    incomplete_primary.add(unit.id)
                     continue
                 if self.judge_proposal_only:
                     # ruff: ignore[import-outside-top-level]
@@ -1504,6 +1522,21 @@ class AutoTranslate(BaseAutoTranslate):
                 )
                 % unparsed
             )
+        if incomplete_primary:
+            self.add_warning(
+                ngettext(
+                    "%d string lacks complete current primary judge evidence.",
+                    "%d strings lack complete current primary judge evidence.",
+                    len(incomplete_primary),
+                )
+                % len(incomplete_primary)
+            )
+        self.judge_summary = _summarize_verdicts(
+            verdicts,
+            cap_remainder=preview.remaining,
+            untranslated=len(untranslated_units),
+            incomplete=incomplete_primary,
+        )
         self.post_process()
         if self.producer_run is not None:
             repair_status: dict[int, str] = getattr(verdicts, "repair_status", {})
@@ -1550,7 +1583,7 @@ class AutoTranslate(BaseAutoTranslate):
                     if unit.id in stale_conflicts
                     else (
                         JudgeRunUnit.Outcome.UNPARSED
-                        if verdict.unparsed
+                        if verdict.unparsed or unit.id in incomplete_primary
                         else severity_outcomes[verdict.effective_severity]
                     )
                 )
@@ -2596,6 +2629,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 .values_list("outcome")
                 .annotate(count=Count("pk"))
             )
+            if status == ProducerRun.Status.COMPLETED and outcomes.get(
+                JudgeRunUnit.Outcome.UNPARSED
+            ):
+                status = ProducerRun.Status.PARTIAL
+                run.status = status
             summary.update(
                 evaluated=sum(
                     count
