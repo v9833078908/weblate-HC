@@ -157,6 +157,33 @@ class ProducerReleaseMigrationDataTest(TransactionTestCase):
                     self.assertIsNone(saved.pop("judge_attempt_id"))
                 self.assertEqual(saved, expected)
 
+    def test_pre_upgrade_attempt_writer_remains_usable_after_upgrade(self) -> None:
+        before = ("trans", "0155_routed_gemini_reasoning_codec")
+        target = ("trans", "0156_judge_delivery_attempt")
+        executor = MigrationExecutor(connection)
+        executor.migrate([before])
+        legacy_attempt = executor.loader.project_state([before]).apps.get_model(
+            "trans", "JudgeRequestAttempt"
+        )
+        executor = MigrationExecutor(connection)
+        executor.migrate([target])
+        written = legacy_attempt.objects.create(
+            seat=1,
+            provider="litellm",
+            model="synthetic/model",
+            endpoint_fingerprint="a" * 64,
+            profile_fingerprint="b" * 64,
+            prompt_schema_version="synthetic",
+            batch_digest="c" * 64,
+            batch_size=1,
+        )
+        current_attempt = executor.loader.project_state([target]).apps.get_model(
+            "trans", "JudgeRequestAttempt"
+        )
+        self.assertIs(
+            current_attempt.objects.get(pk=written.pk).response_complete, False
+        )
+
     def tearDown(self) -> None:
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())

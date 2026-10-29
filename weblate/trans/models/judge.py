@@ -614,7 +614,7 @@ class JudgeRequestAttempt(models.Model):
     batch_digest = models.CharField(max_length=64)
     batch_size = models.PositiveSmallIntegerField()
     transport_succeeded = models.BooleanField(default=False)
-    response_complete = models.BooleanField(default=False)
+    response_complete = models.BooleanField(default=False, db_default=False)
     parsed = models.BooleanField(default=False)
     failure_kind = models.CharField(
         max_length=24, choices=FailureKind, blank=True, db_index=True
