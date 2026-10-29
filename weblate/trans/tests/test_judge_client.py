@@ -8,6 +8,7 @@ import json
 import time
 from dataclasses import replace
 from decimal import Decimal
+from tempfile import TemporaryDirectory
 from typing import Any, ClassVar
 from unittest import mock
 
@@ -49,6 +50,7 @@ from weblate.trans.judge import (
 )
 from weblate.trans.judge_loop import _AVAILABILITY_FAILURE_KINDS
 from weblate.trans.models.judge import JudgeRequestAttempt, ProducerRun
+from weblate.trans.models.llm_delivery import ProducerLLMExchange
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
 
@@ -129,7 +131,7 @@ def _request_segments(body: dict) -> list[dict]:
     return json.loads(payload)["segments"]
 
 
-class JudgeSSETest(SimpleTestCase):
+class JudgeSSETest(http_mock.MockDNSMixin, SimpleTestCase):
     def test_invalid_utf8_is_a_typed_protocol_failure(self) -> None:
         response = httpx2.Response(200, content=b"\xff")
 
@@ -171,7 +173,7 @@ class JudgeSSETest(SimpleTestCase):
         self.assertEqual(payload["usage"]["cost"], Decimal("0.123456789123456789"))
 
 
-class SegmentGlossaryTest(SimpleTestCase):
+class SegmentGlossaryTest(http_mock.MockDNSMixin, SimpleTestCase):
     def test_segment_carries_the_complete_glossary_entry(self) -> None:
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.judge import _segment
@@ -251,7 +253,7 @@ class SegmentGlossaryTest(SimpleTestCase):
         self.assertIn("〜してください", prompt)
 
 
-class JudgeClientGateTest(SimpleTestCase):
+class JudgeClientGateTest(http_mock.MockDNSMixin, SimpleTestCase):
     @override_settings(JUDGE_ENABLED=False)
     @http_mock.activate
     def test_disabled_makes_no_network_call(self) -> None:
@@ -423,7 +425,7 @@ class JudgeClientGateTest(SimpleTestCase):
         self.assertEqual(len(http_mock.calls), 0)
 
 
-class JudgeEndpointResolutionTest(SimpleTestCase):
+class JudgeEndpointResolutionTest(http_mock.MockDNSMixin, SimpleTestCase):
     def test_default_base_url_is_openrouter(self) -> None:
         self.assertEqual(get_judge_base_url(), "https://openrouter.ai/api/v1")
 
@@ -441,7 +443,7 @@ class JudgeEndpointResolutionTest(SimpleTestCase):
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
 )
-class JudgeExplicitEndpointTest(SimpleTestCase):
+class JudgeExplicitEndpointTest(http_mock.MockDNSMixin, SimpleTestCase):
     """An endpoint is a value threaded through resolution, not a global read."""
 
     def test_primary_endpoint_is_an_explicit_value(self) -> None:
@@ -498,7 +500,7 @@ class JudgeExplicitEndpointTest(SimpleTestCase):
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
 )
-class JudgeFallbackConfigurationTest(SimpleTestCase):
+class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
     """Eight new settings, all blank by default, validated all-or-nothing."""
 
     def test_unconfigured_fallback_validates_and_is_ready(self) -> None:
@@ -516,7 +518,10 @@ class JudgeFallbackConfigurationTest(SimpleTestCase):
             ),
         )
         request_verdicts([REQ], seat=1)
-        self.assertEqual(len(http_mock.calls), 1)
+        # Capability lookups are not paid judge attempts and may be cached.
+        posts = [call for call in http_mock.calls if call.request.method == "POST"]
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(str(posts[0].request.url), LITELLM_CHAT_URL)
 
     def test_partial_fallback_configuration_raises_before_any_request(self) -> None:
         required = [
@@ -669,7 +674,7 @@ class JudgeFallbackConfigurationTest(SimpleTestCase):
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeServingIdentityTest(TestCase):
+class JudgeServingIdentityTest(http_mock.MockDNSMixin, TestCase):
     """Every result carries the identity of the profile that actually served it."""
 
     @http_mock.activate
@@ -741,7 +746,7 @@ _FALLBACK_PARSED_PAYLOAD = _reply(
     JUDGE_PROTOCOL_RETRIES=0,
     **JUDGE_FALLBACK_SETTINGS,
 )
-class JudgeFailoverTest(TestCase):
+class JudgeFailoverTest(http_mock.MockDNSMixin, TestCase):
     """One fallback attempt per batch per seat, exactly on the permitted kinds."""
 
     def test_failover_and_availability_kinds_differ_exactly_as_specified(
@@ -1244,7 +1249,7 @@ _SLASHED_PRIMARY = "https://openrouter.ai/api/v1/"
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeEndpointCanonicalizationTest(SimpleTestCase):
+class JudgeEndpointCanonicalizationTest(http_mock.MockDNSMixin, SimpleTestCase):
     """
     One destination is one endpoint, whatever way the operator spelled it.
 
@@ -1331,7 +1336,7 @@ class JudgeEndpointCanonicalizationTest(SimpleTestCase):
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeClientTest(SimpleTestCase):
+class JudgeClientTest(http_mock.MockDNSMixin, SimpleTestCase):
     @http_mock.activate
     def test_openrouter_request_has_service_title(self) -> None:
         http_mock.register("POST", CHAT_URL, json=_reply([]))
@@ -2061,7 +2066,7 @@ class JudgeClientTest(SimpleTestCase):
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeRequestLoggingTest(SimpleTestCase):
+class JudgeRequestLoggingTest(http_mock.MockDNSMixin, SimpleTestCase):
     @http_mock.activate
     def test_batch_outcome_is_logged_with_elapsed_time(self) -> None:
         http_mock.register(
@@ -2090,7 +2095,7 @@ class JudgeRequestLoggingTest(SimpleTestCase):
     JUDGE_API_KEY="sk-test",
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeRequestDeadlineTest(TestCase):
+class JudgeRequestDeadlineTest(http_mock.MockDNSMixin, TestCase):
     def _dripping_response(self) -> httpx2.Response:
         body = json.dumps(
             _reply([{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}])
@@ -2265,7 +2270,7 @@ class JudgeRequestDeadlineTest(TestCase):
     JUDGE_API_KEY="sk-test",
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeOnBatchTest(SimpleTestCase):
+class JudgeOnBatchTest(http_mock.MockDNSMixin, SimpleTestCase):
     @override_settings(JUDGE_BATCH_SIZE=1)
     @http_mock.activate
     def test_is_called_once_per_completed_batch_in_input_order(self) -> None:
@@ -2345,7 +2350,7 @@ class JudgeOnBatchTest(SimpleTestCase):
     JUDGE_API_KEY="sk-test",
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeCancellationTest(SimpleTestCase):
+class JudgeCancellationTest(http_mock.MockDNSMixin, SimpleTestCase):
     """G4: a cancellation predicate stops new batches; a sent one still lands."""
 
     @override_settings(JUDGE_BATCH_SIZE=1)
@@ -2406,7 +2411,7 @@ class JudgeCancellationTest(SimpleTestCase):
         self.assertEqual(results, [])
 
 
-class JudgeUsageLogTest(TestCase):
+class JudgeUsageLogTest(http_mock.MockDNSMixin, TestCase):
     @override_settings(
         JUDGE_ENABLED=True,
         JUDGE_API_KEY="sk-test",
@@ -2818,7 +2823,7 @@ class JudgeUsageLogTest(TestCase):
         self.assertEqual(LLMUsageLog.objects.count(), 0)
 
 
-class JudgeReasoningBudgetTest(TestCase):
+class JudgeReasoningBudgetTest(http_mock.MockDNSMixin, TestCase):
     """Reasoning tokens were 84% of the first dev run's cost."""
 
     @override_settings(
@@ -2865,7 +2870,7 @@ class JudgeReasoningBudgetTest(TestCase):
         self.assertEqual(body["reasoning"], {"effort": "low", "exclude": True})
 
 
-class JudgePromptContextTest(TestCase):
+class JudgePromptContextTest(http_mock.MockDNSMixin, TestCase):
     """The prompt must carry the project's setting, never a hardcoded one."""
 
     @override_settings(
@@ -2931,7 +2936,7 @@ LITELLM_CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeLiteLLMPayloadTest(TestCase):
+class JudgeLiteLLMPayloadTest(http_mock.MockDNSMixin, TestCase):
     def setUp(self) -> None:
         super().setUp()
         # Alias resolution is exercised separately; these payload tests
@@ -3446,6 +3451,33 @@ class JudgeLiteLLMPayloadTest(TestCase):
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
         JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
         JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_1="extra_body.thinking.disabled",
+        JUDGE_REASONING_EFFORT_SEAT_2="extra_body.enable_thinking=false",
+    )
+    def test_native_deepseek_thinking_is_nested_without_changing_qwen(self) -> None:
+        first = resolve_judge_seat_profile(1)
+        second = resolve_judge_seat_profile(2)
+
+        body = _payload([REQ], first, "")
+        self.assertEqual(body["extra_body"], {"thinking": {"type": "disabled"}})
+        self.assertNotIn("thinking", body)
+        self.assertNotIn("reasoning", body)
+        self.assertNotIn("enable_thinking", body)
+        qwen_body = _payload([REQ], second, "")
+        self.assertEqual(qwen_body["extra_body"], {"enable_thinking": False})
+
+        with (
+            override_settings(
+                JUDGE_REASONING_EFFORT_SEAT_1="extra_body.thinking.disable"
+            ),
+            self.assertRaises(JudgeError),
+        ):
+            resolve_judge_seat_profile(1)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
         JUDGE_REASONING_EFFORT="enable_thinking=false",
         JUDGE_RESPONSE_FORMAT="json_object",
         JUDGE_STREAM=True,
@@ -3527,7 +3559,7 @@ class JudgeLiteLLMPayloadTest(TestCase):
         self.assertNotIn("thinking", body)
 
 
-class JudgeHttpFailureMappingTest(SimpleTestCase):
+class JudgeHttpFailureMappingTest(http_mock.MockDNSMixin, SimpleTestCase):
     """The whole safety argument for refusals lives in this table."""
 
     REQUEST_INVALID: ClassVar[set[int]] = {400, 404, 405, 406, 415, 422}
@@ -3576,7 +3608,7 @@ class JudgeHttpFailureMappingTest(SimpleTestCase):
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
-class JudgeRefusedRequestTest(TestCase):
+class JudgeRefusedRequestTest(http_mock.MockDNSMixin, TestCase):
     """A refused request must never become a verdict or a paid retry."""
 
     @http_mock.activate
@@ -3641,7 +3673,7 @@ class JudgeRefusedRequestTest(TestCase):
     JUDGE_PROTOCOL_RETRIES=0,
     **dict.fromkeys(JUDGE_FALLBACK_SETTINGS, ""),
 )
-class JudgeFailedAccountingTest(TestCase):
+class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
     @override_settings(JUDGE_STREAM_SEAT_1=True)
     @http_mock.activate
     def test_failed_stream_retains_only_observed_usage(self) -> None:
@@ -3875,35 +3907,6 @@ class JudgeFailedAccountingTest(TestCase):
                     expected,
                 )
 
-    @override_settings(JUDGE_STREAM_SEAT_1=True)
-    @http_mock.activate
-    def test_stream_failure_after_length_keeps_actual_failure(self) -> None:
-        usage = b'data: {"id":"length-id","choices":[],"usage":{"cost":0.25}}\n\n'
-        length = (
-            b'data: {"choices":[{"delta":{"content":"partial"},'
-            b'"finish_reason":"length"}]}\n\n'
-        )
-        for suffix, expected in (
-            (b"data: bad\n\n", "invalid-json"),
-            (b"data: bad\n\n\xff", "invalid-json"),
-            (b"\xff", "invalid-envelope"),
-            (b"", "invalid-envelope"),
-        ):
-            with self.subTest(suffix=suffix):
-                http_mock.reset()
-                LLMUsageLog.objects.all().delete()
-                JudgeRequestAttempt.objects.all().delete()
-                http_mock.register("POST", CHAT_URL, content=usage + length + suffix)
-                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
-                self.assertTrue(result.unparsed)
-                self.assertEqual(result.failure_kind, expected)
-                attempt = JudgeRequestAttempt.objects.get()
-                self.assertEqual(attempt.failure_kind, expected)
-                self.assertEqual(attempt.finish_reason, "length")
-                self.assertEqual(
-                    LLMUsageLog.objects.get().request_attempt_id, attempt.pk
-                )
-
     @override_settings(JUDGE_STREAM_SEAT_1=True, JUDGE_TRANSPORT_RETRIES=1)
     @http_mock.activate
     def test_extreme_stream_cost_keeps_usage_and_real_parse_failure(self) -> None:
@@ -4033,6 +4036,67 @@ class JudgeFailedAccountingTest(TestCase):
                 self.assertEqual(row.cost_usd, Decimal("0.25"))
 
     @http_mock.activate
+    def test_non_stream_malformed_nested_details_keep_attempt_and_cost(self) -> None:
+        for details in ("unexpected", ["unexpected"]):
+            with self.subTest(details=details):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                http_mock.register(
+                    "POST",
+                    CHAT_URL,
+                    json={
+                        "id": "nested-id",
+                        "usage": {
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                            "total_tokens": 0,
+                            "cost": 0.25,
+                            "prompt_tokens_details": details,
+                            "completion_tokens_details": details,
+                        },
+                    },
+                )
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertTrue(result.unparsed)
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(result.request_attempt_id, attempt.pk)
+                self.assertEqual(attempt.response_id, "nested-id")
+                self.assertEqual(attempt.prompt_tokens, 0)
+                self.assertEqual(attempt.completion_tokens, 0)
+                self.assertEqual(attempt.total_tokens, 0)
+                self.assertIsNone(attempt.reasoning_tokens)
+                row = LLMUsageLog.objects.get()
+                self.assertEqual(row.request_attempt_id, attempt.pk)
+                self.assertEqual(row.cost_usd, Decimal("0.25"))
+                self.assertEqual(row.cached_tokens, 0)
+                self.assertEqual(row.reasoning_tokens, 0)
+
+    @override_settings(JUDGE_TRANSPORT_RETRIES=1)
+    @http_mock.activate
+    def test_non_stream_extreme_number_retains_http_status_and_cost(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            content=(
+                b'{"id":"extreme-id","usage":{"prompt_tokens":2,'
+                b'"completion_tokens":1,"cost":1e9999999999999999999}}'
+            ),
+            headers={"x-litellm-response-cost": "0.02"},
+        )
+        [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "invalid-json")
+        self.assertEqual(len(http_mock.calls), 1)
+        attempt = JudgeRequestAttempt.objects.get()
+        self.assertEqual(attempt.http_status, 200)
+        self.assertTrue(attempt.transport_succeeded)
+        self.assertEqual(attempt.failure_kind, "invalid-json")
+        row = LLMUsageLog.objects.get()
+        self.assertEqual(row.cost_usd, Decimal("0.02"))
+        self.assertEqual(row.request_attempt_id, attempt.pk)
+
+    @http_mock.activate
     def test_cost_without_tokens_or_decodable_body_is_recorded(self) -> None:
         cases = (
             (b"not json", "0.123456789123456789", Decimal("0.123456789123456789")),
@@ -4077,3 +4141,94 @@ class JudgeFailedAccountingTest(TestCase):
         self.assertTrue(result.unparsed)
         self.assertFalse(LLMUsageLog.objects.exists())
         self.assertFalse(JudgeRequestAttempt.objects.exists())
+
+    @override_settings(JUDGE_STREAM_SEAT_1=True)
+    @http_mock.activate
+    def test_stream_failure_after_length_keeps_actual_failure(self) -> None:
+        usage = b'data: {"id":"length-id","choices":[],"usage":{"cost":0.25}}\n\n'
+        length = (
+            b'data: {"choices":[{"delta":{"content":"partial"},'
+            b'"finish_reason":"length"}]}\n\n'
+        )
+        for suffix, expected in (
+            (b"data: bad\n\n", "invalid-json"),
+            (b"data: bad\n\n\xff", "invalid-json"),
+            (b"\xff", "invalid-envelope"),
+            (b"", "invalid-envelope"),
+        ):
+            with self.subTest(suffix=suffix):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                http_mock.register("POST", CHAT_URL, content=usage + length + suffix)
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertTrue(result.unparsed)
+                self.assertEqual(result.failure_kind, expected)
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(attempt.failure_kind, expected)
+                self.assertEqual(attempt.finish_reason, "length")
+                self.assertEqual(
+                    LLMUsageLog.objects.get().request_attempt_id, attempt.pk
+                )
+
+    @http_mock.activate
+    def test_durable_replay_records_failed_response_cost_once(self) -> None:
+        cases = (
+            (b"not json", {"x-litellm-response-cost": "0.25"}, "invalid-json"),
+            (
+                (
+                    b'{"id":"durable-id","usage":{"prompt_tokens":true,'
+                    b'"completion_tokens_details":"invalid","cost":0.5}}'
+                ),
+                {},
+                "invalid-envelope",
+            ),
+            (
+                (
+                    b'{"id":"extreme-id","usage":{"prompt_tokens":2,'
+                    b'"completion_tokens":1,"cost":1e9999999999999999999}}'
+                ),
+                {"x-litellm-response-cost": "0.5"},
+                "invalid-json",
+            ),
+        )
+        with TemporaryDirectory() as directory, override_settings(DATA_DIR=directory):
+            for index, (body, headers, failure) in enumerate(cases):
+                with self.subTest(body=body):
+                    http_mock.reset()
+                    run = ProducerRun.objects.create(
+                        scope_type="component",
+                        scope_id=str(index),
+                        scope_label="Synthetic",
+                        scope_path="/",
+                        requested_mode="judge",
+                        cap=1,
+                        execution_options={"delivery_policy": "wizard-v1"},
+                    )
+                    request = replace(REQ, unit_key=f"durable-{index}")
+                    http_mock.register("POST", CHAT_URL, content=body, headers=headers)
+                    first = request_verdicts(
+                        [request], seat=1, run=run, persist_attempts=True
+                    )
+                    second = request_verdicts(
+                        [request], seat=1, run=run, persist_attempts=True
+                    )
+                    self.assertTrue(first[0].unparsed)
+                    self.assertTrue(second[0].unparsed)
+                    self.assertEqual(first[0].failure_kind, failure)
+                    self.assertEqual(second[0].failure_kind, failure)
+                    self.assertEqual(len(http_mock.calls), 1)
+                    exchange = ProducerLLMExchange.objects.get(run=run)
+                    self.assertTrue(exchange.usage_recorded)
+                    rows = LLMUsageLog.objects.filter(run=run)
+                    self.assertEqual(rows.count(), 1)
+                    row = rows.get()
+                    self.assertEqual(
+                        row.cost_usd, Decimal("0.25" if index == 0 else "0.5")
+                    )
+                    self.assertEqual(
+                        row.request_attempt_id, first[0].request_attempt_id
+                    )
+                    self.assertEqual(row.prompt_tokens, 0)
+                    if index == 1:
+                        self.assertEqual(row.response_id, "durable-id")

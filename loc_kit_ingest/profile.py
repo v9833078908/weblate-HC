@@ -11,7 +11,7 @@ import json
 import re
 from dataclasses import dataclass
 from itertools import pairwise
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from loc_kit_ingest.model import Diagnostic, Severity
 
@@ -292,10 +292,7 @@ def _check_unknown(obj: dict[str, Any], allowed: frozenset[str], *, label: str) 
         raise _err(msg, f"unknown field(s) {extras} in {label}")
 
 
-_ParsedField = TypeVar("_ParsedField")
-
-
-def _require(obj: dict[str, Any], field: str, *, label: str) -> _ParsedField:
+def _require(obj: dict[str, Any], field: str, *, label: str) -> object:
     if field not in obj:
         msg = "profile.missing"
         raise _err(msg, f"missing required field '{field}' in {label}")
@@ -365,10 +362,12 @@ def _parse_metadata_column(obj: dict[str, Any], *, label: str) -> MetadataColumn
     column = _require_int(obj, "column", label=label)
     name = _require(obj, "name", label=label)
     header = _require(obj, "header", label=label)
-    for field_val, field_name in [(name, "name"), (header, "header")]:
-        if not isinstance(field_val, str):
-            msg = "profile.invalid_value"
-            raise _err(msg, f"invalid {field_name} {field_val!r}")
+    if not isinstance(name, str):
+        msg = "profile.invalid_value"
+        raise _err(msg, f"invalid name {name!r}")
+    if not isinstance(header, str):
+        msg = "profile.invalid_value"
+        raise _err(msg, f"invalid header {header!r}")
     return MetadataColumn(column=column - 1, name=name, header=header)
 
 
@@ -1068,14 +1067,18 @@ def _parse_component(
         first_data_row -= 1  # 0-based
     else:
         if not is_v2_tbx:
-            key_language = _require(obj, "key_language", label="component")
-            if not isinstance(key_language, str) or key_language not in lang_codes:
+            raw_key_language = _require(obj, "key_language", label="component")
+            if (
+                not isinstance(raw_key_language, str)
+                or raw_key_language not in lang_codes
+            ):
                 msg = "profile.key_language_missing"
                 raise _err(
                     msg,
-                    f"key_language {key_language!r} is not among language codes "
+                    f"key_language {raw_key_language!r} is not among language codes "
                     f"{lang_codes}",
                 )
+            key_language = raw_key_language
         itl_raw = _require(obj, "initial_target_languages", label="component")
         if not isinstance(itl_raw, list) or not itl_raw:
             msg = "profile.empty_target_languages"

@@ -44,7 +44,7 @@ from weblate.utils.state import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from django.db.models import Expression
+    from django.db.models.expressions import BaseExpression, Combinable
 
 
 class SearchTestCase(TestCase):
@@ -54,9 +54,9 @@ class SearchTestCase(TestCase):
     def assert_query(
         self,
         string: str,
-        expected: Q | tuple[Q, Mapping[str, Expression]],
+        expected: Q | tuple[Q, Mapping[str, BaseExpression | Combinable]],
         *,
-        expected_annotations: Mapping[str, Expression] | None = None,
+        expected_annotations: Mapping[str, BaseExpression | Combinable] | None = None,
         exists: bool = False,
         **context,
     ) -> None:

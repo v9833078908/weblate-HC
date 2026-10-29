@@ -11,6 +11,7 @@ from unittest import mock
 
 from django.conf import settings
 from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from django_otp.oath import totp
@@ -29,6 +30,7 @@ from weblate.trans.tests.test_views import FixtureTestCase
 from weblate.utils.ratelimit import reset_rate_limit
 
 
+@override_settings(SITE_TITLE="Weblate", EMAIL_SUBJECT_PREFIX="[Weblate] ")
 class TwoFactorTestCase(FixtureTestCase):
     def setUp(self) -> None:
         super().setUp()

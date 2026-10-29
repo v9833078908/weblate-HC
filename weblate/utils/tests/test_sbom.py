@@ -53,8 +53,8 @@ class SBOMTest(SimpleTestCase):
             "components": [
                 {
                     "type": "library",
-                    "bom-ref": "weblate-1@2026.6",
-                    "name": "weblate",
+                    "bom-ref": "hcgameloc-1@2026.6",
+                    "name": "hcgameloc",
                     "version": "2026.6",
                 },
                 {
@@ -67,7 +67,7 @@ class SBOMTest(SimpleTestCase):
             ],
             "dependencies": [
                 {
-                    "ref": "weblate-1@2026.6",
+                    "ref": "hcgameloc-1@2026.6",
                     "dependsOn": ["aeidon-2@1.16"],
                 }
             ],
@@ -92,13 +92,31 @@ class SBOMTest(SimpleTestCase):
             },
             metadata["properties"],
         )
-        self.assertEqual(metadata["component"]["name"], "weblate")
+        self.assertEqual(metadata["component"]["name"], "hcgameloc")
         self.assertEqual(metadata["component"]["type"], "application")
-        self.assertEqual(metadata["component"]["purl"], "pkg:pypi/weblate@2026.6")
+        self.assertEqual(metadata["component"]["purl"], "pkg:pypi/hcgameloc@2026.6")
 
         python_component = data["components"][1]
         self.assertNotIn("hashes", python_component)
         self.assertNotIn("licenses", python_component)
+        module.validate_sbom(data)
+
+    def test_select_fork_without_modifying_upstream_dependency(self) -> None:
+        module = load_sbom_module()
+        data = self.get_sbom()
+        upstream = {
+            "type": "library",
+            "bom-ref": "weblate@2026.5",
+            "name": "weblate",
+            "version": "2026.5",
+        }
+        data["components"].insert(0, copy.deepcopy(upstream))
+
+        module.update_sbom(data, "1700000000")
+
+        self.assertEqual(data["metadata"]["component"]["name"], "hcgameloc")
+        self.assertEqual(data["metadata"]["component"]["bom-ref"], "hcgameloc-1@2026.6")
+        self.assertEqual(data["components"][0], upstream)
         module.validate_sbom(data)
 
     def test_preserve_existing_timestamp(self) -> None:

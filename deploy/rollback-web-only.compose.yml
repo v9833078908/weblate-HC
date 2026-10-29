@@ -1,0 +1,17 @@
+# Copyright (c) HCGameLoc
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Apply only under an explicitly approved rollback procedure.
+services:
+  weblate:
+    image: hcgameloc:rollback-20261023
+    environment:
+      WEBLATE_SERVICE: web-only
+    volumes:
+    - ./rollback-web-only.conf:/etc/supervisor/conf.d/web-only.conf:ro
+    networks:
+    - rollback-isolated
+
+networks:
+  rollback-isolated:
+    external: true
+    name: hcgameloc-rollback-isolated

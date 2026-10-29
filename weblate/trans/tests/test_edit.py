@@ -577,7 +577,7 @@ class EditTest(ViewTestCase):
 
     def test_more_dropdown_absent_when_empty(self) -> None:
         """No More dropdown once every folded entry would be empty."""
-        if type(self) is not EditTest:
+        if type(self) is not EditTest:  # pylint: disable=unidiomatic-typecheck
             # A template-structural claim (no sub-condition true -> no
             # dropdown), not a per-format regression: each file format's
             # own fixture data (keys, variants, comments) varies and is
@@ -650,7 +650,7 @@ class EditTest(ViewTestCase):
 
     def test_string_info_card_open_when_empty(self) -> None:
         """The string information card is open with no explanation or flags."""
-        if type(self) is not EditTest:
+        if type(self) is not EditTest:  # pylint: disable=unidiomatic-typecheck
             # A template-structural claim; the base po fixture bakes
             # "#, c-format, max-length:100" onto self.source specifically
             # for check tests elsewhere, so this uses the other, plain

@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.utils.html import format_html
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext
@@ -63,6 +65,26 @@ CONTEXT_SETTINGS = [
 ]
 
 CONTEXT_APPS = ["billing", "legal", "gitexport"]
+
+
+def wizard_navigation_url() -> str:
+    """Return the operator-configured Wizard URL only when it is safe to link."""
+    if not getattr(settings, "WIZARD_SSO_ENABLED", False):
+        return ""
+    value = getattr(settings, "WIZARD_PUBLIC_URL", "")
+    if not isinstance(value, str) or not value or value != value.strip():
+        return ""
+    try:
+        parsed = urlsplit(value)
+        URLValidator(schemes=["https"])(value)
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            return ""
+        # Accessing the port validates its range and format.
+        if parsed.port == 0:
+            return ""
+    except (ValidationError, ValueError):
+        return ""
+    return value
 
 
 def add_settings_context(context) -> None:
@@ -192,6 +214,7 @@ def weblate_context(request: AuthenticatedHttpRequest):
         "site_url": get_site_url(),
         "site_domain": get_site_domain(),
         "login_redirect_url": login_redirect_url,
+        "wizard_navigation_url": wizard_navigation_url(),
         "has_antispam": False,  # Akismet integration removed
         "has_sentry": bool(settings.SENTRY_DSN),
         "suggestion_rejection_reason_length": SUGGESTION_REJECTION_REASON_LENGTH,

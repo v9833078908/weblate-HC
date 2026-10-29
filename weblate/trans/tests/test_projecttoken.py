@@ -237,4 +237,6 @@ class ProjectTokenTest(FixtureTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Test translation\n")
         self.assertEqual(response.data["target"], ["Test translation\n"])

@@ -48,6 +48,7 @@ from weblate.utils.version_display import (
     normalize_version_display,
 )
 from weblate.vcs import defaults as vcs_defaults
+from weblate.wizard_auth.config import configure as configure_wizard_sso
 
 # Title of site to use
 SITE_TITLE = get_env_str("WEBLATE_SITE_TITLE", trans_defaults.DEFAULT_SITE_TITLE)
@@ -916,6 +917,7 @@ INSTALLED_APPS = [
     "weblate.machinery",
     "weblate.workspaces",
     "weblate.trans",
+    "weblate.wizard_auth",
     "weblate.lang",
     "weblate_language_data",
     "weblate.memory",
@@ -1955,9 +1957,16 @@ LLM_USAGE_LOG_RETENTION_DAYS = get_env_int(
 )
 
 ADDITIONAL_CONFIG = Path("/app/data/settings-override.py")
+WIZARD_SSO_ENABLED = get_env_bool("WEBLATE_WIZARD_SSO_ENABLED", False)
+WIZARD_PUBLIC_URL = os.environ.get("WEBLATE_WIZARD_PUBLIC_URL", "")
+WIZARD_SSO_ISSUER = os.environ.get("WEBLATE_WIZARD_SSO_ISSUER", "")
+WIZARD_SSO_CLIENT_ID = os.environ.get("WEBLATE_WIZARD_SSO_CLIENT_ID", "")
+WIZARD_SSO_PRIVATE_KEY_FILE = os.environ.get("WEBLATE_WIZARD_SSO_PRIVATE_KEY_FILE", "")
 if ADDITIONAL_CONFIG.exists():
     code = compile(
         ADDITIONAL_CONFIG.read_text(encoding="utf-8"), ADDITIONAL_CONFIG, "exec"
     )
     # pylint: disable-next=exec-used
     exec(code)  # ruff: ignore[exec-builtin]
+
+configure_wizard_sso(globals())

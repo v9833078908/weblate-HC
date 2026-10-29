@@ -851,7 +851,7 @@ class ManageMiddlewareTest(TestCase):
         close_all.assert_called_once_with()
 
 
-class AdminTest(ViewTestCase):
+class AdminTest(http_mock.MockDNSMixin, ViewTestCase):
     """Test for customized admin interface."""
 
     def setUp(self) -> None:
@@ -872,6 +872,7 @@ class AdminTest(ViewTestCase):
         self.assertContains(response, reverse("manage-discovery-register"))
         self.assertNotContains(response, "Register on weblate.org")
 
+    @override_settings(SITE_TITLE="Weblate")
     def test_manage_index_discovery_registration_requires_site_title(self) -> None:
         response = self.client.get(reverse("manage"))
         self.assertContains(response, "Discover Weblate")
@@ -1745,6 +1746,7 @@ class AdminTest(ViewTestCase):
         status = SupportStatus.objects.get()
         self.assertTrue(status.discoverable)
 
+    @override_settings(SITE_TITLE="Weblate")
     def test_discovery_toggle_requires_site_title(self) -> None:
         status = SupportStatus.objects.create(
             name="community",
@@ -1785,6 +1787,7 @@ class AdminTest(ViewTestCase):
         ENABLE_HTTPS=True,
         SITE_DOMAIN="instance.example",
         SUPPORT_API_URL="https://weblate.example/",
+        SITE_TITLE="Weblate",
     )
     def test_discovery_registration_requires_site_title(self) -> None:
         response = self.client.post(reverse("manage-discovery-register"), follow=True)

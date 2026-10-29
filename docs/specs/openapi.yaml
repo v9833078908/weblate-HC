@@ -32,6 +32,7 @@ paths:
       tags:
       - addons
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -181,6 +182,7 @@ paths:
       tags:
       - addons
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -335,6 +337,7 @@ paths:
               $ref: '#/components/schemas/Addon'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -501,6 +504,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedAddon'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -662,6 +666,7 @@ paths:
       tags:
       - addons
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -799,6 +804,7 @@ paths:
       tags:
       - addons
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -946,6 +952,7 @@ paths:
       tags:
       - categories
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -1093,6 +1100,7 @@ paths:
               $ref: '#/components/schemas/Category'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -1248,6 +1256,7 @@ paths:
       tags:
       - categories
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -1402,6 +1411,7 @@ paths:
               $ref: '#/components/schemas/Category'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -1568,6 +1578,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCategory'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -1729,6 +1740,7 @@ paths:
       tags:
       - categories
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -1878,6 +1890,7 @@ paths:
       tags:
       - categories
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -2032,6 +2045,7 @@ paths:
               $ref: '#/components/schemas/Announcement'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -2192,6 +2206,7 @@ paths:
       tags:
       - categories
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -2341,6 +2356,7 @@ paths:
       tags:
       - categories
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -2480,6 +2496,7 @@ paths:
               $ref: '#/components/schemas/ScopedReportCreate'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -2622,6 +2639,7 @@ paths:
       - categories
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -2801,6 +2819,7 @@ paths:
       tags:
       - changes
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -2950,6 +2969,7 @@ paths:
       tags:
       - changes
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -3105,6 +3125,7 @@ paths:
       tags:
       - component-lists
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -3252,6 +3273,7 @@ paths:
               $ref: '#/components/schemas/ComponentList'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -3408,6 +3430,7 @@ paths:
       tags:
       - component-lists
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -3563,6 +3586,7 @@ paths:
               $ref: '#/components/schemas/ComponentList'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -3730,6 +3754,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedComponentList'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -3892,6 +3917,7 @@ paths:
       tags:
       - component-lists
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -4030,6 +4056,7 @@ paths:
       tags:
       - component-lists
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -4185,6 +4212,7 @@ paths:
               $ref: '#/components/schemas/ComponentList'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -4353,6 +4381,7 @@ paths:
       tags:
       - component-lists
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -4496,6 +4525,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -4653,6 +4683,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -4815,6 +4846,7 @@ paths:
               $ref: '#/components/schemas/Component'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -4989,6 +5021,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedComponent'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -5158,6 +5191,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -5309,6 +5343,7 @@ paths:
               $ref: '#/components/schemas/Component'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -5491,6 +5526,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -5653,6 +5689,7 @@ paths:
               $ref: '#/components/schemas/Announcement'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -5821,6 +5858,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -5978,6 +6016,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -6137,6 +6176,7 @@ paths:
       - components
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -6294,6 +6334,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -6464,6 +6505,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -6626,6 +6668,7 @@ paths:
               $ref: '#/components/schemas/ComponentLinkRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -6794,6 +6837,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -6939,6 +6983,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -7101,6 +7146,7 @@ paths:
               $ref: '#/components/schemas/LockRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -7271,6 +7317,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -7429,6 +7476,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -7599,6 +7647,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -7746,6 +7795,7 @@ paths:
               $ref: '#/components/schemas/ScopedReportCreate'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -7895,6 +7945,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -8057,6 +8108,7 @@ paths:
               $ref: '#/components/schemas/RepoRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -8239,6 +8291,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -8409,6 +8462,7 @@ paths:
       - components
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -8578,6 +8632,7 @@ paths:
       tags:
       - components
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -8740,6 +8795,7 @@ paths:
               $ref: '#/components/schemas/TranslationCreate'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -8901,6 +8957,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -9048,6 +9105,7 @@ paths:
               $ref: '#/components/schemas/Group'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -9203,6 +9261,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -9357,6 +9416,7 @@ paths:
               $ref: '#/components/schemas/Group'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -9523,6 +9583,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedGroup'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -9684,6 +9745,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -9827,6 +9889,7 @@ paths:
               $ref: '#/components/schemas/Group'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -9994,6 +10057,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -10137,6 +10201,7 @@ paths:
               $ref: '#/components/schemas/Group'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -10304,6 +10369,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -10447,6 +10513,7 @@ paths:
               $ref: '#/components/schemas/Group'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -10614,6 +10681,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -10757,6 +10825,7 @@ paths:
               $ref: '#/components/schemas/Group'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -10924,6 +10993,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -11067,6 +11137,7 @@ paths:
               $ref: '#/components/schemas/Group'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -11234,6 +11305,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -11377,6 +11449,7 @@ paths:
               $ref: '#/components/schemas/Group'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -11544,6 +11617,7 @@ paths:
       tags:
       - groups
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -11687,6 +11761,7 @@ paths:
       tags:
       - languages
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -11834,6 +11909,7 @@ paths:
               $ref: '#/components/schemas/Language'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -11989,6 +12065,7 @@ paths:
       tags:
       - languages
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -12143,6 +12220,7 @@ paths:
               $ref: '#/components/schemas/Language'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -12309,6 +12387,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedLanguage'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -12470,6 +12549,7 @@ paths:
       tags:
       - languages
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -12608,6 +12688,7 @@ paths:
       - languages
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -12779,6 +12860,7 @@ paths:
       tags:
       - memory
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -12913,6 +12995,7 @@ paths:
       tags:
       - memory
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -13046,6 +13129,7 @@ paths:
       tags:
       - memory
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -13191,6 +13275,7 @@ paths:
               $ref: '#/components/schemas/MemoryLookupRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -13343,6 +13428,7 @@ paths:
       tags:
       - metrics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -13494,6 +13580,7 @@ paths:
               $ref: '#/components/schemas/ProducerApplyCandidateRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -13655,6 +13742,7 @@ paths:
       tags:
       - producer
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -13800,6 +13888,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProducerClarificationRequest'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -13959,6 +14048,7 @@ paths:
       tags:
       - producer
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -14092,6 +14182,7 @@ paths:
       tags:
       - producer
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -14232,6 +14323,7 @@ paths:
       tags:
       - producer
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -14352,6 +14444,167 @@ paths:
               $ref: '#/components/headers/X-RateLimit-Remaining'
             X-RateLimit-Reset:
               $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/projects/{slug}/decisions/:
+    get:
+      operationId: api_producer_projects_decisions_list
+      description: List one project's text-free, run-scoped judge decisions.
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - judge
+          type: string
+          minLength: 1
+        description: '* `judge` - judge'
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: run
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProducerJudgeDecisionList'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
   /api/producer/projects/{slug}/decisions/apply/:
     post:
       operationId: api_producer_projects_decisions_apply_create
@@ -14366,6 +14619,13 @@ paths:
         producer repeats it, one string at a time, through
         ``ProducerUnitApplyCandidate``.
       parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+          format: uuid
+        description: Actor/project/request-bound UUID for durable local operation
+          recovery.
       - in: path
         name: slug
         schema:
@@ -14380,6 +14640,7 @@ paths:
               $ref: '#/components/schemas/ProducerBulkApplyRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -14516,11 +14777,1354 @@ paths:
               $ref: '#/components/headers/X-RateLimit-Remaining'
             X-RateLimit-Reset:
               $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/projects/{slug}/mt/batches/:
+    post:
+      operationId: api_producer_projects_mt_batches_create
+      description: Accept 1–20 empty non-plural unit revisions for durable background
+        MT. No provider I/O in HTTP.
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MTBatch'
+        required: true
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse415'
+              examples:
+                UnsupportedMediaType:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: unsupported_media_type
+                      detail: Unsupported media type "application/json" in request.
+                      attr: null
+          description: The request media type is not supported.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MTReceipt'
+          description: The request was accepted for asynchronous processing.
+  /api/producer/projects/{slug}/mt/batches/{key}/:
+    get:
+      operationId: api_producer_projects_mt_batches_retrieve
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MTReceipt'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/projects/{slug}/mt/batches/{key}/reconcile/:
+    get:
+      operationId: api_producer_projects_mt_batches_reconcile_retrieve
+      description: 'No paid calls: release only provably unsent terminal reservations.'
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MTReceipt'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+    post:
+      operationId: api_producer_projects_mt_batches_reconcile_create
+      description: 'No paid calls: release only provably unsent terminal reservations.'
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MTReceipt'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/projects/{slug}/quality/issues/:
+    get:
+      operationId: api_producer_projects_quality_issues_retrieve
+      description: Read active repeat and glossary issues as stable structured groups.
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          type: string
+          minLength: 1
+        required: true
+      - in: query
+        name: language
+        schema:
+          type: string
+          minLength: 1
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerQualityIssueList'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/projects/{slug}/quality/operations/{operation_id}/:
+    get:
+      operationId: api_producer_projects_quality_operations_retrieve
+      description: Observe a keyed write after an uncertain HTTP response, without
+        replay.
+      parameters:
+      - in: path
+        name: operation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerQualityOperation'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/projects/{slug}/quality/recheck/:
+    post:
+      operationId: api_producer_projects_quality_recheck_create
+      description: Recompute checks for a closed unit list without changing translations.
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+          format: uuid
+        description: Actor/project/request-bound UUID for durable local operation
+          recovery.
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProducerQualityRecheckRequest'
+        required: true
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse415'
+              examples:
+                UnsupportedMediaType:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: unsupported_media_type
+                      detail: Unsupported media type "application/json" in request.
+                      attr: null
+          description: The request media type is not supported.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerQualityRecheckResult'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/projects/{slug}/quality/repeats/plan/:
+    post:
+      operationId: api_producer_projects_quality_repeats_plan_create
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+          format: uuid
+        description: Actor/project/request-bound UUID for durable local operation
+          recovery.
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProducerRepeatPlanRequest'
+        required: true
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse415'
+              examples:
+                UnsupportedMediaType:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: unsupported_media_type
+                      detail: Unsupported media type "application/json" in request.
+                      attr: null
+          description: The request media type is not supported.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerRepeatPlan'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/projects/{slug}/quality/snapshot/:
+    post:
+      operationId: api_producer_projects_quality_snapshot_create
+      description: Read-only full quality scan over an explicit, permission-closed
+        scope.
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProducerQualitySnapshotRequest'
+        required: true
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse415'
+              examples:
+                UnsupportedMediaType:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: unsupported_media_type
+                      detail: Unsupported media type "application/json" in request.
+                      attr: null
+          description: The request media type is not supported.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerQualitySnapshot'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
   /api/producer/projects/{slug}/runs/:
     post:
       operationId: api_producer_projects_runs_create
       description: Start the run an estimate priced, atomically fenced against drift.
       parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+          format: uuid
+        description: Actor/project/request-bound UUID for durable local operation
+          recovery.
       - in: path
         name: slug
         schema:
@@ -14535,6 +16139,7 @@ paths:
               $ref: '#/components/schemas/ProducerRunStartRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -14701,6 +16306,7 @@ paths:
               $ref: '#/components/schemas/ProducerJudgeEstimateRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -14841,6 +16447,700 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProducerConflict'
           description: ''
+  /api/producer/projects/{slug}/translation-profile/:
+    get:
+      operationId: api_producer_projects_translation_profile_retrieve
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerProfileResponse'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+    patch:
+      operationId: api_producer_projects_translation_profile_partial_update
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - producer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProducerProfileRequest'
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse415'
+              examples:
+                UnsupportedMediaType:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: unsupported_media_type
+                      detail: Unsupported media type "application/json" in request.
+                      attr: null
+          description: The request media type is not supported.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerProfileResponse'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/repeat-plans/{token}/:
+    get:
+      operationId: api_producer_repeat_plans_retrieve
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerRepeatPlan'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/repeat-plans/{token}/apply/:
+    post:
+      operationId: api_producer_repeat_plans_apply_create
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+          format: uuid
+        description: Actor/project/request-bound UUID for durable local operation
+          recovery.
+        required: true
+      - in: path
+        name: token
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerRepeatRun'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+  /api/producer/repeat-runs/{token}/:
+    get:
+      operationId: api_producer_repeat_runs_retrieve
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - producer
+      security:
+      - wizardOAuth: []
+      - tokenAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse400'
+          description: The request was invalid or could not be parsed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: Authentication credentials were missing or invalid.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: The requested resource was not found or is not accessible.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse405'
+              examples:
+                MethodNotAllowed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: method_not_allowed
+                      detail: Method "get" not allowed.
+                      attr: null
+          description: The HTTP method is not allowed for this resource.
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse406'
+              examples:
+                NotAcceptable:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_acceptable
+                      detail: Could not satisfy the request Accept header.
+                      attr: null
+          description: The requested response media type is not available.
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse423'
+          description: The resource is locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: The API request rate limit was exceeded.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse500'
+              examples:
+                APIException:
+                  value:
+                    type: server_error
+                    errors:
+                    - code: error
+                      detail: A server error occurred.
+                      attr: null
+          description: An unexpected server error occurred.
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProducerRepeatRun'
+          description: Successful response.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
   /api/producer/runs/{id}/:
     get:
       operationId: api_producer_runs_retrieve
@@ -14855,6 +17155,7 @@ paths:
       tags:
       - producer
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -14989,6 +17290,7 @@ paths:
       tags:
       - producer
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -15127,6 +17429,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ProducerRun'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -15283,6 +17586,7 @@ paths:
       tags:
       - producer
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -15430,6 +17734,7 @@ paths:
               $ref: '#/components/schemas/ProducerRunResumeRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -15596,6 +17901,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -15743,6 +18049,7 @@ paths:
               $ref: '#/components/schemas/Project'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -15899,6 +18206,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -16054,6 +18362,7 @@ paths:
               $ref: '#/components/schemas/Project'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -16221,6 +18530,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProject'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -16383,6 +18693,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -16527,6 +18838,7 @@ paths:
               $ref: '#/components/schemas/Project'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -16702,6 +19014,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -16857,6 +19170,7 @@ paths:
               $ref: '#/components/schemas/Announcement'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -17018,6 +19332,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -17168,6 +19483,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -17323,6 +19639,7 @@ paths:
               $ref: '#/components/schemas/Project'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -17484,6 +19801,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -17647,6 +19965,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -17809,6 +20128,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -17961,6 +20281,7 @@ paths:
       - projects
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -18123,6 +20444,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -18281,6 +20603,7 @@ paths:
               $ref: '#/components/schemas/Component'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -18430,6 +20753,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -18593,6 +20917,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -18748,6 +21073,7 @@ paths:
               $ref: '#/components/schemas/Label'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -18909,6 +21235,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -19048,6 +21375,7 @@ paths:
       - projects
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -19217,6 +21545,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -19377,6 +21706,7 @@ paths:
               $ref: '#/components/schemas/Announcement'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -19543,6 +21873,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -19688,6 +22019,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -19839,6 +22171,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -19994,6 +22327,7 @@ paths:
               $ref: '#/components/schemas/LockRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -20157,6 +22491,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -20330,6 +22665,7 @@ paths:
                 summary: Service settings example
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -20490,6 +22826,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ProjectMachinerySettings'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -20666,6 +23003,7 @@ paths:
                     url: https://api.service.com/
                 summary: Service settings example
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -20838,6 +23176,7 @@ paths:
       - projects
       - metrics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -21084,6 +23423,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -21224,6 +23564,7 @@ paths:
               $ref: '#/components/schemas/ScopedReportCreate'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -21366,6 +23707,7 @@ paths:
       tags:
       - projects
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -21521,6 +23863,7 @@ paths:
               $ref: '#/components/schemas/RepoRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -21685,6 +24028,7 @@ paths:
       - projects
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -21871,6 +24215,7 @@ paths:
       tags:
       - reports
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -22003,6 +24348,7 @@ paths:
               $ref: '#/components/schemas/ReportCreate'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -22144,6 +24490,7 @@ paths:
       tags:
       - reports
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -22278,6 +24625,7 @@ paths:
       tags:
       - reports
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -22412,6 +24760,7 @@ paths:
       tags:
       - reports
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -22550,6 +24899,7 @@ paths:
       tags:
       - reports
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -22690,6 +25040,7 @@ paths:
       tags:
       - roles
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -22837,6 +25188,7 @@ paths:
               $ref: '#/components/schemas/Role'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -22992,6 +25344,7 @@ paths:
       tags:
       - roles
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -23146,6 +25499,7 @@ paths:
               $ref: '#/components/schemas/Role'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -23312,6 +25666,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedRole'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -23473,6 +25828,7 @@ paths:
       tags:
       - roles
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -23664,6 +26020,7 @@ paths:
       tags:
       - schema
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -24055,6 +26412,7 @@ paths:
       tags:
       - screenshots
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -24202,6 +26560,7 @@ paths:
               $ref: '#/components/schemas/Screenshot'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -24357,6 +26716,7 @@ paths:
       tags:
       - screenshots
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -24511,6 +26871,7 @@ paths:
               $ref: '#/components/schemas/Screenshot'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -24677,6 +27038,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedScreenshot'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -24838,6 +27200,7 @@ paths:
       tags:
       - screenshots
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -24975,6 +27338,7 @@ paths:
       tags:
       - screenshots
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -25130,6 +27494,7 @@ paths:
               $ref: '#/components/schemas/ScreenshotFile'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -25283,6 +27648,7 @@ paths:
               $ref: '#/components/schemas/ScreenshotFile'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -25437,6 +27803,7 @@ paths:
               $ref: '#/components/schemas/Screenshot'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -25604,6 +27971,7 @@ paths:
       tags:
       - screenshots
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -25740,6 +28108,7 @@ paths:
       tags:
       - search
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -25897,6 +28266,7 @@ paths:
       tags:
       - suggestions
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -26046,6 +28416,7 @@ paths:
       tags:
       - suggestions
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -26194,6 +28565,7 @@ paths:
       tags:
       - suggestions
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -26336,6 +28708,7 @@ paths:
             schema:
               $ref: '#/components/schemas/SuggestionAcceptRequest'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -26504,6 +28877,7 @@ paths:
               $ref: '#/components/schemas/SuggestionVoteRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -26666,6 +29040,7 @@ paths:
       tags:
       - tasks
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -26814,6 +29189,7 @@ paths:
       tags:
       - tasks
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -26957,6 +29333,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -27120,6 +29497,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -27282,6 +29660,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -27445,6 +29824,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -27613,6 +29993,7 @@ paths:
               $ref: '#/components/schemas/Announcement'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -27787,6 +30168,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -27944,6 +30326,7 @@ paths:
               $ref: '#/components/schemas/Translation'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -28138,6 +30521,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -28303,6 +30687,7 @@ paths:
       - translations
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -28466,6 +30851,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -28635,6 +31021,7 @@ paths:
               $ref: '#/components/schemas/UploadRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -28802,6 +31189,7 @@ paths:
               $ref: '#/components/schemas/UploadRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -28964,6 +31352,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -29132,6 +31521,7 @@ paths:
               $ref: '#/components/schemas/RepoRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -29309,6 +31699,7 @@ paths:
       - translations
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -29484,6 +31875,7 @@ paths:
       tags:
       - translations
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -29651,6 +32043,7 @@ paths:
             schema:
               $ref: '#/components/schemas/NewUnitRequest'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -29819,6 +32212,7 @@ paths:
       tags:
       - units
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -29968,6 +32362,7 @@ paths:
       tags:
       - units
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -30122,6 +32517,7 @@ paths:
               $ref: '#/components/schemas/UnitWrite'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -30288,6 +32684,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedUnitWrite'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -30449,6 +32846,7 @@ paths:
       tags:
       - units
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -30598,6 +32996,7 @@ paths:
       tags:
       - units
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -30752,6 +33151,7 @@ paths:
               $ref: '#/components/schemas/Comment'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -30926,6 +33326,7 @@ paths:
       tags:
       - units
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -31080,6 +33481,7 @@ paths:
               $ref: '#/components/schemas/Suggestion'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -31248,6 +33650,7 @@ paths:
       tags:
       - units
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -31418,6 +33821,7 @@ paths:
       tags:
       - users
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -31565,6 +33969,7 @@ paths:
               $ref: '#/components/schemas/FullUser'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -31721,6 +34126,7 @@ paths:
       tags:
       - users
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -31876,6 +34282,7 @@ paths:
               $ref: '#/components/schemas/UserUpdateRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -32043,6 +34450,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedUserUpdateRequest'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -32205,6 +34613,7 @@ paths:
       tags:
       - users
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -32368,6 +34777,7 @@ paths:
       - users
       - contributions
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -32524,6 +34934,7 @@ paths:
               $ref: '#/components/schemas/UserGroupRequest'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -32686,6 +35097,7 @@ paths:
       tags:
       - users
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -32868,6 +35280,7 @@ paths:
       tags:
       - users
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -33047,6 +35460,7 @@ paths:
               $ref: '#/components/schemas/Notification'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -33215,6 +35629,7 @@ paths:
       tags:
       - users
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -33375,6 +35790,7 @@ paths:
               $ref: '#/components/schemas/Notification'
         required: true
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -33547,6 +35963,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNotification'
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -33714,6 +36131,7 @@ paths:
       tags:
       - users
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -33853,6 +36271,7 @@ paths:
       - users
       - statistics
       security:
+      - wizardOAuth: []
       - tokenAuth: []
       - bearerAuth: []
       - cookieAuth: []
@@ -34217,6 +36636,9 @@ components:
       - 107
       - 108
       - 109
+      - 110
+      - 111
+      - 112
       type: integer
       description: |-
         * `0` - **Resource updated:** A translation file was synchronized with its repository.
@@ -34323,6 +36745,9 @@ components:
         * `107` - **Judge fix undone:** A producer undid a previously applied judge fix.
         * `108` - **String key renamed:** A source string key was renamed.
         * `109` - **String moved:** A source string was moved in source order.
+        * `110` - **Repeat decision applied:** A managed repeat decision was applied.
+        * `111` - **Repeat kept independent:** A repeat was explicitly kept independent.
+        * `112` - **Repeat decision undone:** A managed repeat decision was undone.
     Addon:
       type: object
       properties:
@@ -34453,6 +36878,22 @@ components:
       required:
       - id
       - message
+    ApplicabilityEnum:
+      enum:
+      - ready
+      - no_candidate
+      - not_verified
+      - stale
+      - needs_individual_confirmation
+      - forbidden
+      type: string
+      description: |-
+        * `ready` - ready
+        * `no_candidate` - no_candidate
+        * `not_verified` - not_verified
+        * `stale` - stale
+        * `needs_individual_confirmation` - needs_individual_confirmation
+        * `forbidden` - forbidden
     AutoComponentList:
       type: object
       properties:
@@ -36187,6 +38628,14 @@ components:
       required:
       - errors
       - type
+    ExecutionModeEnum:
+      enum:
+      - repair
+      - verify_only
+      type: string
+      description: |-
+        * `repair` - repair
+        * `verify_only` - verify_only
     FileFormatEnum:
       enum:
       - apple-xliff
@@ -36537,7 +38986,7 @@ components:
           type: string
           maxLength: 200
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/HookResponseStatusEnum'
         match_status:
           $ref: '#/components/schemas/HookMatch'
         updated_components:
@@ -36550,6 +38999,14 @@ components:
       - message
       - status
       - updated_components
+    HookResponseStatusEnum:
+      enum:
+      - success
+      - failure
+      type: string
+      description: |-
+        * `success` - success
+        * `failure` - failure
     Label:
       type: object
       properties:
@@ -36823,6 +39280,142 @@ components:
           type: boolean
       required:
       - lock
+    MTBatch:
+      type: object
+      properties:
+        component:
+          type: string
+          pattern: ^[-a-zA-Z0-9_]+$
+        language:
+          type: string
+          pattern: ^[A-Za-z0-9_-]+$
+        engine:
+          $ref: '#/components/schemas/RoutedEngineEnum'
+        threshold:
+          type: integer
+          maximum: 100
+          minimum: 0
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/MTUnit'
+      required:
+      - component
+      - engine
+      - language
+      - threshold
+      - units
+    MTReceipt:
+      type: object
+      properties:
+        key:
+          type: string
+          format: uuid
+        run_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+        total:
+          type: integer
+          maximum: 20
+          minimum: 1
+        applied:
+          type: integer
+          maximum: 20
+          minimum: 0
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/MTUnitResult'
+        retryable:
+          type: boolean
+        reconciliation:
+          $ref: '#/components/schemas/MTReconciliation'
+      required:
+      - applied
+      - key
+      - retryable
+      - run_id
+      - state
+      - total
+      - units
+    MTReconciliation:
+      type: object
+      properties:
+        ready:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        never_sent:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        waiting:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        paid_unknown:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        paid_invalid:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        stale:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        forbidden:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+      required:
+      - forbidden
+      - never_sent
+      - paid_invalid
+      - paid_unknown
+      - ready
+      - stale
+      - waiting
+    MTUnit:
+      type: object
+      properties:
+        unit_id:
+          type: integer
+          minimum: 1
+        revision:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+      required:
+      - revision
+      - unit_id
+    MTUnitResult:
+      type: object
+      properties:
+        unit_id:
+          type: integer
+          minimum: 1
+        revision:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        state:
+          type: string
+        after_revision:
+          type: string
+      required:
+      - after_revision
+      - revision
+      - state
+      - unit_id
     Memory:
       type: object
       properties:
@@ -37157,22 +39750,6 @@ components:
         * `cleanup` - Cleanup all untracked files in the Weblate repository
         * `file-sync` - Force writing all translations to the Weblate repository
         * `file-scan` - Rescan all translation files in the Weblate repository
-    OutcomeEnum:
-      enum:
-      - applied
-      - already_applied
-      - stale
-      - forbidden
-      - needs_individual_confirmation
-      - not_verified
-      type: string
-      description: |-
-        * `applied` - applied
-        * `already_applied` - already_applied
-        * `stale` - stale
-        * `forbidden` - forbidden
-        * `needs_individual_confirmation` - needs_individual_confirmation
-        * `not_verified` - not_verified
     PaginatedAddonList:
       type: object
       required:
@@ -37488,6 +40065,27 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Notification'
+    PaginatedProducerJudgeDecisionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProducerJudgeDecision'
     PaginatedProducerProjectSummaryList:
       type: object
       required:
@@ -38523,6 +41121,13 @@ components:
           type: string
         answer:
           type: string
+    PatchedProducerProfileRequest:
+      type: object
+      properties:
+        service:
+          $ref: '#/components/schemas/RoutedEngineEnum'
+        configuration:
+          $ref: '#/components/schemas/TranslatorInstructions'
     PatchedProject:
       type: object
       properties:
@@ -38877,6 +41482,10 @@ components:
           type: array
           items:
             type: integer
+        repeat_decision:
+          allOf:
+          - $ref: '#/components/schemas/RepeatDecisionEnum'
+          writeOnly: true
     PatchedUserUpdateRequest:
       type: object
       description: |-
@@ -39040,10 +41649,34 @@ components:
         unit:
           type: integer
         outcome:
-          $ref: '#/components/schemas/OutcomeEnum'
+          $ref: '#/components/schemas/ProducerBulkApplyResultOutcomeEnum'
+        revision:
+          type: string
+        application_id:
+          type:
+          - integer
+          - 'null'
       required:
+      - application_id
       - outcome
+      - revision
       - unit
+    ProducerBulkApplyResultOutcomeEnum:
+      enum:
+      - applied
+      - already_applied
+      - stale
+      - forbidden
+      - needs_individual_confirmation
+      - not_verified
+      type: string
+      description: |-
+        * `applied` - applied
+        * `already_applied` - already_applied
+        * `stale` - stale
+        * `forbidden` - forbidden
+        * `needs_individual_confirmation` - needs_individual_confirmation
+        * `not_verified` - not_verified
     ProducerCapabilities:
       type: object
       description: |-
@@ -39054,15 +41687,65 @@ components:
         placeholder: the console decides what to hide, so an invented ``true``
         would offer an action the server cannot perform.
       properties:
+        mt_async_batches:
+          type: integer
+          maximum: 1
+          minimum: 1
+        mt_reconciliation:
+          type: integer
+          readOnly: true
+        quality_execution_policy:
+          type: integer
+          readOnly: true
+        verify_only_immutable:
+          type: integer
+          readOnly: true
         judge:
           type: boolean
           description: Whether the LLM judge is configured and usable.
+        judge_seats:
+          type: integer
+          minimum: 0
+          description: Number of independently configured judge seats.
         glossary_profile_analysis:
           type: boolean
           description: Whether loc-kit glossary profile analysis is enabled.
+        quality_api_version:
+          type: integer
+          readOnly: true
+        candidate_quality_gate:
+          type: boolean
+          readOnly: true
+        glossary_direct_scan:
+          type: boolean
+          readOnly: true
+        quality_group_recheck:
+          type: boolean
+          readOnly: true
+        quality_repeat_plan:
+          type: boolean
+          readOnly: true
+        quality_final_snapshot:
+          type: boolean
+          readOnly: true
+        quality_idempotency:
+          type: boolean
+          readOnly: true
       required:
+      - candidate_quality_gate
+      - glossary_direct_scan
       - glossary_profile_analysis
       - judge
+      - judge_seats
+      - mt_async_batches
+      - mt_reconciliation
+      - quality_api_version
+      - quality_execution_policy
+      - quality_final_snapshot
+      - quality_group_recheck
+      - quality_idempotency
+      - quality_repeat_plan
+      - verify_only_immutable
     ProducerClarification:
       type: object
       description: A producer's own answer to a meaning-clarifying question (Task
@@ -39128,6 +41811,100 @@ components:
       - state
       - target
       - unit_id
+    ProducerJudgeDecision:
+      type: object
+      description: One text-free judge decision with every safe-apply guard exposed.
+      properties:
+        unit_id:
+          type: integer
+          readOnly: true
+        run_unit_outcome:
+          type: string
+          readOnly: true
+        severity:
+          type: string
+          readOnly: true
+        seat_results:
+          type: object
+          additionalProperties:
+            enum:
+            - parsed
+            - unparsed
+            - missing
+            type: string
+            description: |-
+              * `parsed` - parsed
+              * `unparsed` - unparsed
+              * `missing` - missing
+          readOnly: true
+        disagreement:
+          type: boolean
+          readOnly: true
+        issue_categories:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        candidate_id:
+          type:
+          - integer
+          - 'null'
+          readOnly: true
+        candidate_verified:
+          type: boolean
+          readOnly: true
+        candidate_acceptable:
+          type: boolean
+          readOnly: true
+        candidate_glossary_status:
+          type: string
+          readOnly: true
+        live_seat_results:
+          type: object
+          additionalProperties:
+            enum:
+            - parsed
+            - unparsed
+            - missing
+            type: string
+            description: |-
+              * `parsed` - parsed
+              * `unparsed` - unparsed
+              * `missing` - missing
+          readOnly: true
+        approval_loss:
+          type: boolean
+          readOnly: true
+        terminology_conflict:
+          type: boolean
+          readOnly: true
+        generation_outcome:
+          type: string
+          readOnly: true
+        applicability:
+          allOf:
+          - $ref: '#/components/schemas/ApplicabilityEnum'
+          readOnly: true
+        revision:
+          type: string
+          readOnly: true
+      required:
+      - applicability
+      - approval_loss
+      - candidate_acceptable
+      - candidate_glossary_status
+      - candidate_id
+      - candidate_verified
+      - disagreement
+      - generation_outcome
+      - issue_categories
+      - live_seat_results
+      - revision
+      - run_unit_outcome
+      - seat_results
+      - severity
+      - terminology_conflict
+      - unit_id
     ProducerJudgeEstimate:
       type: object
       description: Upper bounds and exact selection counts for a judge scope.
@@ -39135,6 +41912,8 @@ components:
         estimate_id:
           type: string
           format: uuid
+        execution_mode:
+          type: string
         scope_hash:
           type: string
         strings:
@@ -39155,6 +41934,7 @@ components:
       - basis
       - estimate_id
       - excluded
+      - execution_mode
       - initial_calls
       - preparation
       - scope_hash
@@ -39167,6 +41947,10 @@ components:
       properties:
         kind:
           $ref: '#/components/schemas/ProducerRunKindEnum'
+        execution_mode:
+          allOf:
+          - $ref: '#/components/schemas/ExecutionModeEnum'
+          default: repair
         scope:
           type: object
           additionalProperties: {}
@@ -39177,6 +41961,8 @@ components:
       description: Identity and capabilities for the authenticated producer.
       properties:
         username:
+          type: string
+        subject:
           type: string
         full_name:
           type: string
@@ -39227,6 +42013,13 @@ components:
       - missing
       - mt_cost_known
       - per_language
+    ProducerProfileResponse:
+      type: object
+      properties:
+        openrouter:
+          $ref: '#/components/schemas/TranslatorInstructions'
+        litellm:
+          $ref: '#/components/schemas/TranslatorInstructions'
     ProducerProjectSummary:
       type: object
       description: One project the authenticated user may access.
@@ -39244,6 +42037,437 @@ components:
       - advanced_url
       - name
       - slug
+    ProducerQualityIssue:
+      type: object
+      description: A text-free consistency group derived from Weblate checks.
+      properties:
+        group_id:
+          type: string
+          readOnly: true
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/ProducerQualityIssueKindEnum'
+          readOnly: true
+        hard:
+          type: boolean
+          readOnly: true
+        advisory:
+          type: boolean
+          readOnly: true
+        unit_ids:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        revisions:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
+        variants:
+          type: array
+          items: {}
+          readOnly: true
+        term_mode:
+          type: string
+          readOnly: true
+        approved_conflict:
+          type: boolean
+          readOnly: true
+        auto_repair_eligible:
+          type: boolean
+          readOnly: true
+      required:
+      - advisory
+      - approved_conflict
+      - auto_repair_eligible
+      - group_id
+      - hard
+      - kind
+      - revisions
+      - term_mode
+      - unit_ids
+      - variants
+    ProducerQualityIssueKindEnum:
+      enum:
+      - repeat-drift
+      - glossary
+      type: string
+      description: |-
+        * `repeat-drift` - repeat-drift
+        * `glossary` - glossary
+    ProducerQualityIssueList:
+      type: object
+      description: Stable snapshot of every requested consistency issue.
+      properties:
+        snapshot_hash:
+          type: string
+          readOnly: true
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProducerQualityIssue'
+          readOnly: true
+      required:
+      - issues
+      - snapshot_hash
+    ProducerQualityOperation:
+      type: object
+      properties:
+        state:
+          allOf:
+          - $ref: '#/components/schemas/ProducerQualityOperationStateEnum'
+          readOnly: true
+        result: {}
+      required:
+      - state
+    ProducerQualityOperationStateEnum:
+      enum:
+      - pending
+      - confirmed
+      - failed
+      type: string
+      description: |-
+        * `pending` - pending
+        * `confirmed` - confirmed
+        * `failed` - failed
+    ProducerQualityRecheckItem:
+      type: object
+      properties:
+        unit_id:
+          type: integer
+        revision:
+          type: string
+      required:
+      - revision
+      - unit_id
+    ProducerQualityRecheckRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProducerQualityRecheckItem'
+      required:
+      - items
+    ProducerQualityRecheckResult:
+      type: object
+      properties:
+        snapshot_hash:
+          type: string
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProducerQualityRecheckResultItem'
+          readOnly: true
+        affected_unit_ids:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        affected_repeat_group_ids:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - affected_repeat_group_ids
+      - affected_unit_ids
+      - items
+      - snapshot_hash
+    ProducerQualityRecheckResultItem:
+      type: object
+      properties:
+        unit_id:
+          type: integer
+          readOnly: true
+        outcome:
+          allOf:
+          - $ref: '#/components/schemas/ProducerQualityRecheckResultItemOutcomeEnum'
+          readOnly: true
+        revision:
+          type: string
+          readOnly: true
+        checks:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - checks
+      - outcome
+      - revision
+      - unit_id
+    ProducerQualityRecheckResultItemOutcomeEnum:
+      enum:
+      - rechecked
+      - stale
+      - forbidden
+      - missing
+      type: string
+      description: |-
+        * `rechecked` - rechecked
+        * `stale` - stale
+        * `forbidden` - forbidden
+        * `missing` - missing
+    ProducerQualityScope:
+      type: object
+      properties:
+        unit_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 10000
+      required:
+      - unit_ids
+    ProducerQualitySnapshot:
+      type: object
+      properties:
+        protected_content_digest:
+          type: string
+          readOnly: true
+        complete:
+          type: boolean
+          readOnly: true
+        unit_ids:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        revisions:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
+        judged_revisions:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
+        scope_revision:
+          type: string
+          readOnly: true
+        snapshot_hash:
+          type: string
+          readOnly: true
+        issues:
+          type: array
+          items: {}
+          readOnly: true
+      required:
+      - complete
+      - issues
+      - judged_revisions
+      - protected_content_digest
+      - revisions
+      - scope_revision
+      - snapshot_hash
+      - unit_ids
+    ProducerQualitySnapshotRequest:
+      type: object
+      properties:
+        language:
+          type: string
+        scope:
+          $ref: '#/components/schemas/ProducerQualityScope'
+      required:
+      - language
+      - scope
+    ProducerRepeatGroup:
+      type: object
+      properties:
+        group_id:
+          type: string
+          readOnly: true
+        revision:
+          type: string
+          readOnly: true
+        unit_ids:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        outcome:
+          allOf:
+          - $ref: '#/components/schemas/ProducerRepeatGroupOutcomeEnum'
+          readOnly: true
+        preferred_origin:
+          type: string
+          readOnly: true
+        reason:
+          type: string
+          readOnly: true
+      required:
+      - group_id
+      - outcome
+      - preferred_origin
+      - reason
+      - revision
+      - unit_ids
+    ProducerRepeatGroupOutcomeEnum:
+      enum:
+      - pending
+      - ready
+      - applied
+      - no_change
+      - independent
+      - approved_conflict
+      - needs_review
+      - stale
+      - forbidden
+      - unrepairable
+      - failed
+      type: string
+      description: |-
+        * `pending` - pending
+        * `ready` - ready
+        * `applied` - applied
+        * `no_change` - no_change
+        * `independent` - independent
+        * `approved_conflict` - approved_conflict
+        * `needs_review` - needs_review
+        * `stale` - stale
+        * `forbidden` - forbidden
+        * `unrepairable` - unrepairable
+        * `failed` - failed
+    ProducerRepeatPlan:
+      type: object
+      properties:
+        token:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ProducerRepeatPlanStatusEnum'
+          readOnly: true
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProducerRepeatGroup'
+          readOnly: true
+      required:
+      - groups
+      - status
+      - token
+    ProducerRepeatPlanRequest:
+      type: object
+      properties:
+        language:
+          type: string
+        scope:
+          $ref: '#/components/schemas/ProducerQualityScope'
+        issue_snapshot_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+        application_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 10000
+      required:
+      - application_ids
+      - issue_snapshot_hash
+      - language
+      - scope
+    ProducerRepeatPlanStatusEnum:
+      enum:
+      - queued
+      - running
+      - ready
+      - failed
+      type: string
+      description: |-
+        * `queued` - queued
+        * `running` - running
+        * `ready` - ready
+        * `failed` - failed
+    ProducerRepeatResult:
+      type: object
+      properties:
+        unit:
+          type: integer
+          readOnly: true
+        revision:
+          type: string
+          readOnly: true
+        outcome:
+          allOf:
+          - $ref: '#/components/schemas/ProducerRepeatResultOutcomeEnum'
+          readOnly: true
+        event_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+      required:
+      - outcome
+      - revision
+      - unit
+    ProducerRepeatResultOutcomeEnum:
+      enum:
+      - applied
+      - no_change
+      - stale
+      - forbidden
+      - approved
+      - independent
+      - needs_review
+      - failed
+      type: string
+      description: |-
+        * `applied` - applied
+        * `no_change` - no_change
+        * `stale` - stale
+        * `forbidden` - forbidden
+        * `approved` - approved
+        * `independent` - independent
+        * `needs_review` - needs_review
+        * `failed` - failed
+    ProducerRepeatRun:
+      type: object
+      properties:
+        token:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ProducerRepeatRunStatusEnum'
+          readOnly: true
+        changed_unit_ids:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProducerRepeatResult'
+          readOnly: true
+      required:
+      - changed_unit_ids
+      - results
+      - status
+      - token
+    ProducerRepeatRunStatusEnum:
+      enum:
+      - queued
+      - running
+      - completed
+      - partial
+      - failed
+      type: string
+      description: |-
+        * `queued` - queued
+        * `running` - running
+        * `completed` - completed
+        * `partial` - partial
+        * `failed` - failed
     ProducerRun:
       type: object
       description: Durable producer-run state without text-bearing judge evidence.
@@ -39288,9 +42512,13 @@ components:
           type: object
           additionalProperties: {}
           readOnly: true
+        execution_mode:
+          type: string
+          readOnly: true
       required:
       - coverage
       - created
+      - execution_mode
       - failure
       - finished
       - id
@@ -39321,6 +42549,10 @@ components:
       properties:
         kind:
           $ref: '#/components/schemas/ProducerRunKindEnum'
+        execution_mode:
+          allOf:
+          - $ref: '#/components/schemas/ExecutionModeEnum'
+          default: repair
         scope:
           type: object
           additionalProperties: {}
@@ -40522,6 +43754,11 @@ components:
         * `3` - All public projects
         * `4` - All protected projects
         * `2` - From component list
+    RepeatDecisionEnum:
+      enum:
+      - independent
+      type: string
+      description: '* `independent` - independent'
     RepoRequest:
       type: object
       properties:
@@ -40874,6 +44111,14 @@ components:
       - name
       - permissions
       - url
+    RoutedEngineEnum:
+      enum:
+      - openrouter
+      - litellm
+      type: string
+      description: |-
+        * `openrouter` - openrouter
+        * `litellm` - litellm
     ScopedReportCreate:
       type: object
       description: |-
@@ -41213,14 +44458,6 @@ components:
       - translated_percent
       - translated_words
       - translated_words_percent
-    StatusEnum:
-      enum:
-      - success
-      - failure
-      type: string
-      description: |-
-        * `success` - success
-        * `failure` - failure
     StringStateEnum:
       enum:
       - 0
@@ -41512,6 +44749,20 @@ components:
             - type: string
       required:
       - language_code
+    TranslatorInstructions:
+      type: object
+      properties:
+        persona:
+          type: string
+          maxLength: 20000
+        style:
+          type: string
+          maxLength: 20000
+        language_instructions:
+          type: object
+          additionalProperties:
+            type: string
+            maxLength: 20000
     Unit:
       type: object
       properties:
@@ -41675,6 +44926,10 @@ components:
           type: array
           items:
             type: integer
+        repeat_decision:
+          allOf:
+          - $ref: '#/components/schemas/RepeatDecisionEnum'
+          writeOnly: true
       required:
       - labels
       - target
@@ -41930,6 +45185,12 @@ components:
         user profile. These tokens have the `wlu_` prefix.\n- It is possible to create
         project tokens whose access to the API is limited to operations to their associated
         project. These tokens have the `wlp_` prefix.\n        "
+    wizardOAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: wzo_ access token
+      description: Delegated Wizard access token. Requires Wizard SSO to be enabled
+        and a scope granting access to the requested operation.
 servers:
 - url: 'http:'
   description: HCGameLoc

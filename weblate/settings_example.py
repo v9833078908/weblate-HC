@@ -444,6 +444,7 @@ INSTALLED_APPS = [
     "weblate.machinery",
     "weblate.workspaces",
     "weblate.trans",
+    "weblate.wizard_auth",
     "weblate.lang",
     "weblate_language_data",
     "weblate.memory",
@@ -1085,3 +1086,12 @@ JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1 = ""
 JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2 = ""
 LLM_USAGE_LOG_RETENTION_DAYS = 90
 PASSWORD_RESET_URL = None
+
+# Optional identity/delegation provider for the separate Wizard.
+WIZARD_SSO_ENABLED = False
+# Public HTTPS page for the optional navigation link; empty hides the link.
+WIZARD_PUBLIC_URL = ""
+WIZARD_SSO_ISSUER = ""
+WIZARD_SSO_CLIENT_ID = ""
+WIZARD_SSO_PRIVATE_KEY_FILE = ""
+WIZARD_SSO_INACTIVE_KEYS: list[str] = []

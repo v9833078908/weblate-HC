@@ -48,6 +48,7 @@ from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.models.project import CommitPolicyChoices, Project
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.variant import Variant
+from weblate.trans.quality_execution import guard_unit_save, guard_unit_update
 from weblate.trans.signals import unit_post_sync, unit_pre_create
 from weblate.trans.util import (
     count_words,
@@ -182,6 +183,11 @@ def _get_permission_scope_query(user: User, permission: str) -> Q:
 
 
 class UnitQuerySet(models.QuerySet["Unit", "Unit"]):
+    def update(self, **kwargs):
+
+        guard_unit_update(self, kwargs)
+        return super().update(**kwargs)
+
     def prefetch(self):
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.models.component import (
@@ -832,6 +838,7 @@ class Unit(models.Model, LoggerMixin):
 
         Wrapper around save to run checks or update fulltext.
         """
+        guard_unit_save(self, update_fields)
         # Store number of words
         if not same_content or not self.num_words:
             self.num_words = count_words(
@@ -3008,7 +3015,7 @@ class Unit(models.Model, LoggerMixin):
         return stripped
 
     def count_read_only_overrides(self) -> int:
-        """Number of target units carrying ``read-only`` in their own extra_flags."""
+        """Count target units carrying ``read-only`` in their own extra_flags."""
         if not self.is_source:
             return 0
         return sum(
@@ -3069,7 +3076,7 @@ class Unit(models.Model, LoggerMixin):
             source.update_extra_flags(own.format(), user)
         elif count:
             # Parked case: the source carries no flag, only the overrides lock.
-            source._strip_read_only_overrides(user)
+            source._strip_read_only_overrides(user)  # ruff: ignore[private-member-access]
         return count
 
     @cached_property

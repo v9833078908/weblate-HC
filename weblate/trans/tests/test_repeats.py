@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -710,7 +711,7 @@ class RepeatModelTest(ViewTestCase):
         ):
             self.assertEqual(requeue_reserved_attempts(run=run, actor=self.user), 1)
         published.assert_called_once_with(
-            args=[attempt.pk], priority=INTERACTIVE_TASK_PRIORITY
+            args=(attempt.pk,), priority=INTERACTIVE_TASK_PRIORITY
         )
 
     def test_send_expiry_reconciliation_and_late_response(self) -> None:
@@ -1355,31 +1356,31 @@ class RepeatRecommendationConcurrencyTest(RepoTestMixin, TransactionTestCase):
 
         def prepare() -> None:
             try:
-                with (
-                    patch(
-                        "weblate.trans.repeat_recommendations.judge_primary_endpoint",
-                        return_value=SimpleNamespace(),
-                    ),
-                    patch(
-                        "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
-                        return_value=self.profile,
-                    ),
-                    patch("weblate.trans.repeat_recommendations.queue_attempt"),
-                ):
-                    barrier.wait(timeout=10)
-                    run = prepare_run(
-                        policy=self.policy, actor=self.user, request_cap=1
-                    )
+                barrier.wait(timeout=10)
+                run = prepare_run(policy=self.policy, actor=self.user, request_cap=1)
                 with lock:
                     runs.append(run.pk)
             finally:
                 connection.close()
 
-        threads = [threading.Thread(target=prepare) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=30)
+        # These patches replace module globals, not thread-local state. Keep
+        # one shared lifetime until both workers have finished and propagate
+        # worker exceptions through the futures to the test thread.
+        with (
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=self.profile,
+            ),
+            patch("weblate.trans.repeat_recommendations.queue_attempt"),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            futures = [executor.submit(prepare) for _ in range(2)]
+            for future in futures:
+                future.result(timeout=30)
 
         self.assertEqual(len(runs), 2, "both preparations must finish")
         self.assertEqual(RepeatRecommendationRun.objects.count(), 2)
@@ -1431,30 +1432,29 @@ class RepeatRecommendationConcurrencyTest(RepoTestMixin, TransactionTestCase):
 
         def deliver() -> None:
             try:
-                with (
-                    patch(
-                        "weblate.trans.repeat_recommendations.judge_primary_endpoint",
-                        return_value=SimpleNamespace(),
-                    ),
-                    patch(
-                        "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
-                        return_value=self.profile,
-                    ),
-                    patch(
-                        "weblate.trans.repeat_recommendations.post_chat_completion",
-                        side_effect=send,
-                    ),
-                ):
-                    barrier.wait(timeout=10)
-                    execute_attempt(attempt=attempt)
+                barrier.wait(timeout=10)
+                execute_attempt(attempt=attempt)
             finally:
                 connection.close()
 
-        threads = [threading.Thread(target=deliver) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=30)
+        with (
+            patch(
+                "weblate.trans.repeat_recommendations.judge_primary_endpoint",
+                return_value=SimpleNamespace(),
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.resolve_judge_seat_profile",
+                return_value=self.profile,
+            ),
+            patch(
+                "weblate.trans.repeat_recommendations.post_chat_completion",
+                side_effect=send,
+            ),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            futures = [executor.submit(deliver) for _ in range(2)]
+            for future in futures:
+                future.result(timeout=30)
 
         self.assertEqual(len(sends), 1, "a claimed attempt sends exactly once")
         attempt.refresh_from_db()

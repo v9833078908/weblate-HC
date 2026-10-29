@@ -242,6 +242,12 @@
     Skip the :ref:`check-repeat-drift` quality check.
 ``ignore-rst-references``
     Skip the :ref:`check-rst-references` quality check.
+``ignore-judge-reject``
+    Skip the :ref:`check-judge-reject` quality check.
+``ignore-judge-flag``
+    Skip the :ref:`check-judge-flag` quality check.
+``ignore-judge-note``
+    Skip the :ref:`check-judge-note` quality check.
 ``ignore-kashida``
     Skip the :ref:`check-kashida` quality check.
 ``ignore-md-link``

@@ -26,6 +26,8 @@ from weblate.machinery.base import (
 from weblate.machinery.forms import BaseOpenAIMachineryForm, EmptyMappingJSONField
 from weblate.machinery.openai import OpenAITranslation
 
+from .routed_reply import LEGACY_PROMPT, legacy_reply_format, legacy_unwrap_reply
+
 if TYPE_CHECKING:
     from weblate.auth.models import User
     from weblate.machinery.types import DownloadMultipleTranslations, SettingsDict
@@ -167,6 +169,62 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
         self._route_target: ContextVar[str | None] = ContextVar(
             "routed_llm_target", default=None
         )
+        self._reply_codec: ContextVar[str] = ContextVar(
+            "routed_reply_codec", default="routed-slots-v3"
+        )
+
+    @property
+    def delivery_request_codec(self) -> str:
+        return self._reply_codec.get()
+
+    def _fetch_llm_batch(
+        self, source_language, target_language, sources, source_occurrences
+    ):
+        codec = "routed-slots-v3"
+        identity = self._delivery_identity(sources)
+        if identity:
+            from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+                DeliveryUnresolved,
+                saved_request_codec,
+            )
+
+            saved = saved_request_codec(identity)
+            if saved in {"", "routed-parts-v1"}:
+                codec = "routed-parts-v1"
+            elif saved == "routed-slots-v2":
+                codec = saved
+            elif saved not in {None, codec}:
+                msg = "Stored routed codec requires reconciliation"
+                raise DeliveryUnresolved(msg)
+        token = self._reply_codec.set(codec)
+        try:
+            return super()._fetch_llm_batch(
+                source_language, target_language, sources, source_occurrences
+            )
+        finally:
+            self._reply_codec.reset(token)
+
+    def _get_prompt(self, target_language: str) -> str:
+        if self.delivery_request_codec != "routed-parts-v1":
+            return super()._get_prompt(target_language)
+        return LEGACY_PROMPT.format(
+            persona=self.format_prompt_part("persona"),
+            style=self.format_prompt_part("style"),
+            language_instructions=self.format_language_instructions(target_language),
+        ) + (
+            '\nWhen a response schema is supplied, return {"translations": [...]}:'
+            " the array described above, wrapped in that one key.\n"
+        )
+
+    def _build_string_ids(self, count: int) -> list[str]:
+        # Durable batch ids are separately derived from semantic identities.
+        # Demonstration ids must also be stable for exact request-digest replay.
+        if self.durable_single_attempt and self.delivery_request_codec in {
+            "routed-slots-v2",
+            "routed-slots-v3",
+        }:
+            return [f"example{index}" for index in range(count)]
+        return super()._build_string_ids(count)
 
     def get_runtime_base_url(self) -> str:
         return self.settings.get("base_url") or DEFAULT_BASE_URL
@@ -308,11 +366,16 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
             self.get_identifier() == "openrouter"
             and urlsplit(self.get_runtime_base_url()).hostname == "openrouter.ai"
             and model == "google/gemini-3.7-flash"
+            and self.delivery_request_codec == "routed-slots-v3"
         ):
             payload["reasoning"] = {"effort": "medium"}
         strings = self._request_strings(content)
         if strings:
-            payload["response_format"] = self._reply_format(strings)
+            payload["response_format"] = (
+                legacy_reply_format(len(strings))
+                if self.delivery_request_codec == "routed-parts-v1"
+                else self._reply_format(strings)
+            )
             provider = cast("dict[str, object]", payload.setdefault("provider", {}))
             provider["require_parameters"] = True
         return payload
@@ -401,6 +464,8 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
         content, response = super()._build_previous_messages_from_examples(
             source_language, target_language, examples
         )
+        if self.delivery_request_codec == "routed-parts-v1":
+            return content, response
         translations = {}
         for source, target in zip(
             json.loads(content)["strings"], json.loads(response), strict=True
@@ -520,6 +585,13 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
         *,
         string_ids: list[str],
     ) -> DownloadMultipleTranslations:
+        if self.delivery_request_codec == "routed-parts-v1":
+            return super()._parse_llm_translations(
+                legacy_unwrap_reply(translations_string),
+                sources,
+                source_occurrences,
+                string_ids=string_ids,
+            )
         try:
             decoded = self._decode_reply(
                 translations_string, sources, source_occurrences, string_ids

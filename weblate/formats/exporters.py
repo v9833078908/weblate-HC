@@ -315,7 +315,9 @@ class CSVExporter(PluralCSVExportMixin, CVSBaseExporter):
     file_format = "csv"
     verbose = gettext_lazy("CSV")
 
-    def string_filter(self, text):
+    # This stateless override preserves the instance-call string_filter(text).
+    @staticmethod
+    def string_filter(text):  # pylint: disable=arguments-differ
         """
         Avoid Excel interpreting text as formula.
 

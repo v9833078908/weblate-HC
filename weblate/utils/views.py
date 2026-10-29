@@ -736,7 +736,7 @@ def create_component_from_kit(data, uploaded):
     from loc_kit_ingest.infer import InferenceError, infer_profile
 
     # ruff: ignore[import-outside-top-level]
-    from loc_kit_ingest.model import Severity
+    from loc_kit_ingest.model import Severity, StringUnit
 
     # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.parser import parse_component as parse_kit_component
@@ -827,7 +827,7 @@ def create_component_from_kit(data, uploaded):
         "explanations": {
             unit.key: unit.explanation.strip()
             for unit in result.units
-            if getattr(unit, "explanation", "").strip()
+            if isinstance(unit, StringUnit) and unit.explanation.strip()
         },
     }
     return fake, kit_info

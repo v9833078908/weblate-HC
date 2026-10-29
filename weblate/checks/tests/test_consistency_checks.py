@@ -155,7 +155,7 @@ class ReusedCheckGuardTest(SimpleTestCase):
         handle_batch.assert_not_called()
 
 
-class SameSourceUnitsMixin:
+class SameSourceUnitsMixin(ComponentTestCase):
     """Create units with an explicit context, source and target."""
 
     def setUp(self) -> None:

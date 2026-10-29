@@ -1,0 +1,15 @@
+status	path
+M	PRODUCTION-SNAPSHOT.json
+M	docs/api.rst
+M	docs/changes.rst
+M	docs/operations/plans/2026-10-23-02-maintenance-isolation-and-external-build.md
+A	docs/operations/reports/2026-10-23-03-weblate-production-reintegration.md
+A	docs/operations/reports/2026-10-23-03-weblate-reintegration-files.tsv
+M	docs/security/threat-model.rst
+M	weblate/api/tests.py
+M	weblate/trans/judge_loop.py
+A	weblate/trans/migrations/0147_judge_application_change_restrict.py
+A	weblate/trans/migrations/0153_merge_production_repair_history.py
+M	weblate/trans/models/judge.py
+M	weblate/trans/tests/test_judge_loop.py
+M	weblate/trans/tests/test_producer_release_migrations.py

@@ -21,6 +21,7 @@ from weblate.utils.ratelimit import reset_rate_limit
 from .test_views import ViewTestCase
 
 
+@override_settings(SITE_TITLE="Weblate", EMAIL_SUBJECT_PREFIX="[Weblate] ")
 class NewLangTest(ViewTestCase):
     expected_lang_code = "pt_BR"
 

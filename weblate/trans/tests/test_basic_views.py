@@ -27,6 +27,59 @@ from weblate.vcs.ssh import ensure_ssh_key
 
 
 class BasicViewTest(FixtureTestCase):
+    @override_settings(
+        WIZARD_SSO_ENABLED=True,
+        WIZARD_PUBLIC_URL="https://wizard.example.com/console/projects",
+    )
+    def test_authenticated_navigation_includes_wizard_link(self) -> None:
+        response = self.client.get(reverse("about"))
+        self.assertContains(
+            response,
+            '<a class="nav-link" href="https://wizard.example.com/console/projects">Localization wizard</a>',
+            html=True,
+        )
+
+    @override_settings(
+        WIZARD_SSO_ENABLED=True,
+        WIZARD_PUBLIC_URL="https://127.0.0.1:19444/console/projects",
+    )
+    def test_wizard_link_supports_local_https_testing(self) -> None:
+        self.assertContains(
+            self.client.get(reverse("about")),
+            'href="https://127.0.0.1:19444/console/projects"',
+        )
+
+    @override_settings(
+        WIZARD_SSO_ENABLED=True,
+        WIZARD_PUBLIC_URL="https://wizard.example.com/console/projects",
+    )
+    def test_wizard_link_is_hidden_from_anonymous_users(self) -> None:
+        self.client.logout()
+        self.assertNotContains(self.client.get(reverse("about")), "Localization wizard")
+
+    @override_settings(
+        WIZARD_SSO_ENABLED=False, WIZARD_PUBLIC_URL="https://wizard.example.com/"
+    )
+    def test_wizard_link_is_hidden_when_sso_is_disabled(self) -> None:
+        self.assertNotContains(self.client.get(reverse("about")), "Localization wizard")
+
+    @override_settings(WIZARD_SSO_ENABLED=True)
+    def test_wizard_link_rejects_unsafe_destination(self) -> None:
+        for url in (
+            "",
+            "javascript:alert(1)",
+            "http://wizard.example.com/",
+            "https://user:password@wizard.example.com/",
+            "https://wizard.example.com:99999/",
+            "https://wizard.example.com:0/",
+            "https://wizard.example.com/?redirect=elsewhere",
+            "https://wizard.example.com/#fragment",
+        ):
+            with self.subTest(url=url), self.settings(WIZARD_PUBLIC_URL=url):
+                self.assertNotContains(
+                    self.client.get(reverse("about")), "Localization wizard"
+                )
+
     def test_about(self) -> None:
         response = self.client.get(reverse("about"))
         self.assertContains(response, "translate-toolkit")

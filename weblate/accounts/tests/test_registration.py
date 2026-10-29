@@ -141,6 +141,7 @@ class WeblateStrategyTest(SimpleTestCase):
         self.assertEqual(strategy.request_data()["email"], "test@example.com")
 
 
+@override_settings(SITE_TITLE="Weblate", EMAIL_SUBJECT_PREFIX="[Weblate] ")
 class BaseRegistrationTest(TestCase, RegistrationTestMixin):
     clear_cookie = False
     social_cleanup = False

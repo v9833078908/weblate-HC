@@ -6,13 +6,19 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
 import httpx2
 from asgiref.sync import async_to_sync
-from django.test import SimpleTestCase, TestCase
+from django.conf import settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 from weblate_customization.checks import GameMarkupCheck
@@ -26,9 +32,17 @@ from weblate_customization.machinery import (
 
 from weblate.checks import models as check_models
 from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.llm import BaseLLMTranslation
 from weblate.machinery.openai import OpenAITranslation
+from weblate.trans.llm_delivery import (
+    DeliveryUnresolved,
+    dispatch_exchange,
+    encode_http_response,
+)
+from weblate.trans.models.llm_delivery import ProducerLLMExchange
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.factories import make_unit
+from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.tests import http_mock
 
 if TYPE_CHECKING:
@@ -65,7 +79,13 @@ def mock_chat(text: str = "テスト", *, invalid_reply: str | None = None) -> N
     register_chat(CHAT_URL, text, invalid_reply=invalid_reply)
 
 
-def register_chat(url: str, text: str, *, invalid_reply: str | None = None) -> None:
+def register_chat(
+    url: str,
+    text: str,
+    *,
+    invalid_reply: str | None = None,
+    usage: dict | None = None,
+) -> None:
     def respond(request: httpx2.Request) -> httpx2.Response:
         inputs = json.loads(json.loads(request.content)["messages"][-1]["content"])[
             "strings"
@@ -86,11 +106,9 @@ def register_chat(url: str, text: str, *, invalid_reply: str | None = None) -> N
             200,
             json={
                 "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
-                "usage": {
-                    "prompt_tokens": 9,
-                    "completion_tokens": 2,
-                    "total_tokens": 11,
-                },
+                "usage": usage
+                if usage is not None
+                else {"prompt_tokens": 9, "completion_tokens": 2, "total_tokens": 11},
             },
         )
 
@@ -1110,3 +1128,224 @@ class RoutedLiteLLMDownloadTest(TestCase):
 
         self.assertTrue(result)
         self.assertEqual(litellm_sent_models(), [DEEPSEEK])
+
+
+class RoutedDeliveryTest(ViewTestCase):
+    def setUp(self):
+        super().setUp()
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        override = override_settings(DATA_DIR=directory.name)
+        override.enable()
+        self.addCleanup(override.disable)
+        self.unit = self.get_unit()
+        self.unit.source = "Open"
+        self.sources = [("Open", self.unit)]
+
+    def machine(self, cls=RoutedLLMTranslation):
+        config = CONFIGURATION if cls is RoutedLLMTranslation else LITELLM_CONFIGURATION
+        engine = cls(as_settings(dict(config)))
+        engine.durable_single_attempt = True
+        engine.cache_translations = False
+        return engine
+
+    @http_mock.activate
+    def assert_fresh_engine_replay(self, cls):
+        engine = self.machine(cls)
+        register_chat(engine.get_chat_completions_url(), "Přeloženo")
+        first = engine.download_multiple_translations("en", "cs", self.sources)
+        second = self.machine(cls).download_multiple_translations(
+            "en", "cs", self.sources
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+        self.assertEqual(
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v3"
+        )
+
+    def test_new_openrouter_reply_replays_across_fresh_engines(self):
+        self.assert_fresh_engine_replay(RoutedLLMTranslation)
+
+    def test_new_litellm_reply_replays_across_fresh_engines(self):
+        self.assert_fresh_engine_replay(RoutedLiteLLMTranslation)
+
+    @http_mock.activate
+    def test_frozen_gemini_v2_paid_reply_recovers_and_changes_stay_fenced(self):
+        engine = self.machine()
+        engine.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        register_chat(engine.get_chat_completions_url(), "Přeloženo")
+        current_payload = engine.get_chat_payload
+
+        def previous_payload(*args):
+            payload = current_payload(*args)
+            payload.pop("reasoning", None)
+            return payload
+
+        # Freeze the pre-reasoning v2 wire request and its actual paid reply.
+        with (
+            patch(
+                "weblate.trans.llm_delivery.saved_request_codec",
+                return_value="routed-slots-v2",
+            ),
+            patch.object(engine, "get_chat_payload", side_effect=previous_payload),
+        ):
+            first = engine.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(first["Open"][0]["text"], "Přeloženo")
+        self.assertNotIn("reasoning", sent_payloads()[0])
+        self.assertEqual(
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v2"
+        )
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+        resumed = self.machine()
+        resumed.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        recovered = resumed.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(recovered["Open"][0]["text"], "Přeloženo")
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+        for changed_source, changed_model, changed_style in (
+            ("Changed source", "google/gemini-3.7-flash", ""),
+            ("Open", GEMINI, ""),
+            ("Open", "google/gemini-3.7-flash", "Different paid request"),
+        ):
+            with self.subTest(
+                source=changed_source, model=changed_model, style=changed_style
+            ):
+                changed = self.machine()
+                changed.settings["routing"] = {"*": changed_model}
+                changed.settings["style"] = changed_style
+                with self.assertRaises(DeliveryUnresolved):
+                    changed.download_multiple_translations(
+                        "en", "cs", [(changed_source, self.unit)]
+                    )
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+    @http_mock.activate
+    def test_new_durable_gemini_request_has_medium_reasoning(self):
+        engine = self.machine()
+        engine.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        register_chat(engine.get_chat_completions_url(), "Přeloženo")
+
+        result = engine.download_multiple_translations("en", "cs", self.sources)
+
+        self.assertEqual(result["Open"][0]["text"], "Přeloženo")
+        self.assertEqual(sent_payloads()[0]["reasoning"], {"effort": "medium"})
+        resumed = self.machine()
+        resumed.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        recovered = resumed.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(recovered["Open"][0]["text"], "Přeloženo")
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+    @http_mock.activate
+    def test_cost_only_usage_is_recorded_once_across_replay(self):
+        engine = self.machine()
+        register_chat(
+            engine.get_chat_completions_url(),
+            "Přeloženo",
+            usage={"cost": "0.25", "prompt_tokens_details": "unexpected"},
+        )
+        first = engine.download_multiple_translations("en", "cs", self.sources)
+        second = self.machine().download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(first, second)
+        self.assertEqual(len(http_mock.calls), 1)
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.cost_usd, Decimal("0.25"))
+        self.assertEqual(log.prompt_tokens, 0)
+        self.assertEqual(log.cached_tokens, 0)
+
+    @http_mock.activate
+    def test_exact_legacy_body_replays_and_changed_settings_stay_blocked(self):
+        engine = self.machine()
+        identity = engine._delivery_identity(self.sources)  # ruff: ignore[private-member-access]
+        ids = [
+            "s"
+            + hmac.new(
+                settings.SECRET_KEY.encode(), item.encode(), hashlib.sha256
+            ).hexdigest()[:16]
+            for item in identity
+        ]
+        examples = ('{"strings":[]}', "[]")
+        with patch.object(
+            BaseLLMTranslation, "_get_previous_messages", return_value=examples
+        ):
+            token = engine._reply_codec.set("routed-parts-v1")  # ruff: ignore[private-member-access]
+            try:
+                args = engine._prepare_llm_translation(  # ruff: ignore[private-member-access]
+                    "en", "cs", self.sources, None, ids
+                )
+                payload = engine.get_chat_payload(engine.get_model(), *args)
+            finally:
+                engine._reply_codec.reset(token)  # ruff: ignore[private-member-access]
+            digest = hashlib.sha256(
+                json.dumps(
+                    {
+                        "url": engine.get_chat_completions_url(),
+                        "method": "post",
+                        "payload": payload,
+                    },
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    default=str,
+                ).encode()
+            ).hexdigest()
+            reply = {
+                "translations": [
+                    {"id": ids[0], "parts": [{"type": "text", "text": "OtevЕ™Г­t"}]}
+                ]
+            }
+            response = httpx2.Response(
+                200, json={"choices": [{"message": {"content": json.dumps(reply)}}]}
+            )
+            dispatch_exchange(identity, digest, lambda: encode_http_response(response))
+            self.assertTrue(
+                engine.download_multiple_translations("en", "cs", self.sources)
+            )
+            self.assertEqual(len(http_mock.calls), 0)
+            saved = ProducerLLMExchange.objects.get()
+            self.assertEqual(saved.request_digest, digest)
+            self.assertEqual(saved.request_codec, "routed-parts-v1")
+            changed = self.machine()
+            changed.settings["style"] = "Different paid request"
+            with self.assertRaises(DeliveryUnresolved):
+                changed.download_multiple_translations("en", "cs", self.sources)
+            self.assertEqual(len(http_mock.calls), 0)
+
+    @http_mock.activate
+    def test_invalid_slot_reply_has_no_legacy_fallback_or_paid_retry(self):
+        engine = self.machine()
+        register_chat(
+            engine.get_chat_completions_url(),
+            "unused",
+            invalid_reply='{"translations":[]}',
+        )
+        for _ in range(2):
+            with self.assertRaises((MachineTranslationError, DeliveryUnresolved)):
+                self.machine().download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v3"
+        )
+
+    def test_frozen_contract_matches_independently_rendered_old_request(self):
+        fixture = json.loads(
+            (Path(__file__).parent / "data/routed-parts-v1-request.json").read_text()
+        )
+        engine = self.machine()
+        token = engine._reply_codec.set("routed-parts-v1")  # ruff: ignore[private-member-access]
+        try:
+            self.assertEqual(
+                engine.get_chat_payload(
+                    fixture["model"],
+                    engine._get_prompt("cs"),  # ruff: ignore[private-member-access]
+                    fixture["messages"][-1]["content"],
+                    fixture["messages"][1]["content"],
+                    fixture["messages"][2]["content"],
+                ),
+                fixture,
+            )
+        finally:
+            engine._reply_codec.reset(token)  # ruff: ignore[private-member-access]

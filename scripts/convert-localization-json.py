@@ -145,7 +145,9 @@ def render(
 
 def validate(blob: bytes, records: list[dict[str, str]], language: str, shape: str):
     """Parse the generated file back with the library Weblate uses."""
-    store = (JsonFile if shape == "flat" else GoI18NJsonFile)(blob)
+    store: JsonFile | GoI18NJsonFile = (
+        JsonFile if shape == "flat" else GoI18NJsonFile
+    )(blob)
     got = [(unit.getid().lstrip("."), unit.target) for unit in store.units]
     expected = [(record[RECORD_KEY], record[language]) for record in records]
     if got != expected:

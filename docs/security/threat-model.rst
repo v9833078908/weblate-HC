@@ -37,6 +37,64 @@ datastore, local filesystem repositories, and external code-hosting systems.
 Scope and intended use
 ----------------------
 
+The optional Wizard sign-in provider adds OIDC authorization-code endpoints and
+client-bound OAuth API delegation. It is disabled by default and uses S256 PKCE,
+state/nonce validation, a fixed HTTPS issuer and exact registered callbacks. The
+provider authenticates through the existing Weblate login and second-factor
+policy. Only the authorization response extends form-action CSP, using origins
+from the registered client rather than an incoming redirect parameter.
+An optional navigation link uses an operator-configured HTTPS URL without user
+credentials, query or fragment; it is hidden unless Wizard SSO is enabled and
+the user is signed in. The link does not contain OAuth tokens.
+Wizard links issuer/immutable subject explicitly; matching login names do not
+merge accounts. Delegated scopes restrict a closed API route/method list and
+never replace current native object permissions. Translator-profile access
+excludes credentials, endpoints and routing. Existing API credentials keep their
+authentication model. Wizard encrypts access/refresh tokens server-side, keeps
+its encryption key separately, limits login attempts durably and never falls
+back to a service token after failed authentication. Backups containing OAuth
+tokens, signing/encryption keys or identities require private handling.
+
+An authorization family has a non-sliding 24-hour lifetime and refresh rotation
+with reuse protection. Workers check the actor and delegation before new paid
+delivery; already accepted responses and financial witnesses survive expiry or
+revocation. A network partition can delay remote revocation: a durable Wizard
+outbox retries revocation only, and local logout is not proof that accepted
+remote work stopped. Shared logout is not claimed. Legacy service-account runs
+are not rebound to a newly signed-in user or automatically resumed. Code rollback
+retains the journals and disables SSO, workers and fallback credentials.
+See ``docs/product/guides/weblate-wizard-single-sign-on.md`` for the fork contract.
+
+The producer MT batch API (:ref:`api-producer-mt-batches`) is an authenticated,
+permission-scoped outbound translation surface. A UUID key is actor/project
+bound and payload bound; a separate unique unit/revision reservation prevents a
+new key from bypassing an unresolved paid intent. Request fields cannot choose
+an endpoint, credential or arbitrary model, or enable overwriting. The existing
+project machinery configuration remains the outbound authority. Admission uses
+the producer rate limit; receipt reads keep the ordinary authenticated API rate
+limit without consuming the paid-admission budget. Workers recheck permissions and
+empty-target revisions before a normal audited write without propagation.
+Provider answers are stored privately in the database before application and
+are not returned by receipt reads. Account deletion preserves unresolved unit
+intents, but removes actor access. Backups must treat these stored answers as
+translation content. Unknown provider outcomes fail closed: this protects
+against blind client or Celery retries, not against provider-internal retries,
+billing duplication, or an independently authorized legacy MT request. Keep
+receipts and unit intents during code rollback; erasing them removes this safety
+boundary. *(documented)* (source: :doc:`/api`)
+
+The separate producer wizard can archive a locally unresolved run with a
+versioned isolation record while preserving its payload, operation keys and
+unknown financial result. Its offline operator command requires a verified
+backup, a matching durable snapshot, recent read-only reconciliation and no
+active writers. Maintenance accepts only an intact record; resume, worker
+admission and new paid wizard operations remain fenced by remote-project
+identity. This local journal is not a provider billing proof or a protection
+against a database administrator rewriting both identities. It does not
+restrict independently authorized Weblate users. Code rollback must retain the
+journal, disable outbound credentials and keep old workers stopped. A production
+application of this procedure requires a separate approved maintenance window.
+
 .. list-table::
    :header-rows: 1
 
@@ -440,7 +498,71 @@ Reachability preconditions:
   per-user API rate limit, so a compromised or over-eager token cannot
   multiply provider spend past a second, independent ceiling.
   *(documented)* (source: :ref:`api-producer`, :doc:`/admin/config`)
-* Judge verdicts, producer runs (including cost estimates and applied
+  Its project decision and quality-list endpoints return identifiers,
+  hashes, classifications, and applicability only: source, target,
+  candidate, prompt, and judge-evidence text stay in Weblate. The bounded
+  quality recheck endpoint accepts only accessible units in the named
+  project and refuses a stale revision before recomputing checks. Applying
+  a result remains a separate operation protected by both
+  ``translation.auto`` and ``unit.review`` and by the candidate verification,
+  approval, terminology, and revision guards described above. An external
+  orchestrator therefore cannot turn a read-only quality report into an
+  unrestricted unit-write primitive. *(documented)* (source:
+  :ref:`api-producer`)
+  Version 2 adds a bounded explicit-scope snapshot, direct glossary and
+  exact-repeat scans, and actor/project-bound repeat plan and run resources.
+  Disabled component propagation is reported as a mandatory repeat-coverage
+  issue, never as proof of consistent translations; the read-only scan does
+  not change that administrator policy.
+  The automatic candidate path requires a current collegial PASS from both
+  parsed seats plus technical and mandatory glossary checks under the unit
+  lock. Unlike manual acknowledgement, this can repair an old terminology
+  failure only if the candidate itself passes the mandatory checks.
+  Automatic repeat writes reuse native signed manifests, revision checks,
+  protection rules and audit events; recipients outside the submitted scope
+  cannot be written. Written recipients remain held until a fresh dual PASS
+  and mandatory checks approve that exact revision. Repeat recommendation
+  preparation may reach the existing configured judge provider and shares
+  the independent producer rate limit with judge estimate/start/resume; polling,
+  snapshot scanning, and applying stored plans do not submit a new provider
+  request. UUID idempotency keys bind accepted local writes to the actor,
+  project and request; receipts contain text-free results, while server-only
+  manifest data is never serialized. This does not promise exactly-once
+  outbound billing or an atomic file download: clients must compare the
+  complete scope revision on both sides of export. *(documented)*
+  (source: :ref:`api-producer-quality-v2`)
+* Durable producer MT and judge dispatches reserve semantic work before outbound
+  I/O and store complete responses before parsing. Durable judge delivery is
+  selected by server-persisted operation admission, not merely by the presence
+  of a producer run or a client-supplied policy field. Ordinary Weblate runs
+  retain their configured streaming, retries and fallback. Existing delegated
+  runs, MT receipts and delivery journals retain their financial fences even
+  without the new policy marker. The private
+  ``DATA_DIR/private-llm-delivery`` files contain translation text and provider
+  output, require the same protection and private backup handling as project
+  content, and are never serialized by producer endpoints. Each body is capped
+  at 16 MiB and checked by SHA-256 before reuse. Missing or corrupt data retains
+  the permanent spend fence and cannot authorize paid replay. Resolved bodies
+  are pruned 30 days after successful terminal processing; unresolved bodies
+  remain available for reconciliation. Provider result lookup and billing
+  idempotency are not claimed for unverified routes. *(maintainer)*
+  Routed deliveries also bind a closed request/reply codec to the spend fence.
+  New requests use source-owned protected slots. A historical parts reply can
+  only enter the replay-only path after its complete work set, reconstructed
+  original request digest and stored response checksum match. An unclassified
+  row is not bulk-classified by migration. A missing body, changed prompt,
+  unknown codec or unreproducible historical example IDs retains the fence;
+  there is no live legacy fallback or new transport call. Producer receipt
+  reconciliation uses the same request gate instead of parsing a body directly.
+* Immutable producer verification binds its mode to actor, project, estimate,
+  run and explicit scope. It suppresses translation preparation, candidates,
+  repair and hold changes; scoped model-write barriers reject accidental
+  protected-content changes and execution-context apply endpoints refuse
+  mutations. Concurrent independent edits invalidate the audit-aware baseline
+  without being rolled back. This is not a database-wide write freeze, a
+  restriction on administrators, or a sandbox against arbitrary SQL executed
+  by trusted application code. *(maintainer)*
+* Producer quality operation receipts, judge verdicts, producer runs (including cost estimates and applied
   candidate receipts), and the durable per-application undo record are
   retained without an automatic expiry; only high-volume transport
   diagnostics - raw provider request/response records and closed retry
@@ -450,6 +572,11 @@ Reachability preconditions:
   accumulating run and receipt history; this is a capacity planning
   concern, not a data-integrity one, since none of these rows are
   secrets. *(maintainer)*
+  This retention does not prevent an authorized string deletion: dependent
+  judge verdicts and application/undo receipts are removed with that string.
+  While the string exists, an application receipt still protects its audit
+  entry against separate deletion. The provider exchange journal follows
+  its own retention rules described above.
 
 Environment assumptions
 -----------------------

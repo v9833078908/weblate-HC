@@ -88,6 +88,18 @@ Running an individual test file:
 
    uv run pytest weblate/utils/tests/test_search.py
 
+With the ``wizard-sso`` extra installed, test settings enable the optional
+Wizard SSO provider with a freshly generated private test key. Its OIDC tests
+can be run with:
+
+.. code-block:: sh
+
+   uv run pytest weblate/wizard_auth/tests
+
+To exercise the default-off configuration, set ``CI_TEST_WIZARD_SSO=0``;
+the OIDC-specific tests are not applicable in that configuration. Without the
+optional dependency, test settings also leave the provider disabled.
+
 .. hint::
 
    You will need a database (PostgreSQL) server to be used for tests. By

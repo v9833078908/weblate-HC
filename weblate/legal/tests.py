@@ -19,6 +19,7 @@ from weblate.trans.tests.test_views import RegistrationTestMixin
 from weblate.trans.tests.utils import create_test_user
 
 
+@override_settings(SITE_TITLE="Weblate", EMAIL_SUBJECT_PREFIX="[Weblate] ")
 class LegalTest(TestCase, RegistrationTestMixin):
     @override_settings(LEGAL_HIDDEN_DOCUMENTS=("", "contracts", " privacy "))
     def test_hidden_documents_normalized(self) -> None:

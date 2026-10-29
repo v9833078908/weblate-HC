@@ -159,10 +159,15 @@ class ParentsUpdateSchedulerTest(TransactionTestCase):
         self.assertEqual(self.get_state(), {"phase": "pending", "token": first_token})
 
         self.task.request.id = first_token
+
+        def mark_dirty() -> None:
+            for _ in range(100):
+                schedule_parents_update(self.task, self.pk)
+
         run_parents_update(
             self.task,
             self.pk,
-            lambda: [schedule_parents_update(self.task, self.pk) for _ in range(100)],
+            mark_dirty,
         )
 
         self.assertEqual(self.task.apply_async.call_count, 2)

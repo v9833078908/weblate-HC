@@ -232,7 +232,7 @@ version = "2026.8.1.dev0"
 
 [project.optional-dependencies]
 all = [
-  "hcgameloc[amazon,gelf,gerrit,google,google-errors,ldap,mercurial,postgres,rollbar,sphinx,zxcvbn]"
+  "hcgameloc[amazon,gelf,gerrit,google,google-errors,ldap,mercurial,postgres,rollbar,sphinx,wizard-sso,zxcvbn]"
 ]
 amazon = [
   "boto3==1.43.62"
@@ -275,6 +275,7 @@ saml2idp = [
 sphinx = [
   "Sphinx==8.2.3"
 ]
+wizard-sso = ["django-oauth-toolkit==3.4.1"]
 wllegal = [
   "wllegal==2026.5"
 ]
@@ -307,6 +308,7 @@ ignore = [
   ".claude/*",
   ".claude/*/*",
   ".claude/*/*/*",
+  ".claude/*/*/*/*",
   ".clusterfuzzlite/*",
   ".dclintrc",
   ".dockerignore",
@@ -315,6 +317,8 @@ ignore = [
   ".imgbotconfig",
   ".omp/*",
   ".omp/*/*",
+  ".omp/*/*/*",
+  ".omp/*/*/*/*",
   ".reuse/dep5",
   ".weblate",
   ".well-known/*",
@@ -330,16 +334,19 @@ ignore = [
   "client/*/*",
   "deploy/*",
   "deploy/*/*",
+  "DESIGN.md",
   "dev-docker/*",
   "dev-docker/*/*",
   "docs/*",
   "docs/*/*",
   "docs/*/*/*",
   "docs/*/*/*/*",
+  "frontend-wizard/**",
   "fuzzing/*",
   "fuzzing/*/*",
   "fuzzing/*/*/*",
   "LICENSES/*",
+  "PRODUCT.md",
   "rundev.sh",
   "scripts/*",
   "scripts/*/*",
@@ -507,6 +514,7 @@ module = [
   "djangosaml2idp.*",
   "google.oauth2.*",
   "icu.*",
+  "jwcrypto.*",
   "ldap.*",
   "mistletoe.*",
   "pygments.*",
@@ -728,12 +736,16 @@ max-complexity = 16  # TODO: should be lower
   "try-except-pass"
 ]
 "ci/migrate-scripts/*.py" = ["INP001", "S101"]
+# Standalone offline operator CLI and its database-free tests.
+"deploy/check-import-capacity.py" = ["implicit-namespace-package", "suspicious-subprocess-import"]
 "docs/_ext/*.py" = ["INP001"]
 "docs/_ext/test_*.py" = ["S101"]
 "docs/conf.py" = ["ERA001", "INP001"]
 "fuzzing/targets.py" = ["PLC0415"]
 "loc_kit_ingest/tests/*.py" = ["INP001", "S101"]
 "scripts/*" = ["T201", "T203"]
+"tests/test_deploy_retention.py" = ["assert", "implicit-namespace-package", "suspicious-subprocess-import"]
+"tests/test_release_capacity.py" = ["assert", "implicit-namespace-package", "suspicious-subprocess-import"]
 "weblate/*/migrations/*.py" = ["RUF012"]
 "weblate/*/tests**.py" = ["ANN001", "S101", "S105", "S106"]
 "weblate/auth/migrations/0003_fixup_teams.py" = ["T201"]
@@ -817,7 +829,7 @@ exclude = [
   "weblate.tests",
   "weblate.tests.*"
 ]
-include = ["weblate*"]
+include = ["weblate", "weblate.*"]
 namespaces = true
 
 [tool.tomlsort]
@@ -830,7 +842,8 @@ spaces_before_inline_comment = 2
 [tool.typos.default]
 extend-ignore-re = [
   "(?Rm)^.*# codespell:ignore.*$",
-  "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on"
+  "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on",
+  "\\b2abd6e6\\b"
 ]
 
 [tool.typos.default.extend-identifiers]

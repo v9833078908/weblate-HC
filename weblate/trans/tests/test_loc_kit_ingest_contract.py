@@ -101,9 +101,11 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 # ruff: ignore[module-import-not-at-top-of-file]
+# pylint: disable=wrong-import-position
 from loc_kit_ingest.model import GlossaryTerm, ParseResult, StringUnit
 
 # ruff: ignore[module-import-not-at-top-of-file]
+# pylint: disable=wrong-import-position
 from loc_kit_ingest.profile import (
     ComponentProfile,
     KeyColumn,
@@ -115,6 +117,7 @@ from loc_kit_ingest.profile import (
 )
 
 # ruff: ignore[module-import-not-at-top-of-file]
+# pylint: disable=wrong-import-position
 from loc_kit_ingest.writer import render_component
 
 # --------------------------------------------------------------------------- #
@@ -909,7 +912,7 @@ def _glossary_profile(sheet: str, *, source_lang: str = "ru") -> dict:
     }
 
 
-class LocKitGlossaryUploadUITest(ViewTestCase):
+class LocKitGlossaryUploadUITest(http_mock.MockDNSMixin, ViewTestCase):
     """The glossary intake stages, end to end, through the real views."""
 
     def setUp(self) -> None:
@@ -1097,6 +1100,8 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         )
         self.assertNotIn("exact", cs_exact.extra_flags)
         source_units["HeroCraft"].update_extra_flags("terminology", self.user)
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         flag_glossary_terminology(component.pk)
         source_units["HeroCraft"].refresh_from_db()
         self.assertIn("read-only", source_units["HeroCraft"].extra_flags)
@@ -1984,6 +1989,7 @@ class LocKitGlossaryUpdateStartTest(ViewTestCase):
 # --------------------------------------------------------------------------- #
 
 # ruff: ignore[module-import-not-at-top-of-file, import-private-name]
+# pylint: disable=wrong-import-position
 from loc_kit_ingest.parser import _context_key
 
 

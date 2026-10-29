@@ -285,7 +285,7 @@ _ENABLED = override_settings(
 )
 
 
-class ProposalShortCircuitTest(SimpleTestCase):
+class ProposalShortCircuitTest(http_mock.MockDNSMixin, SimpleTestCase):
     """No HTTP calls when disabled or misconfigured."""
 
     @_ENABLED
@@ -325,7 +325,7 @@ class ProposalShortCircuitTest(SimpleTestCase):
         self.assertEqual(len(http_mock.calls), 0)
 
 
-class ProposalRequestShapeTest(SimpleTestCase):
+class ProposalRequestShapeTest(http_mock.MockDNSMixin, SimpleTestCase):
     """Exact endpoint, headers, payload fields, and timeout."""
 
     @_ENABLED
@@ -412,7 +412,7 @@ class ProposalRequestShapeTest(SimpleTestCase):
         self.assertEqual(loc_kit.OPENROUTER_REQUEST_TIMEOUT, 120)
 
 
-class ProposalResponseHandlingTest(SimpleTestCase):
+class ProposalResponseHandlingTest(http_mock.MockDNSMixin, SimpleTestCase):
     """Malformed, 4xx, 5xx, and bad-envelope handling never raise uncaught."""
 
     @_ENABLED
