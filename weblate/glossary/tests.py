@@ -1405,6 +1405,7 @@ class GlossaryStemMatcherTest(ViewTestCase):
             state=STATE_EMPTY,
         )
         fetch_glossary_terms([unit])
+        assert unit.glossary_terms is not None
         return {term.source for term in unit.glossary_terms}
 
     def test_matched_prompt_entries_carry_context(self) -> None:
@@ -1540,7 +1541,9 @@ class GlossaryStemMatcherTest(ViewTestCase):
         )
         self.assertEqual(baseline["source_algorithm"], "russian")
         self.assertIsNone(baseline["target_algorithm"])
-        self.assertIn("ru", baseline["source_stem_allowlist"])
+        source_allowlist = baseline["source_stem_allowlist"]
+        assert isinstance(source_allowlist, list)
+        self.assertIn("ru", source_allowlist)
         self.assertEqual(baseline["glossary_term_count"], 0)
         self.assertEqual(baseline["exact_only_term_count"], 0)
         self.assertEqual(baseline["not_applicable_term_count"], 0)
@@ -1631,6 +1634,7 @@ class GlossaryStemMatcherTest(ViewTestCase):
             state=STATE_EMPTY,
         )
         fetch_glossary_terms([unit])
+        assert unit.glossary_terms is not None
         self.assertEqual({term.source for term in unit.glossary_terms}, {"ship"})
 
 

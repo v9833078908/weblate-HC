@@ -11,7 +11,12 @@ from unittest import mock
 from django.test import override_settings
 from django.utils import timezone
 
-from weblate.trans.judge import JudgeResult, resolve_judge_seat_profile
+from weblate.trans.judge import (
+    JudgeResult,
+    _BatchResponse,
+    request_verdicts,
+    resolve_judge_seat_profile,
+)
 from weblate.trans.judge_loop import (
     _claim_judge_deferrals,
     _record_deferral_circuit_outcome,
@@ -60,6 +65,45 @@ def mock_request_verdicts(results):
     JUDGE_DEFERRAL_MAX_UNITS_PER_PASS=20,
 )
 class JudgeDeferralTest(ViewTestCase):
+    def test_unknown_wizard_response_never_enters_native_paid_drain(self):
+        unit = self.get_unit()
+        request = build_request(unit)
+        run = ProducerRun.objects.create(
+            scope_type="translation",
+            scope_id=str(unit.translation_id),
+            scope_label="Wizard",
+            scope_path="/",
+            requested_mode="judge",
+            cap=1,
+            execution_options={"delivery_policy": "wizard-v1"},
+        )
+        profile = resolve_judge_seat_profile(1)
+        with mock.patch(
+            "weblate.trans.judge._post_batch",
+            return_value=_BatchResponse(None, None, "transport"),
+        ) as outbound:
+            result = request_verdicts([request], model=profile.model, run=run)[0]
+            self.assertTrue(result.unparsed)
+            _write_verdict(
+                unit,
+                request,
+                seat=1,
+                attempt=0,
+                run_id=run.pk,
+                result=result,
+                profile=profile,
+                project_context="",
+            )
+            self.defer(unit, result)
+            JudgeDeferral.objects.filter(unit=unit).update(
+                next_attempt_at=timezone.now() - timedelta(seconds=1)
+            )
+            run.execution_options = {}
+            run.save(update_fields=["execution_options"])
+            self.assertEqual(drain_judge_deferrals(), 0)
+        self.assertEqual(outbound.call_count, 1)
+        self.assertEqual(unit.judge_deferrals.get().state, JudgeDeferral.State.CLOSED)
+
     def defer(self, unit, result=DEAD):
         _sync_deferral(
             unit,

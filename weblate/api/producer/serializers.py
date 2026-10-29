@@ -33,18 +33,34 @@ class ProducerCapabilitiesSerializer(serializers.Serializer):
     would offer an action the server cannot perform.
     """
 
+    mt_async_batches = serializers.IntegerField(min_value=1, max_value=1)
+    mt_reconciliation = serializers.IntegerField(read_only=True)
+    quality_execution_policy = serializers.IntegerField(read_only=True)
+    verify_only_immutable = serializers.IntegerField(read_only=True)
     judge = serializers.BooleanField(
         help_text="Whether the LLM judge is configured and usable."
+    )
+    judge_seats = serializers.IntegerField(
+        min_value=0,
+        help_text="Number of independently configured judge seats.",
     )
     glossary_profile_analysis = serializers.BooleanField(
         help_text="Whether loc-kit glossary profile analysis is enabled."
     )
+    quality_api_version = serializers.IntegerField(read_only=True)
+    candidate_quality_gate = serializers.BooleanField(read_only=True)
+    glossary_direct_scan = serializers.BooleanField(read_only=True)
+    quality_group_recheck = serializers.BooleanField(read_only=True)
+    quality_repeat_plan = serializers.BooleanField(read_only=True)
+    quality_final_snapshot = serializers.BooleanField(read_only=True)
+    quality_idempotency = serializers.BooleanField(read_only=True)
 
 
 class ProducerMeSerializer(serializers.Serializer):
     """Identity and capabilities for the authenticated producer."""
 
     username = serializers.CharField()
+    subject = serializers.CharField(required=False)
     full_name = serializers.CharField()
     is_superuser = serializers.BooleanField()
     capabilities = ProducerCapabilitiesSerializer()
@@ -83,6 +99,11 @@ class ProducerRunSerializer(serializers.Serializer):
     warnings = serializers.JSONField(read_only=True)
     preparation_phase = serializers.CharField(read_only=True)
     coverage = serializers.SerializerMethodField(read_only=True)
+    execution_mode = serializers.SerializerMethodField(read_only=True)
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_execution_mode(self, obj: ProducerRun) -> str:
+        return obj.execution_options.get("execution_mode", "repair")
 
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_coverage(self, obj: ProducerRun) -> dict[str, object] | None:
@@ -91,10 +112,253 @@ class ProducerRunSerializer(serializers.Serializer):
         return None
 
 
+class ProducerDecisionListRequestSerializer(serializers.Serializer):
+    """Filters for the project-scoped producer decision queue."""
+
+    kind = serializers.ChoiceField(choices=PRODUCER_RUN_KIND_CHOICES)
+    run = serializers.UUIDField()
+
+
+class ProducerJudgeDecisionSerializer(serializers.Serializer):
+    """One text-free judge decision with every safe-apply guard exposed."""
+
+    unit_id = serializers.IntegerField(read_only=True)
+    run_unit_outcome = serializers.CharField(read_only=True)
+    severity = serializers.CharField(read_only=True)
+    seat_results = serializers.DictField(
+        child=serializers.ChoiceField(choices=("parsed", "unparsed", "missing")),
+        read_only=True,
+    )
+    disagreement = serializers.BooleanField(read_only=True)
+    issue_categories = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
+    candidate_id = serializers.IntegerField(read_only=True, allow_null=True)
+    candidate_verified = serializers.BooleanField(read_only=True)
+    candidate_acceptable = serializers.BooleanField(read_only=True)
+    candidate_glossary_status = serializers.CharField(read_only=True)
+    live_seat_results = serializers.DictField(
+        child=serializers.ChoiceField(choices=("parsed", "unparsed", "missing")),
+        read_only=True,
+    )
+    approval_loss = serializers.BooleanField(read_only=True)
+    terminology_conflict = serializers.BooleanField(read_only=True)
+    generation_outcome = serializers.CharField(read_only=True)
+    applicability = serializers.ChoiceField(
+        choices=(
+            "ready",
+            "no_candidate",
+            "not_verified",
+            "stale",
+            "needs_individual_confirmation",
+            "forbidden",
+        ),
+        read_only=True,
+    )
+    revision = serializers.CharField(read_only=True)
+
+
+class ProducerQualityIssueFilterSerializer(serializers.Serializer):
+    """Closed filters for repeat and glossary quality issues."""
+
+    language = serializers.CharField()
+    kind = serializers.CharField()
+
+    def validate_kind(self, value: str) -> list[str]:
+        kinds = [item.strip() for item in value.split(",") if item.strip()]
+        if not kinds or set(kinds) - {"repeat-drift", "glossary"}:
+            msg = "kind must contain repeat-drift and/or glossary"
+            raise serializers.ValidationError(msg)
+        return kinds
+
+
+class ProducerQualityIssueSerializer(serializers.Serializer):
+    """A text-free consistency group derived from Weblate checks."""
+
+    group_id = serializers.CharField(read_only=True)
+    kind = serializers.ChoiceField(choices=("repeat-drift", "glossary"), read_only=True)
+    hard = serializers.BooleanField(read_only=True)
+    advisory = serializers.BooleanField(read_only=True)
+    unit_ids = serializers.ListField(child=serializers.IntegerField(), read_only=True)
+    revisions = serializers.DictField(child=serializers.CharField(), read_only=True)
+    variants = serializers.ListField(child=serializers.JSONField(), read_only=True)
+    term_mode = serializers.CharField(read_only=True)
+    approved_conflict = serializers.BooleanField(read_only=True)
+    auto_repair_eligible = serializers.BooleanField(read_only=True)
+
+
+class ProducerQualityIssueListSerializer(serializers.Serializer):
+    """Stable snapshot of every requested consistency issue."""
+
+    snapshot_hash = serializers.CharField(read_only=True)
+    issues = ProducerQualityIssueSerializer(many=True, read_only=True)
+
+
+class ProducerQualityRecheckItemSerializer(serializers.Serializer):
+    unit_id = serializers.IntegerField()
+    revision = serializers.CharField()
+
+
+class ProducerQualityScopeSerializer(serializers.Serializer):
+    unit_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), allow_empty=False, max_length=10000
+    )
+
+    def validate_unit_ids(self, value: list[int]) -> list[int]:
+        if len(value) != len(set(value)):
+            msg = "unit_ids must be unique"
+            raise serializers.ValidationError(msg)
+        return value
+
+
+class ProducerQualitySnapshotRequestSerializer(serializers.Serializer):
+    language = serializers.CharField()
+    scope = ProducerQualityScopeSerializer()
+
+
+class ProducerQualitySnapshotSerializer(serializers.Serializer):
+    protected_content_digest = serializers.CharField(read_only=True)
+    complete = serializers.BooleanField(read_only=True)
+    unit_ids = serializers.ListField(child=serializers.IntegerField(), read_only=True)
+    revisions = serializers.DictField(child=serializers.CharField(), read_only=True)
+    judged_revisions = serializers.DictField(
+        child=serializers.CharField(), read_only=True
+    )
+    scope_revision = serializers.CharField(read_only=True)
+    snapshot_hash = serializers.CharField(read_only=True)
+    issues = serializers.ListField(child=serializers.JSONField(), read_only=True)
+
+
+class ProducerRepeatPlanRequestSerializer(ProducerQualitySnapshotRequestSerializer):
+    issue_snapshot_hash = serializers.CharField(min_length=64, max_length=64)
+    application_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), allow_empty=True, max_length=10000
+    )
+
+    def validate_application_ids(self, value: list[int]) -> list[int]:
+        if len(value) != len(set(value)):
+            msg = "application_ids must be unique"
+            raise serializers.ValidationError(msg)
+        return value
+
+
+class ProducerRepeatGroupSerializer(serializers.Serializer):
+    group_id = serializers.CharField(read_only=True)
+    revision = serializers.CharField(read_only=True)
+    unit_ids = serializers.ListField(child=serializers.IntegerField(), read_only=True)
+    outcome = serializers.ChoiceField(
+        choices=(
+            "pending",
+            "ready",
+            "applied",
+            "no_change",
+            "independent",
+            "approved_conflict",
+            "needs_review",
+            "stale",
+            "forbidden",
+            "unrepairable",
+            "failed",
+        ),
+        read_only=True,
+    )
+    preferred_origin = serializers.CharField(read_only=True)
+    reason = serializers.CharField(read_only=True)
+
+
+class ProducerRepeatPlanSerializer(serializers.Serializer):
+    token = serializers.UUIDField(read_only=True)
+    status = serializers.ChoiceField(
+        choices=("queued", "running", "ready", "failed"), read_only=True
+    )
+    groups = ProducerRepeatGroupSerializer(many=True, read_only=True)
+
+
+class ProducerRepeatResultSerializer(serializers.Serializer):
+    unit = serializers.IntegerField(read_only=True)
+    revision = serializers.CharField(read_only=True)
+    outcome = serializers.ChoiceField(
+        choices=(
+            "applied",
+            "no_change",
+            "stale",
+            "forbidden",
+            "approved",
+            "independent",
+            "needs_review",
+            "failed",
+        ),
+        read_only=True,
+    )
+    # This serializer is response-only. Conditional fields must stay optional
+    # in OpenAPI as well as in the actual projection.
+    event_id = serializers.UUIDField(required=False)
+    reason = serializers.CharField(required=False)
+
+
+class ProducerRepeatRunSerializer(serializers.Serializer):
+    token = serializers.UUIDField(read_only=True)
+    status = serializers.ChoiceField(
+        choices=("queued", "running", "completed", "partial", "failed"), read_only=True
+    )
+    changed_unit_ids = serializers.ListField(
+        child=serializers.IntegerField(), read_only=True
+    )
+    results = ProducerRepeatResultSerializer(many=True, read_only=True)
+
+
+class ProducerRepeatApplyRequestSerializer(serializers.Serializer):
+    """The server-owned frozen plan is the entire apply authority."""
+
+
+class ProducerQualityOperationSerializer(serializers.Serializer):
+    state = serializers.ChoiceField(
+        choices=("pending", "confirmed", "failed"), read_only=True
+    )
+    result = serializers.JSONField(required=False)
+
+
+class ProducerQualityRecheckRequestSerializer(serializers.Serializer):
+    items = ProducerQualityRecheckItemSerializer(many=True, allow_empty=False)
+
+    def validate_items(self, value: list[dict]) -> list[dict]:
+        unit_ids = [item["unit_id"] for item in value]
+        if len(unit_ids) != len(set(unit_ids)):
+            msg = "unit_id values must be unique"
+            raise serializers.ValidationError(msg)
+        if len(unit_ids) > 1000:
+            msg = "at most 1000 units can be rechecked"
+            raise serializers.ValidationError(msg)
+        return value
+
+
+class ProducerQualityRecheckResultItemSerializer(serializers.Serializer):
+    unit_id = serializers.IntegerField(read_only=True)
+    outcome = serializers.ChoiceField(
+        choices=("rechecked", "stale", "forbidden", "missing"), read_only=True
+    )
+    revision = serializers.CharField(read_only=True)
+    checks = serializers.ListField(child=serializers.CharField(), read_only=True)
+
+
+class ProducerQualityRecheckResultSerializer(serializers.Serializer):
+    snapshot_hash = serializers.CharField(read_only=True)
+    items = ProducerQualityRecheckResultItemSerializer(many=True, read_only=True)
+    affected_unit_ids = serializers.ListField(
+        child=serializers.IntegerField(), read_only=True
+    )
+    affected_repeat_group_ids = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
+
+
 class ProducerJudgeEstimateRequestSerializer(serializers.Serializer):
     """A read-only judge estimate for a closed project scope."""
 
     kind = serializers.ChoiceField(choices=PRODUCER_RUN_KIND_CHOICES)
+    execution_mode = serializers.ChoiceField(
+        choices=("repair", "verify_only"), default="repair"
+    )
     scope = serializers.DictField(child=serializers.JSONField(), required=False)
 
     def validate_scope(self, value: dict) -> dict:
@@ -138,6 +402,7 @@ class ProducerJudgeEstimateSerializer(serializers.Serializer):
     """Upper bounds and exact selection counts for a judge scope."""
 
     estimate_id = serializers.UUIDField()
+    execution_mode = serializers.CharField()
     scope_hash = serializers.CharField()
     strings = serializers.IntegerField()
     selected = serializers.IntegerField()
@@ -152,6 +417,9 @@ class ProducerRunStartRequestSerializer(serializers.Serializer):
     """Start the run an estimate priced, or fail closed on drift."""
 
     kind = serializers.ChoiceField(choices=PRODUCER_RUN_KIND_CHOICES)
+    execution_mode = serializers.ChoiceField(
+        choices=("repair", "verify_only"), default="repair"
+    )
     scope = serializers.DictField(child=serializers.JSONField(), required=False)
     estimate_id = serializers.UUIDField()
 
@@ -210,6 +478,8 @@ class ProducerBulkApplyResultSerializer(serializers.Serializer):
             "not_verified",
         )
     )
+    revision = serializers.CharField(allow_blank=True)
+    application_id = serializers.IntegerField(allow_null=True)
 
 
 class ProducerClarificationSerializer(serializers.Serializer):

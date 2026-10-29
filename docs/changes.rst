@@ -7,6 +7,13 @@ Weblate 2026.8.1
 
 .. rubric:: New features
 
+* Added optional :ref:`Wizard sign-in through Weblate <wizard-sign-in>` with a configurable navigation link, user-scoped API delegation, existing second-factor authentication and guarded background delivery without automatic paid replay.
+
+* The producer API supports immutable verification sessions and free MT receipt reconciliation; durable provider response storage prevents automatic paid replay after uncertain delivery. See :ref:`api-producer-quality-v2`.
+
+* Added :ref:`durable empty-string MT batches <api-producer-mt-batches>` with actor-bound idempotent acceptance, background execution, saved answers and explicit unknown-provider outcomes; client timeouts no longer own the translation operation.
+
+* The producer console API can now expose text-free, run-scoped decisions from both LLM judge seats, report structured repeat and glossary issues, and recheck an explicit revision-guarded unit list, enabling an external wizard to complete a guarded repair cycle without direct translation writes.
 * Project administrators can rename a key or move a source string in flat JSON components without recreating its translations or metadata; both operations are previewed, audited, and write the resulting source order to the component files.
 
 * Added an optional :ref:`LLM judge <llm-judge>` automatic translation mode, where two independently configured language models review each string in a filter and record a per-string verdict; a rejected string is held in the existing :guilabel:`Needs editing` queue for a human decision instead of shipping automatically.
@@ -19,6 +26,7 @@ Weblate 2026.8.1
 * Added guarded ``check_judge_repair_routes``, ``enable_review_workflow``, and ``judge_release_advisory_holds`` management commands for the LLM judge rollout.
 * Every LLM judge producer launch is now recorded as one durable, permission-checked run report, addressed by its own URL and independent of the Celery task result that started it. The report opens on the strings that still need a producer's decision - held critical rows, unresolved majors and minors, and any string the judge could not finish - grouped by the error category the judge assigned, worst problem first, with every other outcome one click away; a finished component, project, or translation page lists its recent launches behind a :guilabel:`Latest report` button with the earlier ones in a menu. One-string editor re-checks and background retries of unanswered strings stay out of that menu so they cannot crowd out a component-wide launch; their outcomes remain visible on the string's judge card. The report keeps its recorded outcomes as audit evidence and separately marks strings whose current target changed after the report's verdict, without claiming that a change fixed the reported defect. See :ref:`llm-judge`.
 * Added a :ref:`producer console REST API <api-producer>` for the LLM judge workflow: a permission-scoped cost estimate before any provider call, a durable run that survives a closed client and can be polled, cancelled, or resumed, and guarded endpoints to apply a verified repair candidate (individually or in a per-row-honest bulk batch), answer a meaning-clarifying question, and undo one specific applied fix through its own durable receipt.
+* Added :ref:`Producer quality API version 2 <api-producer-quality-v2>`: mandatory candidate quality gates, direct glossary and exact-repeat snapshots, scoped native repeat plans and runs, group-aware rechecks, and durable idempotency receipts for external orchestrators.
 * Ordinary machine-translation launches now have a durable producer-run receipt: the completion notice and translation form history link to a report showing written strings, requests sent to models, and an auditable USD cost breakdown; unknown provider prices remain explicitly incomplete.
 * A repaired LLM-judge major or critical verdict now also sends the judge's own short repair instruction to the machine translation engine, kept out of every human-facing check description.
 * Components can now exchange all language targets through one multilingual CSV or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
@@ -44,6 +52,7 @@ Weblate 2026.8.1
 * Added explicit standard :setting:`JUDGE_REASONING_EFFORT` controls for corporate DeepSeek Flash without thinking and Kimi with low reasoning.
 * Routed OpenRouter and LiteLLM translations now require every protected source occurrence and reconstruct its exact markup on the server, preventing schema-valid replies from silently dropping sprite tags; see :ref:`machine-translation-setup`.
 * LLM usage accounting retains observed costs and token counts from interrupted judge streams and cost-only translation responses without rounding provider prices; invalid :setting:`JUDGE_FALLBACK_BASE_URL` requests stop instead of triggering further recovery calls.
+* LLM usage accounting preserves reported costs and token counts from interrupted judge streams and cost-only translation responses without rounding provider prices; invalid :setting:`JUDGE_FALLBACK_BASE_URL` requests stop instead of triggering further recovery calls.
 * Routed OpenRouter translations explicitly request medium reasoning for ``google/gemini-3.7-flash``; other model routes are unchanged.
 
 * A user-started automatic translation now resumes after a routine service restart instead of being silently lost: its progress bar reports whether it is waiting for a worker, actively updating, or has shown no update for 10 minutes, and its counter now tracks strings actually written rather than technical progress steps. Redelivery after a restart is at-least-once, not exactly-once; already-written strings are not overwritten.
@@ -123,6 +132,8 @@ Weblate 2026.8.1
 
 * An advisory glossary check result, which only asks to verify a term the comparison could not confirm, no longer reaches the LLM judge as a proven defect, so the judge keeps evaluating that term; a hard glossary failure is still passed on.
 * Russian glossary terms with a fleeting vowel, such as ``Стрелок`` or ``Боец``, now match their other case forms (``Стрелков``, ``Бойцами``), so machine translation, the glossary check and the LLM judge no longer lose the term outside the nominative.
+* Native translation downloads no longer invalidate current :ref:`producer decision revisions <api-producer-revision>` merely by flushing pending file changes.
+
 * Automatic translation now rejects a machine-translation request without a selected engine and reports when none of the selected engines is configured for a run.
 * The LLM judge now skips strings that remain untranslated after pretranslation, records the reason in the producer report, and avoids a misleading automatic-translation history entry.
 

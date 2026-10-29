@@ -203,7 +203,7 @@ Argon2id parallelism factor. Defaults to ``1``.
 
 .. seealso::
 
-    `ALTCHA Proof of Work Mechanism <https://altcha.org/docs/proof-of-work/>`_
+    `ALTCHA Proof of Work Mechanism <https://altcha.org/docs/integration/proof-of-work-captcha/>`_
 
 .. setting:: ANONYMOUS_USER_NAME
 
@@ -1944,6 +1944,8 @@ abort as a configuration error. Any other status (413, an unclassified 4xx,
    * :setting:`JUDGE_BATCH_SIZE`
 
 .. setting:: JUDGE_REQUEST_DEADLINE
+.. setting:: JUDGE_REQUEST_DEADLINE_SEAT_1
+.. setting:: JUDGE_REQUEST_DEADLINE_SEAT_2
 
 JUDGE_REQUEST_DEADLINE
 ----------------------
@@ -2162,6 +2164,15 @@ A verdict is always the work of exactly one endpoint and model pair,
 recorded on the verdict itself; that pair is never averaged or merged
 across seats.
 
+An invalid fallback request, such as an HTTP 400 response, stops the judge
+instead of becoming an unparsed verdict with further recovery attempts.
+Correct the fallback configuration before retrying. ``minimal`` is still
+reasoning, not an off setting.
+
+Reported cost and token counts received before an interrupted judge stream
+are retained. Valid cost-only translation responses are also recorded;
+unknown prices remain unknown and provider prices are not rounded.
+
 To roll the primary back onto this same endpoint later, clear all eight
 ``JUDGE_FALLBACK_*`` settings first, then set the primary settings to the
 recorded values, and recreate the container. Leaving the fallback pointed
@@ -2182,7 +2193,7 @@ equal-URL check above.
 .. setting:: JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2
 
 JUDGE_FALLBACK_MODEL_SEAT_1, JUDGE_FALLBACK_MODEL_SEAT_2, JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1, JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2, JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1, JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 .. versionadded:: 2026.8.1
 

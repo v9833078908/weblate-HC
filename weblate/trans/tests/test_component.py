@@ -50,6 +50,7 @@ from weblate.utils.state import (
     STATE_READONLY,
     STATE_TRANSLATED,
 )
+from weblate.utils.tests import http_mock
 from weblate.vcs.base import (
     RepositoryError,
     RepositoryRecoveryEvent,
@@ -1333,7 +1334,7 @@ class ComponentChangeTest(RepoTestCase):
         self.assertTrue(linked_component.locked)
 
 
-class ComponentValidationTest(RepoTestCase):
+class ComponentValidationTest(http_mock.MockDNSMixin, RepoTestCase):
     """Component object validation testing."""
 
     def setUp(self) -> None:

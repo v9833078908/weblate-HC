@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from pathlib import Path
+
 from weblate.fonts.models import FONT_STORAGE
 from weblate.fonts.tasks import cleanup_font_files
 from weblate.fonts.tests.utils import FontComponentTestCase
@@ -22,6 +24,7 @@ class FontModelTest(FontComponentTestCase):
         self.assertEqual(result, expected)
 
     def test_cleanup(self) -> None:
+        Path(FONT_STORAGE.location).mkdir(parents=True, exist_ok=True)
         cleanup_font_files()
         self.assert_font_files(0)
         font = self.add_font()

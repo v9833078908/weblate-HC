@@ -32,7 +32,7 @@ def build_block_schedule(
     if not arms:
         msg = "At least one arm is required."
         raise ValueError(msg)
-    randomizer = random.Random(seed)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
+    randomizer = random.Random(seed)
     ordered_records = list(records)
     randomizer.shuffle(ordered_records)
     tasks: list[dict[str, Any]] = []

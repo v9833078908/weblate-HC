@@ -1190,6 +1190,16 @@ Generic settings
 
       :ref:`api-rate`
 
+.. envvar:: WEBLATE_API_RATELIMIT_PRODUCER
+
+   Configures the separate rate limit for producer API requests that can
+   start paid provider work. Defaults to ``60/hour``. Receipt reads use the
+   ordinary authenticated API limit instead.
+
+   .. seealso::
+
+      :ref:`api-producer-mt-batches`
+
 .. envvar:: WEBLATE_ENABLE_HOOKS
 
    .. versionadded:: 4.13

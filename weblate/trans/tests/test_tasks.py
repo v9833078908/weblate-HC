@@ -539,9 +539,13 @@ class TasksTest(ComponentTestCase):
         )
 
     def test_update_translation_stats_parents_missing_translation(self) -> None:
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         update_translation_stats_parents(-1)
 
     def test_update_language_stats_parents_missing_component(self) -> None:
+        # Celery supplies self for this bind=True task.
+        # pylint: disable-next=no-value-for-parameter
         update_language_stats_parents(-1)
 
     def test_update_project_stats_link_missing_project(self) -> None:

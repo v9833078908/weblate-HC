@@ -69,3 +69,7 @@ weblate-*.tar.*
 
 # Local symlink into the weblate_fonts package (see analysis/prototypes/repeat-queue/README.md)
 /analysis/prototypes/repeat-queue/weblate_fonts
+
+# Local verification environments and temporary test data.
+/.superpowers/
+/.pytest-temp-*/

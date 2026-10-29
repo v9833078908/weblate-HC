@@ -9,7 +9,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -211,11 +211,20 @@ def review_target(
     return None
 
 
-def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
+def plan_bulk(
+    *,
+    policy: RepeatPolicy,
+    actor: User,
+    recipient_ids: list[int] | None = None,
+    automatic: bool = False,
+    group_ids: list[int] | None = None,
+) -> BulkReview:
     """Freeze current recommendations into a review table and confirmation."""
     if not actor.has_perm("project.edit", policy.project):
         raise PermissionDenied
     current = current_recommendations(policy, actor=actor)
+    if group_ids is not None:
+        current = {pk: result for pk, result in current.items() if pk in group_ids}
     # The same groups and judge buckets the queue shows, read once for every
     # row instead of one preview per group; apply still re-previews each one.
     queue = (
@@ -278,6 +287,10 @@ def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
     expires_at = issued_at + timedelta(seconds=REPEAT_BULK_MANIFEST_MAX_AGE)
     payload = {
         "actor": actor.pk,
+        "recipient_ids": sorted(set(recipient_ids))
+        if recipient_ids is not None
+        else None,
+        "automatic": automatic,
         "policy": policy.pk,
         "policy_revision": policy.revision,
         "nonce": nonce,
@@ -285,6 +298,15 @@ def plan_bulk(*, policy: RepeatPolicy, actor: User) -> BulkReview:
         "expires_at": expires_at.timestamp(),
         "results": {
             str(row.result_id): {
+                **(
+                    {
+                        "producer_revision": _producer_revision(
+                            current[row.group_id].group, units[row.group_id]
+                        )
+                    }
+                    if automatic
+                    else {}
+                ),
                 "result_fingerprint": result_fingerprint(current[row.group_id]),
                 "context_fingerprint": current[row.group_id].context_fingerprint,
                 # Only a judge override differs from the result's own target.
@@ -398,6 +420,9 @@ def start_bulk(
                     result=result,
                     decision={
                         "action": result.action,
+                        "recipient_ids": payload.get("recipient_ids"),
+                        "automatic": payload.get("automatic", False),
+                        "producer_revision": entries[str(pk)].get("producer_revision"),
                         # A judge override was frozen in the signed manifest.
                         "target": entries[str(pk)].get("target", list(result.target)),
                         "exclusions": list(result.exclusions),
@@ -503,7 +528,7 @@ def queue_bulk_run(run: RepeatBulkRun) -> None:
 
     def publish() -> None:
         try:
-            task.apply_async(args=[run.pk], priority=INTERACTIVE_TASK_PRIORITY)
+            task.apply_async(args=(run.pk,), priority=INTERACTIVE_TASK_PRIORITY)
         except Exception:
             # The durable batch stays addressable: resume re-publishes it.
             LOGGER.exception("Failed to publish repeat bulk run %s", run.pk)
@@ -721,13 +746,33 @@ def _apply_item_transaction(
         group = (
             RepeatGroup.objects.select_for_update()
             .select_related("policy")
-            .get(pk=item.group_id)
+            .get(pk=cast("int", item.group_id))
         )
         context = _item_context(policy=run.policy, group=group, actor=actor)
         if context_fingerprint(context) != item.context_fingerprint:
             return None, CODE_STALE
+        if item.decision.get("automatic"):
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.models.unit import (
+                Unit,
+            )
+
+            locked = list(
+                Unit.objects.select_for_update()
+                .filter(pk__in=context["unit_ids"])
+                .prefetch()
+                .prefetch_source()
+                .order_by("pk")
+            )
+            if _producer_revision(group, locked) != item.decision.get(
+                "producer_revision"
+            ):
+                return None, CODE_STALE
         preview = preview_group(
-            group=group, target=item.decision["target"], actor=actor
+            group=group,
+            target=item.decision["target"],
+            actor=actor,
+            automatic=item.decision.get("automatic", False),
         )
         frozen_members = {
             member["unit"]: member["unit_fingerprint"] for member in context["members"]
@@ -745,11 +790,24 @@ def _apply_item_transaction(
             member.unit_id
             for member in preview.changing
             if member.unit_id not in exclusions
+            and (
+                item.decision.get("recipient_ids") is None
+                or member.unit_id in item.decision["recipient_ids"]
+            )
         ]
         if not selected:
             return None, CODE_NO_WRITE
         event = apply_preview(token=preview.token, actor=actor, unit_ids=selected)
     return event, ""
+
+
+def _producer_revision(group, units) -> str:
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.judge_quality import (
+        repeat_quality_revision,
+    )
+
+    return repeat_quality_revision(group, units)
 
 
 def _undo_one_item(*, run: RepeatBulkRun, item: RepeatBulkItem, actor: User) -> None:
@@ -777,4 +835,5 @@ def _undo_item_transaction(
     with transaction.atomic():
         if item.apply_event_id is None:
             return None
-        return undo_event(token=str(item.apply_event.token), actor=actor)
+        event = cast("RepeatDecisionEvent", item.apply_event)
+        return undo_event(token=str(event.token), actor=actor)

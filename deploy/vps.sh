@@ -383,9 +383,11 @@ cd deploy
 started=\$(date +%s)
 case $action in
 build)
-    # Keep the image being replaced as the rollback target; a successful
-    # deploy then prunes every older untagged build instead of leaving it.
-    docker tag hcgameloc:latest hcgameloc:previous 2> /dev/null || true
+    # Pin the container's actual image; latest may already refer to another build.
+    running_image=\$(docker inspect -f '{{.Image}}' $WEBLATE_CONTAINER)
+    [[ "\$running_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Invalid rollback image'; exit 1; }
+    docker image inspect "\$running_image" > /dev/null
+    docker tag "\$running_image" hcgameloc:previous
     docker compose up -d --build weblate
     ;;
 compose) docker compose up -d ;;
@@ -426,9 +428,8 @@ echo "queued (translate): \$queued"
 # task; this script never claims a specific task id came back, because it
 # may already have been picked up by a fresh worker by the time this runs.
 if [ "\$health" = healthy ] && [ "\$login" = 200 ] && [ "\$stale" = 0 ]; then
-    docker image prune -f > /dev/null || echo "image prune failed"
-    # Recent cache keeps the next rebuild incremental; older cache only grows.
-    docker builder prune -f --filter until=336h > /dev/null || echo "build cache prune failed"
+    # Shared storage and rollback images require a separately approved cleanup.
+    docker system df || echo "storage report unavailable"
     echo DEPLOY-OK
 else
     docker compose logs --tail 30 weblate

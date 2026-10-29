@@ -15,7 +15,8 @@ from django.db import connection
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils import timezone, translation
+from django.utils import timezone
+from django.utils import translation as django_translation
 from lxml import html
 
 from weblate.auth.data import SELECTION_ALL
@@ -255,6 +256,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
                 "judge_cost",
                 "pretranslation_cost",
                 "preparation",
+                "repeat_comparison",
             },
         )
         # The judge preview prices the mandatory MT volume separately from
@@ -276,7 +278,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         # text instead used to lose every blocker in a non-English
         # interface: the preview showed none and the run was dispatched only
         # to fail inside the worker.
-        real_gettext = translation.gettext
+        real_gettext = django_translation.gettext
 
         def translated_gettext(message: str) -> str:
             if "missing strings cannot be prepared" in message:
@@ -4785,7 +4787,7 @@ class JudgeCardLocalizationTest(ViewTestCase):
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
         self.make_candidate(unit, verdict)
-        with translation.override("ru"):
+        with django_translation.override("ru"):
             response = self.client.get(unit.get_absolute_url())
         content = response.content.decode()
         for text in (
@@ -4815,14 +4817,14 @@ class JudgeCardLocalizationTest(ViewTestCase):
             cap=1,
             status=ProducerRun.Status.QUEUED,
         )
-        with translation.override("ru"):
+        with django_translation.override("ru"):
             response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Перепроверяем строку…")
 
     def test_escalation_button_renders_in_russian(self) -> None:
         unit = self.get_unit()
         self.make_verdict(unit, "critical")
-        with translation.override("ru"):
+        with django_translation.override("ru"):
             response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Вернуть в очередь")
 

@@ -45,6 +45,7 @@ from weblate.utils.state import (
 )
 
 if TYPE_CHECKING:
+    from django.db.models.expressions import BaseExpression, Combinable
     from django_stubs_ext import StrOrPromise
 
     from weblate.auth.models import User
@@ -1291,6 +1292,11 @@ def _seat_round_rows(
     )
     if context_hash is not None:
         base = base.filter(context_hash=context_hash)
+    from weblate.trans.quality_execution import (  # ruff: ignore[import-outside-top-level]
+        annotate_verification_origin,
+    )
+
+    base = annotate_verification_origin(base)
     rows: list[JudgeVerdict] = []
     for seat in base.values_list("seat", flat=True).distinct():
         seat_rows = base.filter(seat=seat)
@@ -1300,7 +1306,11 @@ def _seat_round_rows(
             )
         else:
             newest = seat_rows.order_by("-timestamp", "-pk").first()
-        if newest is not None:
+        from weblate.trans.quality_execution import (  # ruff: ignore[import-outside-top-level]
+            verification_evidence_allowed,
+        )
+
+        if newest is not None and verification_evidence_allowed(newest):
             rows.append(newest)
     rows.sort(key=lambda row: row.seat)
     return rows
@@ -1385,16 +1395,23 @@ def active_verdicts(units: Sequence[Unit]) -> dict[int, JudgeVerdict | None]:
     target_hashes = {
         unit.pk: compute_target_hash(unit.get_target_plurals()) for unit in units
     }
+    from weblate.trans.quality_execution import (  # ruff: ignore[import-outside-top-level]
+        annotate_verification_origin,
+        verification_evidence_allowed,
+    )
+
     if not target_hashes:
         return {}
 
     newest: dict[tuple[int, int], JudgeVerdict] = {}
     rows = (
-        JudgeVerdict.objects.filter(
-            unit_id__in=target_hashes,
-            target_hash__in=set(target_hashes.values()),
-            subject=JudgeVerdict.Subject.LIVE,
-            unparsed=False,
+        annotate_verification_origin(
+            JudgeVerdict.objects.filter(
+                unit_id__in=target_hashes,
+                target_hash__in=set(target_hashes.values()),
+                subject=JudgeVerdict.Subject.LIVE,
+                unparsed=False,
+            )
         )
         .only(
             "id",
@@ -1406,12 +1423,15 @@ def active_verdicts(units: Sequence[Unit]) -> dict[int, JudgeVerdict | None]:
             "back_translation",
             "target_hash",
             "timestamp",
+            "run_id",
         )
         .order_by("unit_id", "seat", "-timestamp", "-pk")
     )
     for row in rows:
         # A hash may be current for one unit and stale for another.
-        if row.target_hash == target_hashes[row.unit_id]:
+        if row.target_hash == target_hashes[
+            row.unit_id
+        ] and verification_evidence_allowed(row):
             newest.setdefault((row.unit_id, row.seat), row)
 
     rounds: dict[int, list[JudgeVerdict]] = defaultdict(list)
@@ -1511,7 +1531,7 @@ def repair_evidence(
     )
 
 
-def judge_status_annotations() -> dict[str, models.Expression]:
+def judge_status_annotations() -> dict[str, BaseExpression | Combinable]:
     """Annotate a Unit queryset with target-fresh judge evidence."""
 
     def _has_newer_sibling(*, newer_parsed: bool) -> Exists:
@@ -1583,7 +1603,7 @@ def judge_status_annotations() -> dict[str, models.Expression]:
             .values("round_severity")[:1],
             output_field=CharField(),
         ),
-        "judge_active_resolution": Subquery(  # type: ignore[dict-item]
+        "judge_active_resolution": Subquery(
             current_parsed_round.annotate(severity_rank=severity_rank)
             .order_by("-severity_rank", "seat")
             .values("resolution")[:1],

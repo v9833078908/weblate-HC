@@ -16,6 +16,7 @@ from weblate.auth.results import Denied
 from weblate.trans.judge_loop import build_request
 from weblate.trans.models import Suggestion, Vote, WorkflowSetting
 from weblate.trans.models.judge import (
+    JudgeApplication,
     JudgeCandidateError,
     JudgeVerdict,
     compute_context_hash,
@@ -23,7 +24,7 @@ from weblate.trans.models.judge import (
     compute_target_storage_hash,
 )
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import STATE_FUZZY, STATE_READONLY
+from weblate.utils.state import STATE_FUZZY, STATE_READONLY, STATE_TRANSLATED
 
 
 class SuggestionsTest(ViewTestCase):
@@ -628,7 +629,17 @@ class JudgeCandidateSuggestionTest(ViewTestCase):
         self.enable_review()
         unit = self.get_unit()
         verdict = self.make_verdict(unit)
-        candidate = self.make_candidate(unit, verdict)
+        candidate = self.make_candidate(unit, verdict, target="Better translation\n")
+        for seat in (1, 2):
+            JudgeVerdict.objects.create(
+                unit=unit,
+                seat=seat,
+                subject=JudgeVerdict.Subject.CANDIDATE,
+                candidate_target_hash=compute_target_hash(candidate.target_list),
+                target_hash=verdict.target_hash,
+                context_hash=verdict.context_hash,
+                max_severity="none",
+            )
         request = self.get_request()
         request.user = self.user
         with (
@@ -640,8 +651,27 @@ class JudgeCandidateSuggestionTest(ViewTestCase):
         ):
             candidate.accept(request)
         refreshed = self.get_unit()
-        self.assertEqual(refreshed.state, STATE_FUZZY)
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        self.assertEqual(refreshed.target, "Better translation\n")
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertTrue(JudgeApplication.objects.filter(unit=unit).exists())
+
+    def test_accept_unverified_candidate_keeps_text_and_suggestion(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict)
+        request = self.get_request()
+        request.user = self.user
+        before = (unit.target, unit.state)
+
+        with self.assertRaisesMessage(JudgeCandidateError, "not been fully verified"):
+            candidate.accept(request)
+
+        unit.refresh_from_db()
+        self.assertEqual((unit.target, unit.state), before)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertFalse(JudgeApplication.objects.filter(unit=unit).exists())
 
     def test_accept_without_review_permission_raises_and_is_untouched(self) -> None:
         unit = self.get_unit()

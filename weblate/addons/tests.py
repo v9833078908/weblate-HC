@@ -9439,7 +9439,7 @@ class BaseWebhookTests(_WebhookTestsTypingBase):
         )
 
 
-class WebhooksAddonTest(BaseWebhookTests, ViewTestCase):
+class WebhooksAddonTest(http_mock.MockDNSMixin, BaseWebhookTests, ViewTestCase):
     """Test for Webhook Addon."""
 
     WEBHOOK_CLS = WebhookAddon
@@ -9799,7 +9799,7 @@ class WebhooksAddonTest(BaseWebhookTests, ViewTestCase):
         self.assertTrue(activity_log.details["result"])
 
 
-class SlackWebhooksAddonsTest(BaseWebhookTests, ViewTestCase):
+class SlackWebhooksAddonsTest(http_mock.MockDNSMixin, BaseWebhookTests, ViewTestCase):
     WEBHOOK_CLS = SlackWebhookAddon
     WEBHOOK_URL = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"  # kingfisher:ignore
 

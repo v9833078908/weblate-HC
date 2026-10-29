@@ -54,9 +54,9 @@ def format_timestamp(source_date_epoch: str | None) -> str | None:
     return timestamp.isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def find_weblate_component(data: dict) -> dict | None:
+def find_application_component(data: dict) -> dict | None:
     for component in data.get("components", []):
-        if component.get("name") == "weblate":
+        if component.get("name") == "hcgameloc":
             return copy.deepcopy(component)
     return None
 
@@ -83,13 +83,13 @@ def update_sbom(data: dict, source_date_epoch: str | None = None) -> None:
     if timestamp is not None:
         metadata["timestamp"] = timestamp
 
-    component = find_weblate_component(data)
+    component = find_application_component(data)
     if component is not None:
         component["type"] = "application"
         component.setdefault("manufacturer", copy.deepcopy(WEBLATE_ORGANIZATION))
         component.setdefault("supplier", copy.deepcopy(WEBLATE_ORGANIZATION))
         if "purl" not in component and "version" in component:
-            component["purl"] = f"pkg:pypi/weblate@{component['version']}"
+            component["purl"] = f"pkg:pypi/hcgameloc@{component['version']}"
         metadata["component"] = component
 
     metadata["authors"] = [copy.deepcopy(WEBLATE_AUTHOR)]

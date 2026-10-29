@@ -11,7 +11,7 @@ import json
 import re
 from dataclasses import dataclass
 from itertools import pairwise
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from loc_kit_ingest.model import Diagnostic, Severity
 
@@ -292,10 +292,7 @@ def _check_unknown(obj: dict[str, Any], allowed: frozenset[str], *, label: str) 
         raise _err(msg, f"unknown field(s) {extras} in {label}")
 
 
-_ParsedField = TypeVar("_ParsedField")
-
-
-def _require(obj: dict[str, Any], field: str, *, label: str) -> _ParsedField:
+def _require(obj: dict[str, Any], field: str, *, label: str) -> object:
     if field not in obj:
         msg = "profile.missing"
         raise _err(msg, f"missing required field '{field}' in {label}")

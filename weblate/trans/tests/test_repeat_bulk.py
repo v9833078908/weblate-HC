@@ -1081,7 +1081,7 @@ class RepeatBulkResumabilityTest(RepeatBulkServiceFixtures, ViewTestCase):
         run.refresh_from_db()
         self.assertEqual(run.status, RepeatBulkRun.Status.QUEUED)
         published.assert_called_once_with(
-            args=[run.pk], priority=INTERACTIVE_TASK_PRIORITY
+            args=(run.pk,), priority=INTERACTIVE_TASK_PRIORITY
         )
         # Resume re-publishes the same durable batch; it creates nothing new.
         self.assertEqual(self.write_snapshot(), before)

@@ -31,6 +31,8 @@ from weblate.utils.request import get_ip_address, get_user_agent_raw
 from weblate.utils.state import STATE_TRANSLATED
 
 if TYPE_CHECKING:
+    from django_stubs_ext import StrOrPromise
+
     from weblate.auth.models import AuthenticatedHttpRequest, User
     from weblate.trans.models.unit import Unit
 
@@ -86,7 +88,7 @@ class SuggestionManager(models.Manager["Suggestion"]):
             return None, SuggestionAddResult.TOO_LONG
 
         # Apply fixups
-        fixups: list[str] = []
+        fixups: list[StrOrPromise] = []
         if not unit.translation.is_template:
             target, fixups = fix_target(target, unit)
 
@@ -126,7 +128,7 @@ class SuggestionManager(models.Manager["Suggestion"]):
                 same_judge_metadata = None
         same_is_judge = same_judge_metadata is not None
         if judge_metadata is not None:
-            if same_is_judge:
+            if same_is_judge and same_suggestion is not None:
                 # Byte-identical repair text is rebound to the newest
                 # verdict instead of duplicated - this also covers a retry
                 # of the same verdict. Candidate identity is its verdict
@@ -253,7 +255,7 @@ class Suggestion(models.Model, UserDisplayMixin):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fixups: list[str] = []
+        self.fixups: list[StrOrPromise] = []
 
     @property
     def is_judge_candidate(self) -> bool:

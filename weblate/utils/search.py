@@ -53,7 +53,7 @@ from weblate.utils.views import parse_path
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from django.db.models import Expression
+    from django.db.models.expressions import BaseExpression, Combinable
 
 
 class SearchQueryError(Exception):
@@ -613,7 +613,7 @@ class BaseTermExpr:
     def as_parsed_query(self, context: dict) -> ParsedQuery:
         return ParsedQuery.from_query(self.as_query(context))
 
-    def get_annotations(self, context: dict) -> dict[str, Expression]:
+    def get_annotations(self, context: dict) -> dict[str, BaseExpression | Combinable]:
         return {}
 
     # ruff: ignore[any-type]
@@ -1002,7 +1002,7 @@ class UnitTermExpr(BaseTermExpr):
             | Q(context__substring=self.match)
         )
 
-    def get_annotations(self, context: dict) -> dict[str, Expression]:
+    def get_annotations(self, context: dict) -> dict[str, BaseExpression | Combinable]:
         if self.field == "labels_count":
             return {"labels_count": Count("source_unit__labels")}
         if self.field == "judge" or (self.field == "has" and self.match == "judge"):
@@ -1186,7 +1186,7 @@ class ScreenshotTermExpr(BaseTermExpr):
             )
         return super().convert_id(text)
 
-    def get_annotations(self, context: dict) -> dict[str, Expression]:
+    def get_annotations(self, context: dict) -> dict[str, BaseExpression | Combinable]:
         if self.field == "strings":
             return {"strings": Count("units", distinct=True)}
         return super().get_annotations(context)
@@ -1252,8 +1252,8 @@ def parser_to_query(obj: ParseResults | BaseTermExpr, context: dict) -> Q:
 
 def parser_annotations(
     obj: ParseResults | BaseTermExpr, context: dict
-) -> dict[str, Expression]:
-    result: dict[str, Expression] = {}
+) -> dict[str, BaseExpression | Combinable]:
+    result: dict[str, BaseExpression | Combinable] = {}
     if isinstance(obj, BaseTermExpr):
         result.update(obj.get_annotations(context))
     else:
@@ -1278,6 +1278,6 @@ def parse_string(text: str, parser: SearchParser) -> ParseResults:
 
 def parse_query(
     text: str, parser: SearchParser = "unit", **context
-) -> tuple[Q, dict[str, Expression]]:
+) -> tuple[Q, dict[str, BaseExpression | Combinable]]:
     parsed = parse_string(text, parser)
     return parser_to_query(parsed, context), parser_annotations(parsed, context)

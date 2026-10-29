@@ -248,6 +248,7 @@ def current_recommendations(
             continue
         if (
             result.attempt_id is not None
+            and result.attempt is not None
             and result.attempt.status != RepeatRecommendationAttempt.Status.COMPLETED
         ):
             continue
@@ -567,7 +568,7 @@ def queue_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
     def publish() -> None:
         try:
             execute_repeat_recommendation_attempt.apply_async(
-                args=[attempt.pk], priority=INTERACTIVE_TASK_PRIORITY
+                args=(attempt.pk,), priority=INTERACTIVE_TASK_PRIORITY
             )
         except Exception:
             # A publication failure keeps the attempt RESERVED: the same
@@ -646,7 +647,12 @@ def parse_results(*, attempt: RepeatRecommendationAttempt, content: str) -> list
             and all(isinstance(value, int) for value in exclusions)
             and isinstance(rationale, str)
         )
-        if not is_valid_shape or group_id not in groups or group_id in seen:
+        if (
+            not is_valid_shape
+            or not isinstance(group_id, int)
+            or group_id not in groups
+            or group_id in seen
+        ):
             continue
         if any(member not in groups[group_id]["unit_ids"] for member in exclusions):
             continue

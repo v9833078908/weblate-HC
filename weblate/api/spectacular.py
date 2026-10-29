@@ -283,6 +283,7 @@ def get_drf_settings(
             else "rest_framework.permissions.IsAuthenticatedOrReadOnly"
         ],
         "DEFAULT_AUTHENTICATION_CLASSES": (
+            "weblate.wizard_auth.api.WizardOAuthAuthentication",
             "rest_framework.authentication.TokenAuthentication",
             "weblate.api.authentication.BearerAuthentication",
             "rest_framework.authentication.SessionAuthentication",

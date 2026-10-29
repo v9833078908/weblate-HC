@@ -33338,3 +33338,7 @@ msgstr "Судья одобрил только этот вариант."
 #, python-format
 msgid "The judge passed only this variant. The model advised: %(rationale)s"
 msgstr "Судья одобрил только этот вариант. Совет модели: %(rationale)s"
+
+#: weblate/templates/base.html
+msgid "Localization wizard"
+msgstr "Визард локализации"
