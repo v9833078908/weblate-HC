@@ -248,20 +248,38 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         prompt_tokens = usage.get("prompt_tokens") or 0
         completion_tokens = usage.get("completion_tokens") or 0
         total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
-        if not prompt_tokens and not completion_tokens:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.llm_usage import LLMUsageLog, parse_provider_cost
+
+        cost = parse_provider_cost(usage.get("cost"))
+        if not prompt_tokens and not completion_tokens and cost is None:
             return
-        cost = usage.get("cost")
-        prompt_details = usage.get("prompt_tokens_details") or {}
-        completion_details = usage.get("completion_tokens_details") or {}
+        prompt_details = usage.get("prompt_tokens_details")
+        completion_details = usage.get("completion_tokens_details")
+        if not isinstance(prompt_details, dict):
+            prompt_details = {}
+        if not isinstance(completion_details, dict):
+            completion_details = {}
+        cached_tokens = prompt_details.get("cached_tokens")
+        if (
+            not isinstance(cached_tokens, int)
+            or isinstance(cached_tokens, bool)
+            or not 0 <= cached_tokens < 2**31
+        ):
+            cached_tokens = 0
+        reasoning_tokens = completion_details.get("reasoning_tokens")
+        if (
+            not isinstance(reasoning_tokens, int)
+            or isinstance(reasoning_tokens, bool)
+            or not 0 <= reasoning_tokens < 2**31
+        ):
+            reasoning_tokens = 0
         project_slug = llm_batch_project.get()
         project_id_snapshot = llm_batch_project_id.get()
         if project_slug is None:
             project = self.settings.get("_project")
             project_slug = project.slug if project is not None else ""
             project_id_snapshot = project.pk if project is not None else None
-        # ruff: ignore[import-outside-top-level]
-        from weblate.trans.models.llm_usage import LLMUsageLog, parse_provider_cost
-
         record = LLMUsageLog.objects.create(
             model=model,
             service=self.get_identifier(),
@@ -273,10 +291,10 @@ class BaseOpenAITranslation(BaseLLMTranslation):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
-            cost_usd=parse_provider_cost(cost),
+            cost_usd=cost,
             response_id=str(payload.get("id") or ""),
-            cached_tokens=prompt_details.get("cached_tokens") or 0,
-            reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+            cached_tokens=cached_tokens,
+            reasoning_tokens=reasoning_tokens,
             operation=LLMUsageLog.Operation.TRANSLATION,
             unit_count=llm_batch_unit_count.get() or None,
             batch_size=batch_size,

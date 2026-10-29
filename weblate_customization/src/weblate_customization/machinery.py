@@ -170,7 +170,7 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
             "routed_llm_target", default=None
         )
         self._reply_codec: ContextVar[str] = ContextVar(
-            "routed_reply_codec", default="routed-slots-v2"
+            "routed_reply_codec", default="routed-slots-v3"
         )
 
     @property
@@ -180,7 +180,7 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
     def _fetch_llm_batch(
         self, source_language, target_language, sources, source_occurrences
     ):
-        codec = "routed-slots-v2"
+        codec = "routed-slots-v3"
         identity = self._delivery_identity(sources)
         if identity:
             from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
@@ -191,6 +191,8 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
             saved = saved_request_codec(identity)
             if saved in {"", "routed-parts-v1"}:
                 codec = "routed-parts-v1"
+            elif saved == "routed-slots-v2":
+                codec = saved
             elif saved not in {None, codec}:
                 msg = "Stored routed codec requires reconciliation"
                 raise DeliveryUnresolved(msg)
@@ -217,10 +219,10 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
     def _build_string_ids(self, count: int) -> list[str]:
         # Durable batch ids are separately derived from semantic identities.
         # Demonstration ids must also be stable for exact request-digest replay.
-        if (
-            self.durable_single_attempt
-            and self.delivery_request_codec == "routed-slots-v2"
-        ):
+        if self.durable_single_attempt and self.delivery_request_codec in {
+            "routed-slots-v2",
+            "routed-slots-v3",
+        }:
             return [f"example{index}" for index in range(count)]
         return super()._build_string_ids(count)
 
@@ -360,6 +362,13 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
         payload = super().get_chat_payload(
             model, prompt, content, previous_content, previous_response
         )
+        if (
+            self.get_identifier() == "openrouter"
+            and urlsplit(self.get_runtime_base_url()).hostname == "openrouter.ai"
+            and model == "google/gemini-3.7-flash"
+            and self.delivery_request_codec == "routed-slots-v3"
+        ):
+            payload["reasoning"] = {"effort": "medium"}
         strings = self._request_strings(content)
         if strings:
             payload["response_format"] = (

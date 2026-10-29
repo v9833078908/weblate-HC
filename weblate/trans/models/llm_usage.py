@@ -239,10 +239,32 @@ def parse_provider_cost(value: object) -> Decimal | None:
         return None
     if not cost.is_finite() or cost < 0:
         return None
-    for candidate in (cost, cost.normalize()):
-        try:
-            _cost_usd_validator(candidate)
-        except ValidationError:
-            continue
-        return candidate
-    return None
+    if not cost:
+        return Decimal(0)
+    if (
+        not -COST_USD_DECIMAL_PLACES
+        <= cost.adjusted()
+        < (COST_USD_MAX_DIGITS - COST_USD_DECIMAL_PLACES)
+    ):
+        return None
+    try:
+        _cost_usd_validator(cost)
+    except ValidationError:
+        pass
+    else:
+        return cost
+
+    # Strip only trailing zeroes, without context-dependent Decimal.normalize()
+    # rounding or allocating storage proportional to the exponent.
+    sign, digits, exponent = cost.as_tuple()
+    end = len(digits)
+    while end and digits[end - 1] == 0:
+        end -= 1
+    if end > COST_USD_MAX_DIGITS:
+        return None
+    candidate = Decimal((sign, digits[:end], exponent + len(digits) - end))
+    try:
+        _cost_usd_validator(candidate)
+    except ValidationError:
+        return None
+    return candidate

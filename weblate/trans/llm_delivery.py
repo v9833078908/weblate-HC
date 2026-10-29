@@ -108,7 +108,13 @@ def reserve_exchange(
 ) -> ExchangeRef:
     """One transaction claims every semantic member before network I/O."""
     keys = _keys(identity)
-    if request_codec not in {None, "opaque-v1", "routed-parts-v1", "routed-slots-v2"}:
+    if request_codec not in {
+        None,
+        "opaque-v1",
+        "routed-parts-v1",
+        "routed-slots-v2",
+        "routed-slots-v3",
+    }:
         msg = "Invalid delivery codec"
         raise ValueError(msg)
     if request_codec == "routed-parts-v1" and not replay_only:

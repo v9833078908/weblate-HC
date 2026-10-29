@@ -4351,6 +4351,64 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         self.assertEqual(log.unit_count, 1)
 
+    def _assert_cost_recorded_with_invalid_details(
+        self, usage: dict, cached_tokens: int, reasoning_tokens: int
+    ) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_usage(usage)
+        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.cost_usd, Decimal("0.25"))
+        self.assertEqual(log.response_id, "chatcmpl-123")
+        self.assertEqual(log.prompt_tokens, 0)
+        self.assertEqual(log.completion_tokens, 0)
+        self.assertEqual(log.cached_tokens, cached_tokens)
+        self.assertEqual(log.reasoning_tokens, reasoning_tokens)
+
+    @http_mock.activate
+    def test_cost_recorded_with_invalid_prompt_token_details(self) -> None:
+        self._assert_cost_recorded_with_invalid_details(
+            {
+                "cost": 0.25,
+                "prompt_tokens_details": "unexpected",
+                "completion_tokens_details": {"reasoning_tokens": 7},
+            },
+            cached_tokens=0,
+            reasoning_tokens=7,
+        )
+
+    @http_mock.activate
+    def test_cost_recorded_with_invalid_completion_token_details(self) -> None:
+        self._assert_cost_recorded_with_invalid_details(
+            {
+                "cost": 0.25,
+                "prompt_tokens_details": {"cached_tokens": 4},
+                "completion_tokens_details": "unexpected",
+            },
+            cached_tokens=4,
+            reasoning_tokens=0,
+        )
+
+    def test_cost_recorded_with_invalid_optional_token_counts(self) -> None:
+        machine = self.get_machine()
+        for invalid in ("unexpected", {}, -1, 2**31, True):
+            with self.subTest(invalid=invalid):
+                LLMUsageLog.objects.all().delete()
+                machine.record_llm_usage(
+                    {
+                        "usage": {
+                            "cost": "0.25",
+                            "prompt_tokens_details": {"cached_tokens": invalid},
+                            "completion_tokens_details": {"reasoning_tokens": invalid},
+                        }
+                    },
+                    self.TRACE_MODEL,
+                )
+                log = LLMUsageLog.objects.get()
+                self.assertEqual(log.cost_usd, Decimal("0.25"))
+                self.assertEqual(log.cached_tokens, 0)
+                self.assertEqual(log.reasoning_tokens, 0)
+
     @http_mock.activate
     def test_usage_is_billed_to_the_run(self) -> None:
         run = ProducerRun.objects.create(
@@ -4822,6 +4880,37 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.mock_chat_usage({"prompt_tokens": 9, "completion_tokens": 12, "cost": 0})
         self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
         self.assertEqual(LLMUsageLog.objects.get().cost_usd, Decimal(0))
+
+    @http_mock.activate
+    def test_usage_cost_without_tokens_is_stored(self) -> None:
+        self.mock_chat_usage({"cost": "0.123456789123456789"})
+        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.cost_usd, Decimal("0.123456789123456789"))
+        self.assertEqual(log.response_id, "chatcmpl-123")
+        self.assertEqual(log.model, self.TRACE_MODEL)
+        self.assertEqual(log.operation, LLMUsageLog.Operation.TRANSLATION)
+
+    @http_mock.activate
+    def test_usage_zero_cost_without_tokens_is_stored_async(self) -> None:
+        self.mock_chat_usage({"cost": 0})
+        machine = self.get_machine()
+        reply = async_to_sync(machine.afetch_llm_translations)(
+            "Translate.", '{"strings": []}', "", ""
+        )
+        self.assertEqual(reply, '["Ahoj světe"]')
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.cost_usd, Decimal(0))
+        self.assertEqual(log.response_id, "chatcmpl-123")
+
+    def test_usage_invalid_cost_without_tokens_is_not_recorded(self) -> None:
+        machine = self.get_machine()
+        for cost in ("invalid", "-1", "NaN", "0.1234567891234567891", None):
+            with self.subTest(cost=cost):
+                machine.record_llm_usage(
+                    {"id": "invalid-cost", "usage": {"cost": cost}}, self.TRACE_MODEL
+                )
+                self.assertFalse(LLMUsageLog.objects.exists())
 
     @http_mock.activate
     def test_usage_missing_means_no_record(self) -> None:

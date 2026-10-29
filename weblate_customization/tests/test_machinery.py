@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, cast
@@ -32,6 +33,7 @@ from weblate_customization.machinery import (
 from weblate.checks import models as check_models
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.llm import BaseLLMTranslation
+from weblate.machinery.openai import OpenAITranslation
 from weblate.trans.llm_delivery import (
     DeliveryUnresolved,
     dispatch_exchange,
@@ -77,7 +79,13 @@ def mock_chat(text: str = "テスト", *, invalid_reply: str | None = None) -> N
     register_chat(CHAT_URL, text, invalid_reply=invalid_reply)
 
 
-def register_chat(url: str, text: str, *, invalid_reply: str | None = None) -> None:
+def register_chat(
+    url: str,
+    text: str,
+    *,
+    invalid_reply: str | None = None,
+    usage: dict | None = None,
+) -> None:
     def respond(request: httpx2.Request) -> httpx2.Response:
         inputs = json.loads(json.loads(request.content)["messages"][-1]["content"])[
             "strings"
@@ -98,11 +106,9 @@ def register_chat(url: str, text: str, *, invalid_reply: str | None = None) -> N
             200,
             json={
                 "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
-                "usage": {
-                    "prompt_tokens": 9,
-                    "completion_tokens": 2,
-                    "total_tokens": 11,
-                },
+                "usage": usage
+                if usage is not None
+                else {"prompt_tokens": 9, "completion_tokens": 2, "total_tokens": 11},
             },
         )
 
@@ -850,6 +856,81 @@ class RoutedDownloadTest(TestCase):
         self.assertEqual(sent_models(), [DEEPSEEK])
 
     @http_mock.activate
+    def test_openrouter_gemini_37_sends_medium_reasoning_sync_and_async(self) -> None:
+        for asynchronous in (False, True):
+            with self.subTest(asynchronous=asynchronous):
+                http_mock.reset()
+                mock_chat("Bonjour")
+                machine = self.machine({"*": "google/gemini-3.7-flash"})
+                if asynchronous:
+                    async_to_sync(machine.adownload_multiple_translations)(
+                        "en", "fr", [("Hello", None)]
+                    )
+                else:
+                    machine.download_multiple_translations(
+                        "en", "fr", [("Hello", None)]
+                    )
+
+                (payload,) = sent_payloads()
+                self.assertEqual(payload["model"], "google/gemini-3.7-flash")
+                self.assertEqual(payload.get("reasoning"), {"effort": "medium"})
+                self.assertEqual(payload["provider"], {"require_parameters": True})
+                response_format = payload["response_format"]
+                self.assertEqual(response_format["type"], "json_schema")
+                self.assertIs(response_format["json_schema"]["strict"], True)
+
+    @http_mock.activate
+    def test_medium_reasoning_does_not_leak_to_other_routes(self) -> None:
+        cases = (
+            (RoutedLLMTranslation, CHAT_URL, DEEPSEEK),
+            (RoutedLLMTranslation, CHAT_URL, GEMINI),
+            (RoutedLLMTranslation, CHAT_URL, "google/gemini-future"),
+            (
+                RoutedLLMTranslation,
+                "https://openrouter.ai.example.com/api/v1/chat/completions",
+                "google/gemini-3.7-flash",
+            ),
+            (RoutedLiteLLMTranslation, CHAT_URL, "google/gemini-3.7-flash"),
+        )
+        for machine_class, url, model in cases:
+            with self.subTest(service=machine_class.name, url=url, model=model):
+                http_mock.reset()
+                register_chat(url, "Bonjour")
+                configuration = {
+                    **CONFIGURATION,
+                    "base_url": url.removesuffix("/chat/completions"),
+                    "routing": {"*": model},
+                }
+                machine = machine_class(as_settings(configuration))
+                machine.delete_cache()
+                machine.cache_translations = False
+                machine.download_multiple_translations("en", "fr", [("Hello", None)])
+
+                (call,) = http_mock.calls
+                payload = json.loads(call.request.content)
+                self.assertEqual(payload["model"], model)
+                self.assertNotIn("reasoning", payload)
+                self.assertEqual(payload["response_format"]["type"], "json_schema")
+                if machine_class is RoutedLiteLLMTranslation:
+                    self.assertNotIn("provider", payload)
+                else:
+                    self.assertEqual(payload["provider"], {"require_parameters": True})
+
+    @http_mock.activate
+    def test_builtin_openai_does_not_send_openrouter_reasoning(self) -> None:
+        mock_chat("Bonjour")
+        machine = OpenAITranslation(as_settings(dict(CONFIGURATION)))
+        with patch.object(
+            machine, "get_traced_model", return_value="google/gemini-3.7-flash"
+        ):
+            machine.fetch_llm_translations("prompt", batch_content(1), "", "")
+
+        (payload,) = sent_payloads()
+        self.assertEqual(payload["model"], "google/gemini-3.7-flash")
+        self.assertNotIn("reasoning", payload)
+        self.assertNotIn("provider", payload)
+
+    @http_mock.activate
     def test_no_models_endpoint_call(self) -> None:
         mock_chat()
         self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
@@ -1080,7 +1161,7 @@ class RoutedDeliveryTest(ViewTestCase):
         self.assertEqual(len(http_mock.calls), 1)
         self.assertEqual(LLMUsageLog.objects.count(), 1)
         self.assertEqual(
-            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v2"
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v3"
         )
 
     def test_new_openrouter_reply_replays_across_fresh_engines(self):
@@ -1088,6 +1169,93 @@ class RoutedDeliveryTest(ViewTestCase):
 
     def test_new_litellm_reply_replays_across_fresh_engines(self):
         self.assert_fresh_engine_replay(RoutedLiteLLMTranslation)
+
+    @http_mock.activate
+    def test_frozen_gemini_v2_paid_reply_recovers_and_changes_stay_fenced(self):
+        engine = self.machine()
+        engine.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        register_chat(engine.get_chat_completions_url(), "Přeloženo")
+        current_payload = engine.get_chat_payload
+
+        def previous_payload(*args):
+            payload = current_payload(*args)
+            payload.pop("reasoning", None)
+            return payload
+
+        # Freeze the pre-reasoning v2 wire request and its actual paid reply.
+        with (
+            patch(
+                "weblate.trans.llm_delivery.saved_request_codec",
+                return_value="routed-slots-v2",
+            ),
+            patch.object(engine, "get_chat_payload", side_effect=previous_payload),
+        ):
+            first = engine.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(first["Open"][0]["text"], "Přeloženo")
+        self.assertNotIn("reasoning", sent_payloads()[0])
+        self.assertEqual(
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v2"
+        )
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+        resumed = self.machine()
+        resumed.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        recovered = resumed.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(recovered["Open"][0]["text"], "Přeloženo")
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+        for changed_source, changed_model, changed_style in (
+            ("Changed source", "google/gemini-3.7-flash", ""),
+            ("Open", GEMINI, ""),
+            ("Open", "google/gemini-3.7-flash", "Different paid request"),
+        ):
+            with self.subTest(
+                source=changed_source, model=changed_model, style=changed_style
+            ):
+                changed = self.machine()
+                changed.settings["routing"] = {"*": changed_model}
+                changed.settings["style"] = changed_style
+                with self.assertRaises(DeliveryUnresolved):
+                    changed.download_multiple_translations(
+                        "en", "cs", [(changed_source, self.unit)]
+                    )
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+    @http_mock.activate
+    def test_new_durable_gemini_request_has_medium_reasoning(self):
+        engine = self.machine()
+        engine.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        register_chat(engine.get_chat_completions_url(), "Přeloženo")
+
+        result = engine.download_multiple_translations("en", "cs", self.sources)
+
+        self.assertEqual(result["Open"][0]["text"], "Přeloženo")
+        self.assertEqual(sent_payloads()[0]["reasoning"], {"effort": "medium"})
+        resumed = self.machine()
+        resumed.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        recovered = resumed.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(recovered["Open"][0]["text"], "Přeloženo")
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+    @http_mock.activate
+    def test_cost_only_usage_is_recorded_once_across_replay(self):
+        engine = self.machine()
+        register_chat(
+            engine.get_chat_completions_url(),
+            "Přeloženo",
+            usage={"cost": "0.25", "prompt_tokens_details": "unexpected"},
+        )
+        first = engine.download_multiple_translations("en", "cs", self.sources)
+        second = self.machine().download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(first, second)
+        self.assertEqual(len(http_mock.calls), 1)
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.cost_usd, Decimal("0.25"))
+        self.assertEqual(log.prompt_tokens, 0)
+        self.assertEqual(log.cached_tokens, 0)
 
     @http_mock.activate
     def test_exact_legacy_body_replays_and_changed_settings_stay_blocked(self):
@@ -1147,7 +1315,7 @@ class RoutedDeliveryTest(ViewTestCase):
             self.assertEqual(len(http_mock.calls), 0)
 
     @http_mock.activate
-    def test_invalid_v2_reply_has_no_legacy_fallback_or_paid_retry(self):
+    def test_invalid_slot_reply_has_no_legacy_fallback_or_paid_retry(self):
         engine = self.machine()
         register_chat(
             engine.get_chat_completions_url(),
@@ -1159,7 +1327,7 @@ class RoutedDeliveryTest(ViewTestCase):
                 self.machine().download_multiple_translations("en", "cs", self.sources)
         self.assertEqual(len(http_mock.calls), 1)
         self.assertEqual(
-            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v2"
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v3"
         )
 
     def test_frozen_contract_matches_independently_rendered_old_request(self):
