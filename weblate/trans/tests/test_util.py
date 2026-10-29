@@ -4,13 +4,17 @@
 
 from types import SimpleNamespace
 
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 from django.core.cache import cache
 from django.test import SimpleTestCase, override_settings
+from django.utils import timezone
 from translate.misc.multistring import multistring
 from translate.storage.base import ParseError
 
 from weblate.lang.models import Language
 from weblate.trans.exceptions import FileParseError, is_expected_parse_error
+from weblate.trans.tests.utils import get_test_certificate
 from weblate.trans.util import (
     cleanup_path,
     cleanup_repo_url,
@@ -21,6 +25,28 @@ from weblate.trans.util import (
     sanitize_backend_error_message,
     translation_percent,
 )
+
+
+class TestCertificateTest(SimpleTestCase):
+    def test_certificate_matches_ephemeral_private_key(self) -> None:
+        certificate_pem, private_key_pem = get_test_certificate()
+        certificate = x509.load_pem_x509_certificate(certificate_pem.encode("ascii"))
+        private_key = serialization.load_pem_private_key(
+            private_key_pem.encode("ascii"), password=None
+        )
+        self.assertEqual(
+            certificate.public_key().public_bytes(
+                serialization.Encoding.DER,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            ),
+            private_key.public_key().public_bytes(
+                serialization.Encoding.DER,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            ),
+        )
+        self.assertLess(certificate.not_valid_before_utc, timezone.now())
+        self.assertGreater(certificate.not_valid_after_utc, timezone.now())
+        certificate.verify_directly_issued_by(certificate)
 
 
 class ExpectedParseErrorTest(SimpleTestCase):

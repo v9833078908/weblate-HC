@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import os
 from datetime import timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
@@ -51,7 +50,7 @@ from weblate.lang.models import Language
 from weblate.trans.tests.test_views import RegistrationTestMixin
 from weblate.trans.tests.utils import (
     enable_login_required_settings,
-    get_test_file,
+    get_test_certificate,
     social_core_override_settings,
 )
 from weblate.utils.ratelimit import reset_rate_limit
@@ -77,8 +76,7 @@ SAML_BACKENDS = (
     "social_core.backends.saml.SAMLAuth",
     "weblate.accounts.auth.WeblateUserBackend",
 )
-SAML_CERT = Path(get_test_file("saml.crt")).read_text(encoding="utf-8")
-SAML_KEY = Path(get_test_file("saml.key")).read_text(encoding="utf-8")
+SAML_CERT, SAML_KEY = get_test_certificate()
 
 REGISTRATION_SUCCESS = (
     "Click the confirmation link sent to your e-mail inbox "
