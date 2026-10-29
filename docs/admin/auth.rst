@@ -864,7 +864,7 @@ The permissions of a team with enforced two-factor authentication won't be appli
 .. _wizard-sign-in:
 
 Wizard sign-in through Weblate
------------------------------
+------------------------------
 
 The HCGameLoc fork can optionally authenticate its separate Wizard through
 Weblate using OpenID Connect authorization code flow with S256 PKCE. Install the

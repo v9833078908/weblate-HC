@@ -30,7 +30,9 @@ if not settings.WIZARD_SSO_ENABLED:
 
 if settings.WIZARD_SSO_ENABLED:
     from jwcrypto.jwk import JWK  # type: ignore[import-untyped]
-    from oauth2_provider.models import get_application_model  # type: ignore[import-untyped]
+    from oauth2_provider.models import (
+        get_application_model,  # type: ignore[import-untyped]
+    )
 
 
 class WizardOIDCTest(TestCase):

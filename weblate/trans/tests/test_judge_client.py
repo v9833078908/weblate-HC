@@ -3907,7 +3907,6 @@ class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
                     expected,
                 )
 
-
     @override_settings(JUDGE_STREAM_SEAT_1=True, JUDGE_TRANSPORT_RETRIES=1)
     @http_mock.activate
     def test_extreme_stream_cost_keeps_usage_and_real_parse_failure(self) -> None:
@@ -4073,6 +4072,30 @@ class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
                 self.assertEqual(row.cached_tokens, 0)
                 self.assertEqual(row.reasoning_tokens, 0)
 
+    @override_settings(JUDGE_TRANSPORT_RETRIES=1)
+    @http_mock.activate
+    def test_non_stream_extreme_number_retains_http_status_and_cost(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            content=(
+                b'{"id":"extreme-id","usage":{"prompt_tokens":2,'
+                b'"completion_tokens":1,"cost":1e9999999999999999999}}'
+            ),
+            headers={"x-litellm-response-cost": "0.02"},
+        )
+        [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "invalid-json")
+        self.assertEqual(len(http_mock.calls), 1)
+        attempt = JudgeRequestAttempt.objects.get()
+        self.assertEqual(attempt.http_status, 200)
+        self.assertTrue(attempt.transport_succeeded)
+        self.assertEqual(attempt.failure_kind, "invalid-json")
+        row = LLMUsageLog.objects.get()
+        self.assertEqual(row.cost_usd, Decimal("0.02"))
+        self.assertEqual(row.request_attempt_id, attempt.pk)
+
     @http_mock.activate
     def test_cost_without_tokens_or_decodable_body_is_recorded(self) -> None:
         cases = (
@@ -4159,6 +4182,14 @@ class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
                 ),
                 {},
                 "invalid-envelope",
+            ),
+            (
+                (
+                    b'{"id":"extreme-id","usage":{"prompt_tokens":2,'
+                    b'"completion_tokens":1,"cost":1e9999999999999999999}}'
+                ),
+                {"x-litellm-response-cost": "0.5"},
+                "invalid-json",
             ),
         )
         with TemporaryDirectory() as directory, override_settings(DATA_DIR=directory):

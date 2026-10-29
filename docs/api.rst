@@ -3931,7 +3931,7 @@ the string exists; it does not prevent deletion of the string itself.
 .. _api-producer-quality-v2:
 
 Full quality cycle contract
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The capabilities returned by :http:get:`/api/producer/me/` advertise
 ``quality_api_version: 2``, ``candidate_quality_gate``,
@@ -4293,7 +4293,7 @@ update individual repositories; see
 
         :ref:`Pagure notifications <code-hosting-pagure-notifications>`
             For instruction on setting up Pagure integration
-        https://docs.pagure.org/pagure/usage/project_settings.html#web-hooks
+        https://dokk.org/documentation/pagure/3.13.2/usage/using_webhooks/
             Generic information about Pagure Webhooks
         :setting:`ENABLE_HOOKS`
             For enabling hooks for whole Weblate
@@ -4362,7 +4362,7 @@ update individual repositories; see
 .. _api-producer-translation-profile:
 
 Producer translation instructions
-++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++
 
 .. http:get:: /api/producer/projects/(string:project)/translation-profile/
 
