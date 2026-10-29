@@ -3914,7 +3914,7 @@ class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
             b'data: {"id":"preserved-id","choices":[],"usage":'
             b'{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18,'
             b'"cost":0.25}}\n\n'
-            b'data: {"choices":[],"usage":{"cost":1e1000000}}\n\n'
+            b'data: {"choices":[],"usage":{"cost":1e9999999999999999999}}\n\n'
             b"data: bad\n\n"
         )
         http_mock.register("POST", CHAT_URL, content=body)

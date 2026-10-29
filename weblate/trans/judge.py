@@ -18,7 +18,7 @@ import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field, replace
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from importlib import resources
 from itertools import starmap
 from secrets import randbelow, token_hex
@@ -1175,7 +1175,7 @@ def _consume_sse_event(lines: list[str], state: _SSEState) -> str:
         return ""
     try:
         event = json.loads(data, parse_float=Decimal)
-    except ValueError:
+    except (ValueError, InvalidOperation):
         return "invalid-json"
     if not isinstance(event, dict):
         return "invalid-envelope"
