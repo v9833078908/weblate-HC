@@ -41,7 +41,10 @@ Weblate 2026.8.1
 
 * Fixed existing-translation overwrite in the :http:post:`translation autotranslate API </api/translations/(string:project)/(string:component)/(string:language)/autotranslate/>` judge mode, finalized confirmed worker pre-flight failures, and required protected placeholder metadata in routed LLM response schemas.
 * LLM judge runs now report repair-provider failures as partial results with an explicit reason instead of silently completing without a repair candidate; see :ref:`llm-judge`.
+* Added explicit standard :setting:`JUDGE_REASONING_EFFORT` controls for corporate DeepSeek Flash without thinking and Kimi with low reasoning.
 * Routed OpenRouter and LiteLLM translations now require every protected source occurrence and reconstruct its exact markup on the server, preventing schema-valid replies from silently dropping sprite tags; see :ref:`machine-translation-setup`.
+* LLM usage accounting retains observed costs and token counts from interrupted judge streams and cost-only translation responses without rounding provider prices; invalid :setting:`JUDGE_FALLBACK_BASE_URL` requests stop instead of triggering further recovery calls.
+* Routed OpenRouter translations explicitly request medium reasoning for ``google/gemini-3.7-flash``; other model routes are unchanged.
 
 * A user-started automatic translation now resumes after a routine service restart instead of being silently lost: its progress bar reports whether it is waiting for a worker, actively updating, or has shown no update for 10 minutes, and its counter now tracks strings actually written rather than technical progress steps. Redelivery after a restart is at-least-once, not exactly-once; already-written strings are not overwritten.
 * LLM judge reports now distinguish strings with a usable conclusion from skipped, pending, and failed rows, and label a known incomplete or unprovable scope instead of presenting a clean subset as a full check.

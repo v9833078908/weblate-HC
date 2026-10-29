@@ -18,7 +18,7 @@ import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from importlib import resources
 from itertools import starmap
 from secrets import randbelow, token_hex
@@ -50,13 +50,14 @@ PROMPT_SCHEMA_REVISION = "judge-verdict-v3"
 # LiteLLM aliases declare the exact reasoning control they support, so the
 # accepted values are a closed set rather than a free-form effort level.
 # `""` sends no field and leaves the alias on its own default.
-# LiteLLM must forward each model's own control inside `extra_body`: DeepSeek
-# uses `thinking.type=disabled`, while Qwen uses `enable_thinking=false`.
-# A top-level `thinking` can be accepted and silently dropped by the proxy.
-# See docs/product/measurements/2026-09-03-judge-thinking-passthrough.md.
+# Native routes can require an `extra_body` toggle; OpenAI-compatible routes
+# can instead accept an explicit top-level `reasoning_effort`.
+# Controls are selected explicitly, never inferred from the model name.
 _LITELLM_REASONING_VALUES = frozenset(
     {
         "",
+        "reasoning_effort.none",
+        "reasoning_effort.low",
         "thinking.disabled",
         "enable_thinking=false",
         "extra_body.enable_thinking=false",
@@ -1120,6 +1121,44 @@ def _read_body(
     return bytes(buffer), "", first_byte_ms, len(buffer), ""
 
 
+def _usage_token_count(value: object) -> int | None:
+    """Accept only counts that fit the ledger's signed integer fields."""
+    if (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and 0 <= value <= 2**31 - 1
+    ):
+        return value
+    return None
+
+
+def _merge_sse_usage(previous: dict, incoming: dict) -> None:
+    """Merge cumulative usage without replacing observed values with invalid ones."""
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        value = _usage_token_count(incoming.get(key))
+        if value is not None:
+            previous[key] = value
+    cost = parse_provider_cost(incoming.get("cost"))
+    if cost is not None:
+        previous["cost"] = cost
+    for key, count_key in (
+        ("prompt_tokens_details", "cached_tokens"),
+        ("completion_tokens_details", "reasoning_tokens"),
+    ):
+        details = incoming.get(key)
+        if not isinstance(details, dict):
+            continue
+        merged = dict(previous.get(key, {}))
+        merged.update(
+            {
+                detail_key: value
+                for detail_key, value in details.items()
+                if detail_key != count_key or _usage_token_count(value) is not None
+            }
+        )
+        previous[key] = merged
+
+
 @dataclass
 class _SSEState:
     content: list[str] = field(default_factory=list)
@@ -1138,12 +1177,13 @@ def _consume_sse_event(lines: list[str], state: _SSEState) -> str:
         return ""
     try:
         event = json.loads(data, parse_float=Decimal)
-    except ValueError:
+    except (ValueError, InvalidOperation):
         return "invalid-json"
     if not isinstance(event, dict):
         return "invalid-envelope"
-    if isinstance(event.get("usage"), dict):
-        state.usage = event["usage"]
+    usage = event.get("usage")
+    if isinstance(usage, dict):
+        _merge_sse_usage(state.usage, usage)
     identifier = event.get("id")
     if isinstance(identifier, str) and identifier:
         state.response_id = identifier
@@ -1171,23 +1211,39 @@ def _consume_sse_event(lines: list[str], state: _SSEState) -> str:
     return ""
 
 
+def _sse_accounting_payload(state: _SSEState) -> dict | None:
+    """Keep only fields already received, never partial verdict content."""
+    payload: dict = {}
+    if state.usage:
+        payload["usage"] = state.usage
+    if state.response_id:
+        payload["id"] = state.response_id
+    return payload or None
+
+
 def _sse_result(
     state: _SSEState, response_bytes: int, first_byte_ms: int | None, incomplete: bool
 ) -> tuple[dict | None, str, str, int, int | None]:
     if incomplete or not state.done or not state.finish_reason:
         return (
-            None,
+            _sse_accounting_payload(state),
             "invalid-envelope",
             state.finish_reason,
             response_bytes,
             first_byte_ms,
         )
     if state.finish_reason == "length":
-        return None, "finish-length", state.finish_reason, response_bytes, first_byte_ms
+        return (
+            _sse_accounting_payload(state),
+            "finish-length",
+            state.finish_reason,
+            response_bytes,
+            first_byte_ms,
+        )
     output = "".join(state.content)
     if not output.strip():
         return (
-            None,
+            _sse_accounting_payload(state),
             "empty-response",
             state.finish_reason,
             response_bytes,
@@ -1231,7 +1287,7 @@ def _read_sse(
             break
         except Exception as error:
             return (
-                None,
+                _sse_accounting_payload(state),
                 "deadline"
                 if isinstance(error, httpx2.TimeoutException)
                 else "transport",
@@ -1243,7 +1299,7 @@ def _read_sse(
         now = time.monotonic()
         if now > deadline or now - last_byte > idle:
             return (
-                None,
+                _sse_accounting_payload(state),
                 "deadline",
                 state.finish_reason,
                 response_bytes,
@@ -1252,27 +1308,20 @@ def _read_sse(
             )
         if first_byte_ms is None:
             first_byte_ms = int((now - started) * 1000)
+        remaining = MAX_BATCH_RESPONSE_BYTES - response_bytes
         response_bytes += len(chunk)
-        if response_bytes > MAX_BATCH_RESPONSE_BYTES:
-            return (
-                None,
-                "response-too-large",
-                state.finish_reason,
-                response_bytes,
-                first_byte_ms,
-                "",
-            )
+        chunk_failure = ""
+        if len(chunk) > remaining:
+            chunk = chunk[:remaining]
+            chunk_failure = "response-too-large"
+        decoder_state = decoder.getstate()
         try:
             decoded = decoder.decode(chunk)
-        except UnicodeDecodeError:
-            return (
-                None,
-                "invalid-envelope",
-                state.finish_reason,
-                response_bytes,
-                first_byte_ms,
-                "",
-            )
+        except UnicodeDecodeError as error:
+            decoder.setstate(decoder_state)
+            prefix_length = max(0, error.start - len(decoder_state[0]))
+            decoded = decoder.decode(chunk[:prefix_length])
+            chunk_failure = chunk_failure or "invalid-envelope"
         last_byte, pending = now, pending + decoded
         while "\n" in pending:
             line, pending = pending.split("\n", 1)
@@ -1283,18 +1332,27 @@ def _read_sse(
             event_lines = []
             if failure:
                 return (
-                    None,
+                    _sse_accounting_payload(state),
                     failure,
                     state.finish_reason,
                     response_bytes,
                     first_byte_ms,
                     "",
                 )
+        if chunk_failure:
+            return (
+                _sse_accounting_payload(state),
+                chunk_failure,
+                state.finish_reason,
+                response_bytes,
+                first_byte_ms,
+                "",
+            )
     try:
         pending += decoder.decode(b"", final=True)
     except UnicodeDecodeError:
         return (
-            None,
+            _sse_accounting_payload(state),
             "invalid-envelope",
             state.finish_reason,
             response_bytes,
@@ -1440,10 +1498,6 @@ def _usage_values(payload: dict | None) -> dict[str, object]:
     )
 
 
-def _usage_integer(value: object) -> int:
-    return value if isinstance(value, int) else 0
-
-
 def _batch_usage_scope(
     batch: Sequence[JudgeRequest],
     project_slug: str,
@@ -1487,9 +1541,12 @@ def _write_llm_usage(
     reported_cost = parse_provider_cost(usage.get("cost"))
     if reported_cost is None:
         reported_cost = header_cost
-    prompt_tokens = _usage_integer(usage.get("prompt_tokens"))
-    completion_tokens = _usage_integer(usage.get("completion_tokens"))
-    if not prompt_tokens and not completion_tokens:
+    prompt_tokens = _usage_token_count(usage.get("prompt_tokens")) or 0
+    completion_tokens = _usage_token_count(usage.get("completion_tokens")) or 0
+    total_tokens = _usage_token_count(usage.get("total_tokens"))
+    if total_tokens is None:
+        total_tokens = _usage_token_count(prompt_tokens + completion_tokens) or 0
+    if not prompt_tokens and not completion_tokens and reported_cost is None:
         return
     details = usage.get("prompt_tokens_details")
     completion_details = usage.get("completion_tokens_details")
@@ -1514,12 +1571,12 @@ def _write_llm_usage(
         target_language_code=target_language_code,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        total_tokens=_usage_integer(usage.get("total_tokens"))
-        or (prompt_tokens + completion_tokens),
+        total_tokens=total_tokens,
         cost_usd=reported_cost,
         response_id=str(payload.get("id") or ""),
-        cached_tokens=_usage_integer(details.get("cached_tokens")),
-        reasoning_tokens=_usage_integer(completion_details.get("reasoning_tokens")),
+        cached_tokens=_usage_token_count(details.get("cached_tokens")) or 0,
+        reasoning_tokens=_usage_token_count(completion_details.get("reasoning_tokens"))
+        or 0,
         operation=LLMUsageLog.Operation.JUDGE,
         unit_count=len(batch),
         batch_size=len(batch),
@@ -1552,6 +1609,10 @@ def _persist_attempt(
     if not enabled:
         return None
     try:
+        usage = _usage_values(response.payload)
+        completion_details = usage.get("completion_tokens_details")
+        if not isinstance(completion_details, dict):
+            completion_details = {}
         return JudgeRequestAttempt.objects.create(
             run=run,
             seat=profile.seat,
@@ -1575,14 +1636,12 @@ def _persist_attempt(
             elapsed_ms=response.elapsed_ms,
             first_byte_ms=response.first_byte_ms,
             response_bytes=response.response_bytes,
-            prompt_tokens=_usage_values(response.payload).get("prompt_tokens") or None,
-            completion_tokens=_usage_values(response.payload).get("completion_tokens")
-            or None,
-            total_tokens=_usage_values(response.payload).get("total_tokens") or None,
-            reasoning_tokens=(
-                _usage_values(response.payload).get("completion_tokens_details") or {}
-            ).get("reasoning_tokens")
-            or None,
+            prompt_tokens=_usage_token_count(usage.get("prompt_tokens")),
+            completion_tokens=_usage_token_count(usage.get("completion_tokens")),
+            total_tokens=_usage_token_count(usage.get("total_tokens")),
+            reasoning_tokens=_usage_token_count(
+                completion_details.get("reasoning_tokens")
+            ),
             response_id=str((response.payload or {}).get("id") or ""),
         )
     except Exception:
@@ -1599,11 +1658,11 @@ def _record_usage(
     attempt: JudgeRequestAttempt | None,
     header_cost: Decimal | None = None,
 ) -> None:
-    if payload is None:
+    if payload is None and header_cost is None:
         return
     try:
         _write_llm_usage(
-            payload, service, model, project_slug, batch, attempt, header_cost
+            payload or {}, service, model, project_slug, batch, attempt, header_cost
         )
     except Exception:
         LOGGER.exception("Failed to record LLM usage")
@@ -1648,6 +1707,10 @@ def _log_attempt(
 
 def _reasoning_payload(profile: JudgeSeatProfile) -> dict:
     if profile.provider == "litellm":
+        if profile.reasoning == "reasoning_effort.none":
+            return {"reasoning_effort": "none"}
+        if profile.reasoning == "reasoning_effort.low":
+            return {"reasoning_effort": "low"}
         if profile.reasoning == "thinking.disabled":
             return {"thinking": {"type": "disabled"}}
         if profile.reasoning == "enable_thinking=false":
@@ -1825,7 +1888,11 @@ def _run_batch(  # ruff: ignore[complex-structure]
         if not failure and response.payload is not None:
             outcome = _parse_reply(response.payload, len(batch))
             failure = outcome.failure_kind
-        if response.finish_reason == "length":
+        if (
+            response.finish_reason == "length"
+            and not _failure_for_http(response.status_code)
+            and not response.failure_kind
+        ):
             failure = "finish-length"
         parsed = outcome.results is not None and not failure
         attempt = _persist_attempt(
@@ -1885,9 +1952,14 @@ def _run_batch(  # ruff: ignore[complex-structure]
         if fallback_profile is None:
             return None, "", None, False
         fallback_payload = _payload(batch, fallback_profile, project_context)
-        _response, failure, outcome, attempt, parsed = send_once(
+        response, failure, outcome, attempt, parsed = send_once(
             fallback_profile, fallback_payload, target_ordinal
         )
+        if failure == "http-request-invalid":
+            raise JudgeError(
+                _("The LLM judge endpoint refused the request (HTTP %s).")
+                % response.status_code
+            )
         if not parsed:
             return None, failure, attempt, True
         # ruff: ignore[assert]

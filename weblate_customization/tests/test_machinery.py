@@ -26,6 +26,7 @@ from weblate_customization.machinery import (
 
 from weblate.checks import models as check_models
 from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.openai import OpenAITranslation
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.factories import make_unit
 from weblate.utils.tests import http_mock
@@ -835,6 +836,81 @@ class RoutedDownloadTest(TestCase):
 
         self.assertTrue(result)
         self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_openrouter_gemini_37_sends_medium_reasoning_sync_and_async(self) -> None:
+        for asynchronous in (False, True):
+            with self.subTest(asynchronous=asynchronous):
+                http_mock.reset()
+                mock_chat("Bonjour")
+                machine = self.machine({"*": "google/gemini-3.7-flash"})
+                if asynchronous:
+                    async_to_sync(machine.adownload_multiple_translations)(
+                        "en", "fr", [("Hello", None)]
+                    )
+                else:
+                    machine.download_multiple_translations(
+                        "en", "fr", [("Hello", None)]
+                    )
+
+                (payload,) = sent_payloads()
+                self.assertEqual(payload["model"], "google/gemini-3.7-flash")
+                self.assertEqual(payload.get("reasoning"), {"effort": "medium"})
+                self.assertEqual(payload["provider"], {"require_parameters": True})
+                response_format = payload["response_format"]
+                self.assertEqual(response_format["type"], "json_schema")
+                self.assertIs(response_format["json_schema"]["strict"], True)
+
+    @http_mock.activate
+    def test_medium_reasoning_does_not_leak_to_other_routes(self) -> None:
+        cases = (
+            (RoutedLLMTranslation, CHAT_URL, DEEPSEEK),
+            (RoutedLLMTranslation, CHAT_URL, GEMINI),
+            (RoutedLLMTranslation, CHAT_URL, "google/gemini-future"),
+            (
+                RoutedLLMTranslation,
+                "https://openrouter.ai.example.com/api/v1/chat/completions",
+                "google/gemini-3.7-flash",
+            ),
+            (RoutedLiteLLMTranslation, CHAT_URL, "google/gemini-3.7-flash"),
+        )
+        for machine_class, url, model in cases:
+            with self.subTest(service=machine_class.name, url=url, model=model):
+                http_mock.reset()
+                register_chat(url, "Bonjour")
+                configuration = {
+                    **CONFIGURATION,
+                    "base_url": url.removesuffix("/chat/completions"),
+                    "routing": {"*": model},
+                }
+                machine = machine_class(as_settings(configuration))
+                machine.delete_cache()
+                machine.cache_translations = False
+                machine.download_multiple_translations("en", "fr", [("Hello", None)])
+
+                (call,) = http_mock.calls
+                payload = json.loads(call.request.content)
+                self.assertEqual(payload["model"], model)
+                self.assertNotIn("reasoning", payload)
+                self.assertEqual(payload["response_format"]["type"], "json_schema")
+                if machine_class is RoutedLiteLLMTranslation:
+                    self.assertNotIn("provider", payload)
+                else:
+                    self.assertEqual(payload["provider"], {"require_parameters": True})
+
+    @http_mock.activate
+    def test_builtin_openai_does_not_send_openrouter_reasoning(self) -> None:
+        mock_chat("Bonjour")
+        machine = OpenAITranslation(as_settings(dict(CONFIGURATION)))
+        with patch.object(
+            machine, "get_traced_model", return_value="google/gemini-3.7-flash"
+        ):
+            machine.fetch_llm_translations("prompt", batch_content(1), "", "")
+
+        (payload,) = sent_payloads()
+        self.assertEqual(payload["model"], "google/gemini-3.7-flash")
+        self.assertNotIn("reasoning", payload)
+        self.assertNotIn("provider", payload)
 
     @http_mock.activate
     def test_no_models_endpoint_call(self) -> None:

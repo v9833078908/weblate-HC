@@ -2092,9 +2092,18 @@ structured verdict.
 
 The accepted values depend on the provider behind :setting:`JUDGE_BASE_URL`.
 On OpenRouter this is an ``effort`` level (``minimal``, ``low``, ``medium`` or
-``high``). On a LiteLLM endpoint an effort level is meaningless, because each
-alias declares the control it supports, so the value is instead one of a
-closed set naming the exact request field to send:
+``high``). On a LiteLLM endpoint each alias declares the control it supports,
+so the value is instead one of a closed set naming the exact request field
+to send:
+
+``reasoning_effort.none``
+    Sends top-level ``reasoning_effort: "none"``. The corporate
+    ``openrouter/deepseek-v4.1-flash`` route accepts this to disable thinking.
+``reasoning_effort.low``
+    Sends top-level ``reasoning_effort: "low"``. The corporate ``Kimi K3.1 Pro``
+    route accepts this; it reduces reasoning but does not disable it.
+    Configure that seat's temperature as ``1`` to match its fixed sampling
+    contract.
 
 ``thinking.disabled``
     Sends ``thinking: {"type": "disabled"}`` at the top level.
@@ -2188,6 +2197,13 @@ means "send no reasoning parameter", not "unset". Transport shape - stream,
 batch size, request deadline, temperature, and the token cap - always
 inherits the primary seat's resolved value, so a fallback batch is never
 wider than the primary's.
+
+An invalid fallback request, such as an HTTP 400 response, stops the judge
+instead of being retried as an unavailable verdict. Correct the fallback
+model and its supported parameters before starting another run. A blank
+reasoning setting leaves the choice to the provider; ``none`` requests
+reasoning off only where the selected model supports it. ``minimal`` is
+still reasoning, not an off setting.
 
 .. seealso::
 
