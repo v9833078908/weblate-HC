@@ -198,14 +198,37 @@ smoke искусственные; внешних платных запросов
 --keep-going` успешно собрал 212 документов. Это локальные проверки фактического
 рабочего дерева; они не заменяют проверку опубликованного commit в GitHub.
 
-Остаются отдельные внешние причины красного GitHub CI:
+Дополнительные исправления CI восстановили OpenAPI security scheme
+необязательного Wizard bearer token и общее имя enum routed engines,
+лицензионные файлы source distribution и корректную lifetime тестовых каталогов.
+Обязательные typing-сайты исправлены без расширения существующего списка
+исключений baseline. OpenAPI пересобран штатной командой с `--fail-on-warn
+--validate`; standalone loc-kit profile suite: **46 passed**.
 
-- Linkcheck получил HTTP 403 для трёх Hosted Weblate URL. Это не доказывает,
-  что ссылки сломаны; причина отказа доступа не установлена.
-- Dependency review сообщает, что dependency graph не поддерживается либо
-  не включён. Repository API подтверждает public visibility и admin permission,
-  но не состояние graph. Настройки GitHub и платные функции не менялись;
-  проверка не отключена.
+Проверка дополнений: **154 passed, 30 subtests passed**; новая проверка
+Bearer security scheme прошла. Единственный отказ касался нового теста,
+который предполагал внутреннее имя `ProducerProfileRequest`; такой incidental
+schema-wiring тест удалён, а не перепривязан к другому имени. Контракт схемы
+проверяется настоящей генерацией с fail-on-warn/validation.
+Pylint затронутых модулей: **10.00/10**, без подавления предупреждений.
+Source manifest: **2172** version-controlled и sdist-файла, списки совпадают.
+Последний оставшийся typing-отказ optional OIDC imports устранён ленивым
+импортом после disabled-SSO exit; отдельный mypy этого модуля прошёл.
+Повторный полный mypy сохранил **1252** baseline-ошибки в **155** исключённых
+существующей workflow файлах; после применения неизменённого обязательного
+CI-фильтра осталось **0** диагностик. Полностью чистым весь mypy не объявляется.
+Свежий OIDC + bearer-schema прогон после исправления импортов: **15 passed**.
+Redocly завершился с кодом 0; документационные warnings не скрывались.
+
+Dependency graph и бесплатные Dependabot alerts включены штатным GitHub REST
+`PUT /repos/{owner}/{repo}/vulnerability-alerts`; проверочный GET вернул 204.
+Повторный dependency-review run `40904266829` после этого прошёл. Платные
+security-функции и защита main не менялись, проверки не отключались.
+
+Внешнее ограничение Linkcheck: три Hosted Weblate URL возвращают HTTP 403
+с `pow_required` и `verification_url=/-/pow/verify/`. Ссылки не признаны
+сломанными; для автоматической проверки нужен поддерживаемый доступ со стороны
+Hosted Weblate. Обход proof-of-work и игнорирование ссылок не добавлены.
 
 Полный зелёный GitHub CI пока не заявляется. PR:
 `https://github.com/v9833078908/weblate-HC/pull/27`.

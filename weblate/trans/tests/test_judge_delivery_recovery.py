@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from tempfile import TemporaryDirectory
+from shutil import rmtree
+from tempfile import mkdtemp
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
@@ -22,9 +23,9 @@ from weblate.trans.models.llm_delivery import ProducerLLMExchange
 )
 class JudgeDeliveryRecoveryTest(TestCase):
     def setUp(self):
-        directory = TemporaryDirectory()
-        self.addCleanup(directory.cleanup)
-        settings = override_settings(DATA_DIR=directory.name)
+        directory = mkdtemp()
+        self.addCleanup(rmtree, directory)
+        settings = override_settings(DATA_DIR=directory)
         settings.enable()
         self.addCleanup(settings.disable)
         self.run = ProducerRun.objects.create(

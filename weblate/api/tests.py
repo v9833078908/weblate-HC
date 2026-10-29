@@ -20441,6 +20441,15 @@ class OpenAPITest(APIBaseTest):
             schema["info"]["x-logo"]["url"], f"{settings.STATIC_URL}weblate.svg"
         )
 
+    def test_wizard_authentication_schema(self) -> None:
+        schema = self.get_schema()
+        security = schema["components"]["securitySchemes"]["wizardOAuth"]
+        self.assertEqual(security["type"], "http")
+        self.assertEqual(security["scheme"], "bearer")
+        self.assertIn(
+            {"wizardOAuth": []}, schema["paths"]["/api/addons/"]["get"]["security"]
+        )
+
     def test_language_code_pattern(self) -> None:
         schema = self.get_schema()
         expected_pattern = r"^[A-Za-z0-9]+(?:[-_@][A-Za-z0-9]+)*$"

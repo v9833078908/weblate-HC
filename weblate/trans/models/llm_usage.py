@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from django.core.exceptions import ValidationError
 from django.core.validators import DecimalValidator
@@ -262,7 +262,7 @@ def parse_provider_cost(value: object) -> Decimal | None:
         end -= 1
     if end > COST_USD_MAX_DIGITS:
         return None
-    candidate = Decimal((sign, digits[:end], exponent + len(digits) - end))
+    candidate = Decimal((sign, digits[:end], cast("int", exponent) + len(digits) - end))
     try:
         _cost_usd_validator(candidate)
     except ValidationError:

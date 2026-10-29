@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from shutil import rmtree
+from tempfile import mkdtemp
 
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -23,9 +24,9 @@ from weblate.trans.tasks import cleanup_judge_observability
 
 class LLMDeliveryTest(TestCase):
     def setUp(self):
-        self.directory = TemporaryDirectory()
-        self.addCleanup(self.directory.cleanup)
-        self.override = override_settings(DATA_DIR=self.directory.name)
+        self.directory = mkdtemp()
+        self.addCleanup(rmtree, self.directory)
+        self.override = override_settings(DATA_DIR=self.directory)
         self.override.enable()
         self.addCleanup(self.override.disable)
 
@@ -133,9 +134,7 @@ class LLMDeliveryTest(TestCase):
 
         dispatch_exchange(["unit:1:r1:pl"], "a" * 64, send)
         record = ProducerLLMExchange.objects.get()
-        (
-            Path(self.directory.name) / "private-llm-delivery" / record.response_path
-        ).unlink()
+        (Path(self.directory) / "private-llm-delivery" / record.response_path).unlink()
         with self.assertRaises(DeliveryUnresolved):
             dispatch_exchange(["unit:1:r1:pl"], "a" * 64, send)
         self.assertEqual(len(calls), 1)
@@ -181,7 +180,7 @@ class LLMDeliveryTest(TestCase):
         cleanup_judge_observability()
         self.assertFalse(
             (
-                Path(self.directory.name) / "private-llm-delivery" / saved.response_path
+                Path(self.directory) / "private-llm-delivery" / saved.response_path
             ).exists()
         )
         calls = []

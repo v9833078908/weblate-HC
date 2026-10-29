@@ -125,7 +125,9 @@ def _recover_saved_bodies(operation) -> None:
             engine = engine or build_engine(operation)
             engine.delivery_replay_only = True
             engine.cache_translations = False
-            sources = [(unit.get_source_plurals()[0], unit) for unit in original]
+            sources: list[tuple[str, Unit | None]] = [
+                (unit.get_source_plurals()[0], unit) for unit in original
+            ]
             # Follow the original producer path: cleanup, context grouping,
             # exact request replay and protected-token restoration in order.
             results = engine._translate_sources(  # ruff: ignore[private-member-access]
@@ -516,7 +518,7 @@ def process_mt_operation(run_id: str | UUID) -> dict:
 
 def reconcile_mt_operation(operation_id, *, reauthorize_family=None) -> dict:
     """Separate coverage from financial history; never dispatch provider work."""
-    groups = {
+    groups: dict[str, list[int]] = {
         name: []
         for name in (
             "ready",

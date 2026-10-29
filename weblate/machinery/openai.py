@@ -70,7 +70,7 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 send,
                 run_id=self.usage_run_id,
                 request_codec=getattr(self, "delivery_request_codec", "opaque-v1"),
-                replay_only=getattr(self, "delivery_replay_only", False)
+                replay_only=self.delivery_replay_only
                 or getattr(self, "delivery_request_codec", None) == "routed-parts-v1",
             )
         )

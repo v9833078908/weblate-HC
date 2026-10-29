@@ -113,6 +113,7 @@ The OpenAPI specification is available as feature preview, feedback welcome!
             "StringStateEnum": "weblate.utils.state.StringState.choices",
             "ReportKindEnum": "weblate.trans.models.report.REPORT_KIND_CHOICES",
             "ProducerRunKindEnum": "weblate.api.producer.serializers.PRODUCER_RUN_KIND_CHOICES",
+            "RoutedEngineEnum": "weblate.trans.forms.ROUTED_ENGINES",
             "NewUnitStateEnum": "weblate.api.serializers.NEW_UNIT_STATE_CHOICES",
             "ErrorResponse400TypeEnum": "weblate.api.serializers.ErrorResponse400TypeEnum.choices",
             "ValidationErrorEnum": "drf_standardized_errors.openapi_serializers.ValidationErrorEnum.choices",

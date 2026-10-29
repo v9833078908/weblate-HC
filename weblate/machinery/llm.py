@@ -417,6 +417,8 @@ class LLMStringPayload(LLMStringContext):
 class BaseLLMTranslation(BatchMachineTranslation):
     # Opt-in for a caller with its own durable per-unit outbound journal.
     durable_single_attempt = False
+    delivery_purpose = "mt"
+    delivery_replay_only = False
     settings_form: type[LLMBasicMachineryForm]
     max_score = 90
     request_timeout = 120
@@ -3002,7 +3004,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         if any(unit is None for _text, unit in sources):
             msg = "Durable MT requires a unit-bound scope"
             raise MachineTranslationError(msg)
-        purpose = getattr(self, "delivery_purpose", "mt")
+        purpose = self.delivery_purpose
         return tuple(
             f"{purpose}:{unit.pk}:{unit.translation.language.code}:{compute_decision_revision(unit if purpose == 'repair' else unit.source_unit)}"
             for _text, unit in sources
