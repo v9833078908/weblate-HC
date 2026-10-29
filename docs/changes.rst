@@ -51,6 +51,7 @@ Weblate 2026.8.1
 * LLM judge runs now report repair-provider failures as partial results with an explicit reason instead of silently completing without a repair candidate; see :ref:`llm-judge`.
 * Added explicit standard :setting:`JUDGE_REASONING_EFFORT` controls for corporate DeepSeek Flash without thinking and Kimi with low reasoning.
 * Routed OpenRouter and LiteLLM translations now require every protected source occurrence and reconstruct its exact markup on the server, preventing schema-valid replies from silently dropping sprite tags; see :ref:`machine-translation-setup`.
+* LLM usage accounting retains observed costs and token counts from interrupted judge streams and cost-only translation responses without rounding provider prices; invalid :setting:`JUDGE_FALLBACK_BASE_URL` requests stop instead of triggering further recovery calls.
 * LLM usage accounting preserves reported costs and token counts from interrupted judge streams and cost-only translation responses without rounding provider prices; invalid :setting:`JUDGE_FALLBACK_BASE_URL` requests stop instead of triggering further recovery calls.
 * Routed OpenRouter translations explicitly request medium reasoning for ``google/gemini-3.7-flash``; other model routes are unchanged.
 

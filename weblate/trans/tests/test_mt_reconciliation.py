@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import httpx2
 from django.conf import settings
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from weblate_customization.checks import GameMarkupCheck
@@ -28,6 +29,12 @@ from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.tests import http_mock
 
 
+@override_settings(
+    WEBLATE_MACHINERY=(
+        *settings.WEBLATE_MACHINERY,
+        "weblate_customization.machinery.RoutedLLMTranslation",
+    )
+)
 class MTReconciliationTest(http_mock.MockDNSMixin, ViewTestCase):
     def setUp(self):
         super().setUp()

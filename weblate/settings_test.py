@@ -6,9 +6,11 @@
 # Django settings for running testsuite
 #
 
+import importlib.util
 import os
 import warnings
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 # ruff: ignore[undefined-local-with-import-star]
 from weblate.settings_example import *
@@ -120,6 +122,27 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 # Test optional apps as well
 INSTALLED_APPS += ("weblate.billing", "weblate.legal")
+
+# Exercise the optional provider when its extra is installed, without operator keys.
+# Set CI_TEST_WIZARD_SSO=0 to exercise the default-off configuration instead.
+if (
+    os.environ.get("CI_TEST_WIZARD_SSO", "1") != "0"
+    and importlib.util.find_spec("oauth2_provider") is not None
+):
+    from jwcrypto.jwk import JWK
+
+    from weblate.wizard_auth.config import configure as configure_wizard_sso
+
+    WIZARD_SSO_ENABLED = True
+    WIZARD_SSO_ISSUER = "https://example.com/oidc"
+    WIZARD_SSO_CLIENT_ID = "synthetic-wizard-client"
+    WIZARD_SSO_PRIVATE_KEY_FILE = "in-memory-test-key"
+    test_oidc_key = JWK.generate(kty="RSA", size=2048).export_to_pem(
+        private_key=True, password=None
+    ).decode()
+    with patch("weblate.wizard_auth.config.Path") as key_path:
+        key_path.return_value.read_text.return_value = test_oidc_key
+        configure_wizard_sso(globals())
 
 # Test GitHub auth
 AUTHENTICATION_BACKENDS = (

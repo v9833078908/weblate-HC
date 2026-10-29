@@ -9,12 +9,11 @@ from typing import Any
 from unittest.mock import Mock
 from urllib.parse import parse_qs, urlencode, urlsplit
 
+import pytest
 from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
-from jwcrypto.jwk import JWK  # type: ignore[import-untyped]
-from oauth2_provider.models import get_application_model  # type: ignore[import-untyped]
 from rest_framework.exceptions import PermissionDenied
 
 from weblate.auth.models import User
@@ -23,6 +22,15 @@ from weblate.trans.models import Project
 from weblate.trans.models.judge import ProducerRun
 from weblate.wizard_auth.grants import family_for, guard_paid_run, subject_for
 from weblate.wizard_auth.models import DelegationFamily
+
+if not settings.WIZARD_SSO_ENABLED:
+    pytest.skip(
+        "Wizard SSO is not enabled in this test configuration", allow_module_level=True
+    )
+
+if settings.WIZARD_SSO_ENABLED:
+    from jwcrypto.jwk import JWK  # type: ignore[import-untyped]
+    from oauth2_provider.models import get_application_model  # type: ignore[import-untyped]
 
 
 class WizardOIDCTest(TestCase):

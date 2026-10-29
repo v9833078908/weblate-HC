@@ -1150,9 +1150,11 @@ def _merge_sse_usage(previous: dict, incoming: dict) -> None:
             continue
         merged = dict(previous.get(key, {}))
         merged.update(
-            (detail_key, value)
-            for detail_key, value in details.items()
-            if detail_key != count_key or _usage_token_count(value) is not None
+            {
+                detail_key: value
+                for detail_key, value in details.items()
+                if detail_key != count_key or _usage_token_count(value) is not None
+            }
         )
         previous[key] = merged
 
@@ -2027,8 +2029,8 @@ def _run_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-sta
             failure = outcome.failure_kind
         if (
             response.finish_reason == "length"
-            and not response.failure_kind
             and not _failure_for_http(response.status_code)
+            and not response.failure_kind
         ):
             failure = "finish-length"
         parsed = outcome.results is not None and not failure

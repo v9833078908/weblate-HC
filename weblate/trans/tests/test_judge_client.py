@@ -3907,6 +3907,7 @@ class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
                     expected,
                 )
 
+
     @override_settings(JUDGE_STREAM_SEAT_1=True, JUDGE_TRANSPORT_RETRIES=1)
     @http_mock.activate
     def test_extreme_stream_cost_keeps_usage_and_real_parse_failure(self) -> None:

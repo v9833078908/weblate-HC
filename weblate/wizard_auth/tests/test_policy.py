@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
+import importlib.util
+import os
+
+from django.conf import settings
 from django.test import RequestFactory, SimpleTestCase
 from rest_framework.exceptions import PermissionDenied
 
@@ -10,6 +14,16 @@ from weblate.wizard_auth.permissions import required_scope
 
 
 class DelegationPolicyTest(SimpleTestCase):
+    def test_optional_sso_test_bootstrap_matches_available_dependencies(self):
+        enabled = (
+            os.environ.get("CI_TEST_WIZARD_SSO", "1") != "0"
+            and importlib.util.find_spec("oauth2_provider") is not None
+        )
+        self.assertEqual(settings.WIZARD_SSO_ENABLED, enabled)
+        self.assertEqual("oauth2_provider" in settings.INSTALLED_APPS, enabled)
+        if enabled:
+            self.assertIn("PRIVATE KEY", settings.OAUTH2_PROVIDER["OIDC_RSA_PRIVATE_KEY"])
+
     def test_existing_api_authentication_challenge_is_preserved(self):
         factory = RequestFactory()
         authentication = WizardOAuthAuthentication()

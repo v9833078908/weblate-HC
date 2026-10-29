@@ -2209,6 +2209,13 @@ batch size, request deadline, temperature, and the token cap - always
 inherits the primary seat's resolved value, so a fallback batch is never
 wider than the primary's.
 
+An invalid fallback request, such as an HTTP 400 response, stops the judge
+instead of being retried as an unavailable verdict. Correct the fallback
+model and its supported parameters before starting another run. A blank
+reasoning setting leaves the choice to the provider; ``none`` requests
+reasoning off only where the selected model supports it. ``minimal`` is
+still reasoning, not an off setting.
+
 .. seealso::
 
    * :setting:`JUDGE_FALLBACK_BASE_URL`

@@ -280,6 +280,7 @@ class BaseOpenAITranslation(BaseLLMTranslation):
             project = self.settings.get("_project")
             project_slug = project.slug if project is not None else ""
             project_id_snapshot = project.pk if project is not None else None
+
         record = LLMUsageLog.objects.create(
             model=model,
             service=self.get_identifier(),
