@@ -21,7 +21,7 @@ PLATFORM = "linux/amd64"
 NUMPY_VERSION = "2.3.5"
 _FIXTURES = {
     "docs/admin/auth.rst": "ab081b2388fbca14fd76c83979cc8efc83282b8bdd97d6fb2b3cbb1a5baabe2d",
-    "weblate/addons/tests.py": "e434e1e4b5d619d1e21c7be2b04ae71d3e53b6c51ac2b09d88aaf7f987bfcdcd",
+    "weblate/addons/tests.py": "50b122b076fae78c50f2d684232360cf1514038b5b1d292740eea79d5e94f75c",
     "weblate/trans/tests/data/googlev3.json": "a00f19e967b0b0e92e7b0d9fd15c4c6790a1667af7d0e3186197f7cf206c3dd5",
     "weblate/vcs/tests/test_github.py": "ffb4f591fcc73ef0d8194c3425ac0171ff3fe1b792a5a32bf0322c08a8b283be",
     "weblate/vcs/tests/test_github_views.py": "81c55efc7593365a3eea872bf921e7340590685b98a0a90ca28baf5dece15323",
