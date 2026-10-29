@@ -304,6 +304,12 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
         payload = super().get_chat_payload(
             model, prompt, content, previous_content, previous_response
         )
+        if (
+            self.get_identifier() == "openrouter"
+            and urlsplit(self.get_runtime_base_url()).hostname == "openrouter.ai"
+            and model == "google/gemini-3.7-flash"
+        ):
+            payload["reasoning"] = {"effort": "medium"}
         strings = self._request_strings(content)
         if strings:
             payload["response_format"] = self._reply_format(strings)

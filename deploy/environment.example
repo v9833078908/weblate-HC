@@ -146,8 +146,8 @@ WEBLATE_JUDGE_ENABLED=0
 WEBLATE_JUDGE_CONSENSUS_REJECT=1
 WEBLATE_JUDGE_API_KEY=
 WEBLATE_JUDGE_BASE_URL=https://hcbifrost.herocraft.com/litellm/v1
-WEBLATE_JUDGE_MODEL_SEAT_1=deepseek-v4-pro
-WEBLATE_JUDGE_MODEL_SEAT_2=atlas/qwen3.8-max
+WEBLATE_JUDGE_MODEL_SEAT_1=openrouter/deepseek-v4.1-flash
+WEBLATE_JUDGE_MODEL_SEAT_2=Kimi K3.1 Pro
 WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS=1
 WEBLATE_JUDGE_BATCH_SIZE=5
 WEBLATE_JUDGE_MAX_UNITS_PER_RUN=2000
@@ -170,35 +170,30 @@ WEBLATE_JUDGE_MAY_APPROVE=0
 # `invalid-envelope`, where `segments` arrived as an object keyed by index
 # instead of an array, and 5 `invalid-segment`, where an error object omitted
 # `span`.
-# Reasoning control is model-specific and must pass through `extra_body`.
-# DeepSeek uses `thinking.type=disabled`; Qwen uses `enable_thinking=false`.
-# A top-level `thinking` is accepted but dropped by this proxy.
-# docs/product/measurements/2026-09-03-judge-thinking-passthrough.md
+# Explicit standard reasoning controls for these corporate routes.
+# Flash uses top-level reasoning_effort=none; Kimi uses reasoning_effort=low.
+# Kimi always reasons and requires temperature=1; low is not an off mode.
 WEBLATE_JUDGE_REASONING_EFFORT=
 WEBLATE_JUDGE_RESPONSE_FORMAT=json_schema
 WEBLATE_JUDGE_STREAM=0
 WEBLATE_JUDGE_TEMPERATURE=0
 WEBLATE_JUDGE_MAX_TOKENS=0
-# The 2026-10-23 probe found `enable_thinking=false` does not disable DeepSeek:
-# it returned 232 reasoning tokens; nested `thinking.type=disabled` returned 0.
-# This verifies the control, not judge quality or workload-wide speed-up.
-WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1=extra_body.thinking.disabled
+# Flash off was confirmed by a bounded response reporting zero reasoning tokens.
+# This verifies the wire control, not workload-wide quality or latency.
+WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1=reasoning_effort.none
 WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_1=json_schema
 WEBLATE_JUDGE_STREAM_SEAT_1=true
 WEBLATE_JUDGE_BATCH_SIZE_SEAT_1=5
 WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_1=120
 WEBLATE_JUDGE_TEMPERATURE_SEAT_1=0
 WEBLATE_JUDGE_MAX_TOKENS_SEAT_1=0
-WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=extra_body.enable_thinking=false
+WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=reasoning_effort.low
 WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_2=json_schema
 WEBLATE_JUDGE_STREAM_SEAT_2=true
-# Iteration 1 & 2 measurements show batch size 5 for Qwen 3.8 Max reduces
-# network POST count by 33%, cuts prompt tokens by 30%, and speeds up the
-# judge pair by >80% with 100% defect recall and 0 unparsed.
-# docs/product/measurements/2026-09-18-judge-seat1-quality-and-bundle.md
+# Keep the existing batch size; short compatibility probes do not justify tuning it.
 WEBLATE_JUDGE_BATCH_SIZE_SEAT_2=5
 WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_2=150
-WEBLATE_JUDGE_TEMPERATURE_SEAT_2=0
+WEBLATE_JUDGE_TEMPERATURE_SEAT_2=1
 WEBLATE_JUDGE_MAX_TOKENS_SEAT_2=0
 # Keep automatic deferred draining disabled until the production canary.
 WEBLATE_JUDGE_DEFERRAL_ENABLED=0

@@ -108,6 +108,11 @@ class LLMUsageLogModelTest(TestCase):
     def test_cost_beyond_supported_scale_is_unpriced(self) -> None:
         self.assertIsNone(parse_provider_cost(Decimal("0.1234567891234567891")))
 
+    def test_normalization_does_not_round_unrepresentable_cost(self) -> None:
+        self.assertIsNone(
+            parse_provider_cost(Decimal("0.12345678912345678900000000000000001"))
+        )
+
     def test_negative_cost_is_unpriced(self) -> None:
         self.assertIsNone(parse_provider_cost(Decimal("-0.01")))
 
@@ -116,6 +121,11 @@ class LLMUsageLogModelTest(TestCase):
             parse_provider_cost(Decimal("0.000010000000000000000000")),
             Decimal("0.00001"),
         )
+
+    def test_extreme_exponent_costs_are_unpriced_without_overflow(self) -> None:
+        for value in ("1e1000000", "1e-1000000"):
+            with self.subTest(value=value):
+                self.assertIsNone(parse_provider_cost(Decimal(value)))
 
 
 class LLMUsageReportTest(TestCase):
