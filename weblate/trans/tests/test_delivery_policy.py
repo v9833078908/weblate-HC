@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
+from functools import partial
 from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
@@ -146,9 +147,9 @@ class DeliveryPolicyTest(ViewTestCase):
                 self.project.save(update_fields=["machinery_settings"])
                 observed = []
 
-                def fetch(observed=observed, **kwargs):
+                def fetch(observations, **kwargs):
                     service = kwargs["services"][0]
-                    observed.append(
+                    observations.append(
                         (service.retry_attempts, service.durable_single_attempt)
                     )
                     return {
@@ -166,7 +167,7 @@ class DeliveryPolicyTest(ViewTestCase):
                     ),
                     patch(
                         "weblate.trans.judge_loop.fetch_machinery_matches",
-                        side_effect=fetch,
+                        side_effect=partial(fetch, observed),
                     ),
                 ):
                     self.assertEqual(

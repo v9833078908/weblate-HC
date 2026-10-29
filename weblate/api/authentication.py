@@ -63,3 +63,19 @@ class BearerScheme(OpenApiAuthenticationExtension):
 class TokenScheme(BearerScheme):
     target_class = "rest_framework.authentication.TokenAuthentication"
     name = "tokenAuth"
+
+
+class WizardOAuthScheme(OpenApiAuthenticationExtension):
+    target_class = "weblate.wizard_auth.api.WizardOAuthAuthentication"
+    name = "wizardOAuth"
+
+    def get_security_definition(self, auto_schema):
+        return {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "wzo_ access token",
+            "description": gettext(
+                "Delegated Wizard access token. Requires Wizard SSO to be enabled "
+                "and a scope granting access to the requested operation."
+            ),
+        }

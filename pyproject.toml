@@ -514,6 +514,7 @@ module = [
   "djangosaml2idp.*",
   "google.oauth2.*",
   "icu.*",
+  "jwcrypto.*",
   "ldap.*",
   "mistletoe.*",
   "pygments.*",

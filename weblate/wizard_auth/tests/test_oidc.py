@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 from datetime import timedelta
+from importlib import import_module
 from typing import Any
 from unittest.mock import Mock
 from urllib.parse import parse_qs, urlencode, urlsplit
@@ -28,11 +29,9 @@ if not settings.WIZARD_SSO_ENABLED:
         "Wizard SSO is not enabled in this test configuration", allow_module_level=True
     )
 
-if settings.WIZARD_SSO_ENABLED:
-    from jwcrypto.jwk import JWK  # type: ignore[import-untyped]
-    from oauth2_provider.models import (
-        get_application_model,  # type: ignore[import-untyped]
-    )
+# Resolve optional dependencies only after the disabled-SSO module exit.
+JWK = import_module("jwcrypto.jwk").JWK
+get_application_model = import_module("oauth2_provider.models").get_application_model
 
 
 class WizardOIDCTest(TestCase):

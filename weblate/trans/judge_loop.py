@@ -110,6 +110,7 @@ if TYPE_CHECKING:
     from weblate.api.producer.views import AuthenticatedRequest
     from weblate.auth.models import AuthenticatedHttpRequest, User
     from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
+    from weblate.machinery.llm import BaseLLMTranslation
     from weblate.trans.judge import JudgeSeatProfile
     from weblate.trans.models.project import Project
     from weblate.trans.models.suggestion import Suggestion
@@ -238,7 +239,7 @@ def repair_targets(
     if engine_id is None or engine_id not in MACHINERY:
         return {}
     setting = settings_map[engine_id]
-    engine = MACHINERY[engine_id](setting)
+    engine = cast("BaseLLMTranslation", MACHINERY[engine_id](setting))
     engine.usage_run_id = str(run_id) if run_id is not None else None
     from weblate.trans.delivery_policy import (  # ruff: ignore[import-outside-top-level]
         uses_durable_delivery,
@@ -319,20 +320,20 @@ def _report_repair_failure(
 ) -> None:
     if on_failure is None:
         return
-    classified = isinstance(error, MachineTranslationServiceError)
+    service_error = error if isinstance(error, MachineTranslationServiceError) else None
     on_failure(
         MachineryBatchOutcome(
             status="failed",
             service=engine.name,
             unit_ids=tuple(unit.pk for unit in units),
             reason_code=(
-                error.reason_code
-                if classified
+                service_error.reason_code
+                if service_error is not None
                 else MachineTranslationServiceError.REASON_PROVIDER_UNAVAILABLE
             ),
             error=(
-                error.safe_message
-                if classified
+                service_error.safe_message
+                if service_error is not None
                 else gettext("The provider refused the request.")
             ),
         )
@@ -1207,7 +1208,10 @@ def _persist_verdict_batches(
                 ),
             )
         with transaction.atomic():
-            if QualityExecutionPolicy.for_run(producer_run).verify_only:
+            if (
+                producer_run is not None
+                and QualityExecutionPolicy.for_run(producer_run).verify_only
+            ):
                 locked_run = ProducerRun.objects.select_for_update().get(
                     pk=producer_run.pk
                 )
@@ -1462,7 +1466,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
     producer candidate; a producer one-unit re-check narrows it to critical
     and turns ``mutating_repairs`` off, which makes the run evidence-only.
     """
-    if QualityExecutionPolicy.for_run(run).verify_only:
+    if run is not None and QualityExecutionPolicy.for_run(run).verify_only:
         if evidence_run_id is not None and evidence_run_id != run.pk:
             msg = "Verification evidence identity cannot be changed"
             raise PermissionDenied(msg)
