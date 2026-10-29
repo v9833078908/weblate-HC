@@ -215,7 +215,7 @@ endpoint допустимо; частичная конфигурация ост�
 
 ## Задачи и проверка
 
-### 1. Исправления учёта и Gemini — проверены, выпуск разрешён
+### 1. Исправления учёта и Gemini — доставлены на production
 
 Файлы: `weblate/trans/judge.py`, `weblate/machinery/openai.py`,
 `weblate/trans/models/llm_usage.py`,
@@ -339,15 +339,15 @@ PYTHONPATH=weblate_customization/src uv run pytest \
   weblate/machinery/tests.py::OpenAITranslationTest --reuse-db -n 0 -q
 ```
 
-Production остаётся на ранее проверенном хотфиксе `c22b2e0f` до доставки
-отдельно разрешённых исправлений учёта и Gemini medium. При выпуске сохранить
-все настройки пары и fallback; проверить семь изменённых runtime-файлов,
-миграцию 0155, OCI/source/profile/worker state. Локальное изменение
-конфигурационного примера не меняет работающий контейнер.
+Production работает на хотфиксе `017464487bfaf46fa0fd013526670614f1ba535c`.
+Образ: `sha256:22f892f3c2e96bb068a61de9eecf213cd16e13a751d3efbbe12cec42b647b87e`.
+Перед переключением preflight подтвердил отсутствие активных автопереводов
+и пустую очередь. Сравнение compose-конфигураций разрешило только смену образа:
+настройки основной пары и fallback не менялись.
 
 ### Проверка срочного выпуска
 
-- После последних изменений: **686 passed, 2 skipped, 180 subtests passed**
+- Полный набор перед финальной защитой JSON-чисел: **686 passed, 2 skipped, 180 subtests passed**
   за 606 с на отдельном временном PostgreSQL 16 (`CI_DB_PORT=54283`).
   Предыдущий xdist-прогон достиг таймаута; следующий прогон на Docker-БД
   потерял соединения с PostgreSQL. Они не считаются успешными проверками.
@@ -365,6 +365,15 @@ Production остаётся на ранее проверенном хотфик�
   воспроизведена до исправления; после исправления весь `test_judge_client.py`:
   **186 passed, 81 subtests passed**. Уже полученная стоимость и response ID
   сохраняются, исход `invalid-json` не превращается в transport retry.
+- Выпуск `01746448`: OCI revision совпадает, SHA256 всех семи файлов проверены
+  внутри образа; шесть импортируемых runtime-модулей повторно сверены в работающем
+  контейнере. Миграция `0155_routed_gemini_reasoning_codec` применена.
+- Контейнер `healthy`, login HTTP 200; Celery, Granian и nginx — `RUNNING`.
+  Runtime подтвердил Flash `none` / температура 0, Kimi `low` / температура 1,
+  Gemini `medium`, неизменный старый v2-запрос и точные границы стоимости.
+- Verification evidence на сервере:
+  `/srv/hcgameloc-rollout-20261029-gemini-01746448/verification.json`.
+  Платных проверочных запросов: **0**; исторические переводы не перезапускались.
 
 ### Граница интеграции в main
 
@@ -380,4 +389,21 @@ Production PR: #24 — основная пара, #25 — учёт и восст
 Во время первой попытки выпуска Gemini preflight обнаружил активные
 автопереводы и отказал до переключения контейнера; переводы не прерывались.
 
+### Проверка узкого переноса
 
+- Финальный прогон в `fix/llm-hotfixes-main-20261029`: **660 passed,
+  2 skipped, 171 subtests passed**, 656 с, отдельная БД PostgreSQL 16.
+  Проверены `test_judge_client.py`, `test_judge_loop.py`, `test_judge_deferrals.py`,
+  `test_judge_autotranslate.py`, `test_llm_usage.py`, custom machinery и
+  `OpenAITranslationTest`. Durable-delivery тесты принадлежат production-базе
+  и не выдаются за тесты отсутствующей в main подсистемы.
+- `makemigrations --check --dry-run`: `No changes detected`; предупреждение
+  об отсутствующем `git svn` не связано с хотфиксами.
+- Настоящий локальный HTTP smoke прошёл в обеих ветках: сохранение ранее
+  полученной стоимости при invalid UTF-8 и непредставимом JSON-числе,
+  отказ HTTP 400 без дальнейшего recovery и Gemini medium с декодированием.
+- Независимое ревью двух участков закрыто после переноса пропущенных
+  защит: приоритет исходной ошибки потока и проверка optional token counters.
+  Scoped hooks runtime-кода прошли; `reuse` и `typos` исключались отдельно.
+- В main требуется один approving code-owner review. Ветки публикуются
+  через PR; автоматического merge и обхода защиты нет.
