@@ -21,6 +21,7 @@ class ProducerLLMExchange(models.Model):
             ("opaque-v1", "Opaque v1"),
             ("routed-parts-v1", "Routed parts v1"),
             ("routed-slots-v2", "Routed slots v2"),
+            ("routed-slots-v3", "Routed slots v3"),
         ],
     )
     state = models.CharField(max_length=20, default="reserved")

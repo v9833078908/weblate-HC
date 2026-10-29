@@ -1,0 +1,1261 @@
+{
+  "date": "2026-10-29",
+  "scope": "bounded minimum-on reasoning experiment; not a production configuration change",
+  "fixture": "analysis/data/judge-cost-latency-ab/quality-corpus-t5.json",
+  "record_ids": [
+    "q000",
+    "q001"
+  ],
+  "fixture_sha256": "9701843739d02b18355fe9665183dfeb22c96a41916ca051541dcae7289e6fed",
+  "probe_source_sha256": "9bf154e76494bd057214173c3300a1ecd30cef4e7e561127b2eb216c5181c78e",
+  "probes": [
+    {
+      "arm": "corp-qwen",
+      "repeat": 1,
+      "model": "qwen3.8-max",
+      "provider": "litellm",
+      "requested_effort": "low",
+      "wire_control": {
+        "reasoning_effort": "low",
+        "extra_body": {
+          "enable_thinking": true
+        }
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:05:20.165333+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 403,
+      "elapsed_ms": 398,
+      "first_byte_ms": 392,
+      "finish_reason": "",
+      "transport_failure": "",
+      "response_bytes": 234,
+      "response_id": null,
+      "returned_model": null,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "reasoning_tokens": null,
+      "cached_tokens": null,
+      "cost": null,
+      "header_cost": null,
+      "usable": false,
+      "parse_failure": "invalid-envelope",
+      "error": {
+        "type": "team_model_access_denied",
+        "code": "403",
+        "message": "The requested model 'qwen3.8-max' is not available for this API key, or the model name is invalid. Check the models available to you and try again."
+      }
+    },
+    {
+      "arm": "corp-flash",
+      "repeat": 1,
+      "model": "openrouter/deepseek-v4.1-flash",
+      "provider": "litellm",
+      "requested_effort": "low",
+      "wire_control": {
+        "reasoning_effort": "low"
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:05:20.564614+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 6463,
+      "first_byte_ms": 1043,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 109003,
+      "response_id": "gen-1793264721-dOqxCXqqSTITwWamZQFy",
+      "returned_model": null,
+      "prompt_tokens": 2043,
+      "completion_tokens": 964,
+      "reasoning_tokens": 843,
+      "cached_tokens": 0,
+      "cost": "0.00147475",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "corp-kimi",
+      "repeat": 1,
+      "model": "Kimi K3.1 Pro",
+      "provider": "litellm",
+      "requested_effort": "low",
+      "wire_control": {
+        "reasoning_effort": "low"
+      },
+      "temperature": null,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:05:20.565903+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 11427,
+      "first_byte_ms": 3478,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 47180,
+      "response_id": "chatcmpl-pvNGvJzbnZD60N90UMpGZ7SO",
+      "returned_model": null,
+      "prompt_tokens": 2333,
+      "completion_tokens": 225,
+      "reasoning_tokens": 108,
+      "cached_tokens": null,
+      "cost": "0.006916",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "or-pro",
+      "repeat": 1,
+      "model": "deepseek/deepseek-v4-pro",
+      "provider": "openrouter",
+      "requested_effort": "high",
+      "wire_control": {
+        "reasoning": {
+          "effort": "high"
+        }
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:05:31.994320+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 27903,
+      "first_byte_ms": 5389,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 196345,
+      "response_id": "gen-1793264732-gpv5rmMJSXfSfsL2YoRj",
+      "returned_model": null,
+      "prompt_tokens": 2100,
+      "completion_tokens": 1512,
+      "reasoning_tokens": 1499,
+      "cached_tokens": 0,
+      "cost": "0.00891576",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "flag",
+          "severity": "major"
+        }
+      ]
+    },
+    {
+      "arm": "or-qwen",
+      "repeat": 1,
+      "model": "qwen/qwen3.8-max-0902",
+      "provider": "openrouter",
+      "requested_effort": "minimal",
+      "wire_control": {
+        "reasoning": {
+          "effort": "minimal"
+        }
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:05:31.994427+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 12486,
+      "first_byte_ms": 1682,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 50915,
+      "response_id": "gen-1793264732-2sqwMWzJtRdFVtIMBLD8",
+      "returned_model": null,
+      "prompt_tokens": 2119,
+      "completion_tokens": 478,
+      "reasoning_tokens": 344,
+      "cached_tokens": 0,
+      "cost": "0.007106",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "corp-flash",
+      "repeat": 2,
+      "model": "openrouter/deepseek-v4.1-flash",
+      "provider": "litellm",
+      "requested_effort": "low",
+      "wire_control": {
+        "reasoning_effort": "low"
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:05:59.898842+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 3428,
+      "first_byte_ms": 774,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 38351,
+      "response_id": "gen-1793264760-DjPbU0F8HKnl7hQs8hhu",
+      "returned_model": null,
+      "prompt_tokens": 2041,
+      "completion_tokens": 399,
+      "reasoning_tokens": 245,
+      "cached_tokens": 0,
+      "cost": "0.00107069",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "corp-kimi",
+      "repeat": 2,
+      "model": "Kimi K3.1 Pro",
+      "provider": "litellm",
+      "requested_effort": "low",
+      "wire_control": {
+        "reasoning_effort": "low"
+      },
+      "temperature": null,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:05:59.898956+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 9153,
+      "first_byte_ms": 2777,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 47499,
+      "response_id": "chatcmpl-xuk9fR9vjCMgO6WZbV0dEGXq",
+      "returned_model": null,
+      "prompt_tokens": 2329,
+      "completion_tokens": 226,
+      "reasoning_tokens": 113,
+      "cached_tokens": 1792,
+      "cost": "0.0036924",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "or-pro",
+      "repeat": 2,
+      "model": "deepseek/deepseek-v4-pro",
+      "provider": "openrouter",
+      "requested_effort": "high",
+      "wire_control": {
+        "reasoning": {
+          "effort": "high"
+        }
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:06:09.053588+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 18402,
+      "first_byte_ms": 1411,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 135444,
+      "response_id": "gen-1793264769-Ki1hiylSuefSxxRAx2sQ",
+      "returned_model": null,
+      "prompt_tokens": 2023,
+      "completion_tokens": 906,
+      "reasoning_tokens": 720,
+      "cached_tokens": 1473,
+      "cost": "0.002373582285",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "or-qwen",
+      "repeat": 2,
+      "model": "qwen/qwen3.8-max-0902",
+      "provider": "openrouter",
+      "requested_effort": "minimal",
+      "wire_control": {
+        "reasoning": {
+          "effort": "minimal"
+        }
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:06:09.053694+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 13046,
+      "first_byte_ms": 2237,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 46757,
+      "response_id": "gen-1793264769-4laoSqR2Sf86ZimAj4x3",
+      "returned_model": null,
+      "prompt_tokens": 2119,
+      "completion_tokens": 436,
+      "reasoning_tokens": 305,
+      "cached_tokens": 1024,
+      "cost": "0.005062",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "corp-flash",
+      "repeat": 3,
+      "model": "openrouter/deepseek-v4.1-flash",
+      "provider": "litellm",
+      "requested_effort": "low",
+      "wire_control": {
+        "reasoning_effort": "low"
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:06:27.457369+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 3083,
+      "first_byte_ms": 815,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 26821,
+      "response_id": "gen-1793264787-rum0HKMcSLxBSxbGCyRq",
+      "returned_model": null,
+      "prompt_tokens": 2041,
+      "completion_tokens": 345,
+      "reasoning_tokens": 200,
+      "cached_tokens": 0,
+      "cost": "0.00035303",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "corp-kimi",
+      "repeat": 3,
+      "model": "Kimi K3.1 Pro",
+      "provider": "litellm",
+      "requested_effort": "low",
+      "wire_control": {
+        "reasoning_effort": "low"
+      },
+      "temperature": null,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:06:27.457475+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 11009,
+      "first_byte_ms": 5002,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 39081,
+      "response_id": "chatcmpl-0DJEizGimt7OHTSN4SB1m7Tr",
+      "returned_model": null,
+      "prompt_tokens": 2325,
+      "completion_tokens": 189,
+      "reasoning_tokens": 72,
+      "cached_tokens": 1792,
+      "cost": "0.0033144000000000003",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "or-pro",
+      "repeat": 3,
+      "model": "deepseek/deepseek-v4-pro",
+      "provider": "openrouter",
+      "requested_effort": "high",
+      "wire_control": {
+        "reasoning": {
+          "effort": "high"
+        }
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:06:38.467781+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 23904,
+      "first_byte_ms": 2063,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 125449,
+      "response_id": "gen-1793264798-XVgEumjp13HAsCqDtsIk",
+      "returned_model": null,
+      "prompt_tokens": 2021,
+      "completion_tokens": 1469,
+      "reasoning_tokens": 1268,
+      "cached_tokens": 0,
+      "cost": "0.00773604",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    },
+    {
+      "arm": "or-qwen",
+      "repeat": 3,
+      "model": "qwen/qwen3.8-max-0902",
+      "provider": "openrouter",
+      "requested_effort": "minimal",
+      "wire_control": {
+        "reasoning": {
+          "effort": "minimal"
+        }
+      },
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "batch_size": 2,
+      "started": "2026-10-29T09:06:38.468558+00:00",
+      "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+      "http_status": 200,
+      "elapsed_ms": 12119,
+      "first_byte_ms": 1939,
+      "finish_reason": "stop",
+      "transport_failure": "",
+      "response_bytes": 43650,
+      "response_id": "gen-1793264798-7UJz5RVMdfzBX232HSwC",
+      "returned_model": null,
+      "prompt_tokens": 2119,
+      "completion_tokens": 420,
+      "reasoning_tokens": 303,
+      "cached_tokens": 1024,
+      "cost": "0.004966",
+      "header_cost": null,
+      "usable": true,
+      "parse_failure": "",
+      "verdicts": [
+        {
+          "key": "q000",
+          "verdict": "pass",
+          "severity": "none"
+        },
+        {
+          "key": "q001",
+          "verdict": "reject",
+          "severity": "critical"
+        }
+      ]
+    }
+  ],
+  "pairs": [
+    {
+      "arms": [
+        "corp-flash",
+        "corp-kimi"
+      ],
+      "repeat": 1,
+      "wall_ms": 11430,
+      "usable_pair": true
+    },
+    {
+      "arms": [
+        "or-pro",
+        "or-qwen"
+      ],
+      "repeat": 1,
+      "wall_ms": 27904,
+      "usable_pair": true
+    },
+    {
+      "arms": [
+        "corp-flash",
+        "corp-kimi"
+      ],
+      "repeat": 2,
+      "wall_ms": 9155,
+      "usable_pair": true
+    },
+    {
+      "arms": [
+        "or-pro",
+        "or-qwen"
+      ],
+      "repeat": 2,
+      "wall_ms": 18403,
+      "usable_pair": true
+    },
+    {
+      "arms": [
+        "corp-flash",
+        "corp-kimi"
+      ],
+      "repeat": 3,
+      "wall_ms": 11011,
+      "usable_pair": true
+    },
+    {
+      "arms": [
+        "or-pro",
+        "or-qwen"
+      ],
+      "repeat": 3,
+      "wall_ms": 23905,
+      "usable_pair": true
+    }
+  ],
+  "historical_matched_slots": [
+    {
+      "source": "analysis/data/judge-cost-latency-ab/bundle-k1/results/block-s001.json",
+      "arm": "C0",
+      "repeat": 1,
+      "wall_clock_seconds": 35.31,
+      "unit_ids": [
+        142022,
+        142004
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "batch_digest": "cee3ddd98a646dd4fe639262fba117c970b05aaac2135deffe08a4128ad6d802",
+          "batch_size": 1,
+          "completion_tokens": 21,
+          "elapsed_ms": 2965,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 2642,
+          "http_status": 200,
+          "id": 678,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1756,
+          "reasoning_tokens": null,
+          "response_bytes": 2456,
+          "response_id": "a2065aacf69a427f8036d06cadf57a40",
+          "seat": 2
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 1565,
+          "elapsed_ms": 31029,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 2924,
+          "http_status": 200,
+          "id": 679,
+          "model": "deepseek-v4-pro",
+          "parsed": true,
+          "prompt_tokens": 2090,
+          "reasoning_tokens": 1376,
+          "response_bytes": 116380,
+          "response_id": "d177cab35421483f9244adfd40df9597",
+          "seat": 1
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "68c8bff1ccd3a99d8494e8ccf22fc0cb74f7f1f2597632d008b0fefbe4db801a",
+          "batch_size": 1,
+          "completion_tokens": 109,
+          "elapsed_ms": 3945,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 2007,
+          "http_status": 200,
+          "id": 680,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1822,
+          "reasoning_tokens": null,
+          "response_bytes": 7675,
+          "response_id": "66e5baa77ad843e0b986989b04dfc872",
+          "seat": 2
+        }
+      ],
+      "usage": [
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 109,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1822,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 0,
+          "completion_tokens": 1565,
+          "cost_usd": null,
+          "model": "deepseek-v4-pro",
+          "prompt_tokens": 2090,
+          "reasoning_tokens": 1376,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 21,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1756,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        }
+      ]
+    },
+    {
+      "source": "analysis/data/judge-cost-latency-ab/bundle-k1/results/block-s002.json",
+      "arm": "B1",
+      "repeat": 1,
+      "wall_clock_seconds": 4.362,
+      "unit_ids": [
+        142022,
+        142004
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 153,
+          "elapsed_ms": 3759,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 2075,
+          "http_status": 200,
+          "id": 681,
+          "model": "deepseek-v4-pro",
+          "parsed": true,
+          "prompt_tokens": 2090,
+          "reasoning_tokens": null,
+          "response_bytes": 8586,
+          "response_id": "4f0e172699ea4feaa64428e8ec6523e0",
+          "seat": 1
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 115,
+          "elapsed_ms": 4163,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 2241,
+          "http_status": 200,
+          "id": 682,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1848,
+          "reasoning_tokens": null,
+          "response_bytes": 8589,
+          "response_id": "372cacbaaf9542988a2b291c1d76b53a",
+          "seat": 2
+        }
+      ],
+      "usage": [
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 115,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1848,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 153,
+          "cost_usd": null,
+          "model": "deepseek-v4-pro",
+          "prompt_tokens": 2090,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        }
+      ]
+    },
+    {
+      "source": "analysis/data/judge-cost-latency-ab/bundle-k1/results/block-s009.json",
+      "arm": "C0",
+      "repeat": 2,
+      "wall_clock_seconds": 38.322,
+      "unit_ids": [
+        142022,
+        142004
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "batch_digest": "cee3ddd98a646dd4fe639262fba117c970b05aaac2135deffe08a4128ad6d802",
+          "batch_size": 1,
+          "completion_tokens": 21,
+          "elapsed_ms": 2328,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 1984,
+          "http_status": 200,
+          "id": 698,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1748,
+          "reasoning_tokens": null,
+          "response_bytes": 2456,
+          "response_id": "b74d1c5cc8f6456eb8f3b6b6bbb429b4",
+          "seat": 2
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 1687,
+          "elapsed_ms": 33754,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 1603,
+          "http_status": 200,
+          "id": 699,
+          "model": "deepseek-v4-pro",
+          "parsed": true,
+          "prompt_tokens": 2094,
+          "reasoning_tokens": 1544,
+          "response_bytes": 130013,
+          "response_id": "dd37325766b9479e98fe3fe661bed8a1",
+          "seat": 1
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "68c8bff1ccd3a99d8494e8ccf22fc0cb74f7f1f2597632d008b0fefbe4db801a",
+          "batch_size": 1,
+          "completion_tokens": 121,
+          "elapsed_ms": 4066,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 1941,
+          "http_status": 200,
+          "id": 700,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1822,
+          "reasoning_tokens": null,
+          "response_bytes": 8775,
+          "response_id": "9fcd5938e1ca47598204051a88541943",
+          "seat": 2
+        }
+      ],
+      "usage": [
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 121,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1822,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 1687,
+          "cost_usd": null,
+          "model": "deepseek-v4-pro",
+          "prompt_tokens": 2094,
+          "reasoning_tokens": 1544,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 21,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1748,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        }
+      ]
+    },
+    {
+      "source": "analysis/data/judge-cost-latency-ab/bundle-k1/results/block-s010.json",
+      "arm": "B1",
+      "repeat": 2,
+      "wall_clock_seconds": 5.165,
+      "unit_ids": [
+        142022,
+        142004
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 135,
+          "elapsed_ms": 4247,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 1776,
+          "http_status": 200,
+          "id": 701,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1846,
+          "reasoning_tokens": null,
+          "response_bytes": 9560,
+          "response_id": "89da3eab600047aea85f6dcab723f27c",
+          "seat": 2
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 247,
+          "elapsed_ms": 4867,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 2190,
+          "http_status": 200,
+          "id": 702,
+          "model": "deepseek-v4-pro",
+          "parsed": true,
+          "prompt_tokens": 1736,
+          "reasoning_tokens": null,
+          "response_bytes": 10741,
+          "response_id": "88f3b0dad0c847c7af0b32eb7a15f2dc",
+          "seat": 1
+        }
+      ],
+      "usage": [
+        {
+          "cached_tokens": 0,
+          "completion_tokens": 247,
+          "cost_usd": null,
+          "model": "deepseek-v4-pro",
+          "prompt_tokens": 1736,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 135,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1846,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        }
+      ]
+    },
+    {
+      "source": "analysis/data/judge-cost-latency-ab/bundle-k1/results/block-s017.json",
+      "arm": "C0",
+      "repeat": 3,
+      "wall_clock_seconds": 18.546,
+      "unit_ids": [
+        142022,
+        142004
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "batch_digest": "cee3ddd98a646dd4fe639262fba117c970b05aaac2135deffe08a4128ad6d802",
+          "batch_size": 1,
+          "completion_tokens": 28,
+          "elapsed_ms": 2636,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 2080,
+          "http_status": 200,
+          "id": 718,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1754,
+          "reasoning_tokens": null,
+          "response_bytes": 2820,
+          "response_id": "6c2e7d121815482e87570a5ab9264593",
+          "seat": 2
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 818,
+          "elapsed_ms": 13887,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 3726,
+          "http_status": 200,
+          "id": 719,
+          "model": "deepseek-v4-pro",
+          "parsed": true,
+          "prompt_tokens": 1738,
+          "reasoning_tokens": 628,
+          "response_bytes": 35226,
+          "response_id": "52ba126b14ae4ac9add10e0b0e189b83",
+          "seat": 1
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "68c8bff1ccd3a99d8494e8ccf22fc0cb74f7f1f2597632d008b0fefbe4db801a",
+          "batch_size": 1,
+          "completion_tokens": 133,
+          "elapsed_ms": 4332,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 1867,
+          "http_status": 200,
+          "id": 720,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1820,
+          "reasoning_tokens": null,
+          "response_bytes": 9550,
+          "response_id": "c0d1fadba01f4f88a5d8ead6ce25a83b",
+          "seat": 2
+        }
+      ],
+      "usage": [
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 133,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1820,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 0,
+          "completion_tokens": 818,
+          "cost_usd": null,
+          "model": "deepseek-v4-pro",
+          "prompt_tokens": 1738,
+          "reasoning_tokens": 628,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 28,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1754,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        }
+      ]
+    },
+    {
+      "source": "analysis/data/judge-cost-latency-ab/bundle-k1/results/block-s018.json",
+      "arm": "B1",
+      "repeat": 3,
+      "wall_clock_seconds": 6.147,
+      "unit_ids": [
+        142022,
+        142004
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 147,
+          "elapsed_ms": 4363,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 1818,
+          "http_status": 200,
+          "id": 721,
+          "model": "atlas/qwen3.8-max",
+          "parsed": true,
+          "prompt_tokens": 1852,
+          "reasoning_tokens": null,
+          "response_bytes": 10095,
+          "response_id": "2b9b1bda1a4b4531ab03b0d6e750824d",
+          "seat": 2
+        },
+        {
+          "attempt": 0,
+          "batch_digest": "a4284e12eb04eeaacc297fcca6fca25a7c3a9582c7230a5924431da9a676f673",
+          "batch_size": 2,
+          "completion_tokens": 266,
+          "elapsed_ms": 5887,
+          "failure_kind": "",
+          "finish_reason": "stop",
+          "first_byte_ms": 2697,
+          "http_status": 200,
+          "id": 722,
+          "model": "deepseek-v4-pro",
+          "parsed": true,
+          "prompt_tokens": 1740,
+          "reasoning_tokens": null,
+          "response_bytes": 11557,
+          "response_id": "144c040005e7482aa2655d1c618ad93f",
+          "seat": 1
+        }
+      ],
+      "usage": [
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 266,
+          "cost_usd": null,
+          "model": "deepseek-v4-pro",
+          "prompt_tokens": 1740,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        },
+        {
+          "cached_tokens": 1024,
+          "completion_tokens": 147,
+          "cost_usd": null,
+          "model": "atlas/qwen3.8-max",
+          "prompt_tokens": 1852,
+          "reasoning_tokens": 0,
+          "service": "litellm"
+        }
+      ]
+    }
+  ],
+  "route_metadata": [
+    {
+      "alias": "qwen3.8-max",
+      "upstream": "openai/qwen3.8-max",
+      "provider": null,
+      "host": "token-plan.ap-southeast-1.maas.aliyuncs.com",
+      "supported": [
+        "frequency_penalty",
+        "logit_bias",
+        "logprobs",
+        "top_logprobs",
+        "max_tokens",
+        "max_completion_tokens",
+        "modalities",
+        "prediction",
+        "n",
+        "presence_penalty",
+        "seed",
+        "stop",
+        "stream",
+        "stream_options",
+        "temperature",
+        "top_p",
+        "tools",
+        "tool_choice",
+        "function_call",
+        "functions",
+        "max_retries",
+        "extra_headers",
+        "parallel_tool_calls",
+        "audio",
+        "web_search_options",
+        "service_tier",
+        "safety_identifier",
+        "prompt_cache_key",
+        "prompt_cache_retention",
+        "store",
+        "response_format",
+        "reasoning_effort"
+      ],
+      "default_reasoning_effort": null,
+      "default_thinking": null,
+      "default_enable_thinking": null
+    },
+    {
+      "alias": "Kimi K3.1 Pro",
+      "upstream": "k3.1-pro",
+      "provider": "openai",
+      "host": "api.kimi.com",
+      "supported": null,
+      "default_reasoning_effort": null,
+      "default_thinking": null,
+      "default_enable_thinking": null
+    },
+    {
+      "alias": "openrouter/deepseek-v4.1-flash",
+      "upstream": "openrouter/deepseek/deepseek-v4.1-flash-1017",
+      "provider": "openrouter",
+      "host": "openrouter.ai",
+      "supported": null,
+      "default_reasoning_effort": null,
+      "default_thinking": null,
+      "default_enable_thinking": null
+    }
+  ],
+  "limits": {
+    "max_calls": 15,
+    "actual_calls": 13,
+    "max_output_tokens_per_call": 4096,
+    "deadline_seconds": 60,
+    "retries": 0,
+    "repeats_if_successful": 3,
+    "fallback": false,
+    "writes_to_production": false,
+    "total_calls_including_separate_off_control": 14
+  },
+  "separate_off_control": {
+    "arm": "corp-flash",
+    "repeat": 1,
+    "model": "openrouter/deepseek-v4.1-flash",
+    "provider": "litellm",
+    "requested_effort": "none",
+    "wire_control": {
+      "reasoning_effort": "none"
+    },
+    "temperature": 0.0,
+    "max_tokens": 4096,
+    "batch_size": 2,
+    "started": "2026-10-29T09:11:44.025819+00:00",
+    "system_prompt_sha256": "86d2d01b38369eab1a5c473d5457426a9e399b2f476322d40d7eaac9b1ec7c26",
+    "http_status": 200,
+    "elapsed_ms": 1777,
+    "first_byte_ms": 1303,
+    "finish_reason": "stop",
+    "transport_failure": "",
+    "response_bytes": 8904,
+    "response_id": "gen-1793265104-8EqrmlfFE18bb4UBUtnX",
+    "returned_model": null,
+    "prompt_tokens": 2018,
+    "completion_tokens": 152,
+    "reasoning_tokens": 0,
+    "cached_tokens": 0,
+    "cost": "0.00047268",
+    "header_cost": null,
+    "usable": true,
+    "parse_failure": "",
+    "verdicts": [
+      {
+        "key": "q000",
+        "verdict": "pass",
+        "severity": "none"
+      },
+      {
+        "key": "q001",
+        "verdict": "reject",
+        "severity": "critical"
+      }
+    ]
+  }
+}

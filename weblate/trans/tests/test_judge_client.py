@@ -8,6 +8,7 @@ import json
 import time
 from dataclasses import replace
 from decimal import Decimal
+from tempfile import TemporaryDirectory
 from typing import Any, ClassVar
 from unittest import mock
 
@@ -49,6 +50,7 @@ from weblate.trans.judge import (
 )
 from weblate.trans.judge_loop import _AVAILABILITY_FAILURE_KINDS
 from weblate.trans.models.judge import JudgeRequestAttempt, ProducerRun
+from weblate.trans.models.llm_delivery import ProducerLLMExchange
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
 
@@ -757,6 +759,91 @@ class JudgeFailoverTest(http_mock.MockDNSMixin, TestCase):
         self.assertEqual(
             _AVAILABILITY_FAILURE_KINDS - _FAILOVER_FAILURE_KINDS, {"http-other"}
         )
+
+    @http_mock.activate
+    def test_invalid_fallback_aborts_auth_and_parser_failover(self) -> None:
+        for primary_status, primary_body, persistence in (
+            (403, b"{}", True),
+            (403, b"{}", False),
+            (500, b"{}", True),
+            (200, json.dumps(_reply([])).encode(), True),
+        ):
+            with self.subTest(primary_status=primary_status, persistence=persistence):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                http_mock.register(
+                    "POST",
+                    LITELLM_CHAT_URL,
+                    status_code=primary_status,
+                    content=primary_body,
+                )
+                http_mock.register(
+                    "POST",
+                    CHAT_URL,
+                    status_code=400,
+                    content=(
+                        b'{"error":"private provider detail","id":"fallback-id",'
+                        b'"usage":{"cost":0.0001}}'
+                    ),
+                )
+                on_batch = mock.Mock()
+                with self.assertRaises(JudgeError) as caught:
+                    request_verdicts(
+                        [REQ, replace(REQ, unit_key="other")],
+                        seat=1,
+                        persist_attempts=persistence,
+                        on_batch=on_batch,
+                    )
+                self.assertIn("HTTP 400", str(caught.exception))
+                self.assertNotIn("private provider detail", str(caught.exception))
+                self.assertNotIn("sk-fallback", str(caught.exception))
+                self.assertEqual(
+                    len(
+                        [
+                            call
+                            for call in http_mock.calls
+                            if call.request.method == "POST"
+                        ]
+                    ),
+                    2,
+                )
+                on_batch.assert_not_called()
+                attempts = JudgeRequestAttempt.objects.order_by("attempt")
+                if persistence:
+                    self.assertEqual(attempts.count(), 2)
+                    self.assertEqual(
+                        attempts.last().failure_kind, "http-request-invalid"
+                    )
+                    self.assertEqual(attempts.last().http_status, 400)
+                    row = LLMUsageLog.objects.get()
+                    self.assertEqual(row.request_attempt_id, attempts.last().pk)
+                    self.assertEqual(row.response_id, "fallback-id")
+                    self.assertEqual(row.cost_usd, Decimal("0.0001"))
+                else:
+                    self.assertFalse(attempts.exists())
+                    self.assertFalse(LLMUsageLog.objects.exists())
+
+    @http_mock.activate
+    def test_http_400_finish_length_remains_a_refused_request(self) -> None:
+        http_mock.register("POST", LITELLM_CHAT_URL, status_code=500, json={})
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            status_code=400,
+            json={
+                "choices": [{"finish_reason": "length"}],
+                "id": "fallback-id",
+                "usage": {"cost": 0.001},
+            },
+        )
+        with self.assertRaises(JudgeError) as caught:
+            request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertIn("HTTP 400", str(caught.exception))
+        attempt = JudgeRequestAttempt.objects.get(provider="openrouter")
+        self.assertEqual(attempt.failure_kind, "http-request-invalid")
+        self.assertEqual(attempt.finish_reason, "length")
+        self.assertEqual(LLMUsageLog.objects.get().request_attempt_id, attempt.pk)
 
     @staticmethod
     def _run_with_primary_failure(primary_response, *, fallback_response=None, **kw):
@@ -3571,3 +3658,545 @@ class JudgeRefusedRequestTest(http_mock.MockDNSMixin, TestCase):
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertTrue(result.unparsed)
         self.assertEqual(result.failure_kind, "http-other")
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_BASE_URL="https://openrouter.ai/api/v1",
+    JUDGE_MODEL_SEAT_1="vendor/model-a",
+    JUDGE_MODEL_SEAT_2="vendor/model-b",
+    JUDGE_BATCH_SIZE=5,
+    JUDGE_REQUEST_SLEEP=0.0,
+    JUDGE_TRANSPORT_RETRIES=0,
+    JUDGE_TRANSIENT_HTTP_RETRIES=0,
+    JUDGE_PROTOCOL_RETRIES=0,
+    **dict.fromkeys(JUDGE_FALLBACK_SETTINGS, ""),
+)
+class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
+    @override_settings(JUDGE_STREAM_SEAT_1=True)
+    @http_mock.activate
+    def test_failed_stream_retains_only_observed_usage(self) -> None:
+        usage = (
+            b'data: {"id":"stream-42","choices":[],"usage":'
+            b'{"prompt_tokens":11,"completion_tokens":7,'
+            b'"cost":0.123456789123456789}}\n\n'
+        )
+        stop = (
+            b'data: {"choices":[{"delta":{"content":"{}"},"finish_reason":"stop"}]}\n\n'
+        )
+        length = b'data: {"choices":[{"delta":{"content":"{}"},"finish_reason":"length"}]}\n\n'
+        empty = b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+
+        class InterruptedStream(httpx2.SyncByteStream):
+            def __iter__(self):
+                yield usage
+                if label == "transport":
+                    msg = "interrupted"
+                    raise httpx2.ReadError(msg)
+                msg = "interrupted"
+                raise httpx2.ReadTimeout(msg)
+
+        class InvalidUTF8Stream(httpx2.SyncByteStream):
+            def __iter__(self):
+                yield usage
+                yield b"\xff"
+
+        cases = (
+            ("missing done", usage + stop, "invalid-envelope", True),
+            ("malformed", usage + b"data: not-json\n\n", "invalid-json", True),
+            ("invalid utf8", None, "invalid-envelope", True),
+            ("empty", usage + empty + b"data: [DONE]\n\n", "empty-response", True),
+            ("length", usage + length + b"data: [DONE]\n\n", "finish-length", True),
+            ("before usage", b"data: not-json\n\n", "invalid-json", False),
+            ("deadline", None, "deadline", True),
+            ("transport", None, "transport", True),
+        )
+        for label, body, failure, observed in cases:
+            with self.subTest(case=label):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                if body is None:
+                    http_mock.register_callback(
+                        "POST",
+                        CHAT_URL,
+                        lambda request, label=label: httpx2.Response(
+                            200,
+                            stream=(
+                                InvalidUTF8Stream()
+                                if label == "invalid utf8"
+                                else InterruptedStream()
+                            ),
+                            request=request,
+                        ),
+                    )
+                else:
+                    http_mock.register("POST", CHAT_URL, content=body)
+                scoped = replace(
+                    REQ,
+                    project_id_snapshot=101,
+                    component_id_snapshot=102,
+                    component_slug="ui",
+                )
+                [result] = request_verdicts(
+                    [scoped], seat=1, project_slug="project", persist_attempts=True
+                )
+                self.assertTrue(result.unparsed)
+                self.assertEqual(result.failure_kind, failure)
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(attempt.failure_kind, failure)
+                if observed:
+                    self.assertEqual(attempt.response_id, "stream-42")
+                    row = LLMUsageLog.objects.get()
+                    self.assertEqual(row.response_id, "stream-42")
+                    self.assertEqual(row.request_attempt_id, attempt.pk)
+                    self.assertEqual(row.service, "openrouter")
+                    self.assertEqual(row.model, "vendor/model-a")
+                    self.assertEqual(row.project_id_snapshot, 101)
+                    self.assertEqual(row.component_id_snapshot, 102)
+                    self.assertEqual(row.target_language_code, "fr")
+                    self.assertEqual(row.prompt_tokens, 11)
+                    self.assertEqual(row.completion_tokens, 7)
+                    self.assertEqual(row.cost_usd, Decimal("0.123456789123456789"))
+                else:
+                    self.assertEqual(attempt.response_id, "")
+                    self.assertFalse(LLMUsageLog.objects.exists())
+
+    @override_settings(JUDGE_STREAM_SEAT_1=True)
+    @http_mock.activate
+    def test_failed_chunk_retains_complete_events_only_before_error(self) -> None:
+        usage = (
+            b'data: {"id":"prefix-id","choices":[],"usage":'
+            b'{"prompt_tokens":11,"completion_tokens":7}}\n\n'
+        )
+        later = b'data: {"id":"later-id","choices":[],"usage":{"prompt_tokens":99}}\n\n'
+        for label, body, limit, failure in (
+            ("invalid utf8", usage + b"\xff" + later, 10000, "invalid-envelope"),
+            ("size limit", usage + later, len(usage) + 5, "response-too-large"),
+        ):
+            with self.subTest(case=label):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                http_mock.register("POST", CHAT_URL, content=body)
+                with mock.patch("weblate.trans.judge.MAX_BATCH_RESPONSE_BYTES", limit):
+                    [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertTrue(result.unparsed)
+                self.assertEqual(result.failure_kind, failure)
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(attempt.response_id, "prefix-id")
+                self.assertEqual(attempt.prompt_tokens, 11)
+                row = LLMUsageLog.objects.get()
+                self.assertEqual(row.request_attempt_id, attempt.pk)
+                self.assertEqual(row.response_id, "prefix-id")
+                self.assertEqual(row.prompt_tokens, 11)
+                self.assertEqual(row.completion_tokens, 7)
+
+    @override_settings(JUDGE_STREAM_SEAT_1=True)
+    @http_mock.activate
+    def test_failed_stream_merges_usage_across_events(self) -> None:
+        first = (
+            b'data: {"id":"merged-id","choices":[],"usage":'
+            b'{"prompt_tokens":11,"completion_tokens":7,'
+            b'"prompt_tokens_details":{"cached_tokens":4},'
+            b'"completion_tokens_details":{"reasoning_tokens":3}}}\n\n'
+        )
+        for later in (
+            b'data: {"choices":[],"usage":{}}\n\n',
+            (
+                b'data: {"choices":[],"usage":{"cost":0.25,'
+                b'"prompt_tokens_details":{},"completion_tokens_details":{}}}\n\n'
+            ),
+        ):
+            with self.subTest(later=later):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                http_mock.register(
+                    "POST", CHAT_URL, content=first + later + b"data: bad\n\n"
+                )
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertEqual(result.failure_kind, "invalid-json")
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(attempt.response_id, "merged-id")
+                self.assertEqual(attempt.reasoning_tokens, 3)
+                row = LLMUsageLog.objects.get()
+                self.assertEqual(row.request_attempt_id, attempt.pk)
+                self.assertEqual(row.prompt_tokens, 11)
+                self.assertEqual(row.completion_tokens, 7)
+                self.assertEqual(row.cached_tokens, 4)
+                self.assertEqual(row.reasoning_tokens, 3)
+                if b"cost" in later:
+                    self.assertEqual(row.cost_usd, Decimal("0.25"))
+
+    @override_settings(JUDGE_STREAM_SEAT_1=True)
+    @http_mock.activate
+    def test_failed_stream_keeps_valid_usage_across_invalid_updates(self) -> None:
+        first = {
+            "id": "preserved-id",
+            "choices": [],
+            "usage": {
+                "prompt_tokens": 11,
+                "completion_tokens": 7,
+                "total_tokens": 18,
+                "cost": 0.25,
+                "prompt_tokens_details": {"cached_tokens": 4},
+                "completion_tokens_details": {"reasoning_tokens": 3},
+            },
+        }
+        invalid = {
+            "choices": [],
+            "usage": {
+                "prompt_tokens": None,
+                "completion_tokens": -1,
+                "total_tokens": "invalid",
+                "cost": "invalid",
+                "prompt_tokens_details": {"cached_tokens": True},
+                "completion_tokens_details": {"reasoning_tokens": None},
+            },
+        }
+        for update, expected in (
+            ({}, (11, 7, 18, 4, 3, Decimal("0.25"))),
+            (
+                {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 2,
+                    "total_tokens": 0,
+                    "cost": 0,
+                    "prompt_tokens_details": {"cached_tokens": 0},
+                    "completion_tokens_details": {"reasoning_tokens": 0},
+                },
+                (0, 2, 0, 0, 0, Decimal(0)),
+            ),
+        ):
+            with self.subTest(update=update):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                events = (first, invalid, {"choices": [], "usage": update}, invalid)
+                body = "".join(f"data: {json.dumps(event)}\n\n" for event in events)
+                http_mock.register(
+                    "POST", CHAT_URL, content=(body + "data: bad\n\n").encode()
+                )
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertEqual(result.failure_kind, "invalid-json")
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(result.request_attempt_id, attempt.pk)
+                self.assertEqual(attempt.response_id, "preserved-id")
+                self.assertEqual(
+                    (
+                        attempt.prompt_tokens,
+                        attempt.completion_tokens,
+                        attempt.total_tokens,
+                        attempt.reasoning_tokens,
+                    ),
+                    (expected[0], expected[1], expected[2], expected[4]),
+                )
+                row = LLMUsageLog.objects.get()
+                self.assertEqual(row.request_attempt_id, attempt.pk)
+                self.assertEqual(
+                    (
+                        row.prompt_tokens,
+                        row.completion_tokens,
+                        row.total_tokens,
+                        row.cached_tokens,
+                        row.reasoning_tokens,
+                        row.cost_usd,
+                    ),
+                    expected,
+                )
+
+    @override_settings(JUDGE_STREAM_SEAT_1=True, JUDGE_TRANSPORT_RETRIES=1)
+    @http_mock.activate
+    def test_extreme_stream_cost_keeps_usage_and_real_parse_failure(self) -> None:
+        body = (
+            b'data: {"id":"preserved-id","choices":[],"usage":'
+            b'{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18,'
+            b'"cost":0.25}}\n\n'
+            b'data: {"choices":[],"usage":{"cost":1e1000000}}\n\n'
+            b"data: bad\n\n"
+        )
+        http_mock.register("POST", CHAT_URL, content=body)
+
+        [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+
+        self.assertEqual(result.failure_kind, "invalid-json")
+        self.assertEqual(len(http_mock.calls), 1)
+        attempt = JudgeRequestAttempt.objects.get()
+        self.assertEqual(attempt.failure_kind, "invalid-json")
+        self.assertEqual(attempt.response_id, "preserved-id")
+        row = LLMUsageLog.objects.get()
+        self.assertEqual(row.request_attempt_id, attempt.pk)
+        self.assertEqual(row.response_id, "preserved-id")
+        self.assertEqual(
+            (row.prompt_tokens, row.completion_tokens, row.total_tokens, row.cost_usd),
+            (11, 7, 18, Decimal("0.25")),
+        )
+
+    @http_mock.activate
+    def test_malformed_scalar_usage_preserves_attempt_and_cost_link(self) -> None:
+        for invalid in (True, -1, 1.5, "12", 2147483648):
+            with self.subTest(invalid=invalid):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                http_mock.register(
+                    "POST",
+                    CHAT_URL,
+                    json={
+                        "id": "scalar-id",
+                        "usage": {
+                            "prompt_tokens": invalid,
+                            "completion_tokens": invalid,
+                            "total_tokens": invalid,
+                            "cost": 0.25,
+                            "prompt_tokens_details": {"cached_tokens": invalid},
+                            "completion_tokens_details": {"reasoning_tokens": invalid},
+                        },
+                    },
+                )
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertTrue(result.unparsed)
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(result.request_attempt_id, attempt.pk)
+                self.assertEqual(attempt.response_id, "scalar-id")
+                self.assertIsNone(attempt.prompt_tokens)
+                self.assertIsNone(attempt.completion_tokens)
+                self.assertIsNone(attempt.total_tokens)
+                self.assertIsNone(attempt.reasoning_tokens)
+                row = LLMUsageLog.objects.get()
+                self.assertEqual(row.request_attempt_id, attempt.pk)
+                self.assertEqual(row.cost_usd, Decimal("0.25"))
+                self.assertEqual(
+                    (
+                        row.prompt_tokens,
+                        row.completion_tokens,
+                        row.total_tokens,
+                        row.cached_tokens,
+                        row.reasoning_tokens,
+                    ),
+                    (0, 0, 0, 0, 0),
+                )
+
+    @http_mock.activate
+    def test_overflowing_inferred_total_keeps_valid_counts_and_cost(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json={
+                "id": "large-counts",
+                "usage": {
+                    "prompt_tokens": 2147483647,
+                    "completion_tokens": 1,
+                    "cost": 0.25,
+                },
+            },
+        )
+        [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+        attempt = JudgeRequestAttempt.objects.get()
+        self.assertEqual(result.request_attempt_id, attempt.pk)
+        self.assertEqual(attempt.prompt_tokens, 2147483647)
+        self.assertEqual(attempt.completion_tokens, 1)
+        self.assertIsNone(attempt.total_tokens)
+        row = LLMUsageLog.objects.get()
+        self.assertEqual(row.request_attempt_id, attempt.pk)
+        self.assertEqual(row.prompt_tokens, 2147483647)
+        self.assertEqual(row.completion_tokens, 1)
+        self.assertEqual(row.total_tokens, 0)
+        self.assertEqual(row.cost_usd, Decimal("0.25"))
+
+    @override_settings(JUDGE_STREAM_SEAT_1=True)
+    @http_mock.activate
+    def test_malformed_completion_details_do_not_lose_failed_attempt(self) -> None:
+        for details in ("unexpected", ["unexpected"]):
+            with self.subTest(details=details):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                event = {
+                    "id": "details-id",
+                    "choices": [],
+                    "usage": {
+                        "prompt_tokens": 11,
+                        "completion_tokens": 7,
+                        "cost": 0.25,
+                        "completion_tokens_details": details,
+                    },
+                }
+                body = f"data: {json.dumps(event)}\n\ndata: bad\n\n".encode()
+                http_mock.register("POST", CHAT_URL, content=body)
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertEqual(result.failure_kind, "invalid-json")
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(attempt.response_id, "details-id")
+                self.assertIsNone(attempt.reasoning_tokens)
+                row = LLMUsageLog.objects.get()
+                self.assertEqual(row.request_attempt_id, attempt.pk)
+                self.assertEqual(row.cost_usd, Decimal("0.25"))
+
+    @http_mock.activate
+    def test_non_stream_malformed_nested_details_keep_attempt_and_cost(self) -> None:
+        for details in ("unexpected", ["unexpected"]):
+            with self.subTest(details=details):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                http_mock.register(
+                    "POST",
+                    CHAT_URL,
+                    json={
+                        "id": "nested-id",
+                        "usage": {
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                            "total_tokens": 0,
+                            "cost": 0.25,
+                            "prompt_tokens_details": details,
+                            "completion_tokens_details": details,
+                        },
+                    },
+                )
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertTrue(result.unparsed)
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(result.request_attempt_id, attempt.pk)
+                self.assertEqual(attempt.response_id, "nested-id")
+                self.assertEqual(attempt.prompt_tokens, 0)
+                self.assertEqual(attempt.completion_tokens, 0)
+                self.assertEqual(attempt.total_tokens, 0)
+                self.assertIsNone(attempt.reasoning_tokens)
+                row = LLMUsageLog.objects.get()
+                self.assertEqual(row.request_attempt_id, attempt.pk)
+                self.assertEqual(row.cost_usd, Decimal("0.25"))
+                self.assertEqual(row.cached_tokens, 0)
+                self.assertEqual(row.reasoning_tokens, 0)
+
+    @http_mock.activate
+    def test_cost_without_tokens_or_decodable_body_is_recorded(self) -> None:
+        cases = (
+            (b"not json", "0.123456789123456789", Decimal("0.123456789123456789")),
+            (
+                b'{"id":"payload-id","usage":{"cost":0.000000000000000001}}',
+                "0.5",
+                Decimal("0.000000000000000001"),
+            ),
+            (b'{"usage":{"cost":0}}', "0.5", Decimal(0)),
+            (b'{"usage":{"cost":"invalid"}}', None, None),
+            (b"not json", None, None),
+        )
+        for body, header, cost in cases:
+            with self.subTest(body=body, header=header):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                headers = {"x-litellm-response-cost": header} if header else {}
+                http_mock.register("POST", CHAT_URL, content=body, headers=headers)
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertTrue(result.unparsed)
+                if cost is None:
+                    self.assertFalse(LLMUsageLog.objects.exists())
+                else:
+                    row = LLMUsageLog.objects.get()
+                    self.assertEqual(row.cost_usd, cost)
+                    self.assertEqual(row.prompt_tokens, 0)
+                    self.assertEqual(row.completion_tokens, 0)
+                    self.assertEqual(row.request_attempt_id, result.request_attempt_id)
+                    if b"payload-id" in body:
+                        self.assertEqual(row.response_id, "payload-id")
+
+    @http_mock.activate
+    def test_failed_header_cost_without_persistence_creates_no_ledger(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            content=b"invalid",
+            headers={"x-litellm-response-cost": "0.1"},
+        )
+        [result] = request_verdicts([REQ], seat=1)
+        self.assertTrue(result.unparsed)
+        self.assertFalse(LLMUsageLog.objects.exists())
+        self.assertFalse(JudgeRequestAttempt.objects.exists())
+
+    @override_settings(JUDGE_STREAM_SEAT_1=True)
+    @http_mock.activate
+    def test_stream_failure_after_length_keeps_actual_failure(self) -> None:
+        usage = b'data: {"id":"length-id","choices":[],"usage":{"cost":0.25}}\n\n'
+        length = (
+            b'data: {"choices":[{"delta":{"content":"partial"},'
+            b'"finish_reason":"length"}]}\n\n'
+        )
+        for suffix, expected in (
+            (b"data: bad\n\n", "invalid-json"),
+            (b"data: bad\n\n\xff", "invalid-json"),
+            (b"\xff", "invalid-envelope"),
+            (b"", "invalid-envelope"),
+        ):
+            with self.subTest(suffix=suffix):
+                http_mock.reset()
+                LLMUsageLog.objects.all().delete()
+                JudgeRequestAttempt.objects.all().delete()
+                http_mock.register("POST", CHAT_URL, content=usage + length + suffix)
+                [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+                self.assertTrue(result.unparsed)
+                self.assertEqual(result.failure_kind, expected)
+                attempt = JudgeRequestAttempt.objects.get()
+                self.assertEqual(attempt.failure_kind, expected)
+                self.assertEqual(attempt.finish_reason, "length")
+                self.assertEqual(
+                    LLMUsageLog.objects.get().request_attempt_id, attempt.pk
+                )
+
+    @http_mock.activate
+    def test_durable_replay_records_failed_response_cost_once(self) -> None:
+        cases = (
+            (b"not json", {"x-litellm-response-cost": "0.25"}, "invalid-json"),
+            (
+                (
+                    b'{"id":"durable-id","usage":{"prompt_tokens":true,'
+                    b'"completion_tokens_details":"invalid","cost":0.5}}'
+                ),
+                {},
+                "invalid-envelope",
+            ),
+        )
+        with TemporaryDirectory() as directory, override_settings(DATA_DIR=directory):
+            for index, (body, headers, failure) in enumerate(cases):
+                with self.subTest(body=body):
+                    http_mock.reset()
+                    run = ProducerRun.objects.create(
+                        scope_type="component",
+                        scope_id=str(index),
+                        scope_label="Synthetic",
+                        scope_path="/",
+                        requested_mode="judge",
+                        cap=1,
+                        execution_options={"delivery_policy": "wizard-v1"},
+                    )
+                    request = replace(REQ, unit_key=f"durable-{index}")
+                    http_mock.register("POST", CHAT_URL, content=body, headers=headers)
+                    first = request_verdicts(
+                        [request], seat=1, run=run, persist_attempts=True
+                    )
+                    second = request_verdicts(
+                        [request], seat=1, run=run, persist_attempts=True
+                    )
+                    self.assertTrue(first[0].unparsed)
+                    self.assertTrue(second[0].unparsed)
+                    self.assertEqual(first[0].failure_kind, failure)
+                    self.assertEqual(second[0].failure_kind, failure)
+                    self.assertEqual(len(http_mock.calls), 1)
+                    exchange = ProducerLLMExchange.objects.get(run=run)
+                    self.assertTrue(exchange.usage_recorded)
+                    rows = LLMUsageLog.objects.filter(run=run)
+                    self.assertEqual(rows.count(), 1)
+                    row = rows.get()
+                    self.assertEqual(
+                        row.cost_usd, Decimal("0.25" if index == 0 else "0.5")
+                    )
+                    self.assertEqual(
+                        row.request_attempt_id, first[0].request_attempt_id
+                    )
+                    self.assertEqual(row.prompt_tokens, 0)
+                    if index == 1:
+                        self.assertEqual(row.response_id, "durable-id")
