@@ -1800,9 +1800,9 @@ def cleanup_judge_observability() -> None:
     """
     Remove bounded-retention Judge transport records.
 
-    Verdicts and run reports are intentionally retained. Foreign keys from
-    verdict and usage rows are nullable, so attempt cleanup preserves their
-    audit value while removing high-volume request diagnostics.
+    Verdicts and run reports are retained. Attempts linked to durable
+    exchanges remain as financial provenance; unlinked diagnostics keep their
+    ordinary bounded retention.
     """
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.llm_delivery import (
@@ -1823,7 +1823,8 @@ def cleanup_judge_observability() -> None:
             days=_judge_observability_retention_days(
                 "JUDGE_REQUEST_ATTEMPT_RETENTION_DAYS"
             )
-        )
+        ),
+        delivery_exchange__isnull=True,
     ).delete()
     LLMUsageLog.objects.filter(
         operation=LLMUsageLog.Operation.JUDGE,

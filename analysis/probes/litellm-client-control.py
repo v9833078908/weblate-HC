@@ -42,6 +42,7 @@ from django.conf import settings
 from weblate.trans.judge import (
     JudgeRequest,
     request_verdicts,
+    resolve_judge_seat_profile,
 )
 
 KEY = os.environ.get("LITELLM_API_KEY", "").strip()
@@ -138,13 +139,19 @@ MUST_FLAG = {1, 3}
 
 rows: list[tuple[str, int, int, int, int]] = []
 for model in MODELS:
+    settings.JUDGE_MODEL_SEAT_1 = model
+    profile = resolve_judge_seat_profile(1)
     print(f"=== {model} ({RUNS} runs through request_verdicts)")
     ok = bad = missed = false_alarm = 0
     for run in range(1, RUNS + 1):
         captured.clear()
         started = time.time()
         results = request_verdicts(
-            REQUESTS, model=model, project_slug="control", project_context=""
+            REQUESTS,
+            profile=profile,
+            model=model,
+            project_slug="control",
+            project_context="",
         )
         elapsed = time.time() - started
         unparsed = [r for r in results if r.unparsed]

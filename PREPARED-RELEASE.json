@@ -4,7 +4,7 @@
   "integrated_main": "d815169a4f9ce65bf7fdfc403b136d461f586f7a",
   "prepared_delta_source": "017464487bfaf46fa0fd013526670614f1ba535c",
   "delta_base": "a554cebea17c390da027ec7e2b8c67ac65397df3",
-  "migration_leaf": "0155_routed_gemini_reasoning_codec",
+  "migration_leaf": "0156_judge_delivery_attempt",
   "release_identity_authority": "external manifest.json generated from the exact committed source by deploy/check-import-capacity.py",
   "historical_snapshot": "docs/operations/reports/2026-10-23-imported-production-snapshot.json",
   "legacy_run_resume_allowed": false,

@@ -18,7 +18,6 @@ from django.test import SimpleTestCase, TestCase, override_settings
 
 from weblate.trans.judge import (
     _ALIAS_CACHE,
-    _FAILOVER_FAILURE_KINDS,
     FAILURE_KINDS,
     OPENROUTER_JUDGE_TITLE,
     JudgeEndpoint,
@@ -43,10 +42,13 @@ from weblate.trans.judge import (
     judge_seat_profiles,
     post_chat_completion,
     render_preview,
-    request_verdicts,
-    resolve_judge_fallback_seat_profile,
+    resolve_judge_fallback_profile,
     resolve_judge_seat_profile,
     validate_judge_configuration,
+    validate_request_settings,
+)
+from weblate.trans.judge import (
+    request_verdicts as request_verdicts_with_profile,
 )
 from weblate.trans.judge_loop import _AVAILABILITY_FAILURE_KINDS
 from weblate.trans.models.judge import JudgeRequestAttempt, ProducerRun
@@ -54,17 +56,29 @@ from weblate.trans.models.llm_delivery import ProducerLLMExchange
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
 
+
+def request_verdicts(requests, *, profile=None, model=None, seat=None, **kwargs):
+    """Resolve the fixture's legacy model shorthand outside the client."""
+    validate_request_settings()
+    if profile is None:
+        profile = (
+            resolve_judge_seat_profile(seat)
+            if seat is not None
+            else _resolve_profile(0, legacy_model=model)
+        )
+    return request_verdicts_with_profile(
+        requests, profile=profile, model=model, seat=seat, **kwargs
+    )
+
+
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 JUDGE_FALLBACK_SETTINGS = {
     "JUDGE_FALLBACK_BASE_URL": "https://openrouter.ai/api/v1",
     "JUDGE_FALLBACK_API_KEY": "sk-fallback",
     "JUDGE_FALLBACK_MODEL_SEAT_1": "vendor-c/model",
-    "JUDGE_FALLBACK_MODEL_SEAT_2": "vendor-d/model",
     "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1": "medium",
-    "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2": "low",
     "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1": "json_schema",
-    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2": "json_schema",
 }
 
 REQ = JudgeRequest(
@@ -501,7 +515,7 @@ class JudgeExplicitEndpointTest(http_mock.MockDNSMixin, SimpleTestCase):
     JUDGE_MODEL_SEAT_2="vendor-b/model",
 )
 class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
-    """Eight new settings, all blank by default, validated all-or-nothing."""
+    """The optional single fallback is validated all-or-nothing."""
 
     def test_unconfigured_fallback_validates_and_is_ready(self) -> None:
         validate_judge_configuration()
@@ -528,9 +542,7 @@ class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
             "JUDGE_FALLBACK_BASE_URL",
             "JUDGE_FALLBACK_API_KEY",
             "JUDGE_FALLBACK_MODEL_SEAT_1",
-            "JUDGE_FALLBACK_MODEL_SEAT_2",
             "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1",
-            "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2",
         ]
         for missing in required:
             partial = {
@@ -545,11 +557,15 @@ class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
             ):
                 validate_judge_configuration()
 
+    @override_settings(JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1="none")
+    def test_reasoning_only_fallback_is_rejected_as_partial_configuration(self) -> None:
+        with self.assertRaises(JudgeError):
+            judge_fallback_endpoint()
+
     @override_settings(
         **{
             **JUDGE_FALLBACK_SETTINGS,
             "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1": "",
-            "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2": "",
         }
     )
     def test_blank_fallback_reasoning_effort_is_a_valid_configuration(self) -> None:
@@ -558,7 +574,7 @@ class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
         validate_judge_configuration()
         endpoint = judge_fallback_endpoint()
         primary = resolve_judge_seat_profile(1)
-        fallback = resolve_judge_fallback_seat_profile(1, primary)
+        fallback = resolve_judge_fallback_profile(primary)
         self.assertIsNotNone(endpoint)
         self.assertEqual(fallback.reasoning, "")
 
@@ -610,7 +626,7 @@ class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
     def test_fallback_profile_uses_its_own_reasoning_not_the_primarys(self) -> None:
         with override_settings(JUDGE_REASONING_EFFORT_SEAT_1="thinking.disabled"):
             primary = resolve_judge_seat_profile(1)
-            fallback = resolve_judge_fallback_seat_profile(1, primary)
+            fallback = resolve_judge_fallback_profile(primary)
         self.assertEqual(fallback.provider, "openrouter")
         self.assertEqual(fallback.reasoning, "medium")
         body = _payload([REQ], fallback, "")
@@ -624,15 +640,12 @@ class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
         JUDGE_FALLBACK_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
         JUDGE_FALLBACK_API_KEY="sk-fallback",
         JUDGE_FALLBACK_MODEL_SEAT_1="vendor-c/model",
-        JUDGE_FALLBACK_MODEL_SEAT_2="vendor-d/model",
         JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1="thinking.disabled",
-        JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2="",
         JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1="json_schema",
-        JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2="json_schema",
     )
     def test_reverse_fallback_profile_never_leaks_the_primarys_reasoning(self) -> None:
         primary = resolve_judge_seat_profile(1)
-        fallback = resolve_judge_fallback_seat_profile(1, primary)
+        fallback = resolve_judge_fallback_profile(primary)
         self.assertEqual(fallback.provider, "litellm")
         body = _payload([REQ], fallback, "")
         self.assertEqual(body["thinking"], {"type": "disabled"})
@@ -654,13 +667,9 @@ class JudgeFallbackConfigurationTest(http_mock.MockDNSMixin, SimpleTestCase):
     def test_snapshot_records_fallback_metadata_without_key_material(self) -> None:
         snapshot = judge_configuration_snapshot()
         self.assertEqual(snapshot["fallback_hostname"], "openrouter.ai")
-        self.assertEqual(
-            snapshot["fallback_model"], ["vendor-c/model", "vendor-d/model"]
-        )
-        self.assertEqual(snapshot["fallback_reasoning"], ["medium", "low"])
-        self.assertEqual(
-            snapshot["fallback_response_format"], ["json_schema", "json_schema"]
-        )
+        self.assertEqual(snapshot["fallback_model"], ["vendor-c/model"])
+        self.assertEqual(snapshot["fallback_reasoning"], ["medium"])
+        self.assertEqual(snapshot["fallback_response_format"], ["json_schema"])
         blob = json.dumps(snapshot)
         self.assertNotIn("sk-fallback", blob)
         self.assertNotIn("sk-primary", blob)
@@ -710,6 +719,39 @@ class JudgeServingIdentityTest(http_mock.MockDNSMixin, TestCase):
         self.assertEqual(result.served_model, profile.model)
         self.assertEqual(result.served_profile_fingerprint, profile.profile_fingerprint)
 
+    @override_settings(JUDGE_BATCH_SIZE=2, JUDGE_PROTOCOL_RETRIES=0)
+    @http_mock.activate
+    def test_partial_valid_batch_preserves_only_the_proven_opinion(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+                    {
+                        "id": 1,
+                        "verdict": "invalid",
+                        "errors": [],
+                        "back_translation": "",
+                    },
+                ]
+            ),
+        )
+        first, second = request_verdicts(
+            [REQ, replace(REQ, unit_key="other")],
+            model="vendor/model-a",
+            persist_attempts=True,
+            retry_budget=RetryBudget(maximum=0),
+        )
+        self.assertFalse(first.unparsed)
+        self.assertTrue(second.unparsed)
+        self.assertEqual(second.failure_kind, "invalid-segment")
+        attempt = JudgeRequestAttempt.objects.get()
+        self.assertEqual(first.request_attempt_id, attempt.pk)
+        self.assertEqual(second.request_attempt_id, attempt.pk)
+        self.assertEqual(attempt.failure_kind, "invalid-segment")
+        self.assertEqual(len(http_mock.calls), 1)
+
 
 def _canned_response(
     *,
@@ -739,502 +781,45 @@ _FALLBACK_PARSED_PAYLOAD = _reply(
     JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
-    JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
     JUDGE_TRANSPORT_RETRIES=0,
     JUDGE_TRANSIENT_HTTP_RETRIES=0,
     JUDGE_PROTOCOL_RETRIES=0,
     **JUDGE_FALLBACK_SETTINGS,
 )
-class JudgeFailoverTest(http_mock.MockDNSMixin, TestCase):
-    """One fallback attempt per batch per seat, exactly on the permitted kinds."""
+class JudgeExplicitProfileTest(http_mock.MockDNSMixin, TestCase):
+    @http_mock.activate
+    def test_primary_auth_failure_does_not_dispatch_fallback(self):
+        http_mock.register("POST", LITELLM_CHAT_URL, status_code=403, json={})
+        results = request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertTrue(results[0].unparsed)
+        self.assertEqual(results[0].failure_kind, "http-auth")
+        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(JudgeRequestAttempt.objects.get().http_status, 403)
 
-    def test_failover_and_availability_kinds_differ_exactly_as_specified(
-        self,
-    ) -> None:
-        self.assertEqual(
-            _FAILOVER_FAILURE_KINDS - _AVAILABILITY_FAILURE_KINDS,
-            {"http-auth", "segment-count"},
+    @override_settings(JUDGE_BATCH_SIZE_SEAT_1=1)
+    @http_mock.activate
+    def test_refusal_stops_unsent_tail_without_fabricating_attempts(self):
+        route = http_mock.register("POST", LITELLM_CHAT_URL, status_code=402, json={})
+        results = request_verdicts(
+            [REQ, replace(REQ, unit_key="unsent")], seat=1, persist_attempts=True
         )
-        self.assertEqual(
-            _AVAILABILITY_FAILURE_KINDS - _FAILOVER_FAILURE_KINDS, {"http-other"}
-        )
+        self.assertEqual(len(route.calls), 1)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[1].failure_kind, "not-sent-auth")
+        self.assertIsNone(results[1].request_attempt_id)
+        self.assertEqual(JudgeRequestAttempt.objects.count(), 1)
 
     @http_mock.activate
-    def test_invalid_fallback_aborts_auth_and_parser_failover(self) -> None:
-        for primary_status, primary_body, persistence in (
-            (403, b"{}", True),
-            (403, b"{}", False),
-            (500, b"{}", True),
-            (200, json.dumps(_reply([])).encode(), True),
-        ):
-            with self.subTest(primary_status=primary_status, persistence=persistence):
-                http_mock.reset()
-                LLMUsageLog.objects.all().delete()
-                JudgeRequestAttempt.objects.all().delete()
-                http_mock.register(
-                    "POST",
-                    LITELLM_CHAT_URL,
-                    status_code=primary_status,
-                    content=primary_body,
-                )
-                http_mock.register(
-                    "POST",
-                    CHAT_URL,
-                    status_code=400,
-                    content=(
-                        b'{"error":"private provider detail","id":"fallback-id",'
-                        b'"usage":{"cost":0.0001}}'
-                    ),
-                )
-                on_batch = mock.Mock()
-                with self.assertRaises(JudgeError) as caught:
-                    request_verdicts(
-                        [REQ, replace(REQ, unit_key="other")],
-                        seat=1,
-                        persist_attempts=persistence,
-                        on_batch=on_batch,
-                    )
-                self.assertIn("HTTP 400", str(caught.exception))
-                self.assertNotIn("private provider detail", str(caught.exception))
-                self.assertNotIn("sk-fallback", str(caught.exception))
-                self.assertEqual(
-                    len(
-                        [
-                            call
-                            for call in http_mock.calls
-                            if call.request.method == "POST"
-                        ]
-                    ),
-                    2,
-                )
-                on_batch.assert_not_called()
-                attempts = JudgeRequestAttempt.objects.order_by("attempt")
-                if persistence:
-                    self.assertEqual(attempts.count(), 2)
-                    self.assertEqual(
-                        attempts.last().failure_kind, "http-request-invalid"
-                    )
-                    self.assertEqual(attempts.last().http_status, 400)
-                    row = LLMUsageLog.objects.get()
-                    self.assertEqual(row.request_attempt_id, attempts.last().pk)
-                    self.assertEqual(row.response_id, "fallback-id")
-                    self.assertEqual(row.cost_usd, Decimal("0.0001"))
-                else:
-                    self.assertFalse(attempts.exists())
-                    self.assertFalse(LLMUsageLog.objects.exists())
-
-    @http_mock.activate
-    def test_http_400_finish_length_remains_a_refused_request(self) -> None:
-        http_mock.register("POST", LITELLM_CHAT_URL, status_code=500, json={})
-        http_mock.register(
-            "POST",
-            CHAT_URL,
-            status_code=400,
-            json={
-                "choices": [{"finish_reason": "length"}],
-                "id": "fallback-id",
-                "usage": {"cost": 0.001},
-            },
-        )
-        with self.assertRaises(JudgeError) as caught:
-            request_verdicts([REQ], seat=1, persist_attempts=True)
-        self.assertIn("HTTP 400", str(caught.exception))
-        attempt = JudgeRequestAttempt.objects.get(provider="openrouter")
-        self.assertEqual(attempt.failure_kind, "http-request-invalid")
-        self.assertEqual(attempt.finish_reason, "length")
-        self.assertEqual(LLMUsageLog.objects.get().request_attempt_id, attempt.pk)
-
-    @staticmethod
-    def _run_with_primary_failure(primary_response, *, fallback_response=None, **kw):
-        calls = []
-
-        def fake_post_batch(payload, profile):
-            calls.append(profile.provider)
-            if profile.provider == "litellm":
-                return primary_response
-            return (
-                fallback_response if fallback_response is not None else primary_response
-            )
-
-        with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
-            [result] = request_verdicts([REQ], seat=1, persist_attempts=True, **kw)
-        return result, calls
-
-    def test_transport_fails_over_to_a_parsed_fallback_result(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(failure_kind="transport"),
-            fallback_response=_canned_response(
-                status_code=200,
-                payload=_FALLBACK_PARSED_PAYLOAD,
-                transport_succeeded=True,
-            ),
-        )
-        self.assertFalse(result.unparsed)
-        self.assertEqual(result.served_provider, "openrouter")
-        self.assertEqual(calls, ["litellm", "openrouter"])
-
-    def test_deadline_fails_over(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(failure_kind="deadline"),
-            fallback_response=_canned_response(
-                status_code=200,
-                payload=_FALLBACK_PARSED_PAYLOAD,
-                transport_succeeded=True,
-            ),
-        )
-        self.assertFalse(result.unparsed)
-        self.assertEqual(calls, ["litellm", "openrouter"])
-
-    def test_http_server_fails_over(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(
-                status_code=500, failure_kind="http-server", transport_succeeded=True
-            ),
-            fallback_response=_canned_response(
-                status_code=200,
-                payload=_FALLBACK_PARSED_PAYLOAD,
-                transport_succeeded=True,
-            ),
-        )
-        self.assertFalse(result.unparsed)
-        self.assertEqual(calls, ["litellm", "openrouter"])
-
-    def test_http_rate_limit_fails_over(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(
-                status_code=429,
-                failure_kind="http-rate-limit",
-                transport_succeeded=True,
-            ),
-            fallback_response=_canned_response(
-                status_code=200,
-                payload=_FALLBACK_PARSED_PAYLOAD,
-                transport_succeeded=True,
-            ),
-        )
-        self.assertFalse(result.unparsed)
-        self.assertEqual(calls, ["litellm", "openrouter"])
-
-    def test_http_other_does_not_fail_over(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(
-                status_code=402, failure_kind="http-other", transport_succeeded=True
-            ),
-        )
-        self.assertTrue(result.unparsed)
-        self.assertEqual(result.failure_kind, "http-other")
-        self.assertEqual(calls, ["litellm"])
-
-    def test_protocol_failure_does_not_fail_over(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(
-                status_code=200,
-                payload={"choices": [{"message": {"content": "not json"}}]},
-                transport_succeeded=True,
-            ),
-        )
-        self.assertTrue(result.unparsed)
-        self.assertEqual(result.failure_kind, "invalid-json")
-        self.assertEqual(calls, ["litellm"])
-
-    @override_settings(JUDGE_PROTOCOL_RETRIES=1)
-    def test_segment_count_retries_primary_before_fallback(self) -> None:
-        primary = _canned_response(
-            status_code=200,
-            payload=_reply([]),
-            transport_succeeded=True,
-        )
-        fallback = _canned_response(
-            status_code=200,
-            payload=_FALLBACK_PARSED_PAYLOAD,
-            transport_succeeded=True,
-        )
-        with mock.patch("weblate.trans.judge._sleep_retry"):
-            result, calls = self._run_with_primary_failure(
-                primary,
-                fallback_response=fallback,
-            )
-
-        self.assertFalse(result.unparsed)
-        self.assertEqual(result.served_provider, "openrouter")
-        self.assertEqual(calls, ["litellm", "litellm", "openrouter"])
-        self.assertEqual(
-            list(
-                JudgeRequestAttempt.objects.order_by("pk").values_list(
-                    "provider", "failure_kind"
-                )
-            ),
-            [
-                ("litellm", "segment-count"),
-                ("litellm", "segment-count"),
-                ("openrouter", ""),
-            ],
-        )
-
-    @override_settings(JUDGE_PROTOCOL_RETRIES=1)
-    def test_segment_count_falls_back_when_shared_retry_budget_is_exhausted(
-        self,
-    ) -> None:
-        budget = RetryBudget(maximum=0)
-        result, calls = self._run_with_primary_failure(
-            _canned_response(
-                status_code=200,
-                payload=_reply([]),
-                transport_succeeded=True,
-            ),
-            fallback_response=_canned_response(
-                status_code=200,
-                payload=_FALLBACK_PARSED_PAYLOAD,
-                transport_succeeded=True,
-            ),
-            retry_budget=budget,
-        )
-
-        self.assertFalse(result.unparsed)
-        self.assertEqual(calls, ["litellm", "openrouter"])
-        self.assertEqual(budget.used, 0)
-
-    @override_settings(JUDGE_BATCH_SIZE=2, JUDGE_RETRY_BUDGET_RATIO=10)
-    def test_segment_count_fallback_is_not_repeated_during_isolation(self) -> None:
-        second_request = replace(REQ, unit_key="OTHER_KEY")
-        calls = []
-
-        def fake_post_batch(payload, profile):
-            calls.append(profile.provider)
-            if profile.provider == "openrouter":
-                return _canned_response(
-                    status_code=200,
-                    payload={"choices": [{"message": {"content": "not json"}}]},
-                    transport_succeeded=True,
-                )
-            return _canned_response(
-                status_code=200,
-                payload=_reply([]),
-                transport_succeeded=True,
-            )
-
-        with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
-            results = request_verdicts(
-                [REQ, second_request], seat=1, persist_attempts=True
-            )
-
-        self.assertEqual(len(results), 2)
-        self.assertTrue(all(item.unparsed for item in results))
-        self.assertEqual(calls, ["litellm", "openrouter", "litellm", "litellm"])
-
-    def test_a_parsed_primary_result_never_fails_over(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(
-                status_code=200,
-                payload=_reply(
-                    [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
-                ),
-                transport_succeeded=True,
-            ),
-        )
-        self.assertFalse(result.unparsed)
-        self.assertEqual(calls, ["litellm"])
-
-    def test_http_auth_with_fallback_success_completes_the_run(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(status_code=401, failure_kind="http-auth"),
-            fallback_response=_canned_response(
-                status_code=200,
-                payload=_FALLBACK_PARSED_PAYLOAD,
-                transport_succeeded=True,
-            ),
-        )
-        self.assertFalse(result.unparsed)
-        self.assertEqual(result.served_provider, "openrouter")
-        self.assertEqual(calls, ["litellm", "openrouter"])
-
-    def test_http_auth_on_both_endpoints_raises_with_no_third_call(self) -> None:
-        calls = []
-
-        def fake_post_batch(payload, profile):
-            calls.append(profile.provider)
-            return _canned_response(status_code=401, failure_kind="http-auth")
-
-        with (
-            mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch),
-            self.assertRaises(JudgeError),
-        ):
-            request_verdicts([REQ], seat=1, persist_attempts=True)
-        self.assertEqual(calls, ["litellm", "openrouter"])
-
-    @override_settings(**dict.fromkeys(JUDGE_FALLBACK_SETTINGS, ""))
-    def test_http_auth_without_a_fallback_raises_immediately(self) -> None:
-        calls = []
-
-        def fake_post_batch(payload, profile):
-            calls.append(profile.provider)
-            return _canned_response(status_code=401, failure_kind="http-auth")
-
-        with (
-            mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch),
-            self.assertRaises(JudgeError),
-        ):
-            request_verdicts([REQ], seat=1, persist_attempts=True)
-        self.assertEqual(calls, ["litellm"])
-
-    def test_a_fallback_that_also_fails_yields_unparsed_not_an_exception(self) -> None:
-        result, calls = self._run_with_primary_failure(
-            _canned_response(
-                status_code=500, failure_kind="http-server", transport_succeeded=True
-            ),
-        )
-        self.assertTrue(result.unparsed)
-        self.assertEqual(calls, ["litellm", "openrouter"])
-        self.assertEqual(result.served_provider, "openrouter")
-
-    def test_fallback_fires_even_when_the_retry_budget_is_exhausted(self) -> None:
-        budget = RetryBudget(maximum=0)
-        result, calls = self._run_with_primary_failure(
-            _canned_response(
-                status_code=500, failure_kind="http-server", transport_succeeded=True
-            ),
-            fallback_response=_canned_response(
-                status_code=200,
-                payload=_FALLBACK_PARSED_PAYLOAD,
-                transport_succeeded=True,
-            ),
-            retry_budget=budget,
-        )
-        self.assertFalse(result.unparsed)
-        self.assertEqual(calls, ["litellm", "openrouter"])
-        self.assertEqual(budget.used, 0)
-
-    def test_fallback_attempt_is_persisted_with_distinguishable_identity(
-        self,
-    ) -> None:
-        self._run_with_primary_failure(
-            _canned_response(
-                status_code=500, failure_kind="http-server", transport_succeeded=True
-            ),
-            fallback_response=_canned_response(
-                status_code=200,
-                payload=_FALLBACK_PARSED_PAYLOAD,
-                transport_succeeded=True,
-            ),
-        )
-        primary_attempt = JudgeRequestAttempt.objects.get(provider="litellm")
-        fallback_attempt = JudgeRequestAttempt.objects.get(provider="openrouter")
-        self.assertNotEqual(
-            primary_attempt.endpoint_fingerprint, fallback_attempt.endpoint_fingerprint
-        )
-        self.assertNotEqual(primary_attempt.attempt, fallback_attempt.attempt)
-
-    def test_fallback_response_creates_exactly_one_usage_row(self) -> None:
-        fallback_payload = {
-            **_FALLBACK_PARSED_PAYLOAD,
-            "usage": {"prompt_tokens": 10, "completion_tokens": 4},
-        }
-        self._run_with_primary_failure(
-            _canned_response(
-                status_code=500, failure_kind="http-server", transport_succeeded=True
-            ),
-            fallback_response=_canned_response(
-                status_code=200, payload=fallback_payload, transport_succeeded=True
-            ),
-            project_slug="proj",
-        )
-        self.assertEqual(LLMUsageLog.objects.count(), 1)
-        row = LLMUsageLog.objects.get()
-        self.assertEqual(row.service, "openrouter")
-        self.assertEqual(row.model, "vendor-c/model")
-        fallback_attempt = JudgeRequestAttempt.objects.get(provider="openrouter")
-        self.assertEqual(row.request_attempt_id, fallback_attempt.pk)
-
-    @override_settings(JUDGE_BATCH_SIZE=2, JUDGE_RETRY_BUDGET_RATIO=10)
-    def test_width_one_isolation_never_attempts_a_fallback(self) -> None:
-        second_request = replace(REQ, unit_key="OTHER_KEY")
-        calls = []
-
-        def fake_post_batch(payload, profile):
-            calls.append(profile.provider)
-            return _canned_response(
-                status_code=200,
-                payload={"choices": [{"message": {"content": "not json"}}]},
-                transport_succeeded=True,
-            )
-
-        with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
-            results = request_verdicts(
-                [REQ, second_request], seat=1, persist_attempts=True
-            )
-        self.assertEqual(len(results), 2)
-        self.assertTrue(all(item.unparsed for item in results))
-        self.assertTrue(all(item.served_provider == "litellm" for item in results))
-        self.assertEqual(set(calls), {"litellm"})
-
-    def test_every_failure_kind_fails_over_only_when_permitted(
-        self,
-    ) -> None:
-        """
-        Enumerate the closed kind set rather than trusting a representative.
-
-        A regression that routed another parser kind to the fallback, or that
-        stopped failing over on one permitted kind, passes a set-difference
-        assertion but fails here.
-        """
-        fallback = _canned_response(
-            status_code=200,
-            payload=_FALLBACK_PARSED_PAYLOAD,
-            transport_succeeded=True,
-        )
-        for kind in sorted(FAILURE_KINDS):
-            with self.subTest(kind=kind):
-                if kind == "http-request-invalid":
-                    # A refused request aborts the run outright and must
-                    # still never reach the fallback: resending a request
-                    # the endpoint rejected is waste, not availability.
-                    with self.assertRaises(JudgeError):
-                        self._run_with_primary_failure(
-                            _canned_response(failure_kind=kind),
-                            fallback_response=fallback,
-                        )
-                    continue
-                _result, calls = self._run_with_primary_failure(
-                    _canned_response(failure_kind=kind),
-                    fallback_response=fallback,
-                )
-                if kind in _FAILOVER_FAILURE_KINDS:
-                    self.assertEqual(calls, ["litellm", "openrouter"])
-                else:
-                    self.assertEqual(calls, ["litellm"])
-
-    @override_settings(JUDGE_BATCH_SIZE=2, JUDGE_RETRY_BUDGET_RATIO=10)
-    def test_a_fallback_protocol_failure_never_triggers_width_one_isolation(
-        self,
-    ) -> None:
-        """
-        Isolation must key off the primary's own failure, not the fallback's.
-
-        The fallback is one attempt with no isolation of its own. An
-        implementation that narrowed on the fallback's ``invalid-json``
-        would pay one POST per unit here.
-        """
-        second_request = replace(REQ, unit_key="OTHER_KEY")
-        calls = []
-
-        def fake_post_batch(payload, profile):
-            calls.append(profile.provider)
-            if profile.provider == "litellm":
-                return _canned_response(status_code=500, failure_kind="http-server")
-            return _canned_response(
-                status_code=200,
-                payload={"choices": [{"message": {"content": "not json"}}]},
-                transport_succeeded=True,
-            )
-
-        with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
-            results = request_verdicts(
-                [REQ, second_request], seat=1, persist_attempts=True
-            )
-        self.assertEqual(len(results), 2)
-        self.assertTrue(all(item.unparsed for item in results))
-        self.assertEqual(calls, ["litellm", "openrouter"])
+    def test_explicit_fallback_profile_uses_only_its_endpoint(self):
+        profile = resolve_judge_fallback_profile(resolve_judge_seat_profile(1))
+        http_mock.register("POST", CHAT_URL, json=_FALLBACK_PARSED_PAYLOAD)
+        results = request_verdicts([REQ], profile=profile, persist_attempts=True)
+        self.assertFalse(results[0].unparsed)
+        self.assertEqual(results[0].served_provider, "openrouter")
+        posts = [call for call in http_mock.calls if call.request.method == "POST"]
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(str(posts[0].request.url), CHAT_URL)
 
 
 _SLASHED_PRIMARY = "https://openrouter.ai/api/v1/"
@@ -1739,7 +1324,7 @@ class JudgeClientTest(http_mock.MockDNSMixin, SimpleTestCase):
                 [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
             ),
         )
-        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+        request_verdicts([REQ], model="vendor/model-a")
         body = json.loads(http_mock.calls[0].request.content)
         self.assertTrue(body["response_format"]["json_schema"]["strict"])
         segments_schema = body["response_format"]["json_schema"]["schema"][
@@ -2804,23 +2389,22 @@ class JudgeUsageLogTest(http_mock.MockDNSMixin, TestCase):
         JUDGE_REQUEST_SLEEP=0.0,
     )
     @http_mock.activate
-    def test_accounting_failure_does_not_break_judging(self) -> None:
+    def test_accounting_failure_stops_judging(self) -> None:
         payload = _reply(
             [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
         )
         payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
         http_mock.register("POST", CHAT_URL, json=payload)
-        with mock.patch.object(
-            LLMUsageLog._default_manager,  # ruff: ignore[private-member-access]
-            "create",
-            side_effect=DatabaseError("boom"),
+        with (
+            mock.patch.object(
+                LLMUsageLog._default_manager,  # ruff: ignore[private-member-access]
+                "create",
+                side_effect=DatabaseError("boom"),
+            ),
+            self.assertRaises(DatabaseError),
         ):
-            results = request_verdicts(
-                [REQ], model="vendor/model-a", persist_attempts=True
-            )
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].model_verdict, "pass")
-        self.assertEqual(LLMUsageLog.objects.count(), 0)
+            request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+        self.assertEqual(len(http_mock.calls), 1)
 
 
 class JudgeReasoningBudgetTest(http_mock.MockDNSMixin, TestCase):
@@ -3674,6 +3258,50 @@ class JudgeRefusedRequestTest(http_mock.MockDNSMixin, TestCase):
     **dict.fromkeys(JUDGE_FALLBACK_SETTINGS, ""),
 )
 class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
+    @http_mock.activate
+    def test_capture_failure_after_response_is_fatal(self) -> None:
+        http_mock.register("POST", CHAT_URL, json=_reply([]))
+        with (
+            mock.patch(
+                "weblate.trans.llm_delivery.capture_transport_response",
+                side_effect=RuntimeError("journal failed"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "journal failed"),
+        ):
+            request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @http_mock.activate
+    def test_attempt_persistence_failure_after_response_is_fatal(self) -> None:
+        http_mock.register("POST", CHAT_URL, json=_reply([]))
+        with (
+            mock.patch.object(
+                JudgeRequestAttempt.objects,
+                "create",
+                side_effect=RuntimeError("attempt failed"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "attempt failed"),
+        ):
+            request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @http_mock.activate
+    def test_local_body_reader_failure_is_not_transport_failure(self) -> None:
+        class BrokenStream(httpx2.SyncByteStream):
+            def __iter__(self):
+                msg = "local stream failed"
+                raise RuntimeError(msg)
+                yield b""  # pragma: no cover
+
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: httpx2.Response(200, stream=BrokenStream()),
+        )
+        with self.assertRaisesRegex(RuntimeError, "local stream failed"):
+            request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertEqual(len(http_mock.calls), 1)
+
     @override_settings(JUDGE_STREAM_SEAT_1=True)
     @http_mock.activate
     def test_failed_stream_retains_only_observed_usage(self) -> None:

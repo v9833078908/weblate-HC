@@ -300,6 +300,26 @@ def reconcile_exchange(exchange_id, *, allow_new_charge=False) -> RecoveryDispos
     return "ready"
 
 
+def _send_and_record_response(
+    exchange_id: UUID,
+    send: Callable[[], str],
+    on_response: Callable[[ProducerLLMExchange, str], None] | None,
+) -> str:
+    if on_response is None:
+        response = send()
+        record_response(exchange_id, response)
+        return response
+    # A replay's reservation lock must not pass the receipt before its
+    # mandatory attempt association commits. Sending state was already
+    # committed, so rollback never makes this work sendable again.
+    with transaction.atomic():
+        exchange = ProducerLLMExchange.objects.select_for_update().get(pk=exchange_id)
+        response = send()
+        record_response(exchange_id, response)
+        on_response(exchange, response)
+    return response
+
+
 def dispatch_exchange(
     identity: Sequence[str],
     request_digest: str,
@@ -308,6 +328,7 @@ def dispatch_exchange(
     run_id=None,
     request_codec: str | None = None,
     replay_only: bool = False,
+    on_response: Callable[[ProducerLLMExchange, str], None] | None = None,
 ) -> str:
     if not replay_only:
         guard_paid_run(run_id)
@@ -343,8 +364,7 @@ def dispatch_exchange(
         raise DeliveryUnresolved(msg)
     token = _active_exchange.set(reference.id)
     try:
-        response = send()
-        record_response(reference.id, response)
+        response = _send_and_record_response(reference.id, send, on_response)
     except BaseException:
         # Never release semantic claims on timeout, cancellation, parser failure
         # or process redelivery. The saved raw reply (if any) remains recoverable.

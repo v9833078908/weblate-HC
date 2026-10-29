@@ -71,6 +71,119 @@ class ProducerReleaseMigrationDataTest(TransactionTestCase):
         self.assertEqual(saved.pop("request_codec"), "")
         self.assertEqual(saved, old)
 
+    def test_attempt_link_upgrade_preserves_paid_history_without_inferred_links(self):
+        before = ("trans", "0155_routed_gemini_reasoning_codec")
+        target = ("trans", "0156_judge_delivery_attempt")
+        executor = MigrationExecutor(connection)
+        executor.migrate([before])
+        apps = executor.loader.project_state([before]).apps
+        run = apps.get_model("trans", "ProducerRun").objects.create(
+            scope_type="component",
+            scope_id="synthetic",
+            scope_label="Synthetic",
+            scope_path="/",
+            requested_mode="judge",
+            cap=1,
+        )
+        attempt = apps.get_model("trans", "JudgeRequestAttempt").objects.create(
+            run=run,
+            seat=1,
+            provider="litellm",
+            model="synthetic/model",
+            endpoint_fingerprint="a" * 64,
+            profile_fingerprint="b" * 64,
+            prompt_schema_version="synthetic",
+            batch_digest="c" * 64,
+            batch_size=1,
+            http_status=200,
+            transport_succeeded=True,
+            parsed=False,
+            failure_kind="invalid-json",
+            response_id="synthetic-paid",
+        )
+        exchange = apps.get_model("trans", "ProducerLLMExchange").objects.create(
+            run=run,
+            request_digest="d" * 64,
+            response_digest="e" * 64,
+            response_path="synthetic-paid.reply",
+            response_id="synthetic-paid",
+            request_codec="opaque-v1",
+            state="received",
+            owner="synthetic",
+            lease_until=timezone.now() + timedelta(seconds=1),
+            usage_recorded=True,
+        )
+        work = apps.get_model("trans", "ProducerLLMWork").objects.create(
+            semantic_key="f" * 64,
+            identity="synthetic-paid-work",
+            position=0,
+            exchange=exchange,
+        )
+        usage = apps.get_model("trans", "LLMUsageLog").objects.create(
+            run=run,
+            request_attempt=attempt,
+            model="synthetic/model",
+            service="litellm",
+            operation="judge",
+            prompt_tokens=2,
+            completion_tokens=1,
+            total_tokens=3,
+            response_id="synthetic-paid",
+            cost_usd="0.02",
+        )
+        witnesses = {
+            name: apps.get_model("trans", name).objects.values().get(pk=row.pk)
+            for name, row in (
+                ("ProducerRun", run),
+                ("JudgeRequestAttempt", attempt),
+                ("ProducerLLMExchange", exchange),
+                ("ProducerLLMWork", work),
+                ("LLMUsageLog", usage),
+            )
+        }
+        executor = MigrationExecutor(connection)
+        executor.migrate([target])
+        current = executor.loader.project_state([target]).apps
+        for name, expected in witnesses.items():
+            with self.subTest(model=name):
+                saved = (
+                    current.get_model("trans", name)
+                    .objects.values()
+                    .get(pk=expected["id"])
+                )
+                if name == "JudgeRequestAttempt":
+                    self.assertIs(saved.pop("response_complete"), False)
+                elif name == "ProducerLLMExchange":
+                    self.assertIsNone(saved.pop("judge_attempt_id"))
+                self.assertEqual(saved, expected)
+
+    def test_pre_upgrade_attempt_writer_remains_usable_after_upgrade(self) -> None:
+        before = ("trans", "0155_routed_gemini_reasoning_codec")
+        target = ("trans", "0156_judge_delivery_attempt")
+        executor = MigrationExecutor(connection)
+        executor.migrate([before])
+        legacy_attempt = executor.loader.project_state([before]).apps.get_model(
+            "trans", "JudgeRequestAttempt"
+        )
+        executor = MigrationExecutor(connection)
+        executor.migrate([target])
+        written = legacy_attempt.objects.create(
+            seat=1,
+            provider="litellm",
+            model="synthetic/model",
+            endpoint_fingerprint="a" * 64,
+            profile_fingerprint="b" * 64,
+            prompt_schema_version="synthetic",
+            batch_digest="c" * 64,
+            batch_size=1,
+        )
+        current_attempt = executor.loader.project_state([target]).apps.get_model(
+            "trans", "JudgeRequestAttempt"
+        )
+        self.assertIs(
+            current_attempt.objects.get(pk=written.pk).response_complete, False
+        )
+
     def tearDown(self) -> None:
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())

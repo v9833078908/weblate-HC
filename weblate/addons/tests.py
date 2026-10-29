@@ -72,7 +72,7 @@ from weblate.trans.models import (
     Vote,
 )
 from weblate.trans.tests.test_views import ComponentTestCase, ViewTestCase
-from weblate.trans.tests.utils import get_optional_path
+from weblate.trans.tests.utils import get_optional_path, get_test_certificate
 from weblate.utils.celery import handle_task_failure
 from weblate.utils.site import get_site_url
 from weblate.utils.state import (
@@ -9819,11 +9819,11 @@ class SlackWebhooksAddonsTest(http_mock.MockDNSMixin, BaseWebhookTests, ViewTest
 class FedoraMessagingPEMBlockTest(SimpleTestCase):
     @staticmethod
     def get_certificate() -> str:
-        return Path("weblate/trans/tests/data/saml.crt").read_text(encoding="utf-8")
+        return get_test_certificate()[0]
 
     @staticmethod
     def get_private_key() -> str:
-        return Path("weblate/trans/tests/data/saml.key").read_text(encoding="utf-8")
+        return get_test_certificate()[1]
 
     def test_pem_block_labels_accept_multiple_blocks(self) -> None:
         cert = self.get_certificate()
@@ -9901,8 +9901,7 @@ class FedoraMessagingAddonTestCase(BaseWebhookTests, ViewTestCase):
 
     @staticmethod
     def get_tls_configuration() -> TLSConfiguration:
-        cert = Path("weblate/trans/tests/data/saml.crt").read_text(encoding="utf-8")
-        key = Path("weblate/trans/tests/data/saml.key").read_text(encoding="utf-8")
+        cert, key = get_test_certificate()
         return {
             "amqp_url": "amqps://rabbitmq.example.com",
             "ca_cert": cert,

@@ -20,9 +20,8 @@ BASE_DIGEST = "sha256:81acc89b2a9742015f2ffdee77130d1c5fcdbf3eeae203b3ff665bc6d2
 PLATFORM = "linux/amd64"
 NUMPY_VERSION = "2.3.5"
 _FIXTURES = {
-    "docs/admin/auth.rst": "ef6790fcd4ae26f93e50502bd81cac98aa107576dc355d7025ce96aa228e56d6",
-    "weblate/addons/tests.py": "e434e1e4b5d619d1e21c7be2b04ae71d3e53b6c51ac2b09d88aaf7f987bfcdcd",
-    "weblate/machinery/tests.py": "956ec57cffdd87ea197a94bd03561ad3bd894bc1531a3276a412a225185be4cf",
+    "docs/admin/auth.rst": "ab081b2388fbca14fd76c83979cc8efc83282b8bdd97d6fb2b3cbb1a5baabe2d",
+    "weblate/addons/tests.py": "50b122b076fae78c50f2d684232360cf1514038b5b1d292740eea79d5e94f75c",
     "weblate/trans/tests/data/googlev3.json": "a00f19e967b0b0e92e7b0d9fd15c4c6790a1667af7d0e3186197f7cf206c3dd5",
     "weblate/vcs/tests/test_github.py": "ffb4f591fcc73ef0d8194c3425ac0171ff3fe1b792a5a32bf0322c08a8b283be",
     "weblate/vcs/tests/test_github_views.py": "81c55efc7593365a3eea872bf921e7340590685b98a0a90ca28baf5dece15323",

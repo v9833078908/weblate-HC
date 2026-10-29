@@ -18,9 +18,9 @@ from django.db.models import Max
 from weblate.checks.glossary import GLOSSARY_CHECK_ID, evaluate_glossary_terms
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.checks.models import CHECKS
-from weblate.trans.judge import JUDGE_SEATS
 from weblate.trans.models.judge import (
     JudgeVerdict,
+    _complete_primary_evidence,
     collegium_verdict,
     compute_decision_revision,
     compute_target_hash,
@@ -90,15 +90,11 @@ def candidate_quality(
     unit: Unit, targets: Sequence[str], *, evidence: Sequence[JudgeVerdict]
 ) -> CandidateQuality:
     """Require parsed evidence, a collegial PASS and clean local checks."""
-    context_hash = project_quality_context_hash(unit.translation.component.project)
-    verified = (
-        len(evidence) == len(JUDGE_SEATS)
-        and {row.seat for row in evidence} == set(JUDGE_SEATS)
-        and all(
-            not row.unparsed and row.project_context_hash == context_hash
-            for row in evidence
-        )
-    )
+    subject = evidence[0].subject if evidence else JudgeVerdict.Subject.CANDIDATE
+    verified = subject in {
+        JudgeVerdict.Subject.LIVE,
+        JudgeVerdict.Subject.CANDIDATE,
+    } and _complete_primary_evidence(unit, targets, evidence, subject=subject)
     verdict = collegium_verdict(evidence) if verified else None
     return CandidateQuality(
         verified,

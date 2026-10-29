@@ -60,6 +60,7 @@ from weblate.trans.judge import (
     get_judge_base_url,
     get_judge_chat_completions_url,
     request_verdicts,
+    resolve_judge_seat_profile,
     validate_request_settings,
 )
 
@@ -249,7 +250,11 @@ for seat, model in ((1, SEAT_1), (2, SEAT_2)):
     started = time.time()
     try:
         results = request_verdicts(
-            requests, model=model, project_slug="preflight", project_context=""
+            requests,
+            profile=resolve_judge_seat_profile(seat),
+            model=model,
+            project_slug="preflight",
+            project_context="",
         )
     except JudgeError as error:
         check(f"seat {seat} returned verdicts", False, f"JudgeError: {error}")

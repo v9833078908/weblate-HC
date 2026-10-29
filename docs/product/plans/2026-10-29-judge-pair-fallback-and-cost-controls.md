@@ -8,10 +8,18 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Статус и согласованные решения
 
-Статус: архитектурное ревью парного переключения пройдено; пользователь
-выбрал «Пока только исправления учёта», поэтому задачи 2–3 и их rollout
-отложены. Задача 1 (учёт и Gemini medium) разрешена; затем отдельно разрешён
-её срочный production hotfix. План парного fallback не является выполненным.
+Статус: пользователь разрешил завершить парный fallback, исправления CI,
+слияние, публикацию в корпоративный Git и GitHub и production-выкладку.
+Новые Gemini-эксперименты и включение Flex исключены. Проверка suites,
+миграции и локального fake-HTTP smoke обязательна до подтверждения завершения.
+
+Пользователь также разрешил интеграцию полной существующей production-базы
+Weblate, включая опциональную Weblate-side SSO, без изменений корневого проекта
+или настроек самостоятельного Wizard. Отдельно разрешена минимальная аддитивная
+миграция `0156`: связь exchange с фактическим attempt и признак полноты ответа,
+с исключением связанных attempts из обычной очистки. Новая таблица и угадывание
+связей для исторических записей не разрешены. Последнее согласование также
+разрешает rollout проверенного non-Gemini результата.
 
 Пользователь утвердил в чате:
 
@@ -26,12 +34,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Переводчик Gemini отдельно получает явный `medium`; это не настройка судей.
 - Производственные переводы и массовые повторные прогоны не выполняются.
 
-Рабочая ветка `fix/llm-spend-production-20261029`, worktree
+Историческая ветка срочного хотфикса основной пары:
+`fix/llm-spend-production-20261029`, worktree
 `.worktrees/judge-hotfix-20261029`, база `c22b2e0fc1be6247887cfb1a9fc569e0877c1763`.
 Этот хотфикс основной пары уже доставлен и проверен ранее в текущей сессии.
-Основной checkout и старая ветка `.worktrees/llm-spend-20261029` не используются
-как база выпуска: у production новее durable-delivery код. Новый срочный
-rollout разрешён только для учёта и Gemini medium, не для парного fallback.
+Текущая реализация парного fallback: `feat/judge-pair-fallback-20261029`,
+worktree `.worktrees/judge-pair-fallback-20261029`, поверх проверенной полной
+production-интеграции и её CI-исправлений `d9d22048`. Пользовательский основной
+checkout и старый `.worktrees/llm-spend-20261029` не используются как база выпуска.
 
 Предыдущий контракт: `docs/product/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`.
 Замеры и ограничения качества: `docs/product/measurements/2026-10-29-judge-minimum-reasoning-latency.md`.
@@ -240,10 +250,10 @@ endpoint допустимо; частичная конфигурация ост�
 `weblate/trans/tests/test_judge_client.py`,
 `weblate/trans/tests/test_judge_delivery_recovery.py`.
 
-- [ ] Явный профиль, никакого внутреннего failover; один resolver OR.
-- [ ] Ожидаемый отказ и локальная фатальная ошибка различаются без broad catch.
-- [ ] OR journal phase не обходит неопределённую primary оплату.
-- [ ] Заменить старые контрактные тесты per-seat fallback новой политикой;
+- [x] Явный профиль, никакого внутреннего failover; один resolver OR.
+- [x] Ожидаемый отказ и локальная фатальная ошибка различаются без broad catch.
+- [x] OR journal phase не обходит неопределённую primary оплату.
+- [x] Заменить старые контрактные тесты per-seat fallback новой политикой;
   сохранить регрессии accounting и Flash/Kimi, не перепинить устаревшие defaults.
 
 ### 3. Пара, recovery и доказательства — зависит от задачи 2
@@ -258,20 +268,20 @@ endpoint допустимо; частичная конфигурация ост�
 `test_judge_autotranslate.py`, `test_judge_delivery_recovery.py` и существующие
 тесты candidate quality, apply, repeat hold и configuration API.
 
-- [ ] Парный gate на уровне строк, строгая identity каждого профиля.
-- [ ] Сохранить ACK/fatal-error/DB-cleanup инварианты и healthy-seat continuation.
-- [ ] Recovery, subset, cancel/stale и неизвестная оплата не дают лишних OR calls.
-- [ ] Одно мнение сохраняется как одно; approval требует двух primary opinions.
-- [ ] Интеграционные сценарии: обе healthy; каждая из двух по отдельности 403;
+- [x] Парный gate на уровне строк, строгая identity каждого профиля.
+- [x] Сохранить ACK/fatal-error/DB-cleanup инварианты и healthy-seat continuation.
+- [x] Recovery, subset, cancel/stale и неизвестная оплата не дают лишних OR calls.
+- [x] Одно мнение сохраняется как одно; approval требует двух primary opinions.
+- [x] Интеграционные сценарии: обе healthy; каждая из двух по отдельности 403;
   обе 403/402; смешанный batch с частичным parsed ответом; обе protocol-failed;
   несовпадающие ширины; OR 400/timeout; cancel, stale scope и ошибка persistence;
   старый другой profile/project context/subject; deferral одного места;
   crash/replay до/после OR POST. Утверждать точный набор оплаченных вызовов,
   реальные verdicts и итоговые состояния, не mock wiring.
-- [ ] Подтвердить отсутствие OR после двух timeout с неизвестной оплатой,
+- [x] Подтвердить отсутствие OR после двух timeout с неизвестной оплатой,
   после ошибок настоящего capture/attempt persistence; подтвердить replay
   исходного OR batch после изменения pending subset/порядка/batch size.
-- [ ] Проверить общий строгий quality predicate на candidate, apply, repeat
+- [x] Проверить общий строгий quality predicate на candidate, apply, repeat
   hold, producer API и approval, включая положительный контроль двух primary.
 
 ### 4. Документация, выпуск и smoke
@@ -281,18 +291,19 @@ endpoint допустимо; частичная конфигурация ост�
 Проверить `docs/security/threat-model.rst`: сохраняются существующие boundaries;
 добавить описание нового phase gate только если меняется заявленное свойство.
 
-- [ ] Описать один резерв, двух-primary gate, неполные результаты и financial fence.
+- [x] Описать один резерв, двух-primary gate, неполные результаты и financial fence.
 - [x] Зафиксировать исследование батчей/кеша: батч 10 сохраняется; необходимость
   одиночных вызовов не опровергнута, увеличение ранее давало truncation. Новые
   оптимизации без доказанного эффекта и сохранения качества не вводятся.
 - [x] Документировать ограничения сверки OR: ledger не полный provider statement;
   management key/export отсутствует, исторические пропуски не заполнять оценками.
-- [ ] Прогнать затронутые suites и реальный локальный HTTP сценарий пары с fake
+- [x] Прогнать затронутые suites и реальный локальный HTTP сценарий пары с fake
   upstream, проверить хранимые attempts/usage/вердикты; не обращаться к моделям.
-- [ ] Независимое ревью и аудит критериев; commit/push feature branch, PR без merge.
-  Corporate credentials сейчас недоступны: не вызывать новое окно Keychain,
-  не запускать запрос ключа повторно без разрешения. GitHub-доставка отдельно
-  не называется успешной публикацией на обоих remotes.
+- [ ] Независимое ревью и аудит критериев; commit/push feature branch,
+  разрешённое закрывающее слияние через PR и production-выкладка.
+  Corporate credentials восстановлены в локальном игнорируемом хранилище;
+  повторный Keychain не нужен. Каждый push через `origin` независимо сверяется
+  с корпоративным Git и GitHub. Чужие ветки не перезаписываются и не удаляются.
 
 ### Результаты исследования расходов и батчинга
 
@@ -318,14 +329,14 @@ Read-only выборка production за 28 октября по московск
 Неполные исторические результаты Heart Abyss не перезапускались и не
 переписывались. Отказ провайдера не является отрицательной оценкой перевода;
 восстановление основной пары не превращает прошлый `completed` в доказательство
-полноценного второго мнения. Новая политика парного fallback отложена
-пользователем и не входит в срочный выпуск.
+полноценного второго мнения. Тогда парный fallback был отложен и не входил
+в срочный выпуск; позднее пользователь отдельно разрешил его реализацию и rollout.
 
-Команда текущей тестовой среды из worktree (PostgreSQL на 5434):
+Команда текущей тестовой среды из worktree (изолированный PostgreSQL 16 на 54283):
 
 ```sh
 DJANGO_SETTINGS_MODULE=weblate.settings_test \
-CI_DB_HOST=127.0.0.1 CI_DB_PORT=5434 CI_DB_NAME=llm_cost_20261029 \
+CI_DB_HOST=127.0.0.1 CI_DB_PORT=54283 CI_DB_NAME=pair_review_fix_20261029 \
 CI_DB_USER=weblate CI_DB_PASSWORD=weblate \
 PYTHONPATH=weblate_customization/src uv run pytest \
   weblate/trans/tests/test_judge_client.py \
@@ -444,3 +455,71 @@ credentials перенесены из локального окружения Ga
 `psycopg-binary==3.3.4` из-за отсутствующего wheel для runner.
 Локальный HTTP smoke повторно подтвердил сохранение SSE usage/ID,
 HTTP 400 без дальнейшего recovery и Gemini medium без платных обращений.
+
+## Проверка парного fallback перед выпуском
+
+Реализация сведена с полной production-базой и её CI-исправлениями.
+PR #27 уже находится в `main=520cb0dbf98fba0763e8f54fcb1d8326a6621726`,
+с одинаковым SHA на корпоративном Git и GitHub. Новые Gemini-эксперименты
+и Flex в эту работу не включены.
+
+- Целевая политика: **26 passed**. Независимое ревью выявило возможность
+  отправить сохранённый, ещё не оплаченный батч после появления здорового
+  primary-мнения у исключённого из pending subset участника. Регрессия сначала
+  получила лишний OR POST, после исправления получила ноль POST с сохранённым
+  reservation. Уже оплаченный полный ответ по-прежнему воспроизводится для
+  совместимого остатка, даже если ранее завершённый участник стал здоровым.
+- После сведения базы и выделения локальных helpers проверки пары,
+  delivery recovery и journal: **46 passed, 2 subtests passed**.
+  Mypy четырёх затронутых runtime-модулей: **0** ошибок. Frozen round parameters
+  остались явными; новые локальные функции разделяют восстановление membership,
+  preflight и проверку участника, не вводя второй слой orchestration.
+- Миграции: **6 passed, 5 subtests passed**. Переход `0155 → 0156` сохранил
+  старые run/attempt/exchange/work/usage значения, оставил association равным
+  null и response-completeness равным false; историческая provenance не угадана.
+- Настоящий loopback HTTP и настоящий Django quality snapshot API проверили
+  восемь сценариев. Обе healthy дают полную проверку; каждая одиночная ошибка
+  даёт ноль OR; два отказа дают один OR; unknown после отправки и local capture
+  failure не открывают OR. Повтор не создаёт новых POST. Сохранённый OR batch
+  из трёх строк восстановлен для двух строк в обратном порядке и при другой
+  adaptive width без нового POST; неоплаченный reservation с уже здоровым
+  участником остался fenced. Snapshot API вернул 200, target/state не менялись.
+  Платных внешних запросов не было.
+- Обновлён `docs/security/threat-model.rst`: per-record pair gate, неизвестная
+  оплата, полнота фактического attempt, сохранность связанной provenance и
+  строгая двух-primary проверка candidate/apply/repeat/approval.
+  Удалён obsolete live probe старого per-seat failover; три самостоятельных
+  диагностических probe используют явный публично разрешённый primary profile.
+  Они проверены на синтаксис и обязательный аргумент, но не запускались платно.
+
+Общий release-регрессионный набор завершён: **988 passed, 2 skipped,
+212 subtests passed**. Он включает judge client/loop/round/deferrals,
+autotranslate, durable delivery и accounting, producer MT/reconciliation,
+quality policy, миграции, producer/API/OpenAPI, optional SSO, machinery
+и release/retention checks. Проверки выполнялись на отдельном native PostgreSQL.
+
+Аудит именованных критериев дополнен прямым отрицательным контролем:
+`JudgePairFallbackTest.test_noncurrent_peer_failures_cannot_authorize_a_fallback`
+проверил старый профиль, старый project context и другой subject:
+**1 passed, 3 subtests passed**, по два corporate POST и ноль OR в каждом случае.
+Положительный контроль `test_saved_exact_peer_failure_allows_single_seat_recheck`
+по-прежнему допускает ровно один OR только для точной текущей пары.
+
+Остальные итоги перед публикацией:
+
+- Все repository hooks прошли. Sphinx HTML с `-W --keep-going` собрал 212
+  документов без warnings после исправления длины одного RST underline.
+- Проверка настоящего чистого `git archive` выявила устаревший fingerprint
+  документационного примера в offline-release gate. Материал примера совпал
+  с ранее разрешённой версией `03ef9d85`; обновлён только fingerprint.
+  Неиспользуемое исключение для machinery tests удалено: credential markers
+  там больше нет. Gate остаётся включённым; архив из 5154 members допущен.
+  Затронутый release-capacity suite: **25 passed**.
+- Резервная копия production подготовлена приватно под
+  `/srv/hcgameloc-backups/2026-10-29-non-gemini-before-pair`: logical database
+  dump проверен `pg_restore --list`, сохранены data, фактический environment
+  и старый image. Неполный tar не используется. Исходные права не менялись;
+  работающий сервис не перезапускался и платных запросов не выполнялось.
+- Commit/push, закрывающее слияние и фактический rollout отмечаются отдельно
+  после их выполнения; эти локальные доказательства не объявляют production
+  обновлённым или GitHub CI полностью зелёным.
