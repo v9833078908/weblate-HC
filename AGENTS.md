@@ -22,11 +22,13 @@ inherited from the original codebase.
 - When approved plan work turns out to need something the plan does not
   mention, stop and get that increment approved instead of widening the change
   silently.
-- Never deploy without explicit approval. Deployment is anything that changes a
-  running instance: `deploy/vps.sh`, any command against `l10n.herocraft.com`
-  or the `hcgameloc-*` containers, production image builds, management commands
-  or `weblate shell` against production, and rebuilding or restarting the
-  shared `dev-docker` stack through `./rundev.sh`.
+- When asked to investigate, perform the necessary read-only production checks
+  and calculations without additional approval. Never change a running instance
+  or deploy without explicit approval. This includes `deploy/vps.sh`, changes
+  against `l10n.herocraft.com` or the `hcgameloc-*` containers, production image
+  builds, mutating management commands or `weblate shell` operations against
+  production, and rebuilding or restarting the shared `dev-docker` stack through
+  `./rundev.sh`.
 - Committing and pushing is not deployment. The "Always finish by committing
   and pushing" rule under "Code expectations" applies once an approved
   implementation is complete and verified; it never authorises starting work or

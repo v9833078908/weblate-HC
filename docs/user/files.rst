@@ -171,6 +171,10 @@ Add new strings (``add``)
 
     Only source, translation and key (context) are used from the uploaded file.
 
+    If the connection closes before a result is shown, check the component's
+    history. You can repeat this method safely: strings already present are
+    skipped, including strings committed before the connection closed.
+
     This option is available only with :ref:`component-manage_units` turned on
     and only if the user has the :ref:`"Add new string" permission <privileges>`.
 

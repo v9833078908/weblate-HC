@@ -16,7 +16,12 @@ from translate.storage.base import TranslationUnit as TranslateToolkitUnit
 
 from weblate.formats.helpers import NamedBytesIO
 from weblate.formats.models import FILE_FORMATS
-from weblate.formats.ttkit import BaseTTKitFormat, CSVMetadataError, TTKitUnit
+from weblate.formats.ttkit import (
+    BaseTTKitFormat,
+    CSVMetadataError,
+    PoMonoFormat,
+    TTKitUnit,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
@@ -91,6 +96,7 @@ def try_load(
     language_code: str | None = None,
     source_language: str | None = None,
     is_template: bool = False,
+    reuse_template_store: bool = False,
     existing_units: Callable[[], Iterable[Unit]] | Iterable[Unit] | None = None,
     file_format_params: FileFormatParams | None = None,
 ) -> TranslationFormat:
@@ -107,6 +113,14 @@ def try_load(
     for file_format in formats_iter(filename, original_format):
         for kwargs, validate in params_iter(file_format, template_store, is_template):
             handle = NamedBytesIO(filename, content)
+            # Opt in only when the template was parsed from these upload bytes.
+            if (
+                reuse_template_store
+                and file_format is PoMonoFormat
+                and kwargs.get("template_store") is template_store
+                and isinstance(template_store, PoMonoFormat)
+            ):
+                handle = template_store.store
             try:
                 result = file_format(
                     handle,

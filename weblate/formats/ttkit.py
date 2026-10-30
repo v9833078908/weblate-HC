@@ -846,6 +846,19 @@ class PoUnit[U: pounit, F: "PoFormat"](BasePoUnit[U, F]):
 
 
 class PoMonoUnit(PoUnit):
+    def set_state(self, state) -> None:
+        # Uploaded source files can share their parsed units with the template.
+        # Fuzzy handling must not modify the template view.
+        if (
+            self._unit is not None
+            and self.parent.template_store is not None
+            and self.parent.store is self.parent.template_store.store
+        ):
+            self._unit = deepcopy(
+                self._unit, {id(self.parent.store): self.parent.store}
+            )
+        super().set_state(state)
+
     @cached_property
     def context(self):
         """

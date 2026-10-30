@@ -144,7 +144,7 @@ from weblate.utils.licenses import (
     get_license_url,
     is_libre,
 )
-from weblate.utils.lock import WeblateLock, WeblateLockTimeoutError
+from weblate.utils.lock import ComponentUpdateLock, WeblateLock, WeblateLockTimeoutError
 from weblate.utils.random import get_random_identifier
 from weblate.utils.regex import (
     compile_regex,
@@ -1841,8 +1841,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
     def lock(self):
         # Serializes component-wide creation/import operations. Existing string
         # updates should rely on row locks, and check refreshes use checks_lock.
-        return WeblateLock(
-            scope="component:update",
+        return ComponentUpdateLock(
             key=self.pk,
             slug=self.slug,
             timeout=5,

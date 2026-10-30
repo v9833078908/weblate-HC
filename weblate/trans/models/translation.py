@@ -2233,6 +2233,9 @@ class Translation(
                     component.file_format_cls,
                     template_store,
                     is_template=is_template,
+                    reuse_template_store=method == "add"
+                    and self.is_template
+                    and not is_template,
                     language_code=self.language_code,
                     source_language=self.component.source_language.code,
                     existing_units=get_existing_units,
