@@ -144,7 +144,7 @@ class FullSourceUploadTest(ViewTestCase):
             samples: list[int] = []
             stopped = threading.Event()
 
-            def sample_memory(stopped=stopped, samples=samples):
+            def sample_memory(stopped, samples):
                 while not stopped.is_set():
                     output = subprocess.check_output(
                         ["/bin/ps", "-o", "rss=", "-p", str(os.getpid())], text=True
@@ -152,7 +152,7 @@ class FullSourceUploadTest(ViewTestCase):
                     samples.append(int(output.strip()))
                     stopped.wait(0.2)
 
-            sampler = threading.Thread(target=sample_memory)
+            sampler = threading.Thread(target=sample_memory, args=(stopped, samples))
             profiling = bool(os.environ.get("PROFILE_IMPORT_MEMORY"))
             if profiling:
                 sampler.start()
