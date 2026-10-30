@@ -874,6 +874,82 @@ class AutoLoadTest(SimpleTestCase):
         self.assertIsInstance(store, fileclass)
         self.assertEqual(fileclass, detect_filename(filename))
 
+    def test_uploaded_po_template_reuses_parsed_store(self) -> None:
+        content = Path(TEST_PO).read_bytes()
+        template = try_load(TEST_PO, content, PoMonoFormat, None, is_template=True)
+        store = try_load(
+            TEST_PO, content, PoMonoFormat, template, reuse_template_store=True
+        )
+        self.assertIs(store.store, template.store)
+
+    def test_reused_po_template_matches_separate_parse_for_fuzzy_units(self) -> None:
+        content = (
+            b'msgid ""\nmsgstr ""\n'
+            b'"Content-Type: text/plain; charset=UTF-8\\n"\n\n'
+            b'msgctxt "menu"\nmsgid "key"\nmsgstr "Text"\n\n'
+            b'#, fuzzy\n#| msgid "old"\nmsgid "other"\nmsgstr "Draft"\n\n'
+            b'msgid "empty"\nmsgstr ""\n\n'
+            b'msgid "one"\nmsgid_plural "many"\nmsgstr[0] "One"\nmsgstr[1] "Many"\n'
+        )
+        for fuzzy in ("", "process", "approve"):
+            with self.subTest(fuzzy=fuzzy):
+                template = try_load(
+                    "upload.po", content, PoMonoFormat, None, is_template=True
+                )
+                baseline = try_load("upload.po", content, PoMonoFormat, template)
+                reused_template = try_load(
+                    "upload.po", content, PoMonoFormat, None, is_template=True
+                )
+                reused = try_load(
+                    "upload.po",
+                    content,
+                    PoMonoFormat,
+                    reused_template,
+                    reuse_template_store=True,
+                )
+
+                def snapshot(store, fuzzy):
+                    return [
+                        (
+                            flag,
+                            unit.context,
+                            unit.source,
+                            unit.target,
+                            unit.is_fuzzy(),
+                            str(unit.flags),
+                            unit.notes,
+                            unit.locations,
+                            unit.previous_source,
+                        )
+                        for flag, unit in store.iterate_merge(
+                            fuzzy, only_translated=False
+                        )
+                    ]
+
+                self.assertEqual(snapshot(reused, fuzzy), snapshot(baseline, fuzzy))
+                self.assertEqual(bytes(reused_template.store), bytes(template.store))
+                self.assertEqual(
+                    reused.store.parseheader(), baseline.store.parseheader()
+                )
+
+    def test_reused_po_duplicate_keys_preserve_template(self) -> None:
+        content = (
+            b'msgid ""\nmsgstr ""\n'
+            b'"Content-Type: text/plain; charset=UTF-8\\n"\n\n'
+            b'msgid "ordinary"\nmsgstr "Text"\n\n'
+            b'#, fuzzy\nmsgid "duplicate"\nmsgstr "First draft"\n\n'
+            b'#, fuzzy\nmsgid "duplicate"\nmsgstr "Last draft"\n'
+        )
+        template = try_load("upload.po", content, PoMonoFormat, None, is_template=True)
+        self.assertIsInstance(template, PoMonoFormat)
+        original = bytes(template.store)
+        store = try_load(
+            "upload.po", content, PoMonoFormat, template, reuse_template_store=True
+        )
+        self.assertIsInstance(store, PoMonoFormat)
+        list(store.iterate_merge("process", only_translated=False))
+        self.assertEqual(bytes(template.store), original)
+
     def test_existing_units_not_loaded_for_po(self) -> None:
         store = try_load(
             TEST_PO,

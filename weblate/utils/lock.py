@@ -4,12 +4,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import threading
+import time
 from typing import TYPE_CHECKING, cast
 from urllib.parse import quote
 
 from django.core.cache import cache
+from django.db import connection, transaction
 from filelock import FileLock, Timeout
 
 from weblate.utils.cache import is_redis_cache
@@ -199,3 +202,76 @@ class WeblateLock:
     @property
     def is_locked(self) -> bool:
         return self._local.depth > 0
+
+
+class ComponentUpdateLock(WeblateLock):
+    """
+    Serialize component updates until the enclosing transaction ends.
+
+    PostgreSQL releases transaction-scoped advisory locks on rollback or loss of
+    the connection, while a paused owner retains its lock indefinitely.
+    """
+
+    # This backend intentionally does not initialize Redis or file-lock state.
+    def __init__(  # pylint: disable=super-init-not-called
+        self, *, key: int, slug: str, timeout: int = 5, origin: str | None = None
+    ) -> None:
+        self._scope = "component:update"
+        self._key = key
+        self._slug = slug
+        self._origin = origin
+        self._timeout = timeout
+        self._name = f"postgres:component:update:{key}"
+        self._local = threading.local()
+        digest = hashlib.blake2b(self._name.encode(), digest_size=8).digest()
+        self._advisory_key = int.from_bytes(digest, "big", signed=True)
+
+    def __enter__(self) -> None:
+        if not hasattr(self._local, "depth"):
+            self._local.depth = 0
+        self.add_breadcrumb("enter")
+        if self.is_locked:
+            self._local.depth += 1
+            return
+        atomic = transaction.atomic()
+        atomic.__enter__()
+        try:
+            self._acquire_advisory_lock()
+        except BaseException as error:
+            atomic.__exit__(type(error), error, error.__traceback__)
+            raise
+        self._local.atomic = atomic
+        self._local.depth = 1
+
+    def _acquire_advisory_lock(self) -> None:
+        deadline = time.monotonic() + self._timeout
+        with start_span(op="lock.wait", name=self._name):
+            while True:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT pg_try_advisory_xact_lock(%s)", [self._advisory_key]
+                    )
+                    acquired = cursor.fetchone()[0]
+                if acquired:
+                    return
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self.add_breadcrumb("timeout")
+                    raise WeblateLockTimeoutError(self.get_error_message(), lock=self)
+                time.sleep(min(0.1, remaining))
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        if not self.is_locked:
+            msg = f"Lock on {self._name} was not held on release"
+            raise WeblateLockNotLockedError(msg, lock=self)
+        self._local.depth -= 1
+        if not self.is_locked:
+            self._local.atomic.__exit__(exc_type, exc_value, traceback)
+
+    @property
+    def is_locked(self) -> bool:
+        return getattr(self._local, "depth", 0) > 0
+
+    def reacquire(self) -> None:
+        # Transaction-scoped locks do not expire.
+        pass

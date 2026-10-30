@@ -3,22 +3,25 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import multiprocessing
+import os
+import queue
+import signal
+import threading
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase
+from django.db import DatabaseError, connections, transaction
+from django.test import SimpleTestCase, TransactionTestCase
 from filelock import FileLock
 
+from weblate.trans.models import Component
 from weblate.trans.tasks import JudgeExecutionGuardError, producer_execution_guard
-from weblate.utils.lock import WeblateLock
+from weblate.utils.lock import ComponentUpdateLock, WeblateLock, WeblateLockTimeoutError
 from weblate.vcs.base import Repository, RepositoryLock, get_repository_lock_key
-
-if TYPE_CHECKING:
-    from weblate.trans.models import Component
 
 
 def hold_file_lock(lock_path: str, ready) -> None:
@@ -411,3 +414,151 @@ class RepositoryLockTest(SimpleTestCase):
             ).as_posix(),
         )
         self.assertNotEqual(first.lock.name, second.lock.name)
+
+
+def hold_component_lock(ready) -> None:
+    connections.close_all()
+    lock = ComponentUpdateLock(key=987654, slug="test", timeout=1)
+    with lock:
+        ready.set()
+        time.sleep(30)
+
+
+class ComponentUpdateLockTest(TransactionTestCase):
+    def test_component_update_does_not_depend_on_redis(self) -> None:
+        with (
+            patch("weblate.utils.lock.is_redis_cache", return_value=True),
+            patch("weblate.utils.lock.cache") as redis_cache,
+        ):
+            component = Component(pk=987654, slug="test")
+            component.__dict__["full_slug"] = "test/test"
+            self.assertIsInstance(component.lock, ComponentUpdateLock)
+            redis_cache.lock.assert_not_called()
+
+    def test_owner_death_releases_lock_and_paused_owner_keeps_it(self) -> None:
+        connections.close_all()
+        context = multiprocessing.get_context("fork")
+        ready = context.Event()
+        process = context.Process(target=hold_component_lock, args=(ready,))
+        process.start()
+        try:
+            self.assertTrue(ready.wait(10))
+            assert process.pid is not None
+            os.kill(process.pid, signal.SIGSTOP)
+            with (
+                self.assertRaises(WeblateLockTimeoutError),
+                ComponentUpdateLock(key=987654, slug="test", timeout=1),
+            ):
+                pass
+            process.kill()
+            process.join(10)
+            with (
+                patch("weblate.utils.lock.is_redis_cache", return_value=True),
+                patch("weblate.utils.lock.cache") as redis_cache,
+            ):
+                with ComponentUpdateLock(key=987654, slug="test", timeout=2):
+                    pass
+                redis_cache.lock.assert_not_called()
+        finally:
+            if process.is_alive():
+                process.kill()
+                process.join(10)
+
+
+def try_component_lock(result) -> None:
+    connections.close_all()
+    try:
+        with ComponentUpdateLock(key=987654, slug="test", timeout=1):
+            result.put(True)
+    except WeblateLockTimeoutError:
+        result.put(False)
+    finally:
+        connections.close_all()
+
+
+class ComponentTransactionLockTest(TransactionTestCase):
+    def test_lock_survives_context_until_outer_commit(self) -> None:
+        with transaction.atomic():
+            lock = ComponentUpdateLock(key=987654, slug="test", timeout=1)
+            with lock:
+                with lock:
+                    self.assertTrue(lock.is_locked)
+                self.assertTrue(lock.is_locked)
+            self.assertFalse(lock.is_locked)
+            result: queue.Queue[bool] = queue.Queue()
+            thread = threading.Thread(target=try_component_lock, args=(result,))
+            thread.start()
+            self.assertFalse(result.get(timeout=10))
+            thread.join(10)
+            self.assertFalse(thread.is_alive())
+        result = queue.Queue()
+        thread = threading.Thread(target=try_component_lock, args=(result,))
+        thread.start()
+        self.assertTrue(result.get(timeout=10))
+        thread.join(10)
+        self.assertFalse(thread.is_alive())
+        connections.close_all()
+
+    def test_outer_rollback_releases_lock(self) -> None:
+        with self.assertRaisesMessage(ValueError, "rollback"), transaction.atomic():
+            with ComponentUpdateLock(key=987654, slug="test", timeout=1):
+                pass
+            msg = "rollback"
+            raise ValueError(msg)
+        result: queue.Queue[bool] = queue.Queue()
+        thread = threading.Thread(target=try_component_lock, args=(result,))
+        thread.start()
+        self.assertTrue(result.get(timeout=10))
+        thread.join(10)
+        self.assertFalse(thread.is_alive())
+
+    def test_backend_termination_rolls_back_before_waiting_worker_resumes(self) -> None:
+        ready: queue.Queue[int] = queue.Queue()
+        resume = threading.Event()
+        result: queue.Queue[bool] = queue.Queue()
+        with connections["default"].cursor() as cursor:
+            cursor.execute(
+                "CREATE TABLE component_lock_interruption_test (value integer)"
+            )
+        try:
+            thread = threading.Thread(
+                target=hold_interrupted_transaction, args=(ready, resume, result)
+            )
+            thread.start()
+            backend_pid = ready.get(timeout=10)
+            with connections["default"].cursor() as cursor:
+                cursor.execute("SELECT pg_terminate_backend(%s)", [backend_pid])
+                self.assertTrue(cursor.fetchone()[0])
+            with (
+                ComponentUpdateLock(key=987654, slug="test", timeout=2),
+                connections["default"].cursor() as cursor,
+            ):
+                cursor.execute("SELECT count(*) FROM component_lock_interruption_test")
+                self.assertEqual(cursor.fetchone()[0], 0)
+            resume.set()
+            self.assertTrue(result.get(timeout=10))
+            thread.join(10)
+            self.assertFalse(thread.is_alive())
+        finally:
+            resume.set()
+            thread.join(10)
+            with connections["default"].cursor() as cursor:
+                cursor.execute("DROP TABLE component_lock_interruption_test")
+
+
+def hold_interrupted_transaction(ready, resume, result) -> None:
+    try:  # ruff: ignore[too-many-statements-in-try-clause]
+        with (
+            ComponentUpdateLock(key=987654, slug="test", timeout=1),
+            connections["default"].cursor() as cursor,
+        ):
+            cursor.execute("INSERT INTO component_lock_interruption_test VALUES (1)")
+            cursor.execute("SELECT pg_backend_pid()")
+            ready.put(cursor.fetchone()[0])
+            resume.wait(10)
+            cursor.execute("SELECT 1")
+        result.put(False)
+    except DatabaseError:
+        result.put(True)
+    finally:
+        connections.close_all()
