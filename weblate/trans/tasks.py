@@ -2655,9 +2655,6 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
     from celery.exceptions import Retry
 
     # ruff: ignore[import-outside-top-level]
-    from django.core.exceptions import ValidationError
-
-    # ruff: ignore[import-outside-top-level]
     from weblate.trans.loc_kit import (
         LOC_KIT_STRING_UPDATE_PORTION_SIZE,
         apply_loc_kit_portion,
@@ -3231,7 +3228,10 @@ def send_llm_cost_report(self, *, month: str | None = None) -> None:
         return
 
     period = _llm_cost_report_period(
-        self.request.expires, timezone.now().astimezone(UTC), self.request.retries, month
+        self.request.expires,
+        timezone.now().astimezone(UTC),
+        self.request.retries,
+        month,
     )
     if period is None:
         _report_llm_cost_failure(

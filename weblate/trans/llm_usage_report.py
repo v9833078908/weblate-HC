@@ -14,6 +14,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from email.message import MIMEPart
 from operator import itemgetter
+from typing import Any
 from urllib.parse import urlsplit
 
 import httpx2
@@ -292,7 +293,7 @@ def _decode_spend(body, start, end, digest):
         msg = "No LiteLLM spend data for this month"
         raise LLMReportDataError(msg)
     rows = []
-    days = set()
+    days: set[date] = set()
     for item in data:
         rows.extend(_spend_day(item, start, end, digest, days))
     return rows
@@ -418,7 +419,7 @@ def _amount_label(amount, unpriced=0):
 
 
 def _cost_groups(rows, key):
-    groups = {}
+    groups: dict[Any, dict[str, Any]] = {}
     for row in rows:
         name = key(row)
         group = groups.setdefault(name, {"cost": None, "unpriced": 0})
@@ -506,7 +507,7 @@ def build_monthly_report(start, end):
         judge = [
             r for r in usage if r["service"] == "litellm" and r["operation"] == "judge"
         ]
-        combined = defaultdict(
+        combined: dict[str, dict[str, Any]] = defaultdict(
             lambda: {"prompt": None, "completion": None, "total": None, "cost": None}
         )
         for row in judge:
@@ -518,7 +519,7 @@ def build_monthly_report(start, end):
                 continue
             group = combined[MODEL_ALIASES.get(row["model"], row["model"])]
             group["cost"] = (group["cost"] or Decimal(0)) + row["cost"]
-        key_rows = [
+        key_rows: list[dict[str, Any]] = [
             {
                 "name": name,
                 "prompt": value["prompt"] if value["prompt"] is not None else "—",
