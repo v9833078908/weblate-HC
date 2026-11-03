@@ -250,10 +250,6 @@ def repair_targets(
     setting = settings_map[engine_id]
     engine = cast("BaseLLMTranslation", MACHINERY[engine_id](setting))
     engine.usage_run_id = str(run_id) if run_id is not None else None
-    from weblate.trans.delivery_policy import (  # ruff: ignore[import-outside-top-level]
-        uses_durable_delivery,
-    )
-
     delivery_run = ProducerRun.objects.filter(pk=run_id).first() if run_id else None
     if uses_durable_delivery(delivery_run):
         engine.durable_single_attempt = True

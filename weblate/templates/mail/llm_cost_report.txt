@@ -1,0 +1,29 @@
+{% load i18n %}
+
+{{ subject }}
+
+OpenRouter
+{% translate "Проекты" %}:
+{% for row in projects %}{{ row.name }}: {{ row.cost }}
+{% empty %}{% translate "Нет записей" %}
+{% endfor %}{% translate "Итого" %}: {{ openrouter_total }}
+
+{% translate "Модели" %}:
+{% for row in models %}{{ row.name }}: {{ row.cost }} — {{ row.share }}
+{% empty %}{% translate "Нет записей" %}
+{% endfor %}
+{% translate "Корпоративная подписка LiteLLM" %}
+{% translate "Токены судей Weblate: входные" %}: {{ judge_prompt }}; {% translate "ответные" %}: {{ judge_completion }}; {% translate "всего" %}: {{ judge_total }}.
+{% translate "Модель | входные | ответные | всего | стоимость всего ключа" %}
+{% for row in key_models %}{{ row.name }} | {{ row.prompt }} | {{ row.completion }} | {{ row.total }} | {{ row.cost }}
+{% empty %}{% translate "Нет записей" %}
+{% endfor %}{% translate "Итого по всему ключу" %}: {{ key_total }}
+
+{% translate "Ведущие модели OpenRouter" %}: {{ top_openrouter }}.
+{% translate "Ведущие модели по стоимости всего ключа LiteLLM" %}: {{ top_key }}.
+
+{% if other_services %}{% translate "Прочие и неизвестные сервисы (не входят в OpenRouter)" %}:
+  {% for row in other_services %}{{ row.name }}: {{ row.cost }}
+  {% endfor %}
+{% endif %}
+{% translate "Токены относятся только к судьям Weblate; стоимость LiteLLM относится ко всему ключу, включая другие операции и потребителей. Стоимость OpenRouter — сообщённая провайдером сумма записей Weblate, а не полный счёт: оплаченные запросы могут отсутствовать или появиться с задержкой." %}

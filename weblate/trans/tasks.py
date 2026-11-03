@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 import time
 from contextlib import ExitStack, contextmanager, suppress
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 from glob import glob
 from operator import itemgetter
@@ -19,13 +19,16 @@ from celery.exceptions import MaxRetriesExceededError
 from celery.schedules import crontab
 from django.conf import settings
 from django.core.cache import cache
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
+from django.core.mail import mail_admins
+from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, F, OuterRef
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext, ngettext, override
+from django_celery_beat.tzcrontab import TzAwareCrontab
 
 from weblate.accounts.utils import remove_user
 from weblate.addons.events import AddonActivityLogReason, AddonActivityLogStatus
@@ -2652,9 +2655,6 @@ def apply_loc_kit_string_update_draft(  # ruff: ignore[complex-structure]
     from celery.exceptions import Retry
 
     # ruff: ignore[import-outside-top-level]
-    from django.core.exceptions import ValidationError
-
-    # ruff: ignore[import-outside-top-level]
     from weblate.trans.loc_kit import (
         LOC_KIT_STRING_UPDATE_PORTION_SIZE,
         apply_loc_kit_portion,
@@ -3154,8 +3154,121 @@ def cleanup_project_backup_download() -> None:
             storage.delete(full_name)
 
 
+def _report_llm_cost_failure(reason: str) -> None:
+    """Report only fixed messages: provider and SMTP errors may contain secrets."""
+    LOGGER.error("Monthly LLM cost report: %s", reason)
+    report_error(reason, level="error", message=True, exception=RuntimeError(reason))
+    try:
+        mail_admins("Monthly LLM cost report failed", reason)
+    except Exception:
+        LOGGER.error("Monthly LLM cost report: administrator notification failed")
+        admin_failure = "Monthly LLM cost report: administrator notification failed"
+        report_error(
+            admin_failure,
+            level="error",
+            message=True,
+            exception=RuntimeError(admin_failure),
+        )
+
+
+def _llm_cost_report_period(expires, now, retries, month):
+    """Return a verifiable delivery's period, or None when it is stale."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.llm_usage_report import previous_utc_month
+
+    if isinstance(expires, str):
+        try:
+            expires = datetime.fromisoformat(expires)
+        except ValueError:
+            return None
+    if not isinstance(expires, datetime) or expires.utcoffset() is None:
+        return None
+    try:
+        expires = expires.astimezone(UTC)
+        published = expires - timedelta(hours=48)
+    except (ValueError, OverflowError):
+        return None
+    if (
+        published.day != 1
+        or published.hour != 6
+        or published.minute != 0
+        or now < published
+        or now >= expires
+    ):
+        return None
+    try:
+        start, end = previous_utc_month(published)
+    except (ValueError, OverflowError):
+        return None
+    expected_month = start.strftime("%Y-%m")
+    if (retries == 0 and month is not None) or (
+        retries > 0 and month != expected_month
+    ):
+        return None
+    return start, end, expected_month
+
+
+@app.task(bind=True, trail=False)
+def send_llm_cost_report(self, *, month: str | None = None) -> None:
+    """Send a fresh beat delivery, retrying only collection before SMTP."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.llm_usage_report import (
+        LLMReportTemporaryError,
+        build_monthly_report,
+        send_monthly_llm_usage_report,
+    )
+
+    if not settings.LLM_COST_REPORT_RECIPIENTS:
+        return
+    try:
+        for address in settings.LLM_COST_REPORT_RECIPIENTS:
+            validate_email(address)
+    except (TypeError, ValidationError):
+        _report_llm_cost_failure("Invalid report recipient configuration.")
+        return
+
+    period = _llm_cost_report_period(
+        self.request.expires,
+        timezone.now().astimezone(UTC),
+        self.request.retries,
+        month,
+    )
+    if period is None:
+        _report_llm_cost_failure(
+            "The scheduled delivery is stale or cannot be verified; run manually."
+        )
+        return
+    start, end, expected_month = period
+
+    try:
+        report = build_monthly_report(start, end)
+    except LLMReportTemporaryError:
+        if self.request.retries < 3:
+            raise self.retry(countdown=300, kwargs={"month": expected_month}) from None
+        _report_llm_cost_failure("Report collection failed after retries.")
+        return
+    except Exception:
+        _report_llm_cost_failure("Report collection failed.")
+        return
+
+    try:
+        send_monthly_llm_usage_report(start, end, report=report)
+    except Exception:
+        _report_llm_cost_failure(
+            "Report delivery failed or is uncertain; check recipients before resending."
+        )
+
+
 @app.on_after_finalize.connect
 def setup_periodic_tasks(sender, **kwargs) -> None:
+    # Always register the entry, including when disabled, so an old persistent
+    # beat row is updated. The task itself gates every delivery on recipients.
+    sender.add_periodic_task(
+        TzAwareCrontab(minute=0, hour=6, day_of_month=1, tz=UTC),
+        send_llm_cost_report.s(),
+        name="monthly-llm-cost-report",
+        expire_seconds=48 * 3600,
+    )
     sender.add_periodic_task(3600, commit_pending.s(), name="commit-pending")
     sender.add_periodic_task(3600, update_remotes.s(), name="update-remotes")
     sender.add_periodic_task(3600, cleanup_repos.s(), name="cleanup-repos")

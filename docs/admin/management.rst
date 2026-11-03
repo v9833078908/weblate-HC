@@ -873,6 +873,22 @@ instance-wide.
 
    :ref:`llm-judge`
 
+send_llm_cost_report
+--------------------
+
+.. weblate-admin:: send_llm_cost_report --month YYYY-MM [--dry-run | --test-recipient EMAIL]
+
+Collects the Weblate usage ledger and corporate LiteLLM key spend for a
+completed UTC calendar month. ``--dry-run`` contacts the data sources without
+opening SMTP. ``--test-recipient`` sends a real email only to that address as
+a blind copy; it does not send to the configured recipients. Without either
+option, the command sends to :setting:`LLM_COST_REPORT_RECIPIENTS`.
+
+Weblate usage is not a complete provider invoice; LiteLLM spend covers the
+entire key, not only the Weblate judge. An empty LiteLLM history is not proof
+of zero spend. Reports and delivery receipts are not archived. Verify with
+recipients before repeating a send whose SMTP outcome is uncertain.
+
 judge_release_advisory_holds
 -----------------------------
 

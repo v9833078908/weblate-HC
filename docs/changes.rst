@@ -7,6 +7,8 @@ Weblate 2026.8.1
 
 .. rubric:: New features
 
+* Added an optional monthly LLM cost email with usage and key-spend CSV attachments; see :setting:`LLM_COST_REPORT_RECIPIENTS`.
+
 * Added optional :ref:`Wizard sign-in through Weblate <wizard-sign-in>` with a configurable navigation link, user-scoped API delegation, existing second-factor authentication and guarded background delivery without automatic paid replay.
 
 * The producer API supports immutable verification sessions and free MT receipt reconciliation; durable provider response storage prevents automatic paid replay after uncertain delivery. See :ref:`api-producer-quality-v2`.

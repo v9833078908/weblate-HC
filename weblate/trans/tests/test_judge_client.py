@@ -3289,9 +3289,9 @@ class JudgeFailedAccountingTest(http_mock.MockDNSMixin, TestCase):
     def test_local_body_reader_failure_is_not_transport_failure(self) -> None:
         class BrokenStream(httpx2.SyncByteStream):
             def __iter__(self):
+                yield from ()
                 msg = "local stream failed"
                 raise RuntimeError(msg)
-                yield b""  # pragma: no cover
 
         http_mock.register_callback(
             "POST",

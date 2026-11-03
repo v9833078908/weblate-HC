@@ -1,0 +1,50 @@
+{% extends "mail/base.html" %}
+
+{% load i18n %}
+
+{% block content %}
+  <h2>OpenRouter</h2>
+  <h3>{% translate "Проекты" %}</h3>
+  <table style="border-collapse:collapse;width:100%">
+    <thead>
+      <tr>
+        <th scope="col" style="text-align:left">{% translate "Проект" %}</th>
+        <th scope="col" style="text-align:right">{% translate "Стоимость" %}</th>
+      </tr>
+    </thead>
+    <tbody>{% for row in projects %}<tr><td>{{ row.name }}</td><td style="text-align:right">{{ row.cost }}</td></tr>{% empty %}<tr><td colspan="2">{% translate "Нет записей" %}</td></tr>{% endfor %}</tbody>
+    <tfoot><tr><th scope="row" style="text-align:left">{% translate "Итого" %}</th><td style="text-align:right">{{ openrouter_total }}</td></tr></tfoot>
+  </table>
+  <h3>{% translate "Модели" %}</h3>
+  <table style="border-collapse:collapse;width:100%">
+    <thead>
+      <tr>
+        <th scope="col" style="text-align:left">{% translate "Модель" %}</th>
+        <th scope="col">{% translate "Стоимость" %}</th>
+        <th scope="col">{% translate "Доля известной суммы" %}</th>
+      </tr>
+    </thead>
+    <tbody>{% for row in models %}<tr><td>{{ row.name }}</td><td>{{ row.cost }}</td><td>{{ row.share }}</td></tr>{% empty %}<tr><td colspan="3">{% translate "Нет записей" %}</td></tr>{% endfor %}</tbody>
+  </table>
+  <h2>{% translate "Корпоративная подписка LiteLLM" %}</h2>
+  <p>{% translate "Токены судей Weblate: входные" %}: {{ judge_prompt }}; {% translate "ответные" %}: {{ judge_completion }}; {% translate "всего" %}: {{ judge_total }}.</p>
+  <table style="border-collapse:collapse;width:100%">
+    <thead>
+      <tr>
+        <th scope="col" style="text-align:left">{% translate "Модель" %}</th>
+        <th scope="col">{% translate "Входные" %}</th>
+        <th scope="col">{% translate "Ответные" %}</th>
+        <th scope="col">{% translate "Всего" %}</th>
+        <th scope="col">{% translate "Стоимость всего ключа" %}</th>
+      </tr>
+    </thead>
+    <tbody>{% for row in key_models %}<tr><td>{{ row.name }}</td><td>{{ row.prompt }}</td><td>{{ row.completion }}</td><td>{{ row.total }}</td><td>{{ row.cost }}</td></tr>{% empty %}<tr><td colspan="5">{% translate "Нет записей" %}</td></tr>{% endfor %}</tbody>
+    <tfoot><tr><th scope="row" colspan="4" style="text-align:left">{% translate "Итого по всему ключу" %}</th><td>{{ key_total }}</td></tr></tfoot>
+  </table>
+  <p>{% translate "Ведущие модели OpenRouter" %}: {{ top_openrouter }}.<br>{% translate "Ведущие модели по стоимости всего ключа LiteLLM" %}: {{ top_key }}.</p>
+  {% if other_services %}
+    <h3>{% translate "Прочие и неизвестные сервисы (не входят в OpenRouter)" %}</h3>
+    <ul>{% for row in other_services %}<li>{{ row.name }}: {{ row.cost }}</li>{% endfor %}</ul>
+  {% endif %}
+  <p>{% translate "Токены относятся только к судьям Weblate; стоимость LiteLLM относится ко всему ключу, включая другие операции и потребителей. Стоимость OpenRouter — сообщённая провайдером сумма записей Weblate, а не полный счёт: оплаченные запросы могут отсутствовать или появиться с задержкой." %}</p>
+{% endblock content %}

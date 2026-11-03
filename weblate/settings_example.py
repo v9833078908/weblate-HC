@@ -968,6 +968,7 @@ CELERY_TASK_ROUTES = {
     "weblate.trans.tasks.auto_translate*": {"queue": "translate"},
     "weblate.accounts.tasks.notify_*": {"queue": "notify"},
     "weblate.accounts.tasks.send_mails": {"queue": "notify"},
+    "weblate.trans.tasks.send_llm_cost_report": {"queue": "notify"},
     "weblate.addons.tasks.addon_change": {"queue": "notify"},
     "weblate.utils.tasks.settings_backup": {"queue": "backup"},
     "weblate.utils.tasks.database_backup": {"queue": "backup"},
@@ -1016,6 +1017,9 @@ LOC_KIT_PROFILE_OPENROUTER_KEY = ""
 LOC_KIT_PROFILE_OPENROUTER_MODEL = ""
 LOC_KIT_PROFILE_SAMPLE_MAX_BYTES = 131072
 LOC_KIT_IMPORT_DRAFT_EXPIRY = 3600
+
+# Empty disables the monthly report; addresses are used only as BCC.
+LLM_COST_REPORT_RECIPIENTS: list[str] = []
 
 # LLM judge (off by default). Sends component strings to the configured
 # endpoint (JUDGE_BASE_URL); see docs/security/threat-model.rst.

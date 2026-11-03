@@ -1476,6 +1476,7 @@ CELERY_TASK_ROUTES = {
     "weblate.trans.tasks.auto_translate*": {"queue": "translate"},
     "weblate.accounts.tasks.notify_*": {"queue": "notify"},
     "weblate.accounts.tasks.send_mails": {"queue": "notify"},
+    "weblate.trans.tasks.send_llm_cost_report": {"queue": "notify"},
     "weblate.addons.tasks.addon_change": {"queue": "notify"},
     "weblate.utils.tasks.settings_backup": {"queue": "backup"},
     "weblate.utils.tasks.database_backup": {"queue": "backup"},
@@ -1712,6 +1713,15 @@ LOC_KIT_IMPORT_DRAFT_EXPIRY = trans_defaults.clamp_loc_kit_import_draft_expiry(
         trans_defaults.DEFAULT_LOC_KIT_IMPORT_DRAFT_EXPIRY,
     )
 )
+
+LLM_COST_REPORT_RECIPIENTS = [
+    address.strip()
+    for address in get_env_list(
+        "WEBLATE_LLM_COST_REPORT_RECIPIENTS",
+        trans_defaults.DEFAULT_LLM_COST_REPORT_RECIPIENTS,
+    )
+    if address.strip()
+]
 
 # LLM judge (off by default). The judge sends component strings to the
 # configured provider; see docs/security/threat-model.rst.

@@ -3289,7 +3289,9 @@ class JudgePairFallbackTest(http_mock.MockDNSMixin, RepoTestMixin, TransactionTe
                     isolate=False,
                     ordinal=0,
                 )
-                for unit, request, result in zip(units, requests, results, strict=True):
+                for unit, request, verdict in zip(
+                    units, requests, results, strict=True
+                ):
                     _write_verdict(
                         unit,
                         request,
@@ -3297,7 +3299,7 @@ class JudgePairFallbackTest(http_mock.MockDNSMixin, RepoTestMixin, TransactionTe
                         attempt=0,
                         run_id=run.pk,
                         request_round=primary_round,
-                        result=result,
+                        result=verdict,
                         profile=profile,
                         project_context=context,
                     )

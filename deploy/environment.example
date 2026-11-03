@@ -109,6 +109,8 @@ WEBLATE_EMAIL_USE_TLS=0
 # it stays a real human mailbox and is unrelated to the sender.
 WEBLATE_SERVER_EMAIL=webnotify@herocraft.com
 WEBLATE_DEFAULT_FROM_EMAIL=webnotify@herocraft.com
+# Empty disables the monthly report. Comma-separated BCC recipients.
+WEBLATE_LLM_COST_REPORT_RECIPIENTS=
 
 # --- Hero Craft customizations -----------------------------------------
 WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation,weblate_customization.machinery.RoutedLiteLLMTranslation

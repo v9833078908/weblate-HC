@@ -33,12 +33,14 @@ inherited from the original codebase.
   and pushing" rule under "Code expectations" applies once an approved
   implementation is complete and verified; it never authorises starting work or
   deploying.
-- `main` is protected: every change must arrive through a pull request with one
-  approving review (code-owner review required). The protection deliberately does
-  not include administrators, so the repository owner may still push to `main`
-  directly; that bypass is reserved for the owner's own closing merges, not for
-  regular work. When acting for anyone else, finish at `git push` of the feature
-  branch plus `gh pr create` - never merge to `main` yourself.
+- Regular changes to protected `main` go through a pull request with one
+  approving code-owner review. When the repository owner explicitly asks the
+  assistant to complete a closing merge, the assistant may merge that PR on the
+  owner's behalf, using the owner's existing administrator bypass if needed,
+  after reviewing the changes and verification results. Without that explicit
+  instruction, finish with the feature branch pushed and a pull request open.
+  Merge approval does not authorise changing branch protection, force-pushing,
+  or deploying.
 
 ## Project overview
 
@@ -175,9 +177,15 @@ inherited from the original codebase.
 HCGameLoc is an independent Weblate-derived repository used to localize Hero
 Craft games. The corporate Git at
 `http://10.39.40.3:8080/scm/git/ai_weblate` is authoritative (`origin`);
-`v9833078908/weblate-HC` on GitHub is an additional mirror. Fetch the current
-`main` from corporate Git and publish there first. GitHub state is not the
-source of truth or a release gate; mirror synchronization is secondary.
+`v9833078908/weblate-HC` on GitHub is an additional mirror. At the start of branch
+work and again immediately before a merge, run `git fetch origin` and compare
+the current corporate `origin/main` with the working branch and GitHub `main`.
+Preserve and incorporate newer corporate commits before merging; never replace
+them with an older mirror state. Publish through `origin`, whose two push URLs
+send to corporate Git first and GitHub second, then verify both branch tips:
+the two pushes are not atomic. GitHub state is not the source of truth or a
+release gate; mirror synchronization is secondary.
+
 It is no longer tracking WeblateOrg/weblate: there is no upstream remote, no rebase workflow,
 and editing files under `weblate/` directly is a normal way to change product
 behavior. Keep the code GPL-3.0-or-later and keep upstream conventions from the
