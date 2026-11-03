@@ -1828,6 +1828,20 @@ when the configured host resolves to OpenRouter.
    * :setting:`JUDGE_ENABLED`
    * :setting:`JUDGE_API_KEY`
 
+.. setting:: LLM_COST_REPORT_RECIPIENTS
+
+LLM_COST_REPORT_RECIPIENTS
+--------------------------
+
+.. versionadded:: 2026.8.1
+
+Email addresses receiving the monthly LLM cost report as blind copies. An empty
+list disables automatic delivery. Docker deployments set
+``WEBLATE_LLM_COST_REPORT_RECIPIENTS``. The report requires the corporate
+LiteLLM judge endpoint and :setting:`JUDGE_API_KEY`; it uses the existing email
+backend and sender. See :wladmin:`send_llm_cost_report` for a dry run and
+test delivery.
+
 .. setting:: JUDGE_MODEL_SEAT_1
 .. setting:: JUDGE_MODEL_SEAT_2
 

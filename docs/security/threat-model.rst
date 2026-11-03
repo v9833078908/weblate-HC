@@ -246,6 +246,18 @@ application of this procedure requires a separate approved maintenance window.
        local write; neither makes an outbound request. *(documented)*
        (source: :ref:`llm-judge`, :doc:`/admin/config`,
        :doc:`/admin/management`)
+   * - Monthly LLM cost report
+     - Scheduled report or operator-invoked management command; recipients
+       are configured site-wide and receive blind copies
+     - Local usage aggregates, a bounded read-only LiteLLM Spend Logs request
+       authenticated with the judge key, and outbound email containing
+       financial aggregates and CSV attachments
+     - In scope. The outbound request uses the configured judge endpoint,
+       the existing outbound network policy, a key-specific filter, bounded
+       response and no redirects. The provider's ledger completeness and
+       downstream mail delivery are outside Weblate's control. No message or
+       delivery archive is stored. *(documented)* (source:
+       :setting:`LLM_COST_REPORT_RECIPIENTS`, :doc:`/admin/management`)
    * - Machine translation and outbound integrations
      - Machine translation, avatars, status reporting, telemetry, error
        reporting, VCS hosts, GitHub App connections, CDN add-on, Fedora
