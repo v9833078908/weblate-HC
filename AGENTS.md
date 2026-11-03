@@ -177,9 +177,15 @@ inherited from the original codebase.
 HCGameLoc is an independent Weblate-derived repository used to localize Hero
 Craft games. The corporate Git at
 `http://10.39.40.3:8080/scm/git/ai_weblate` is authoritative (`origin`);
-`v9833078908/weblate-HC` on GitHub is an additional mirror. Fetch the current
-`main` from corporate Git and publish there first. GitHub state is not the
-source of truth or a release gate; mirror synchronization is secondary.
+`v9833078908/weblate-HC` on GitHub is an additional mirror. At the start of branch
+work and again immediately before a merge, run `git fetch origin` and compare
+the current corporate `origin/main` with the working branch and GitHub `main`.
+Preserve and incorporate newer corporate commits before merging; never replace
+them with an older mirror state. Publish through `origin`, whose two push URLs
+send to corporate Git first and GitHub second, then verify both branch tips:
+the two pushes are not atomic. GitHub state is not the source of truth or a
+release gate; mirror synchronization is secondary.
+
 It is no longer tracking WeblateOrg/weblate: there is no upstream remote, no rebase workflow,
 and editing files under `weblate/` directly is a normal way to change product
 behavior. Keep the code GPL-3.0-or-later and keep upstream conventions from the
