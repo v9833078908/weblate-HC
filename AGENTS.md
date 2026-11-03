@@ -33,12 +33,14 @@ inherited from the original codebase.
   and pushing" rule under "Code expectations" applies once an approved
   implementation is complete and verified; it never authorises starting work or
   deploying.
-- `main` is protected: every change must arrive through a pull request with one
-  approving review (code-owner review required). The protection deliberately does
-  not include administrators, so the repository owner may still push to `main`
-  directly; that bypass is reserved for the owner's own closing merges, not for
-  regular work. When acting for anyone else, finish at `git push` of the feature
-  branch plus `gh pr create` - never merge to `main` yourself.
+- Regular changes to protected `main` go through a pull request with one
+  approving code-owner review. When the repository owner explicitly asks the
+  assistant to complete a closing merge, the assistant may merge that PR on the
+  owner's behalf, using the owner's existing administrator bypass if needed,
+  after reviewing the changes and verification results. Without that explicit
+  instruction, finish with the feature branch pushed and a pull request open.
+  Merge approval does not authorise changing branch protection, force-pushing,
+  or deploying.
 
 ## Project overview
 
