@@ -106,7 +106,7 @@ LOGGER = logging.getLogger(__name__)
 # (base_url, alias) with a monotonic expiry. A failed lookup is cached
 # briefly so an unreachable capability endpoint cannot add one HTTP call
 # to every paid request.
-_ALIAS_CACHE: dict[tuple[str, str], tuple[str, str, float]] = {}
+_ALIAS_CACHE: dict[tuple[str, str, str], tuple[str, str, float]] = {}
 _ALIAS_CACHE_TTL = 300.0
 _ALIAS_CACHE_FAILURE_TTL = 60.0
 _ALIAS_INFO_TIMEOUT = 5.0
@@ -234,9 +234,24 @@ def _validate_base_url(base_url: object) -> str:
         raise JudgeError(_("The LLM judge is not configured."))
     base_url = base_url.strip().rstrip("/")
     parsed = urlsplit(base_url)
-    if parsed.scheme != "https" or not parsed.netloc:
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise JudgeError(_("The LLM judge is not configured.")) from error
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
         raise JudgeError(_("The LLM judge is not configured."))
-    return base_url
+    host = parsed.hostname.casefold().rstrip(".")
+    if ":" in host:
+        host = f"[{host}]"
+    authority = f"{host}:{port}" if port and port != 443 else host
+    return f"https://{authority}{parsed.path.rstrip('/')}"
 
 
 def get_judge_base_url() -> str:
@@ -249,7 +264,7 @@ def get_judge_chat_completions_url() -> str:
 
 
 def _judge_provider(base_url: str) -> str:
-    hostname = urlsplit(base_url).hostname or ""
+    hostname = (urlsplit(base_url).hostname or "").casefold().rstrip(".")
     if hostname == _OPENROUTER_HOST or hostname.endswith(f".{_OPENROUTER_HOST}"):
         return "openrouter"
     if hostname == _LITELLM_HOST or hostname.endswith(f".{_LITELLM_HOST}"):
@@ -339,52 +354,61 @@ def _fetch_litellm_alias(
     entries = payload.get("data", []) if isinstance(payload, dict) else []
     if not isinstance(entries, list):
         entries = []
-    entry = next(
-        (
-            item
-            for item in entries
-            if isinstance(item, dict) and item.get("model_name") == model
-        ),
-        None,
-    )
-    if entry is None:
+    selected = [
+        item
+        for item in entries
+        if isinstance(item, dict) and item.get("model_name") == model
+    ]
+    if not selected:
         return None
-    params = entry.get("litellm_params")
-    upstream = params.get("model") if isinstance(params, dict) else None
-    if not isinstance(upstream, str) or not upstream:
+    upstreams = set()
+    for entry in selected:
+        params = entry.get("litellm_params")
+        if not isinstance(params, dict):
+            return None
+        upstream = params.get("model")
+        base = params.get("api_base")
+        if (
+            not isinstance(upstream, str)
+            or not upstream.strip()
+            or not isinstance(base, str)
+        ):
+            return None
+        host = (urlsplit(base).hostname or "").casefold().rstrip(".")
+        if (
+            not host
+            or host == _OPENROUTER_HOST
+            or host.endswith(f".{_OPENROUTER_HOST}")
+        ):
+            return None
+        if upstream.casefold().startswith("openrouter/"):
+            return None
+        upstreams.add(upstream.strip().casefold())
+    # A multi-deployment alias is comparable only when all deployments point
+    # to the same model. Ambiguous aliases cannot safely be used as fallback.
+    if len(upstreams) != 1:
         return None
-    return upstream, _alias_revision_hash(entry)
+    return next(iter(upstreams)), _alias_revision_hash({"deployments": selected})
 
 
 def resolve_judge_alias(base_url: str, model: str, api_key: str) -> tuple[str, str]:
-    """
-    Return ``(resolved_upstream_model, revision_hash)`` for an alias.
-
-    Only LiteLLM-backed endpoints resolve; every other provider (and any
-    lookup failure) degrades to ``(model, "")`` so a capability-endpoint
-    outage can never block a paid request. Answers are cached per
-    (endpoint, alias) with a bounded TTL.
-    """
+    """Resolve and validate every disclosed LiteLLM deployment, failing closed."""
     if _judge_provider(base_url) != "litellm":
-        return model, ""
-    key = (base_url.rstrip("/"), model)
+        raise JudgeError(_("The LLM judge is not configured."))
+    key = (base_url.rstrip("/"), model, hashlib.sha256(api_key.encode()).hexdigest())
     now = time.monotonic()
     cached = _ALIAS_CACHE.get(key)
     if cached is not None and cached[2] > now:
         return cached[0], cached[1]
-    resolved, revision = model, ""
-    cache_ttl = _ALIAS_CACHE_FAILURE_TTL
     try:
         alias = _fetch_litellm_alias(base_url, model, api_key)
     except Exception:
-        # A capability outage must degrade, not block, judging.
         LOGGER.debug("Judge alias resolution failed for %s", model)
-    else:
-        if alias is not None:
-            resolved, revision = alias
-            cache_ttl = _ALIAS_CACHE_TTL
-    _ALIAS_CACHE[key] = (resolved, revision, now + cache_ttl)
-    return resolved, revision
+        alias = None
+    if alias is None:
+        raise JudgeError(_("The LLM judge is not configured."))
+    _ALIAS_CACHE[key] = (*alias, now + _ALIAS_CACHE_TTL)
+    return alias
 
 
 def _fingerprint(*parts: object) -> str:
@@ -564,40 +588,31 @@ def judge_seat_profiles() -> tuple[JudgeSeatProfile, JudgeSeatProfile]:
 # `JUDGE_REASONING_EFFORT`, "" is a valid, common value ("send no reasoning
 # parameter"), not a missing setting. `_resolve_fallback_profile` still
 # requires it to be a string and applies the same per-provider allowlist.
-_FALLBACK_REQUIRED_SETTING_NAMES = (
-    "JUDGE_FALLBACK_BASE_URL",
-    "JUDGE_FALLBACK_API_KEY",
-    "JUDGE_FALLBACK_MODEL_SEAT_1",
-    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1",
-)
-
-
 def judge_fallback_endpoint() -> JudgeEndpoint | None:
-    """
-    Return the configured fallback endpoint, or None when unconfigured.
-
-    Reject partial configuration or an endpoint equal to the primary.
-    The caller, not this resolver, decides whether the pair permits a request.
-    """
-    configured = [
-        isinstance(value, str) and bool(value.strip())
-        for value in (
-            getattr(settings, name) for name in _FALLBACK_REQUIRED_SETTING_NAMES
-        )
+    """Resolve the shared optional endpoint and enforce its credential boundary."""
+    base = settings.JUDGE_FALLBACK_BASE_URL
+    key = settings.JUDGE_FALLBACK_API_KEY
+    values = [
+        getattr(settings, f"JUDGE_FALLBACK_{name}_SEAT_{seat}", "")
+        for seat in JUDGE_SEATS
+        for name in ("MODEL", "REASONING_EFFORT", "RESPONSE_FORMAT")
     ]
-    reasoning = settings.JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1
-    if not any(configured) and isinstance(reasoning, str) and not reasoning:
+    if not base and not key and not any(values):
         return None
-    if not all(configured):
+    if not isinstance(base, str) or not base.strip() or not isinstance(key, str):
         raise JudgeError(_("The LLM judge is not configured."))
-    base_url = _validate_base_url(settings.JUDGE_FALLBACK_BASE_URL)
-    if base_url == get_judge_base_url():
+    base = _validate_base_url(base)
+    primary = judge_primary_endpoint()
+    if base == primary.base_url:
+        if key and key != primary.api_key:
+            raise JudgeError(_("The LLM judge is not configured."))
+        key = primary.api_key
+    elif not key.strip():
+        raise JudgeError(_("The LLM judge is not configured."))
+    if _judge_provider(base) != "litellm":
         raise JudgeError(_("The LLM judge is not configured."))
     return JudgeEndpoint(
-        role="fallback",
-        base_url=base_url,
-        api_key=settings.JUDGE_FALLBACK_API_KEY,
-        provider=_judge_provider(base_url),
+        role="fallback", base_url=base, api_key=key, provider="litellm"
     )
 
 
@@ -614,9 +629,13 @@ def _resolve_fallback_profile(
     no "inherit": mixing one provider's reasoning control into the other's
     payload would silently corrupt the request.
     """
-    model = settings.JUDGE_FALLBACK_MODEL_SEAT_1
-    reasoning = settings.JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1
-    response_format = settings.JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1
+    model = getattr(settings, f"JUDGE_FALLBACK_MODEL_SEAT_{primary.seat}")
+    reasoning = getattr(
+        settings, f"JUDGE_FALLBACK_REASONING_EFFORT_SEAT_{primary.seat}"
+    )
+    response_format = getattr(
+        settings, f"JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_{primary.seat}"
+    )
     if not isinstance(model, str) or not model.strip():
         raise JudgeError(_("The LLM judge is not configured."))
     model = model.strip()
@@ -638,6 +657,15 @@ def _resolve_fallback_profile(
     upstream_model, alias_revision = resolve_judge_alias(
         endpoint.base_url, model, endpoint.api_key
     )
+    if endpoint.base_url == primary.base_url:
+        primary_upstream, _primary_revision = resolve_judge_alias(
+            primary.base_url, primary.model, primary.api_key
+        )
+        if (
+            model.casefold() == primary.model.casefold()
+            or upstream_model == primary_upstream
+        ):
+            raise JudgeError(_("The LLM judge is not configured."))
     endpoint_fingerprint = _fingerprint(endpoint.base_url)
     model_fingerprint = _fingerprint(model, upstream_model, alias_revision)
     profile_fingerprint = _fingerprint(
@@ -654,7 +682,7 @@ def _resolve_fallback_profile(
         _prompt_schema_version(),
     )
     return JudgeSeatProfile(
-        seat=1,
+        seat=primary.seat,
         model=model,
         base_url=endpoint.base_url,
         api_key=endpoint.api_key,
@@ -675,24 +703,40 @@ def _resolve_fallback_profile(
     )
 
 
+def resolve_judge_fallback_seat_profile(
+    seat: int, primary: JudgeSeatProfile
+) -> JudgeSeatProfile | None:
+    """Resolve and validate one seat's optional fallback."""
+    if seat not in JUDGE_SEATS or primary.seat != seat:
+        raise JudgeError(_("The LLM judge is not configured."))
+    endpoint = judge_fallback_endpoint()
+    model = getattr(settings, f"JUDGE_FALLBACK_MODEL_SEAT_{seat}", "")
+    reasoning = getattr(settings, f"JUDGE_FALLBACK_REASONING_EFFORT_SEAT_{seat}", "")
+    response_format = getattr(
+        settings, f"JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_{seat}", ""
+    )
+    if not model and not reasoning and not response_format:
+        return None
+    if endpoint is None:
+        raise JudgeError(_("The LLM judge is not configured."))
+    return _resolve_fallback_profile(primary, endpoint)
+
+
 def resolve_judge_fallback_profile(
     primary: JudgeSeatProfile,
 ) -> JudgeSeatProfile | None:
-    """Resolve the single logical seat-one pair fallback."""
-    endpoint = judge_fallback_endpoint()
-    if endpoint is None:
-        return None
-    return _resolve_fallback_profile(primary, endpoint)
+    return resolve_judge_fallback_seat_profile(primary.seat, primary)
 
 
 def _validate_fallback_configuration(
     primary_profiles: tuple[JudgeSeatProfile, JudgeSeatProfile],
 ) -> None:
-    """Validate the optional single fallback before any paid request."""
     endpoint = judge_fallback_endpoint()
-    if endpoint is None:
-        return
-    _resolve_fallback_profile(primary_profiles[0], endpoint)
+    profiles = [
+        resolve_judge_fallback_seat_profile(p.seat, p) for p in primary_profiles
+    ]
+    if endpoint is not None and not any(profiles):
+        raise JudgeError(_("The LLM judge is not configured."))
 
 
 def judge_configuration_snapshot() -> dict[str, object]:
@@ -722,19 +766,28 @@ def _fallback_configuration_snapshot(
     primary_profiles: tuple[JudgeSeatProfile, JudgeSeatProfile],
 ) -> dict[str, object]:
     """Redacted fallback metadata, or {} when no fallback is configured."""
-    endpoint = judge_fallback_endpoint()
-    if endpoint is None:
+    profiles = [
+        resolve_judge_fallback_seat_profile(p.seat, p) for p in primary_profiles
+    ]
+    if not any(profiles):
         return {}
-    profile = _resolve_fallback_profile(primary_profiles[0], endpoint)
     return {
-        # A bare hostname (no scheme, path or query) distinguishes providers
-        # for an audit trail without recording the request URL.
-        "fallback_hostname": urlsplit(endpoint.base_url).hostname or "",
-        "fallback_model": [profile.model],
-        "fallback_reasoning": [profile.reasoning],
-        "fallback_response_format": [profile.response_format],
-        "fallback_endpoint_fingerprint": profile.endpoint_fingerprint,
-        "fallback_profile_fingerprint": profile.profile_fingerprint,
+        "fallback_hostname": [
+            urlsplit(p.base_url).hostname if p else "" for p in profiles
+        ],
+        "fallback_model": [p.model if p else "" for p in profiles],
+        "fallback_reasoning": [p.reasoning if p else "" for p in profiles],
+        "fallback_response_format": [p.response_format if p else "" for p in profiles],
+        "fallback_endpoint_fingerprint": [
+            p.endpoint_fingerprint if p else "" for p in profiles
+        ],
+        "fallback_profile_fingerprint": [
+            p.profile_fingerprint if p else "" for p in profiles
+        ],
+        "fallback_same_endpoint": [
+            bool(p and p.base_url == primary.base_url)
+            for p, primary in zip(profiles, primary_profiles, strict=True)
+        ],
     }
 
 
@@ -934,13 +987,15 @@ class _ParseOutcome:
     shape: str = ""
 
 
-def _parse_reply(payload: object, size: int) -> _ParseOutcome:
+def _parse_reply(payload: object, size: int) -> _ParseOutcome:  # ruff: ignore[complex-structure]
     """Accept precisely ``choices[0].message.content`` JSON object replies."""
     if not isinstance(payload, dict):
         return _ParseOutcome(None, "invalid-envelope", shape="non-object")
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
         return _ParseOutcome(None, "invalid-envelope", shape="choices")
+    if choices[0].get("finish_reason") == "length":
+        return _ParseOutcome(None, "finish-length", shape="choices")
     message = choices[0].get("message")
     if not isinstance(message, dict) or "parsed" in message:
         return _ParseOutcome(None, "invalid-envelope", shape="message")
@@ -1461,6 +1516,11 @@ def _request_timeout(profile: JudgeSeatProfile) -> httpx2.Timeout:
 def _post_batch(
     payload: dict, profile: JudgeSeatProfile, *, title: str = OPENROUTER_JUDGE_TITLE
 ) -> _BatchResponse:
+    upstream, revision = resolve_judge_alias(
+        profile.base_url, profile.model, profile.api_key
+    )
+    if upstream != profile.upstream_model or revision != profile.alias_revision:
+        raise JudgeError(_("The LLM judge is not configured."))
     started = time.monotonic()
     try:
         return _post_response(payload, profile, started, title=title)
@@ -1886,7 +1946,7 @@ def _delivery_identity(
         else request.unit_key
     )
     identity = f"judge:{request.unit_id or request.unit_key}:{revision}:{request.target_language}:{profile.seat}:{content}"
-    return identity if phase == "primary" else f"{identity}:pair-fallback"
+    return identity if phase == "primary" else f"{identity}:seat-fallback"
 
 
 def _durable_judge_response(
@@ -1918,6 +1978,13 @@ def _durable_judge_response(
     sent = False
     sent_response = None
 
+    def validate_route():
+        upstream, revision = resolve_judge_alias(
+            profile.base_url, profile.model, profile.api_key
+        )
+        if (upstream, revision) != (profile.upstream_model, profile.alias_revision):
+            raise JudgeError(_("The LLM judge is not configured."))
+
     def send():
         nonlocal sent, sent_response
         sent = True
@@ -1944,7 +2011,24 @@ def _durable_judge_response(
 
     try:  # ruff: ignore[too-many-statements-in-try-clause]
         saved = json.loads(
-            dispatch_exchange(identities, digest, send, run_id=run.pk, on_response=bind)
+            dispatch_exchange(
+                identities,
+                digest,
+                send,
+                run_id=run.pk,
+                on_response=bind,
+                before_send=validate_route,
+                judge_primary_identity=(
+                    [
+                        _delivery_identity(
+                            request, profile, project_context, phase="primary"
+                        )
+                        for request in batch
+                    ]
+                    if phase == "fallback"
+                    else None
+                ),
+            )
         )
         if "body" in saved:
             response = httpx2.Response(
@@ -1972,7 +2056,37 @@ def _durable_judge_response(
             # Legacy journals may contain a serialized client-side timeout.
             # Only a complete captured HTTP response proves a provider outcome.
             result = _BatchResponse(None, None, "unknown")
-        return replace(result, delivery_id=str(exchange_for_work(identities)))
+        exchange_id = exchange_for_work(identities)
+        if "body" in saved:
+            from django.db import transaction  # ruff: ignore[import-outside-top-level]
+
+            from weblate.trans.models.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+                ProducerLLMExchange,
+            )
+
+            with transaction.atomic():
+                exchange = ProducerLLMExchange.objects.select_for_update().get(
+                    pk=exchange_id
+                )
+                if exchange.judge_attempt_id is None:
+                    orphans = list(
+                        JudgeRequestAttempt.objects.filter(
+                            run_id=exchange.run_id,
+                            seat=profile.seat,
+                            profile_fingerprint=profile.profile_fingerprint,
+                            batch_digest=_batch_digest(batch),
+                            delivery_exchange__isnull=True,
+                        )[:2]
+                    )
+                    if len(orphans) > 1:
+                        msg = "Ambiguous judge attempt requires reconciliation"
+                        raise DeliveryUnresolved(msg)  # ruff: ignore[raise-within-try]
+                    if orphans:
+                        exchange.judge_attempt = orphans[0]
+                        exchange.save(update_fields=["judge_attempt", "updated"])
+                    else:
+                        bind_attempt(exchange, result)
+        return replace(result, delivery_id=str(exchange_id))
     except DeliveryUnresolved as error:
         if sent:
             msg = "Failed to persist judge delivery after sending"
@@ -2272,7 +2386,267 @@ def _run_batch(  # ruff: ignore[complex-structure]
     ]
 
 
-def request_verdicts(  # ruff: ignore[too-many-arguments]
+def _recover_subset_attempt(exchange, receipt, profile, request, size, *, phase):
+    """Restore the captured attempt when the original batch cannot be rebuilt."""
+    from django.db import transaction  # ruff: ignore[import-outside-top-level]
+
+    from weblate.trans.models.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+        ProducerLLMExchange,
+    )
+
+    snapshot = exchange.run.configuration_snapshot if exchange.run else {}
+    prefix = "fallback_" if phase == "fallback" else ""
+    index = profile.seat - 1
+    for field_name, expected in (
+        ("model", profile.model),
+        ("profile_fingerprint", profile.profile_fingerprint),
+        ("endpoint_fingerprint", profile.endpoint_fingerprint),
+    ):
+        values = snapshot.get(prefix + field_name)
+        if (
+            not isinstance(values, list)
+            or index < 0
+            or index >= len(values)
+            or values[index] != expected
+        ):
+            return None
+    status = receipt.get("status")
+    body = receipt.get("body")
+    if (
+        not isinstance(status, int)
+        or isinstance(status, bool)
+        or not isinstance(body, str)
+    ):
+        return None
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        payload = None
+    if not isinstance(payload, dict):
+        payload = None
+    failure = _failure_for_http(status)
+    outcome = (
+        _parse_reply(payload, size)
+        if payload is not None and not failure
+        else _ParseOutcome(None, failure or "invalid-json")
+    )
+    failure = failure or outcome.failure_kind
+    response = _BatchResponse(
+        status,
+        payload,
+        failure,
+        response_complete=True,
+        transport_succeeded=200 <= status < 300,
+        provider_cost=_response_cost(receipt.get("headers", {})),
+    )
+    with transaction.atomic():
+        locked = ProducerLLMExchange.objects.select_for_update().get(pk=exchange.pk)
+        if locked.judge_attempt_id is not None:
+            return locked.judge_attempt
+        if JudgeRequestAttempt.objects.filter(
+            run_id=locked.run_id,
+            seat=profile.seat,
+            profile_fingerprint=profile.profile_fingerprint,
+            batch_size=size,
+            delivery_exchange__isnull=True,
+        ).exists():
+            return None
+        raw_attempt = _persist_attempt(
+            enabled=True,
+            run=locked.run,
+            profile=profile,
+            batch=[request] * size,
+            ordinal=0,
+            response=response,
+            parsed=outcome.results is not None and not failure,
+            failure_kind=failure,
+            segment_count=outcome.segment_count,
+            response_shape="chat:recovered",
+        )
+        if raw_attempt is None:
+            return None
+        attempt = cast("JudgeRequestAttempt", raw_attempt)
+        attempt.batch_digest = ""
+        attempt.save(update_fields=["batch_digest"])
+        locked.judge_attempt = attempt
+        locked.save(update_fields=["judge_attempt", "updated"])
+        return attempt
+
+
+def _replay_captured_subset(request, profile, project_context, project_slug):
+    """Use a saved segment by its original position without constructing a send."""
+    from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+        DeliveryUnresolved,
+        read_response,
+        record_usage_once,
+    )
+    from weblate.trans.models.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+        ProducerLLMWork,
+    )
+
+    identity = _delivery_identity(request, profile, project_context, phase="primary")
+    try:  # ruff: ignore[too-many-statements-in-try-clause]
+        key = hashlib.sha256(identity.encode()).hexdigest()
+        work = ProducerLLMWork.objects.select_related("exchange__judge_attempt").get(
+            semantic_key=key
+        )
+        receipt = json.loads(read_response(work.exchange_id))
+        if not isinstance(receipt, dict):
+            return None
+        primary_attempt = work.exchange.judge_attempt
+        if primary_attempt is None:
+            primary_attempt = _recover_subset_attempt(
+                work.exchange,
+                receipt,
+                profile,
+                request,
+                work.exchange.work.count(),
+                phase="primary",
+            )
+        if (
+            primary_attempt is None
+            or primary_attempt.profile_fingerprint != profile.profile_fingerprint
+        ):
+            return None
+        attempt = primary_attempt
+        if receipt.get("status") == 429 or 500 <= receipt.get("status", 0) <= 599:
+            fallback = resolve_judge_fallback_seat_profile(profile.seat, profile)
+            if fallback is None:
+                return None
+            fallback_key = hashlib.sha256(
+                (identity + ":seat-fallback").encode()
+            ).hexdigest()
+            work = ProducerLLMWork.objects.select_related(
+                "exchange__judge_attempt"
+            ).get(semantic_key=fallback_key)
+            receipt = json.loads(read_response(work.exchange_id))
+            fallback_attempt = work.exchange.judge_attempt
+            if fallback_attempt is None and isinstance(receipt, dict):
+                fallback_attempt = _recover_subset_attempt(
+                    work.exchange,
+                    receipt,
+                    fallback,
+                    request,
+                    work.exchange.work.count(),
+                    phase="fallback",
+                )
+            if (
+                fallback_attempt is None
+                or fallback_attempt.profile_fingerprint != fallback.profile_fingerprint
+            ):
+                return None
+            attempt = fallback_attempt
+        exchange = work.exchange
+        if (
+            attempt is None
+            or not isinstance(receipt, dict)
+            or receipt.get("status") != 200
+        ):
+            return None
+        members = list(
+            exchange.work.order_by("position").values_list("position", "identity")
+        )
+        if [position for position, _identity in members] != list(range(len(members))):
+            return None
+        if work.position >= len(members) or members[work.position][1] != work.identity:
+            return None
+        payload = json.loads(receipt["body"])
+        outcome = _parse_reply(payload, len(members))
+        if outcome.results is None or outcome.failure_kind:
+            return None
+        record_usage_once(
+            exchange.pk,
+            lambda: _write_llm_usage(
+                payload,
+                attempt.provider,
+                attempt.model,
+                "",
+                [request] * len(members),
+                attempt,
+                _response_cost(receipt.get("headers", {})),
+            ),
+        )
+        return replace(
+            outcome.results[work.position],
+            request_attempt_id=attempt.pk,
+            served_model=attempt.model,
+            served_provider=attempt.provider,
+            served_profile_fingerprint=attempt.profile_fingerprint,
+            served_prompt_schema_version=attempt.prompt_schema_version,
+        )
+    except (
+        DeliveryUnresolved,
+        ProducerLLMWork.DoesNotExist,
+        TypeError,
+        ValueError,
+        KeyError,
+    ):
+        return None
+
+
+def _recover_primary_batch(request, requests, profile, project_context):
+    """Rebuild saved ordered membership; never turn missing members into a send."""
+    from weblate.trans.judge_loop import (  # ruff: ignore[import-outside-top-level]
+        active_judge_candidate,
+        build_request,
+        current_verdict,
+    )
+    from weblate.trans.models import Unit  # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+        ProducerLLMWork,
+    )
+
+    identity = _delivery_identity(request, profile, project_context, phase="primary")
+    key = hashlib.sha256(identity.encode()).hexdigest()
+    work = ProducerLLMWork.objects.filter(semantic_key=key).first()
+    if work is None:
+        parts = identity.rsplit(":", 4)
+        parts[-2] = "1"
+        legacy = ":".join(parts) + ":pair-fallback"
+        legacy_key = hashlib.sha256(legacy.encode()).hexdigest()
+        if ProducerLLMWork.objects.filter(semantic_key=legacy_key).exists():
+            return [], -1
+        return None
+    members = list(
+        work.exchange.work.order_by("position").values_list("position", "identity")
+    )
+    if [position for position, _ in members] != list(range(len(members))):
+        return [], -1
+    available = {
+        _delivery_identity(item, profile, project_context, phase="primary"): item
+        for item in requests
+    }
+    batch = []
+    for _position, member in members:
+        candidate = available.get(member)
+        if candidate is None:
+            try:  # ruff: ignore[too-many-statements-in-try-clause]
+                unit_id = int(member.split(":")[1])
+                unit = Unit.objects.prefetch_source().get(pk=unit_id)
+                candidate = build_request(unit)
+                if (
+                    _delivery_identity(
+                        candidate, profile, project_context, phase="primary"
+                    )
+                    != member
+                ):
+                    alternative = active_judge_candidate(unit, current_verdict(unit))
+                    if alternative is not None:
+                        candidate = build_request(
+                            unit, target_plurals=alternative.target_list
+                        )
+            except (ValueError, IndexError, Unit.DoesNotExist):
+                return [], -1
+        if (
+            _delivery_identity(candidate, profile, project_context, phase="primary")
+            != member
+        ):
+            return [], -1
+        batch.append(candidate)
+    return batch, [member for _, member in members].index(identity)
+
+
+def request_verdicts(  # ruff: ignore[complex-structure, too-many-arguments]
     requests: Sequence[JudgeRequest],
     *,
     profile: JudgeSeatProfile,
@@ -2303,7 +2677,8 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
     already sent batch keeps its results.
     """
     validate_request_settings()
-    judge_fallback_endpoint()
+    if judge_fallback_endpoint() is not None:
+        _validate_fallback_configuration(judge_seat_profiles())
     if (model is not None and model != profile.model) or (
         seat is not None and seat != profile.seat
     ):
@@ -2321,6 +2696,29 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
         # keep sending that size until the run ends.
         batch_size = _adaptive_budget(profile, adaptive)
         batch = list(requests[start : start + batch_size])
+        selected_index = None
+        advance = batch_size
+        if phase == "primary" and run is not None:
+            from weblate.trans.delivery_policy import (  # ruff: ignore[import-outside-top-level]
+                uses_durable_delivery,
+            )
+
+            if uses_durable_delivery(run):
+                recovered = _recover_primary_batch(
+                    requests[start], requests, profile, project_context
+                )
+                if recovered is not None:
+                    batch, selected_index = recovered
+                    advance = 1
+                    if not batch:
+                        result = _replay_captured_subset(
+                            requests[start], profile, project_context, project_slug
+                        ) or replace(UNPARSED, failure_kind="unknown")
+                        results.append(result)
+                        if on_batch is not None:
+                            on_batch([requests[start]], [result])
+                        start += 1
+                        continue
         if scope_guard is not None and scope_guard(batch):
             break
         batch_results = _run_batch(
@@ -2337,6 +2735,45 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
             ordinal=attempt,
             phase=phase,
         )
+        transient = bool(batch_results) and all(
+            result.failure_kind in {"http-rate-limit", "http-server"}
+            and (
+                result.http_status == 429
+                or (result.http_status is not None and 500 <= result.http_status <= 599)
+            )
+            for result in batch_results
+        )
+        can_fallback = phase == "primary" and profile.seat in JUDGE_SEATS and transient
+        if can_fallback and cancelled is not None and cancelled():
+            can_fallback = False
+        if can_fallback and scope_guard is not None and scope_guard(batch):
+            can_fallback = False
+        if (
+            can_fallback
+            and retry_deadline is not None
+            and time.monotonic() >= retry_deadline
+        ):
+            can_fallback = False
+        if can_fallback:
+            fallback = resolve_judge_fallback_seat_profile(profile.seat, profile)
+            if fallback is not None:
+                batch_results = _run_batch(
+                    batch,
+                    profile=fallback,
+                    project_slug=project_slug,
+                    project_context=project_context,
+                    persistence=persist_attempts or run is not None,
+                    run=run,
+                    retry_budget=budget,
+                    adaptive=False,
+                    isolate=False,
+                    ordinal=attempt + 1,
+                    phase="fallback",
+                    retry_deadline=retry_deadline,
+                )
+        if selected_index is not None:
+            batch_results = [batch_results[selected_index]]
+            batch = [requests[start]]
         results.extend(batch_results)
         if on_batch is not None:
             on_batch(batch, batch_results)
@@ -2350,7 +2787,7 @@ def request_verdicts(  # ruff: ignore[too-many-arguments]
                 if on_batch is not None:
                     on_batch(unsent, stopped)
             break
-        start += batch_size
+        start += advance
         if start < len(requests) and settings.JUDGE_REQUEST_SLEEP:
             time.sleep(settings.JUDGE_REQUEST_SLEEP)
     return results

@@ -105,6 +105,7 @@ def reserve_exchange(
     run_id=None,
     request_codec: str | None = None,
     replay_only: bool = False,
+    judge_primary_identity: Sequence[str] | None = None,
 ) -> ExchangeRef:
     """One transaction claims every semantic member before network I/O."""
     keys = _keys(identity)
@@ -127,6 +128,18 @@ def reserve_exchange(
         raise ValueError(msg)
     try:  # ruff: ignore[too-many-statements-in-try-clause]
         with transaction.atomic():
+            if judge_primary_identity is not None:
+                # Lock the original reservation while deciding whether this stage
+                # may reserve work. Its exact ordered membership is immutable.
+                primary_keys = _keys(judge_primary_identity)
+                list(
+                    ProducerLLMWork.objects.select_for_update().filter(
+                        semantic_key__in=primary_keys
+                    )
+                )
+                if not judge_fallback_allowed(judge_primary_identity):
+                    msg_0 = "Judge primary response does not permit fallback"
+                    raise DeliveryUnresolved(msg_0)
             existing = list(
                 ProducerLLMWork.objects.select_for_update()
                 .filter(semantic_key__in=keys)
@@ -264,6 +277,68 @@ def exchange_for_work(identity: Sequence[str]):
     return identifiers.pop()
 
 
+def legacy_judge_exchange(identity: Sequence[str]):
+    """Read a legacy reply and its original ordered membership without sending."""
+    if not identity or any(not item.endswith(":pair-fallback") for item in identity):
+        msg = "Invalid legacy judge identity"
+        raise DeliveryUnresolved(msg)
+    work = list(ProducerLLMWork.objects.filter(semantic_key__in=_keys(identity)))
+    if len(work) != len(identity) or len({row.exchange_id for row in work}) != 1:
+        msg = "Legacy judge work is not recoverable"
+        raise DeliveryUnresolved(msg)
+    exchange = ProducerLLMExchange.objects.get(pk=work[0].exchange_id)
+    members = list(
+        exchange.work.order_by("position").values_list("position", "identity")
+    )
+    if [position for position, _ in members] != list(range(len(members))):
+        msg = "Legacy judge membership is incomplete"
+        raise DeliveryUnresolved(msg)
+    if any(not member.endswith(":pair-fallback") for _, member in members):
+        msg = "Invalid legacy judge membership"
+        raise DeliveryUnresolved(msg)
+    return exchange, [member for _, member in members], read_response(exchange.pk)
+
+
+def judge_fallback_allowed(identity: Sequence[str]) -> bool:
+    """Allow a fallback only for one fully captured transient HTTP response."""
+    legacy = []
+    for item in identity:
+        parts = item.rsplit(":", 4)
+        if (
+            len(parts) != 5
+            or not parts[0].startswith("judge:")
+            or parts[-2] not in {"1", "2"}
+        ):
+            return False
+        parts[-2] = "1"
+        legacy.append(":".join(parts) + ":pair-fallback")
+    if ProducerLLMWork.objects.filter(semantic_key__in=_keys(legacy)).exists():
+        return False
+    try:
+        exchange_id = exchange_for_work(identity)
+        exchange = ProducerLLMExchange.objects.get(pk=exchange_id)
+        if list(
+            exchange.work.order_by("position").values_list("identity", flat=True)
+        ) != list(identity):
+            return False
+        receipt = json.loads(read_response(exchange_id))
+    except (
+        DeliveryUnresolved,
+        ProducerLLMExchange.DoesNotExist,
+        TypeError,
+        ValueError,
+    ):
+        return False
+    if not isinstance(receipt, dict) or not isinstance(receipt.get("body"), str):
+        return False
+    status = receipt.get("status")
+    return (
+        isinstance(status, int)
+        and not isinstance(status, bool)
+        and (status == 429 or 500 <= status <= 599)
+    )
+
+
 def saved_request_codec(identity: Sequence[str]) -> str | None:
     """Inspect the exact spend fence; a partial/overlapping scope cannot replay."""
     keys = _keys(identity)
@@ -329,6 +404,8 @@ def dispatch_exchange(
     request_codec: str | None = None,
     replay_only: bool = False,
     on_response: Callable[[ProducerLLMExchange, str], None] | None = None,
+    judge_primary_identity: Sequence[str] | None = None,
+    before_send: Callable[[], None] | None = None,
 ) -> str:
     if not replay_only:
         guard_paid_run(run_id)
@@ -338,6 +415,7 @@ def dispatch_exchange(
         run_id=run_id,
         request_codec=request_codec,
         replay_only=replay_only,
+        judge_primary_identity=judge_primary_identity,
     )
     if not reference.can_send:
         body = read_response(reference.id)
@@ -353,6 +431,8 @@ def dispatch_exchange(
                     saved.request_codec = request_codec
                     saved.save(update_fields=["request_codec", "updated"])
         return body
+    if before_send is not None:
+        before_send()
     claimed = ProducerLLMExchange.objects.filter(
         pk=reference.id,
         owner=reference.owner,

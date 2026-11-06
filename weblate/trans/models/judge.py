@@ -93,6 +93,7 @@ _SAFE_CONFIGURATION_SNAPSHOT_KEYS = frozenset(
         "request_deadline",
         "prompt_schema_version",
         "fallback_hostname",
+        "fallback_same_endpoint",
         "fallback_model",
         "fallback_reasoning",
         "fallback_response_format",
