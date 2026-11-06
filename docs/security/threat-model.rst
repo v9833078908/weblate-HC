@@ -217,14 +217,16 @@ application of this procedure requires a separate approved maintenance window.
        move again through an allowed transition, and bounded request-attempt
        diagnostics), outbound requests for both primary seats to the provider
        configured by :setting:`JUDGE_BASE_URL`, bounded by
-       :setting:`JUDGE_REQUEST_DEADLINE` when enabled. Only confirmed failures
-       of both current primary requests permit one fallback opinion through
-       :setting:`JUDGE_FALLBACK_BASE_URL` and its separate credential
-       :setting:`JUDGE_FALLBACK_API_KEY`. One usable primary opinion suppresses
-       fallback; a valid rejection is an opinion, not an availability failure.
-       Unknown billing, incomplete capture, missing provenance, cancellation
-       and local persistence failures do not authorize another paid request.
-       A completely captured but malformed provider reply can prove failure.
+       :setting:`JUDGE_REQUEST_DEADLINE` when enabled. Each seat may make one
+       fallback attempt through :setting:`JUDGE_FALLBACK_BASE_URL` after its
+       primary receives HTTP 429 or 5xx. A fallback on the same endpoint uses
+       the primary credential; another endpoint requires its own credential.
+       The corporate LiteLLM route must disclose complete deployment metadata
+       and cannot route to OpenRouter. Durable runs require a captured HTTP
+       response before fallback. Unknown billing, incomplete capture, missing
+       provenance, cancellation and local persistence failures do not
+       authorize another paid request. A malformed reply alone does not
+       authorize fallback.
        Attempts retain only
        status, timing, response shape, hashes, and token counters, never
        source/target text, prompts, completions, reasoning, headers, or keys.
@@ -385,12 +387,12 @@ repository state, background tasks, outbound requests, and rendered UI.
        explanation, a producer's own answer to a meaning-clarifying
        question about that exact target unit, glossary terms, and failing
        check names to the provider
-       host configured by :setting:`JUDGE_BASE_URL` under separate site-wide
-       credentials. Only strings with confirmed failures from both current
-       primary profiles may be sent to the single fallback model at
-       :setting:`JUDGE_FALLBACK_BASE_URL`; users cannot supply an endpoint,
-       key, or model for either host. Unknown paid outcomes remain fenced,
-       and fallback has no automatic retry or split isolation. The provider response is
+       host configured by :setting:`JUDGE_BASE_URL` under site-wide
+       credentials. A seat may use its configured fallback model at
+       :setting:`JUDGE_FALLBACK_BASE_URL` after HTTP 429 or 5xx for that
+       seat; users cannot supply an endpoint, key, or model. Unknown paid
+       outcomes remain fenced, and fallback has no automatic retry or split
+       isolation. The provider response is
        untrusted input parsed against a strict schema; a batch that exceeds
        :setting:`JUDGE_REQUEST_DEADLINE`, or is malformed, is recorded as
        unparsed and never treated as a favorable verdict. A judge run also
@@ -553,9 +555,10 @@ Reachability preconditions:
   I/O and store complete responses before parsing. Durable judge delivery is
   selected by server-persisted operation admission, not merely by the presence
   of a producer run or a client-supplied policy field. Ordinary Weblate runs
-  retain their configured streaming and bounded primary retries. Both paths
-  use the same per-string two-primary-failure fallback gate; durable delivery
-  does not gain hidden retries. Existing delegated runs, MT receipts and
+  retain their configured streaming and bounded primary retries. Each path
+  permits at most one fallback for a seat after HTTP 429 or 5xx; durable
+  delivery additionally requires the complete captured response and does not
+  gain hidden retries. Existing delegated runs, MT receipts and
   delivery journals retain their financial fences even without the new policy
   marker. The private
   ``DATA_DIR/private-llm-delivery`` files contain translation text and provider
@@ -567,13 +570,16 @@ Reachability preconditions:
   remain available for reconciliation. Provider result lookup and billing
   idempotency are not claimed for unverified routes. *(maintainer)*
   A judge exchange links atomically to its actual HTTP attempt while the
-  complete receipt is captured under the exchange lock. Linked attempts are
-  retained for replay and fallback admission; historical null associations
-  and incomplete-response metadata are not inferred or backfilled. Saved
-  fallback exchanges replay their complete original membership and request
-  digest, not a reordered or narrower pending subset. Before an expired,
-  provably unsent reservation can incur a charge, every original member must
-  still satisfy the current two-primary-failure gate.
+  complete receipt is captured under the exchange lock. A captured response
+  whose association was interrupted can restore the attempt from a matching
+  request digest or frozen run configuration. If the original batch cannot be
+  reconstructed, the batch digest and usage scope remain unknown rather than
+  being attributed to the remaining member. Saved responses retain their
+  original positions when a narrower subset is recovered. Missing or
+  unresolved historical pair-fallback work blocks overlapping new fallback
+  sends; captured legacy responses can be replayed without a new request.
+  Before an expired, provably unsent reservation can incur a charge, its
+  complete original membership remains subject to the current request gate.
   Routed deliveries also bind a closed request/reply codec to the spend fence.
   New requests use source-owned protected slots. A historical parts reply can
   only enter the replay-only path after its complete work set, reconstructed
@@ -1303,15 +1309,16 @@ configuration rather than per-project configuration, the key is built inline
 into the request and never bound to a frame local an error reporter could
 serialize, and a
 transport or parse failure is recorded as unparsed rather than defaulting to
-a favorable verdict. A batch may be sent to a second endpoint
-(:setting:`JUDGE_FALLBACK_BASE_URL`) under its own separate site-wide
-credential (:setting:`JUDGE_FALLBACK_API_KEY`, the second secret to rotate)
-only after both current primary requests have confirmed unusable outcomes.
-One healthy primary suppresses fallback; a parsed rejection never opens it.
-Unknown billing or incomplete capture blocks fallback rather than authorizing
-a new charge. The credential is never shared with the primary, the endpoints
-must differ once canonicalized, and one fallback opinion is never presented as
-two independent primary opinions. Its bounded request-attempt
+a favorable verdict. Each seat can use one fallback model through
+:setting:`JUDGE_FALLBACK_BASE_URL` after HTTP 429 or 5xx from that seat.
+The same endpoint uses the primary credential; a different endpoint requires
+its own site-wide :setting:`JUDGE_FALLBACK_API_KEY`. The judge rejects direct
+OpenRouter routes and LiteLLM deployments disclosed as routing to OpenRouter;
+incomplete or unavailable routing metadata blocks a new request. This check
+covers the routing disclosed by LiteLLM, not further downstream proxies.
+Unknown billing or incomplete capture blocks durable fallback rather than
+authorizing a new charge. A fallback opinion keeps its original seat and is
+never presented as two independent opinions. Its bounded request-attempt
 records contain only redacted metadata and keyed digests, and are not an API
 or report confirmation oracle for a source or translation supplied by a
 user. *(maintainer)*

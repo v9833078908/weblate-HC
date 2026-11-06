@@ -1816,12 +1816,18 @@ JUDGE_BASE_URL
 
 .. versionadded:: 2026.8.1
 
-Base URL of the OpenAI-compatible chat-completions API the LLM judge sends
-requests to. Defaults to ``https://openrouter.ai/api/v1``. Set it to the
-corporate LiteLLM proxy, or another OpenAI-compatible endpoint, to move the
-judge off OpenRouter; this is operator configuration, never exposed
-per-project or per-user. OpenRouter-specific request fields are sent only
-when the configured host resolves to OpenRouter.
+Base URL of the corporate LiteLLM chat-completions API used by the LLM judge.
+The historical default is ``https://openrouter.ai/api/v1``; it is rejected by
+the judge policy, so set this to the corporate LiteLLM endpoint before enabling
+the judge. The setting is site-wide and is not exposed per-project or per-user.
+
+Before a paid request, the judge checks every deployment of the selected alias
+in LiteLLM's ``/model/info``. Direct OpenRouter and deployments whose upstream
+host is ``openrouter.ai`` or a subdomain are rejected. Missing, incomplete or
+unavailable routing information also stops the request. Successful lookups are
+cached for five minutes and checked again before sending; a routing change is
+visible after the cache expires. This check covers routes disclosed by LiteLLM,
+not routing performed by a downstream proxy.
 
 .. seealso::
 
@@ -1850,7 +1856,7 @@ JUDGE_MODEL_SEAT_1, JUDGE_MODEL_SEAT_2
 
 .. versionadded:: 2026.8.1
 
-OpenRouter model identifiers for the two seats of the judge collegium. Both
+LiteLLM model aliases for the two seats of the judge collegium. Both
 seats judge every string independently; below critical the string's verdict
 is the strictest of the two. With :setting:`JUDGE_CONSENSUS_REJECT` enabled,
 a critical hold requires both seats to agree (see :ref:`llm-judge`);
@@ -1889,7 +1895,7 @@ JUDGE_BATCH_SIZE
 
 .. versionadded:: 2026.8.1
 
-Number of strings sent to OpenRouter in a single judge request. Defaults to
+Number of strings sent in a single judge request. Defaults to
 5. Both the per-string cost and the run's wall-clock time scale with this
 value: a smaller batch multiplies the number of requests, which increases
 both the run time and the risk of provider rate limiting.
@@ -2102,19 +2108,14 @@ JUDGE_REASONING_EFFORT
 Reasoning budget requested from a model that supports one. Empty by default,
 which sends no reasoning parameter at all and leaves each model on its own
 default. Set it to cap the spend: on the first production-shaped run reasoning
-tokens accounted for most of the cost of one seat. The reasoning trace itself
-is always excluded from the response, because the judge reads only the
+tokens accounted for most of the cost of one seat. The judge reads only the
 structured verdict.
 
-The accepted values depend on the provider behind :setting:`JUDGE_BASE_URL`.
-On OpenRouter this is an ``effort`` level (``minimal``, ``low``, ``medium`` or
-``high``). On a LiteLLM endpoint each alias declares the control it supports,
-so the value is instead one of a closed set naming the exact request field
-to send:
+Each LiteLLM alias declares the control it supports. The value is one of a
+closed set naming the exact request field to send:
 
 ``reasoning_effort.none``
-    Sends top-level ``reasoning_effort: "none"``. The corporate
-    ``openrouter/deepseek-v4.1-flash`` route accepts this to disable thinking.
+    Sends top-level ``reasoning_effort: "none"``.
 ``reasoning_effort.low``
     Sends top-level ``reasoning_effort: "low"``. The corporate ``Kimi K3.1 Pro``
     route accepts this; it reduces reasoning but does not disable it.
@@ -2156,81 +2157,76 @@ JUDGE_FALLBACK_BASE_URL, JUDGE_FALLBACK_API_KEY
 
 .. versionadded:: 2026.8.1
 
-Optional endpoint and credential for one pair-level availability fallback.
-Configure the endpoint, credential, seat-one model, and response format
-together; reasoning effort may be blank. Partial configuration is rejected
-before a request. The canonical fallback URL must differ from
-:setting:`JUDGE_BASE_URL`.
+Optional endpoint and credential for the fallback models. Set the endpoint
+and configure the model and response format for each seat that needs a
+fallback. Reasoning may be blank. Incomplete seat configuration is rejected
+before a paid request.
 
-Both primary seats run independently. One healthy primary opinion is kept
-without a fallback request. Only two confirmed failures for the same current
-request snapshot permit one fallback opinion. Missing evidence, cancellation,
-local failures and unknown paid outcomes, including timeouts, do not permit a
-fallback. A complete malformed provider response can be a confirmed failure.
-The pair policy permits only OpenRouter ``deepseek/deepseek-v4-pro`` with
-reasoning effort ``none``; an incompatible configured profile is not sent.
-The fallback is one opinion, not a replacement for two primary opinions; it
-does not authorize automatic approval or complete candidate verification.
-Durable delivery fences uncertain charges and replays the original saved batch
-instead of re-sending a subset.
-New judge exchanges retain a protected link to their actual attempt. Cleanup
-keeps linked financial provenance while removing ordinary expired diagnostics.
-Historical exchanges without this link remain unchanged; their attempts are
-not guessed, and their paid-work fences still apply.
+The fallback can use the primary endpoint. On the same endpoint, leave the
+fallback key empty to inherit :setting:`JUDGE_API_KEY`, or set the same key
+explicitly. A different key on the same endpoint is rejected. A different
+endpoint requires its own key and must also pass the LiteLLM route checks in
+:setting:`JUDGE_BASE_URL`. A primary and fallback on the same endpoint must
+have different aliases and different resolved upstream models.
 
-An invalid fallback request, such as an HTTP 400 response, stops the judge
-instead of becoming an unparsed verdict with further recovery attempts.
-Correct the fallback configuration before retrying. ``minimal`` is still
-reasoning, not an off setting.
+Each seat can make at most one fallback attempt per batch, after its primary
+returns HTTP 429 or 5xx. A failure of one seat does not require the other to
+fail. Authentication and invalid-request errors, malformed or incomplete
+verdicts, and unknown paid outcomes such as transport failures or timeouts do
+not authorize a fallback. The result belongs to the original seat and is
+combined with the other seat's result by the usual policy.
 
-Reported cost and token counts received before an interrupted judge stream
-are retained. Valid cost-only translation responses are also recorded;
-unknown prices remain unknown and provider prices are not rounded.
+For runs admitted to durable delivery, fallback requires a saved complete
+primary response with an eligible HTTP status. Saved responses are replayed
+without another paid request; an unresolved delivery is fenced rather than
+retried under a new identity. Existing pair-fallback records remain subject to
+these fences. Old OpenRouter work is not resumed with a new paid request.
+Ordinary runs are not made durable by configuring a fallback.
 
-To roll the primary back onto this same endpoint later, clear the
-``JUDGE_FALLBACK_*`` settings first, then set the primary settings to the
-recorded values, and recreate the container. Leaving the fallback pointed
-at the endpoint you are about to promote to primary is rejected by the
-equal-URL check above.
+To disable the fallback, clear all ``JUDGE_FALLBACK_*`` settings. Before
+promoting a fallback model to primary, clear or change its fallback model so
+that the primary and fallback do not resolve to the same model. Record the
+previous settings and use the deployment procedure appropriate to the
+installation when applying or rolling back configuration.
 
 .. seealso::
 
    * :setting:`JUDGE_BASE_URL`
    * :setting:`JUDGE_API_KEY`
    * :setting:`JUDGE_FALLBACK_MODEL_SEAT_1`
+   * :setting:`JUDGE_FALLBACK_MODEL_SEAT_2`
 
 .. setting:: JUDGE_FALLBACK_MODEL_SEAT_1
+.. setting:: JUDGE_FALLBACK_MODEL_SEAT_2
 .. setting:: JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1
+.. setting:: JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2
 .. setting:: JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1
+.. setting:: JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2
 
-JUDGE_FALLBACK_MODEL_SEAT_1, JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1, JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1
-----------------------------------------------------------------------------------------------------------
+JUDGE_FALLBACK_MODEL_SEAT_1, JUDGE_FALLBACK_MODEL_SEAT_2
+---------------------------------------------------------
 
 .. versionadded:: 2026.8.1
 
-Model and provider-semantic profile for the single fallback endpoint.
-Unlike :setting:`JUDGE_REQUEST_DEADLINE_SEAT_1` and the other transport
-settings, none of these three inherit from the primary seat's value: model,
-reasoning effort and response format are specific to the provider actually
-serving the request, and reusing the primary's value here has previously
-sent a LiteLLM-only reasoning control to OpenRouter. The reasoning-effort
-setting may be blank, exactly like :setting:`JUDGE_REASONING_EFFORT`: blank
-means "send no reasoning parameter", not "unset". Transport shape - stream,
-batch size, request deadline, temperature, and the token cap - always
-inherits primary seat one's resolved value, so a fallback batch is never
-wider than that seat.
+Configure the fallback model, reasoning control and response format separately
+for each seat. The response format must be ``json_object`` or ``json_schema``.
+The reasoning control uses the values documented in
+:setting:`JUDGE_REASONING_EFFORT`; an empty value sends no reasoning parameter.
+These three values do not inherit from the primary profile. Stream mode, batch
+size, request deadline, temperature and token limit inherit the corresponding
+primary seat's resolved values. There is no separate fallback temperature.
 
-An invalid fallback request, such as an HTTP 400 response, stops the judge
-instead of being retried as an unavailable verdict. Correct the fallback
-model and its supported parameters before starting another run. A blank
-reasoning setting leaves the choice to the provider; ``none`` requests
-reasoning off only where the selected model supports it. ``minimal`` is
-still reasoning, not an off setting.
+Before enabling a model, verify its reasoning control and compatibility with
+the inherited temperature on the configured route. In particular, the control
+for disabling reasoning on ``atlas_glm-5.1`` has not been confirmed; do not
+enable that fallback until its actual response and temperature compatibility
+have been checked.
 
 .. seealso::
 
    * :setting:`JUDGE_FALLBACK_BASE_URL`
    * :setting:`JUDGE_MODEL_SEAT_1`
+   * :setting:`JUDGE_MODEL_SEAT_2`
    * :setting:`JUDGE_REASONING_EFFORT`
 
 .. setting:: PIWIK_SITE_ID

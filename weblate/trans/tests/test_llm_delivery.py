@@ -14,6 +14,8 @@ from weblate.trans.llm_delivery import (
     DeliveryUnresolved,
     capture_transport_response,
     dispatch_exchange,
+    judge_fallback_allowed,
+    legacy_judge_exchange,
     reserve_exchange,
     resolve_run_deliveries,
 )
@@ -193,3 +195,49 @@ class LLMDeliveryTest(TestCase):
             dispatch_exchange(["mt:unresolved"], "e" * 64, lambda: "paid"),
             "must remain recoverable",
         )
+
+    def test_judge_fallback_requires_captured_transient_primary(self):
+        identity = ["judge:1:r1:pl:1:content"]
+        dispatch_exchange(identity, "d" * 64, lambda: '{"status": 503, "body": "busy"}')
+        self.assertTrue(judge_fallback_allowed(identity))
+        self.assertFalse(judge_fallback_allowed(["judge:2:r1:pl:1:content"]))
+        dispatch_exchange(
+            ["judge:3:r1:pl:1:content"],
+            "e" * 64,
+            lambda: '{"status": 403, "body": "denied"}',
+        )
+        self.assertFalse(judge_fallback_allowed(["judge:3:r1:pl:1:content"]))
+
+    def test_judge_fallback_rejects_overlapping_legacy_reservation(self):
+        identity = ["judge:1:r1:pl:1:content", "judge:2:r1:pl:1:content"]
+        dispatch_exchange(identity, "f" * 64, lambda: '{"status": 429, "body": "busy"}')
+        legacy = reserve_exchange([identity[1] + ":pair-fallback"], "a" * 64)
+        for state in ("reserved", "sending", "unknown", "received"):
+            ProducerLLMExchange.objects.filter(pk=legacy.id).update(state=state)
+            self.assertFalse(judge_fallback_allowed(identity))
+
+    def test_legacy_judge_replay_retains_saved_order_for_a_subset(self):
+        members = [
+            "judge:2:r1:pl:1:content:pair-fallback",
+            "judge:1:r1:pl:1:content:pair-fallback",
+        ]
+        receipt = '{"status": 200, "body": "saved"}'
+        dispatch_exchange(members, "d" * 64, lambda: receipt)
+        exchange, identities, saved = legacy_judge_exchange([members[1]])
+        self.assertEqual(identities, members)
+        self.assertEqual(saved, receipt)
+        self.assertEqual(exchange.work.count(), 2)
+
+    def test_pre_send_refusal_keeps_reservation_never_sent(self):
+        calls = []
+
+        def refuse():
+            msg = "route changed"
+            raise ValueError(msg)
+
+        with self.assertRaisesRegex(ValueError, "route changed"):
+            dispatch_exchange(
+                ["route:1"], "d" * 64, lambda: calls.append(1), before_send=refuse
+            )
+        self.assertEqual(calls, [])
+        self.assertEqual(ProducerLLMExchange.objects.get().state, "reserved")
