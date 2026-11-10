@@ -38,6 +38,8 @@ from weblate.trans.repeats import (
     share_translations,
     unit_fingerprint,
 )
+from weblate.wizard_auth.grants import delegated_project_actor
+from weblate.wizard_auth.policy import wizard_can_write_component
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -464,6 +466,7 @@ def prepare_run(
     refresh_group_ids: Iterable[int] = (),
     retry_unknown: bool = False,
     group_ids: Iterable[int] | None = None,
+    wizard_delegation: str | None = None,
 ) -> RepeatRecommendationRun:
     """Freeze a visible policy scope and reserve its bounded paid requests."""
     if request_cap < 1:
@@ -497,6 +500,8 @@ def prepare_run(
             for context in (*plan.contexts, *plan.oversized)
         ]
         snapshot = {"policy_revision": policy.revision, "groups": groups}
+        if wizard_delegation is not None:
+            snapshot["_wizard_delegation"] = wizard_delegation
         run = RepeatRecommendationRun.objects.create(
             policy=policy,
             actor=actor,
@@ -701,9 +706,10 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
             _fail_attempt(attempt, "cancelled")
             finalize_run(run.pk)
             return
-        if run.actor is None or not bool(
-            run.actor.has_perm("project.edit", run.policy.project)
-        ):
+        actor = delegated_project_actor(
+            run.actor, run.policy.project, run.snapshot.get("_wizard_delegation")
+        )
+        if actor is None or not actor.has_perm("project.edit", run.policy.project):
             _fail_attempt(attempt, "permission-changed")
             finalize_run(run.pk)
             return
@@ -712,12 +718,17 @@ def execute_attempt(*, attempt: RepeatRecommendationAttempt) -> None:
             for group in attempt.request_snapshot.get("groups", [])
             for unit_id in group["unit_ids"]
         }
-        visible_unit_ids = set(
+        visible_units = (
             policy_units(run.policy)
-            .filter_access(run.actor)
+            .filter_access(actor)
             .filter(pk__in=requested_unit_ids)
-            .values_list("pk", flat=True)
+            .select_related("translation__component__linked_component")
         )
+        visible_unit_ids = {
+            unit.pk
+            for unit in visible_units
+            if wizard_can_write_component(actor, unit.translation.component)
+        }
         if visible_unit_ids != requested_unit_ids:
             _fail_attempt(attempt, "access-changed")
             finalize_run(run.pk)

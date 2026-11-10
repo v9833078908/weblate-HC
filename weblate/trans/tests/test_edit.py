@@ -58,6 +58,7 @@ from weblate.utils.state import (
 )
 from weblate.utils.stats import CategoryLanguage, ProjectLanguage
 from weblate.utils.views import get_sort_name
+from weblate.wizard_auth.policy import wizard_principal
 
 if TYPE_CHECKING:
     from weblate.checks.base import BaseCheck
@@ -1587,6 +1588,27 @@ class EditPropagateTest(EditTest):
                 component=second_component, action=ActionEvents.PROPAGATED_EDIT
             ).exists()
         )
+
+    def test_wizard_edit_skips_component_linked_to_unowned_repository(self) -> None:
+        foreign_project = Project.objects.create(name="Other", slug="other")
+        foreign_component = self._create_component(
+            "po", "second-po/*.po", name="Foreign", project=foreign_project
+        )
+        second = Translation.objects.get(component__slug="second", language_code="cs")
+        Component.objects.filter(pk=second.component_id).update(
+            linked_component=foreign_component
+        )
+        self.project.add_user(self.user, "Administration")
+        with override_settings(WIZARD_EXTERNAL_PROJECT_IDS=[self.project.pk]):
+            actor = wizard_principal(self.user)
+        sibling = self.get_unit(source=self.source, translation=second)
+        self.assertTrue(actor.has_perm("unit.edit", sibling))
+
+        unit = self.get_unit(source=self.source)
+        unit.translate(actor, [self.target], STATE_TRANSLATED)
+        sibling.refresh_from_db()
+        self.assertEqual(unit.target, self.target)
+        self.assertEqual(sibling.target, "")
 
     def test_edit(self) -> None:
         def get_targets() -> list[str]:

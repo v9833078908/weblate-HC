@@ -14,9 +14,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from weblate.trans.models import Project
-
-FIELDS = {"persona", "style", "language_instructions"}
-ENGINES = {"openrouter", "litellm"}
+from weblate.wizard_auth.policy import (
+    PROFILE_ENGINES,
+    PROFILE_FIELDS,
+    require_wizard_profile,
+    sign_wizard_profile,
+    wizard_external,
+    wizard_project_profile_allowed,
+)
 
 
 class TranslatorInstructionsSerializer(serializers.Serializer):
@@ -33,17 +38,19 @@ class ProducerProfileResponseSerializer(serializers.Serializer):
 
 
 class ProducerProfileRequestSerializer(serializers.Serializer):
-    service = serializers.ChoiceField(choices=sorted(ENGINES))
+    service = serializers.ChoiceField(choices=sorted(PROFILE_ENGINES))
     configuration = TranslatorInstructionsSerializer()
 
 
 def public_profiles(project):
     return {
         engine: {
-            key: copy.deepcopy(value) for key, value in config.items() if key in FIELDS
+            key: copy.deepcopy(value)
+            for key, value in config.items()
+            if key in PROFILE_FIELDS
         }
         for engine, config in project.machinery_settings.items()
-        if engine in ENGINES and isinstance(config, dict)
+        if engine in PROFILE_ENGINES and isinstance(config, dict)
     }
 
 
@@ -53,6 +60,8 @@ class ProducerTranslationProfile(APIView):
     @extend_schema(responses=ProducerProfileResponseSerializer)
     def get(self, request, slug):
         project = get_object_or_404(request.user.allowed_projects, slug=slug)
+        if not wizard_project_profile_allowed(request.user, project):
+            return Response({})
         return Response(public_profiles(project))
 
     @extend_schema(
@@ -62,9 +71,9 @@ class ProducerTranslationProfile(APIView):
     def patch(self, request, slug):
         service, config = request.data.get("service"), request.data.get("configuration")
         if (
-            service not in ENGINES
+            service not in PROFILE_ENGINES
             or not isinstance(config, dict)
-            or not set(config) <= FIELDS
+            or not set(config) <= PROFILE_FIELDS
         ):
             msg = "Only translator instructions may be updated"
             raise ValidationError(msg)
@@ -96,6 +105,7 @@ class ProducerTranslationProfile(APIView):
             if not request.user.has_perm("project.edit", project):
                 msg = "Project edit permission required"
                 raise PermissionDenied(msg)
+            require_wizard_profile(request.user, project)
             current = project.machinery_settings.get(service, {})
             if not isinstance(current, dict):
                 msg = "Invalid existing service configuration"
@@ -104,5 +114,7 @@ class ProducerTranslationProfile(APIView):
                 **project.machinery_settings,
                 service: {**current, **config},
             }
+            if wizard_external(request.user):
+                sign_wizard_profile(project, service)
             project.save(update_fields=["machinery_settings"])
         return Response(public_profiles(project))

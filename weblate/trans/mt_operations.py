@@ -25,8 +25,8 @@ from weblate.trans.models.judge import compute_decision_revision
 from weblate.trans.models.producer_mt import unit_revision
 from weblate.wizard_auth.grants import (
     WizardAuthorizationRequired,
+    delegated_run_actor,
     delegation_active,
-    run_delegation_active,
 )
 
 if TYPE_CHECKING:
@@ -206,9 +206,11 @@ def _receive_pending(operation, owner, engine, translation, actor, pending) -> b
                 if actor
                 else None
             )
+            current_actor = delegated_run_actor(
+                operation.run, current_actor, component=translation.component
+            )
             permitted = (
                 current_actor is not None
-                and run_delegation_active(operation.run)
                 and current_actor.has_perm("translation.auto", translation)
                 and not translation.component.locked
                 and not translation.is_readonly
@@ -331,14 +333,10 @@ def process_mt_operation(run_id: str | UUID) -> dict:
         run.started = run.started or timezone.now()
         run.save(update_fields=["status", "started"])
     translation = operation.translation
-    actor = operation.actor
     run = operation.run
+    actor = delegated_run_actor(run, operation.actor, component=translation.component)
     cancelled = _cancelled(run_id)
-    permitted = (
-        actor is not None
-        and run_delegation_active(run)
-        and actor.has_perm("translation.auto", translation)
-    )
+    permitted = actor is not None and actor.has_perm("translation.auto", translation)
     permitted = (
         permitted
         and not translation.component.locked
@@ -433,9 +431,11 @@ def process_mt_operation(run_id: str | UUID) -> dict:
                 if actor
                 else None
             )
+            actor = delegated_run_actor(
+                operation.run, actor, component=translation.component
+            )
             if delegated and (
                 authorization_paused
-                or not run_delegation_active(operation.run)
                 or actor is None
                 or not actor.has_perm("translation.auto", translation)
             ):
@@ -449,7 +449,6 @@ def process_mt_operation(run_id: str | UUID) -> dict:
                 saved.state = "stale"
             elif (
                 actor is None
-                or not run_delegation_active(operation.run)
                 or not actor.has_perm("translation.auto", translation)
                 or translation.component.locked
                 or translation.is_readonly
@@ -552,11 +551,11 @@ def reconcile_mt_operation(operation_id, *, reauthorize_family=None) -> dict:
             }
             run.save(update_fields=["execution_options"])
         translation = operation.translation
-        actor = operation.actor
-        permitted = (
-            actor is not None
-            and run_delegation_active(run)
-            and actor.has_perm("translation.auto", translation)
+        actor = delegated_run_actor(
+            run, operation.actor, component=translation.component
+        )
+        permitted = actor is not None and actor.has_perm(
+            "translation.auto", translation
         )
         permitted = (
             permitted

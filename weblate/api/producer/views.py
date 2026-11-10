@@ -51,6 +51,7 @@ from weblate.api.producer.serializers import (
     ProducerJudgeEstimateSerializer,
     ProducerMeSerializer,
     ProducerProjectSummarySerializer,
+    ProducerProjectWizardAccessSerializer,
     ProducerQualityIssueFilterSerializer,
     ProducerQualityIssueListSerializer,
     ProducerQualityOperationSerializer,
@@ -86,7 +87,7 @@ from weblate.trans.judge_loop import (
     accept_judge_candidate,
     undo_judge_application,
 )
-from weblate.trans.models import Project
+from weblate.trans.models import Component, Project, Translation
 from weblate.trans.models.judge import (
     JudgeApplication,
     JudgeApplicationUndoError,
@@ -109,6 +110,15 @@ from weblate.trans.tasks import publish_producer_run_dispatch
 from weblate.trans.views.judge import _get_scope, user_can_view_producer_run
 from weblate.utils.state import STATE_APPROVED
 from weblate.wizard_auth.grants import request_binding, subject_for
+from weblate.wizard_auth.policy import (
+    WIZARD_ACCESS_POLICY_VERSION,
+    require_wizard_components,
+    require_wizard_profile,
+    require_wizard_project,
+    wizard_can_write_component,
+    wizard_internal,
+    wizard_scope_project,
+)
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -163,6 +173,9 @@ class ProducerMe(APIView):
         }
         if getattr(settings, "WIZARD_SSO_ENABLED", False):
             payload["subject"] = subject_for(user)
+        if user.wizard_project_roles is not None:
+            payload["wizard_access_policy"] = WIZARD_ACCESS_POLICY_VERSION
+            payload["bdhc_access"] = wizard_internal(user)
         return Response(ProducerMeSerializer(payload).data)
 
 
@@ -185,6 +198,30 @@ class ProducerProjects(ListAPIView):
         # The same access filter the native project API uses, so the console
         # can never widen what a producer already sees in the interface.
         return self.request.user.allowed_projects.order_by("id")
+
+
+class ProducerProjectWizardAccess(APIView):
+    """Return the current delegated role for an explicit project."""
+
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ProducerProjectWizardAccessSerializer
+    request: AuthenticatedRequest  # type: ignore[assignment]
+
+    @extend_schema(responses=ProducerProjectWizardAccessSerializer)
+    def get(self, request: Request, slug: str) -> Response:
+        user = self.request.user
+        if user.wizard_project_roles is None:
+            raise Http404
+        project = get_object_or_404(user.allowed_projects, slug=slug)
+        return Response(
+            ProducerProjectWizardAccessSerializer(
+                {
+                    "slug": project.slug,
+                    "project_id": project.pk,
+                    "wizard_role": user.wizard_project_roles[project.pk],
+                }
+            ).data
+        )
 
 
 def _preparation_estimate_payload(
@@ -308,6 +345,7 @@ class ProducerProjectJudgeEstimate(APIView):
         serializer = ProducerJudgeEstimateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         project = get_object_or_404(self.request.user.allowed_projects, slug=slug)
+        require_wizard_profile(self.request.user, project)
         if not judge_configuration_ready():
             return Response(
                 {"detail": "Judge is not configured.", "code": "not-configured"},
@@ -393,6 +431,7 @@ class ProducerProjectRunStart(APIView):
         serializer = ProducerRunStartRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         project = get_object_or_404(self.request.user.allowed_projects, slug=slug)
+        require_wizard_profile(self.request.user, project)
         estimate = get_object_or_404(
             ProducerRun,
             pk=serializer.validated_data["estimate_id"],
@@ -447,6 +486,7 @@ class ProducerProjectRunStart(APIView):
                 project, self.request.user, scope, policy.mode
             )
         )
+        require_wizard_components(self.request.user, units)
         scope_hash = _scope_hash_for(
             project,
             scope,
@@ -556,6 +596,16 @@ class ProducerRunDetail(APIView):
             scope = _get_scope(run)
         except Http404:
             raise Http404 from None
+        if self.request.user.wizard_project_roles is not None:
+            project = wizard_scope_project(scope)
+            if project is None:
+                raise Http404
+            component = scope.component if isinstance(scope, Translation) else scope
+            require_wizard_project(
+                self.request.user,
+                component if isinstance(component, Component) else project,
+                write=self.request.method != "GET",
+            )
         if not user_can_view_producer_run(self.request.user, scope, run):
             raise Http404
         return run
@@ -595,6 +645,11 @@ class ProducerProjectDecisions(GenericAPIView):
             .select_related("unit", "unit__translation", "verdict")
             .order_by("pk")
         )
+        if self.request.user.wizard_project_roles is not None:
+            visible_units = Unit.objects.filter_access(self.request.user).filter(
+                translation__component__project=project
+            )
+            queryset = queryset.filter(unit_id__in=visible_units.values("pk"))
         page = cast("list[JudgeRunUnit]", self.paginate_queryset(queryset))
         rows = [project_judge_decision(item, self.request.user) for item in page]
         serializer = self.get_serializer(rows, many=True)
@@ -703,7 +758,9 @@ class ProducerProjectQualityRecheck(APIView):
                 if unit.translation.component.is_glossary
                 else "unit.edit"
             )
-            if not self.request.user.has_perm(permission, unit):
+            if not wizard_can_write_component(
+                self.request.user, unit.translation.component
+            ) or not self.request.user.has_perm(permission, unit):
                 results.append(
                     {
                         "unit_id": unit.pk,
@@ -932,6 +989,9 @@ class ProducerUnitApplyCandidate(APIView):
         serializer = ProducerApplyCandidateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         unit = get_object_or_404(Unit.objects.filter_access(self.request.user), pk=pk)
+        require_wizard_project(
+            self.request.user, unit.translation.component, write=True
+        )
         reject_verification_mutation(request, unit.translation.component.project)
         if not self.request.user.has_perm(
             "unit.review", unit
@@ -999,6 +1059,10 @@ class ProducerProjectDecisionsApply(APIView):
                 pk=unit_id, translation__component__project=project
             )
         except Unit.DoesNotExist:
+            return self._bulk_result(unit_id, "forbidden")
+        if not wizard_can_write_component(
+            self.request.user, unit.translation.component
+        ):
             return self._bulk_result(unit_id, "forbidden")
         if not self.request.user.has_perm(
             "unit.review", unit
@@ -1095,6 +1159,11 @@ class ProducerUnitClarification(APIView):
 
     def _get_unit(self, pk) -> Unit:
         unit = get_object_or_404(Unit.objects.filter_access(self.request.user), pk=pk)
+        require_wizard_project(
+            self.request.user,
+            unit.translation.component,
+            write=self.request.method != "GET",
+        )
         if not self.request.user.has_perm(
             "unit.review", unit
         ) or not self.request.user.has_perm("translation.auto", unit.translation):
@@ -1181,6 +1250,11 @@ class ProducerJudgeApplicationUndo(APIView):
                 unit__in=Unit.objects.filter_access(self.request.user)
             ),
             pk=pk,
+        )
+        require_wizard_project(
+            self.request.user,
+            application.unit.translation.component,
+            write=True,
         )
         if not self.request.user.has_perm(
             "translation.auto", application.unit.translation

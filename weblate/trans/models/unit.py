@@ -1716,6 +1716,9 @@ class Unit(models.Model, LoggerMixin):
         self, user: User | None, change_action=None, author=None, request=None
     ) -> bool:
         """Propagate current translation to all others."""
+        # ruff: ignore[import-outside-top-level]
+        from weblate.wizard_auth.policy import wizard_can_write_component
+
         warnings: list[str] = []
 
         with start_span(op="unit.propagate", name=f"{self.pk}"):
@@ -1724,6 +1727,12 @@ class Unit(models.Model, LoggerMixin):
                 target=self.target, state=self.state
             ).select_for_update()
             for unit in units:
+                if (
+                    user is not None
+                    and user.wizard_project_roles is not None
+                    and not wizard_can_write_component(user, unit.translation.component)
+                ):
+                    continue
                 if user is not None and not (
                     denied := user.has_perm("unit.edit", unit)
                 ):

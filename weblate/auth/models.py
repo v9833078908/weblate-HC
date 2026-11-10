@@ -50,6 +50,7 @@ from weblate.auth.permissions import (
     check_global_permission,
     check_permission,
 )
+from weblate.auth.results import Denied
 from weblate.auth.utils import (
     create_anonymous,
     format_address,
@@ -799,6 +800,9 @@ class GroupManyToManyField(models.ManyToManyField):
 
 
 class User(AbstractBaseUser):
+    # Populated on the fresh user instance used for a Wizard delegation.
+    wizard_project_roles: dict[int, Literal["owner", "read"]] | None = None
+
     @dataclass
     class AuditState:
         group_ids: set[int]
@@ -893,6 +897,13 @@ class User(AbstractBaseUser):
     def save(self, *args, **kwargs) -> None:
         # ruff: ignore[import-outside-top-level]
         from weblate.accounts.models import AuditLog
+
+        if self.wizard_project_roles is not None and (
+            (update_fields := kwargs.get("update_fields")) is None
+            or "is_superuser" in update_fields
+        ):
+            msg = "Cannot persist the effective Wizard user role"
+            raise ValueError(msg)
 
         original = None
         if self.pk:
@@ -1026,6 +1037,14 @@ class User(AbstractBaseUser):
         obj: models.Model | ProjectLanguage | CategoryLanguage | None = None,
     ) -> PermissionResult | bool:
         """Permission check."""
+        if obj is not None and self.wizard_project_roles is not None:
+            # ruff: ignore[import-outside-top-level]
+            from weblate.wizard_auth.policy import wizard_scope_project
+
+            project = wizard_scope_project(obj)
+            if project is not None and project.pk not in self.wizard_project_roles:
+                return Denied(gettext("Access denied"))
+
         # Weblate global scope permissions
         if perm in GLOBAL_PERM_NAMES:
             return check_global_permission(self, perm)
@@ -1071,6 +1090,11 @@ class User(AbstractBaseUser):
         return bool(self.get_project_permissions(project))
 
     def get_project_permissions(self, project: Project) -> SimplePermissionList:
+        if (
+            self.wizard_project_roles is not None
+            and project.pk not in self.wizard_project_roles
+        ):
+            return []
         # Build a fresh list as we need to merge them
         result: SimplePermissionList = []
         # This relies on project_permission being defaultdict(list)
@@ -1078,6 +1102,8 @@ class User(AbstractBaseUser):
         # Apply blocking
         if result == [(None, None)]:
             return []
+        if self.wizard_project_roles is not None:
+            return result
         if project.access_control == Project.ACCESS_PUBLIC:
             result.extend(
                 self.project_permissions[-SELECTION_ALL_PUBLIC]  # type: ignore[arg-type]
@@ -1124,6 +1150,8 @@ class User(AbstractBaseUser):
             return Q()
 
         field_prefix = f"{prefix}__" if prefix else ""
+        if self.wizard_project_roles is not None:
+            return Q(**{f"{field_prefix}pk__in": self.wizard_project_roles.keys()})
         # All public and protected projects are accessible
         acls = {Project.ACCESS_PUBLIC, Project.ACCESS_PROTECTED}
         if self.project_permissions[-SELECTION_ALL]:
@@ -1158,6 +1186,8 @@ class User(AbstractBaseUser):
 
     @cached_property
     def needs_project_filter(self):
+        if self.wizard_project_roles is not None:
+            return True
         if self.is_superuser:
             return False
         if any(

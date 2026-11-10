@@ -6,12 +6,14 @@
 from __future__ import annotations
 
 import threading
+import uuid
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 
 from weblate.auth.models import Group, User, setup_project_groups
@@ -19,6 +21,7 @@ from weblate.lang.models import Language
 from weblate.trans import repeat_bulk
 from weblate.trans.models import (
     JudgeVerdict,
+    ProducerQualityOperation,
     RepeatBulkItem,
     RepeatBulkRun,
     RepeatDecisionEvent,
@@ -31,6 +34,7 @@ from weblate.trans.models.judge import compute_target_hash
 from weblate.trans.repeat_bulk import (
     CODE_ITEM_ERROR,
     CODE_NO_WRITE,
+    CODE_PERMISSION_CHANGED,
     CODE_STALE,
     CODE_UNDONE,
     REPEAT_BULK_MANIFEST_SALT,
@@ -60,6 +64,7 @@ from weblate.trans.util import join_plural
 from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY
 from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_APPROVED, STATE_TRANSLATED
+from weblate.wizard_auth.models import DelegationFamily
 
 
 class RepeatBulkModelTest(ViewTestCase):
@@ -459,6 +464,45 @@ class RepeatBulkServiceFixtures:
 
 class RepeatBulkReviewBindingTest(RepeatBulkServiceFixtures, ViewTestCase):
     """A confirmation binds the reviewed content, not whatever is newest."""
+
+    @override_settings(WIZARD_SSO_ENABLED=True)
+    def test_delegated_apply_rechecks_assignment_for_superuser(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        policy = self.make_policy()
+        group = self.make_group(policy, "An exact repeat", ["Old one", "Old two"])
+        run = self.make_run(policy)
+        item = self.make_result(run, group, ["New shared"])
+        family = DelegationFamily.objects.create(
+            user=self.user,
+            client_id="wizard",
+            expires=timezone.now() + timedelta(hours=1),
+        )
+        ProducerQualityOperation.objects.create(
+            actor=self.user,
+            project=self.project,
+            key=uuid.uuid4(),
+            action="repeat-apply",
+            request_hash="a" * 64,
+            private_data={
+                "_wizard_delegation": str(family.pk),
+                "runs": [{"run": run.pk}],
+            },
+        )
+        self.project.remove_user(self.user)
+
+        with override_settings(WIZARD_EXTERNAL_PROJECT_IDS=(self.project.pk,)):
+            process_apply_items(run.pk)
+
+        run.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(run.failure_code, CODE_PERMISSION_CHANGED)
+        self.assertEqual(item.status, RepeatBulkItem.Status.PENDING)
+        for unit, expected in zip(
+            self.group_units[group.pk], ["Old one", "Old two"], strict=True
+        ):
+            unit.refresh_from_db()
+            self.assertEqual(unit.target, expected)
 
     def test_review_binds_exact_result_despite_newer_recommendation(self) -> None:
         policy = self.make_policy()

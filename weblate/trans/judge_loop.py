@@ -113,6 +113,7 @@ from weblate.trans.quality_execution import (
 )
 from weblate.trans.util import join_plural
 from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
+from weblate.wizard_auth.grants import guard_run_result
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -701,6 +702,8 @@ def _store_candidate(
     verdict: JudgeVerdict,
     engine: str,
     user: User | None,
+    *,
+    run: ProducerRun | None = None,
 ) -> str:
     """
     Persist a repair candidate as a native Suggestion under the unit lock.
@@ -768,7 +771,7 @@ def _store_candidate(
             new_target,
             request=None,
             vote=False,
-            user=user,
+            user=guard_run_result(run, user, unit=locked, review=True),
             raise_exception=False,
             userdetails=metadata,
             change_details={
@@ -2062,6 +2065,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
                     item.verdict,
                     candidate_engine,
                     user,
+                    run=run,
                 )
                 if stored == "drift":
                     # The judged snapshot no longer owns the unit: discard
@@ -2107,7 +2111,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-arguments, too-
                 item.before_checks,
                 item.before_state,
                 new_target,
-                user,
+                guard_run_result(run, user, unit=item.unit, review=True),
             )
             if outcome.unit is None:
                 verdicts.pop(unit.id, None)

@@ -63,10 +63,20 @@ class ProducerMeSerializer(serializers.Serializer):
     subject = serializers.CharField(required=False)
     full_name = serializers.CharField()
     is_superuser = serializers.BooleanField()
+    wizard_access_policy = serializers.IntegerField(required=False)
+    bdhc_access = serializers.BooleanField(required=False)
     capabilities = ProducerCapabilitiesSerializer()
     advanced_url = serializers.URLField(
         help_text="Weblate interface entry point for this user."
     )
+
+
+class ProducerProjectWizardAccessSerializer(serializers.Serializer):
+    """Explicit Wizard access to one project."""
+
+    slug = serializers.CharField()
+    project_id = serializers.IntegerField()
+    wizard_role = serializers.ChoiceField(choices=("owner", "read"))
 
 
 class ProducerProjectSummarySerializer(serializers.Serializer):
@@ -74,6 +84,8 @@ class ProducerProjectSummarySerializer(serializers.Serializer):
 
     slug = serializers.CharField()
     name = serializers.CharField()
+    project_id = serializers.IntegerField(required=False)
+    wizard_role = serializers.ChoiceField(choices=("owner", "read"), required=False)
     advanced_url = serializers.SerializerMethodField(
         help_text="Weblate interface entry point for this project."
     )
@@ -83,6 +95,14 @@ class ProducerProjectSummarySerializer(serializers.Serializer):
         url = obj.get_absolute_url()
         request = self.context.get("request")
         return request.build_absolute_uri(url) if request is not None else url
+
+    def to_representation(self, instance):
+        result = super().to_representation(instance)
+        request = self.context.get("request")
+        if request is not None and request.user.wizard_project_roles is not None:
+            result["project_id"] = instance.pk
+            result["wizard_role"] = request.user.wizard_project_roles[instance.pk]
+        return result
 
 
 class ProducerRunSerializer(serializers.Serializer):

@@ -31,6 +31,7 @@ from .llm import (
     llm_batch_project_id,
     llm_batch_target_language,
     llm_batch_unit_count,
+    llm_delivery_unit_ids,
     llm_delivery_usage,
     llm_delivery_work,
     llm_usage_record,
@@ -72,6 +73,8 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 request_codec=getattr(self, "delivery_request_codec", "opaque-v1"),
                 replay_only=self.delivery_replay_only
                 or getattr(self, "delivery_request_codec", None) == "routed-parts-v1",
+                unit_ids=llm_delivery_unit_ids.get(),
+                review=getattr(self, "delivery_purpose", None) == "repair",
             )
         )
         llm_delivery_usage.set(exchange_for_work(work))

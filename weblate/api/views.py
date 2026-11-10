@@ -223,6 +223,11 @@ from weblate.utils.stats import (
 from weblate.utils.version import GIT_VERSION
 from weblate.utils.version_display import show_metrics_version
 from weblate.utils.views import download_translation_file, zip_download
+from weblate.wizard_auth.policy import (
+    external_workspace_ids,
+    require_wizard_project,
+    wizard_internal,
+)
 from weblate.workspaces.models import Workspace
 
 from .renderers import (
@@ -1938,6 +1943,8 @@ class ProjectViewSet(
     def get_create_workspaces(self, request: Request):
         user = get_request_user(request)
         workspaces = user.workspaces_with_perm("workspace.add_project")
+        if user.wizard_project_roles is not None and not wizard_internal(user):
+            workspaces = workspaces.filter(pk__in=external_workspace_ids())
         if "weblate.billing" in settings.INSTALLED_APPS:
             # ruff: ignore[import-outside-top-level]
             from weblate.billing.models import Billing
@@ -2240,11 +2247,17 @@ class ProjectViewSet(
     def create(self, request: Request, *args, **kwargs):
         """Create a new project."""
         user = get_request_user(request)
+        external_wizard = user.wizard_project_roles is not None and not wizard_internal(
+            user
+        )
         workspace_id = request.data.get("workspace")
         data = request.data
         if workspace_id:
             try:
-                workspace = get_object_or_404(Workspace, pk=workspace_id)
+                workspaces = Workspace.objects.all()
+                if external_wizard:
+                    workspaces = workspaces.filter(pk__in=external_workspace_ids())
+                workspace = get_object_or_404(workspaces, pk=workspace_id)
             except (DjangoValidationError, ValueError) as error:
                 raise ValidationError({"workspace": error.messages}) from error
             if not user.has_perm("workspace.add_project", workspace):
@@ -2263,7 +2276,7 @@ class ProjectViewSet(
                     self.permission_denied(
                         request, "No valid billing found or limit exceeded."
                     )
-        elif not user.has_perm("project.add"):
+        elif external_wizard or not user.has_perm("project.add"):
             if not user.workspaces_with_perm("workspace.add_project").exists():
                 self.permission_denied(request, "Can not create projects")
 
@@ -2292,7 +2305,11 @@ class ProjectViewSet(
 
     def perform_create(self, serializer) -> None:
         with transaction.atomic():
-            super().perform_create(serializer)
+            delegated = self.request.user.wizard_project_roles is not None
+            if delegated:
+                serializer.save(access_control=Project.ACCESS_PRIVATE)
+            else:
+                super().perform_create(serializer)
             billing = None
             if (
                 "weblate.billing" in settings.INSTALLED_APPS
@@ -2301,6 +2318,13 @@ class ProjectViewSet(
                 with suppress(AttributeError):
                     billing = serializer.instance.workspace.billing
             serializer.instance.post_create(self.request.user, billing)
+            if (
+                delegated
+                and serializer.instance.access_control != Project.ACCESS_PRIVATE
+            ):
+                self.permission_denied(
+                    self.request, "Wizard can only create private projects"
+                )
 
     def perform_update(self, serializer) -> None:
         serializer.instance.acting_user = self.request.user
@@ -2827,6 +2851,7 @@ class ComponentViewSet(
         obj = self.get_object()
 
         if request.method == "POST":
+            require_wizard_project(request.user, obj, write=True)
             if not request.user.has_perm("translation.add", obj):
                 self.permission_denied(request, "Can not create translation")
             serializer = TranslationCreateSerializer(
@@ -3457,6 +3482,7 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
         if request.method == "GET":
             return self.get_translation_file_response(request, obj, user)
 
+        require_wizard_project(user, obj.component, write=True)
         if not (can_upload := user.has_perm("upload.perform", obj)):
             self.permission_denied(
                 request,
@@ -3633,6 +3659,7 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
             serializer_class = BilingualUnitSerializer
 
         if request.method == "POST":
+            require_wizard_project(request.user, obj.component, write=True)
             if not (can_add := request.user.has_perm("unit.add", obj)):
                 self.permission_denied(
                     request,
@@ -4032,6 +4059,7 @@ class UnitViewSet(viewsets.ReadOnlyModelViewSet, UpdateModelMixin, DestroyModelM
         translation = unit.translation
         request = self.request
         user = request.user
+        require_wizard_project(user, translation.component, write=True)
 
         new_target = data.get("target", [])
         new_state = data.get("state", None)
@@ -5155,7 +5183,10 @@ class TasksViewSet(ViewSet):
                 Component.objects.filter_access(user), pk=component_id
             )
             obj = component
-        elif (user_id := metadata.get("user_id")) is not None:
+        elif (
+            user.wizard_project_roles is None
+            and (user_id := metadata.get("user_id")) is not None
+        ):
             if user_id != user.id:
                 msg = "Invalid task"
                 raise Http404(msg)

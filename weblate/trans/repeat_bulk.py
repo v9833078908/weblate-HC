@@ -24,6 +24,7 @@ from weblate.trans.models import (
     RepeatGroup,
     RepeatRecommendationResult,
 )
+from weblate.trans.models.producer_quality import ProducerQualityOperation
 from weblate.trans.repeat_judge import READY, judge_groups
 from weblate.trans.repeat_recommendations import (
     build_group_context,
@@ -46,6 +47,8 @@ from weblate.trans.repeats import (
 )
 from weblate.trans.util import join_plural
 from weblate.utils.state import STATE_APPROVED
+from weblate.wizard_auth.grants import delegated_project_actor
+from weblate.wizard_auth.policy import wizard_can_write_component
 
 if TYPE_CHECKING:
     from weblate.auth.models import User
@@ -545,10 +548,11 @@ def _item_context(
         for unit in policy_units(policy)
         .filter_access(actor)
         .filter(source=join_plural(group.source_forms))
-        .select_related("source_unit", "translation__component")
+        .select_related("source_unit", "translation__component__linked_component")
         .prefetch_related("source_unit__labels")
         .order_by("pk")
         if tuple(unit.get_source_plurals()) == tuple(group.source_forms)
+        and wizard_can_write_component(actor, unit.translation.component)
     ]
     return build_group_context(policy=policy, group=group, units=units)
 
@@ -602,7 +606,22 @@ def _load_actor(run: RepeatBulkRun) -> tuple[User | None, str]:
     actor = User.objects.filter(pk=run.actor_id).first()
     if actor is None:
         return None, CODE_ACTOR_MISSING
-    if not actor.has_perm("project.edit", run.policy.project):
+    # The producer apply callback stores this receipt in the same transaction
+    # that queues the batch, before the on_commit publication becomes visible.
+    receipt = (
+        ProducerQualityOperation.objects.filter(
+            actor_id=run.actor_id,
+            project_id=run.policy.project_id,
+            action="repeat-apply",
+            private_data__contains={"runs": [{"run": run.pk}]},
+        )
+        .values_list("private_data", flat=True)
+        .first()
+    )
+    actor = delegated_project_actor(
+        actor, run.policy.project, (receipt or {}).get("_wizard_delegation")
+    )
+    if actor is None or not actor.has_perm("project.edit", run.policy.project):
         return None, CODE_PERMISSION_CHANGED
     if not run.policy.enabled:
         return None, CODE_POLICY_DISABLED

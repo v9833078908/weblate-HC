@@ -73,6 +73,7 @@ from weblate.utils.state import (
     STATE_TRANSLATED,
 )
 from weblate.utils.stats import ProjectLanguage
+from weblate.wizard_auth.grants import guard_run_result
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
@@ -595,6 +596,11 @@ class AutoTranslate(BaseAutoTranslate):
     def update(
         self, unit: Unit, state: StringState, target: list[str], user=None
     ) -> None:
+        if self.producer_run is not None and self.producer_run.execution_options.get(
+            "_wizard_delegation"
+        ):
+            self.user = guard_run_result(self.producer_run, self.user, unit=unit)
+            user = self.user
         if isinstance(target, str):
             target = [target]
         max_length = unit.get_max_length()
@@ -2817,6 +2823,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
             )
         return judge_remaining
 
+    def _authorize_delegated_run(self, run: ProducerRun | None) -> None:
+        if run is not None and run.execution_options.get("_wizard_delegation"):
+            self.active_producer_run = run
+            self.user = guard_run_result(run, self.user)
+
     def perform(
         self,
         *,
@@ -2832,6 +2843,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 if self.producer_run_id
                 else None
             )
+            self._authorize_delegated_run(run)
             with verification_context(run):
                 message = self._perform(
                     auto_source=auto_source,

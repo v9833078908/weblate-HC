@@ -24,6 +24,9 @@ WEBLATE_WIZARD_PUBLIC_URL=https://wizard.example.com/console/projects
 WEBLATE_WIZARD_SSO_ISSUER=https://weblate.example.com/oidc
 WEBLATE_WIZARD_SSO_CLIENT_ID=wizard-production
 WEBLATE_WIZARD_SSO_PRIVATE_KEY_FILE=/run/secrets/wizard-oidc-signing.pem
+WEBLATE_WIZARD_INTERNAL_GROUP_ID=0
+WEBLATE_WIZARD_EXTERNAL_WORKSPACE_IDS=
+WEBLATE_WIZARD_EXTERNAL_PROJECT_IDS=
 ```
 
 В недокерной конфигурации эквиваленты называются `WIZARD_SSO_ENABLED`,
@@ -100,8 +103,27 @@ OAuth scopes `wizard.read/import/translate/quality` ограничивают з�
 API-маршрутов. Они не выдают Django permissions. Weblate повторно проверяет
 доступ к проектам/компонентам и право конкретного действия. ID token не разрешает
 REST-доступ. Обычные клиенты Token/Bearer/Session продолжают прежнюю работу.
+
+Укажите числовой ID команды внутренних пользователей в
+`WEBLATE_WIZARD_INTERNAL_GROUP_ID`. Только её участникам доступна БДХК.
+Внешним пользователям назначайте доступ к проектам через проектные команды.
+Разрешённую внешнюю область задают списки через запятую
+`WEBLATE_WIZARD_EXTERNAL_WORKSPACE_IDS` с UUID пространств и
+`WEBLATE_WIZARD_EXTERNAL_PROJECT_IDS` с числовыми ID проектов.
+В настройках Python используются те же имена без префикса `WEBLATE_`.
+Пустые списки закрывают доступ к внешней области. Для создания приватного
+проекта внешнему пользователю требуется право добавления проекта в разрешённом
+пространстве. При создании Weblate назначает пользователя владельцем проекта.
+
+Явное право `project.edit` позволяет запускать обновление проекта. Явное
+назначение без этого права даёт доступ на чтение. Публичная видимость и
+глобальное администрирование Weblate не дают доступа через токен Wizard.
 Профиль переводчика передаётся через producer endpoint только с полями persona,
 style и language_instructions: ключи, URL и routing не возвращаются и не изменяются.
+Внешнему пользователю доступен пустой профиль или профиль, сохранённый через
+ручной ввод Wizard. Weblate подписывает итоговые инструкции для проекта и
+сервиса. Ранее сохранённые инструкции с неизвестным происхождением и изменения
+вне этого процесса закрывают чтение профиля и запуск перевода через Wizard.
 
 `WIZARD_SSO_EMERGENCY_LOGIN=1` — отдельный аварийный локальный вход оператора.
 Он выключен по умолчанию, требует локального is_admin и не разрешает внешние
