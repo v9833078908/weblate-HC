@@ -256,6 +256,65 @@ class WizardOIDCTest(TestCase):
             200,
         )
 
+    def test_creator_only_scope_filters_wizard_access_without_changing_native_api(self):
+        internal = Group.objects.create(name="Wizard internal")
+        self.user.add_team(None, internal)
+        projects = {
+            slug: Project.objects.create(
+                name=slug, slug=slug, access_control=Project.ACCESS_PRIVATE
+            )
+            for slug in (
+                "own-project",
+                "legacy-project",
+                "other-project",
+                "unassigned-project",
+            )
+        }
+        own = projects["own-project"]
+        own.post_create(self.user)
+        legacy = projects["legacy-project"]
+        legacy.add_user(self.user, "Translate")
+        other = projects["other-project"]
+        other.add_user(self.user, "Administration")
+        unassigned = projects["unassigned-project"]
+        token, _ = self.issue()
+        wizard = {
+            "HTTP_AUTHORIZATION": "Bearer " + token["access_token"],
+            "secure": True,
+        }
+        with override_settings(
+            WIZARD_INTERNAL_GROUP_ID=internal.pk,
+            WIZARD_CREATOR_ONLY_PROJECTS={
+                str(self.user.pk): [legacy.pk, unassigned.pk]
+            },
+        ):
+            response = self.client.get("/api/producer/projects/", **wizard)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(
+                {row["slug"]: row["wizard_role"] for row in response.json()["results"]},
+                {"own-project": "owner", "legacy-project": "read"},
+            )
+            for slug in ("other-project", "unassigned-project"):
+                with self.subTest(slug=slug):
+                    self.assertEqual(
+                        self.client.get(
+                            f"/api/producer/projects/{slug}/wizard-access/", **wizard
+                        ).status_code,
+                        404,
+                    )
+                    self.assertEqual(
+                        self.client.get(f"/api/projects/{slug}/", **wizard).status_code,
+                        404,
+                    )
+            self.assertEqual(
+                self.client.get(
+                    f"/api/projects/{other.slug}/",
+                    HTTP_AUTHORIZATION=f"Token {self.user.auth_token.key}",
+                    secure=True,
+                ).status_code,
+                200,
+            )
+
     def test_explicit_reader_can_view_external_project_but_cannot_mutate(self):
         project = Project.objects.create(
             name="External project",

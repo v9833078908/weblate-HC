@@ -15,7 +15,8 @@ from django.utils.crypto import constant_time_compare, salted_hmac
 from rest_framework.exceptions import PermissionDenied
 
 from weblate.auth.data import SELECTION_MANUAL
-from weblate.trans.models import Component, Project, Translation, Unit
+from weblate.trans.actions import ActionEvents
+from weblate.trans.models import Change, Component, Project, Translation, Unit
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -155,6 +156,18 @@ def _project_roles(user: User) -> dict[int, WizardProjectRole]:
             ).values_list("pk", "workspace_id")
             if project_id in external_projects or workspace_id in external_workspaces
         }
+    legacy_projects = getattr(settings, "WIZARD_CREATOR_ONLY_PROJECTS", {}).get(
+        str(user.pk)
+    )
+    if project_ids and legacy_projects is not None:
+        created_projects = Change.objects.filter(
+            project_id__in=project_ids,
+            action=ActionEvents.CREATE_PROJECT,
+            user_id=user.pk,
+            author_id=user.pk,
+        ).values_list("project_id", flat=True)
+        project_ids.intersection_update(set(legacy_projects).union(created_projects))
+
     owned_ids = set(
         user.owned_projects.filter(pk__in=project_ids).values_list("pk", flat=True)
     )

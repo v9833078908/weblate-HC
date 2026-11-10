@@ -50,7 +50,9 @@ Wizard links issuer/immutable subject explicitly; matching login names do not
 merge accounts. Delegated scopes restrict a closed API route/method list and
 work alongside native object permissions. The Wizard bearer principal uses
 explicit project assignments, ignores site superuser and public visibility
-grants, and requires project ownership for writes. Only configured team
+grants, and requires project ownership for writes. An optional per-user filter
+intersects delegated project permissions with creation events attributed to
+the actor and operator-verified legacy project IDs. Only configured team
 membership grants access to the corporate knowledge base. Other users need
 explicit project permissions within a workspace or project allowlist keyed by
 stable IDs. Missing policy configuration grants no access. Delegated creation
