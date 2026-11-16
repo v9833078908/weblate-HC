@@ -460,7 +460,7 @@ D1 закрыт; блокирующего решения владельца по
 - [x] Positive durable `process_mt_operation`, admission, stage-aware
   reconciliation/retention и crash/redelivery/concurrency; затем полный
   aggregation/report/docs. Ни negative-only durable test, ни hidden skip не done.
-- [ ] Основной агент проверяет весь K1 после изменений, выполняет final review,
+- [x] Основной агент проверяет весь K1 после изменений, выполняет final review,
   corporate reconciliation, commit/push/PR. Никакого production activation.
 
 ### TDD seams: setup и ожидаемое наблюдаемое поведение
@@ -646,10 +646,10 @@ helper-level green suite не считается приёмкой. Платны�
   Регрессии проверяют отдельные plural receipts и replay, отзыв delegation,
   изменение audit при пустом target и очистку enrollment без exchange.
 
-Corporate reconciliation остаётся отдельным integration gate: повторный fetch
-снова завершился `Can't complete SOCKS5 connection ... (5)`. Проверены также
-прямое соединение и VPN gateway; cached `origin/main` не считается живой
-сверкой. Последний checkbox не закрывается до публикации и сверки corporate.
+На этапе первого коммита corporate reconciliation оставалась отдельным
+integration gate: fetch завершался `Can't complete SOCKS5 connection ... (5)`.
+Прямое соединение и VPN gateway также были недоступны; cached `origin/main`
+не считался живой сверкой. После переезда SCM gate закрыт, см. ниже.
 Production deploy/config/activation и платных переводных probes не было.
 
 Полный public machinery/API прогон: **2188 passed, 53 skipped,
@@ -661,3 +661,29 @@ URL этого mock; отдельный повтор исходного тест
 Также обновлены offline judge fixtures: поддерживаемый LiteLLM endpoint,
 mock alias discovery и настоящие profile/request identity поля candidate evidence.
 Runtime judge и его verification guards ради тестов не ослаблялись.
+
+### Публикация после переезда SCM
+
+Владелец отдельно разрешил push после предупреждения о переходном read-only
+режиме SCM. Это разрешение на публикацию ветки, не на merge или production.
+
+- Локальный `origin` переведён на
+  `http://corp.herocraft.com:9090/scm/git/ai_weblate`; corporate остаётся
+  первым push URL, GitHub mirror — вторым.
+- Локальный credential helper привязан к новому host и точному repository
+  path; проверено, что старый host, другой repository и другой protocol
+  credentials не получают. Секреты не копировались в tracked files.
+- Настоящий `git fetch origin` прошёл. Corporate `main` и GitHub `main`
+  совпали на `778f287b2f426753f8a622fa84177bc5142cf05c`; эта база является
+  предком `a4b5f4458f8c5768d6fceee9b161a41520e18e6b`, новых corporate-only
+  коммитов `main` включать не потребовалось.
+- Реализация опубликована через два push URL `origin`. Независимые
+  `git ls-remote` подтвердили одинаковый implementation commit `a4b5f445`
+  на обеих feature branches.
+- Открыт PR: <https://github.com/v9833078908/weblate-HC/pull/35>,
+  `feat/mt-credit-fallback` → `main`. Состояние `OPEN`, code-owner review
+  требуется перед merge (`REVIEW_REQUIRED`).
+
+Реализация и публикация плана завершены. Merge, production deployment,
+настройка/активация fallback и платные canary не выполнялись и этим закрытием
+плана не разрешаются.
