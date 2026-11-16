@@ -78,10 +78,39 @@ Provider answers are stored privately in the database before application and
 are not returned by receipt reads. Account deletion preserves unresolved unit
 intents, but removes actor access. Backups must treat these stored answers as
 translation content. Unknown provider outcomes fail closed: this protects
-against blind client or Celery retries, not against provider-internal retries,
-billing duplication, or an independently authorized legacy MT request. Keep
-receipts and unit intents during code rollback; erasing them removes this safety
-boundary. *(documented)* (source: :doc:`/api`)
+against blind client or Celery retries, not against provider-internal retries
+or billing duplication. Opted-in legacy MT and durable MT share canonical
+stage arbitration; unrelated nonparticipating legacy requests are not claimed
+to have exactly-once billing. Keep receipts and unit intents during code rollback;
+erasing them removes this safety boundary. *(documented)* (source: :doc:`/api`)
+
+The optional MT credit fallback is a bounded standing authorization, not a
+claim that the primary refusal was free. Only the single OpenRouter route may
+authorize one separate LiteLLM ``QWEN3.7-plus`` attempt with
+``reasoning_effort: none`` for its captured credit-refused members and
+provably never-sent, credit-stopped tail. Successful primary members are
+excluded. The fixed ``mt_fallback`` metadata contains no credentials or endpoint;
+the LiteLLM service supplies its own effective credentials and transport.
+An audited run/translation authorization, immutable occurrence membership and
+one globally canonical unit-stage slot preserve the primary financial identity
+and its original work/exchange link. A new run, key or policy version does not
+open another fallback slot. Shared unit locks arbitrate legacy enrollment and
+durable reservations before transport.
+
+Quota, authentication, permission, rate-limit, timeout, lost-response and
+malformed or partial-reply outcomes never authorize fallback, even if another
+request later receives a credit refusal. Every participating internal request
+records its secret-free frozen wire snapshot and ordered source slots before
+sending, then captures the complete response before classification. Unknown
+delivery remains fenced. Fallback has no automatic retry, split rescue or
+third model. Current permissions, revisions and empty targets are rechecked
+before send and application; partial plural vectors are kept private until
+complete. Disabling policy prevents new charges but permits local receipt
+recovery. Request snapshots, frozen text and private stage answers follow the
+same resolved 30-day retention as response bodies; canonical claims, hashes
+and audit links remain. This does not change judge or pre-judge preparation.
+*(documented)* (source: :ref:`machine-translation-setup`,
+``docs/product/guides/run-isolation-and-offline-release.md``)
 
 The separate producer wizard can archive a locally unresolved run with a
 versioned isolation record while preserving its payload, operation keys and

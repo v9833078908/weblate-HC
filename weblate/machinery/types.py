@@ -51,6 +51,8 @@ class SettingsDict(TypedDict, total=False):
     persona: str
     style: str
     language_instructions: dict[str, str]
+    routing: dict[str, str]
+    mt_fallback: dict[str, object]
     custom_model: str
     max_tokens: int
     bucket_name: str

@@ -11,16 +11,33 @@ from uuid import uuid4
 
 import httpx2
 from django.conf import settings
+from django.db.models.deletion import ProtectedError
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIClient
 
+from weblate.api.producer.mt import MTReceiptSerializer, operation_result
 from weblate.auth.models import User
-from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.base import (
+    MachineTranslationError,
+    MachineTranslationServiceError,
+)
 from weblate.machinery.llm import PartialLLMReplyError
+from weblate.machinery.models import MACHINERY
 from weblate.trans.models import Unit
-from weblate.trans.models.producer_mt import ProducerMTOperation, ProducerMTUnitAttempt
+from weblate.trans.models.judge import ProducerRun
+from weblate.trans.models.llm_delivery import ProducerLLMExchange, ProducerLLMWork
+from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.mt_fallback import (
+    ProducerMTFallbackAuthorization,
+    ProducerMTFallbackUnit,
+    ProducerMTStageMember,
+)
+from weblate.trans.models.producer_mt import (
+    ProducerMTOperation,
+    ProducerMTUnitAttempt,
+)
 from weblate.trans.mt_operations import (
     build_engine,
     process_mt_operation,
@@ -741,3 +758,891 @@ class ProducerMTTest(ViewTestCase):
         self.assertEqual(outbound.call_count, 1)
         self.assertEqual(operation.units.filter(state="provider_unknown").count(), 1)
         self.assertEqual(operation.units.filter(state="pending").count(), 1)
+
+
+class _CreditRefusingEngine:
+    """Engine that refuses with insufficient credit on every call."""
+
+    name = "OpenRouter"
+    batch_size = 20
+    batch_concurrency = 1
+    usage_run_id: str | None = None
+
+    def __init__(
+        self, reason_code: str = "insufficient-credit", engine_id: str = "openrouter"
+    ) -> None:
+        self.reason_code = reason_code
+        self.engine_id = engine_id
+        self.calls: list[list[int]] = []
+
+    def get_identifier(self) -> str:
+        return self.engine_id
+
+    def _refuse(self, sources):
+        self.calls.extend(u.pk for _, u in sources)
+        msg = "insufficient credit"
+        raise MachineTranslationServiceError(
+            msg,
+            reason_code=self.reason_code,
+            safe_message="The credit balance is spent.",
+        )
+
+    def _translate_sources(self, source, target, sources, user=None, threshold=80):
+        self._refuse(sources)
+
+    def _translate_sources_plan(self, source, target, sources, user=None, threshold=80):
+        self._refuse(sources)
+
+    def translate_mt_fallback_slots(
+        self, source, target, ordered_slots, user=None, threshold=80
+    ):
+        self._refuse([(text, unit) for _stage, _slot, text, unit in ordered_slots])
+
+    def _prepare_translation_download(self, source, target, sources, threshold):
+        return SimpleNamespace(output=[[] for _ in sources])
+
+
+class _SuccessfulFallbackEngine:
+    """Fallback engine that returns translations."""
+
+    name = "LiteLLM"
+    batch_size = 20
+    batch_concurrency = 1
+    usage_run_id: str | None = None
+
+    def __init__(self) -> None:
+        self.calls: list[list[int]] = []
+
+    @classmethod
+    def get_identifier(cls) -> str:
+        return "litellm"
+
+    def _translate_sources(self, source, target, sources, user=None, threshold=80):
+        self.calls.extend(u.pk for _, u in sources)
+        return [[{"text": "Fallback translated", "quality": 90}] for _ in sources]
+
+    def _translate_sources_plan(self, source, target, sources, user=None, threshold=80):
+        self.calls.extend(u.pk for _, u in sources)
+        return SimpleNamespace(
+            output=[[{"text": "Fallback translated", "quality": 90}] for _ in sources]
+        )
+
+    def translate_mt_fallback_slots(
+        self, source, target, ordered_slots, user=None, threshold=80
+    ):
+        self.calls.extend(unit.pk for _stage, _slot, _text, unit in ordered_slots)
+        return [[{"text": "Fallback translated", "quality": 90}] for _ in ordered_slots]
+
+    def _prepare_translation_download(self, source, target, sources, threshold):
+        return SimpleNamespace(output=[[] for _ in sources])
+
+
+class ProducerMTFallbackTest(ViewTestCase):
+    """Durable MT orchestrates a fallback stage after confirmed credit refusal."""
+
+    def setUp(self):
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.project.machinery_settings = {
+            "openrouter": {
+                "key": "test-fixture-only",
+                "mt_fallback": {
+                    "engine": "litellm",
+                    "routing": {"*": "QWEN3.7-plus"},
+                },
+            },
+            "litellm": {"key": "ll-key", "routing": {"*": "QWEN3.7-plus"}},
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+        self.unit = self.get_unit()
+        Unit.objects.filter(pk=self.unit.pk).update(target="", state=0)
+        self.unit.refresh_from_db()
+        self.url = f"/api/producer/projects/{self.project.slug}/mt/batches/"
+        self.key = str(uuid4())
+        self.payload = {
+            "component": self.component.slug,
+            "language": "cs",
+            "engine": "openrouter",
+            "threshold": 80,
+            "units": [{"unit_id": self.unit.pk, "revision": revision(self.unit)}],
+        }
+
+    def submit(self, payload=None, key=None):
+        with patch("weblate.trans.tasks.publish_producer_run_dispatch"):
+            return self.api.post(
+                self.url,
+                payload or self.payload,
+                format="json",
+                HTTP_IDEMPOTENCY_KEY=key or self.key,
+            )
+
+    def operation(self):
+        response = self.submit()
+        self.assertEqual(response.status_code, 202)
+        return ProducerMTOperation.objects.get(run_id=response.data["run_id"])
+
+    def test_credit_exception_without_receipt_never_authorizes_fallback(self):
+        operation = self.operation()
+        primary = _CreditRefusingEngine("insufficient-credit")
+        fallback = _SuccessfulFallbackEngine()
+        machinery = {
+            "openrouter": lambda _cfg: primary,
+            "litellm": lambda _cfg: fallback,
+        }
+        with (
+            patch("weblate.trans.mt_operations.MACHINERY", machinery),
+            patch("weblate.machinery.models.MACHINERY", machinery),
+        ):
+            result = process_mt_operation(str(operation.run_id))
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "")
+        self.assertEqual(result["state"], "provider_unknown")
+        self.assertEqual(len(primary.calls), 1)
+        self.assertEqual(len(fallback.calls), 0)
+
+    def test_quota_refusal_does_not_trigger_fallback(self):
+        operation = self.operation()
+        primary = _CreditRefusingEngine("quota-exhausted")
+        fallback = _SuccessfulFallbackEngine()
+        machinery = {
+            "openrouter": lambda _cfg: primary,
+            "litellm": lambda _cfg: fallback,
+        }
+        with (
+            patch("weblate.trans.mt_operations.MACHINERY", machinery),
+            patch("weblate.machinery.models.MACHINERY", machinery),
+        ):
+            result = process_mt_operation(str(operation.run_id))
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "")
+        self.assertNotEqual(result["state"], "completed")
+        self.assertEqual(len(fallback.calls), 0)
+
+    def test_unjournaled_refusal_cannot_start_fallback(self):
+        operation = self.operation()
+        primary = _CreditRefusingEngine("insufficient-credit")
+        fallback = _CreditRefusingEngine("insufficient-credit", engine_id="litellm")
+        machinery = {
+            "openrouter": lambda _cfg: primary,
+            "litellm": lambda _cfg: fallback,
+        }
+        with (
+            patch("weblate.trans.mt_operations.MACHINERY", machinery),
+            patch("weblate.machinery.models.MACHINERY", machinery),
+        ):
+            result = process_mt_operation(str(operation.run_id))
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "")
+        self.assertNotEqual(result["state"], "completed")
+        self.assertEqual(len(primary.calls), 1)
+        self.assertEqual(len(fallback.calls), 0)
+
+    def test_no_fallback_mapping_configured(self):
+        # Remove mt_fallback mapping.
+        self.project.machinery_settings = {
+            "openrouter": {"key": "test-fixture-only"},
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        operation = self.operation()
+        primary = _CreditRefusingEngine("insufficient-credit")
+        machinery = {"openrouter": lambda _cfg: primary}
+        with (
+            patch("weblate.trans.mt_operations.MACHINERY", machinery),
+            patch("weblate.machinery.models.MACHINERY", machinery),
+        ):
+            process_mt_operation(str(operation.run_id))
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "")
+
+    def test_redelivery_of_unknown_work_does_not_send(self):
+        """An unknown primary without a receipt cannot authorize fallback."""
+        operation = self.operation()
+        primary = _CreditRefusingEngine("insufficient-credit")
+        fallback = _SuccessfulFallbackEngine()
+        machinery = {
+            "openrouter": lambda _cfg: primary,
+            "litellm": lambda _cfg: fallback,
+        }
+        with (
+            patch("weblate.trans.mt_operations.MACHINERY", machinery),
+            patch("weblate.machinery.models.MACHINERY", machinery),
+        ):
+            process_mt_operation(str(operation.run_id))
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "")
+        authorizations = ProducerMTFallbackAuthorization.objects.filter(
+            run_id=operation.run_id
+        )
+        self.assertEqual(authorizations.count(), 1)
+        authorization = authorizations.first()
+        self.assertIsNotNone(authorization)
+        assert authorization is not None
+        # The fake fallback engine does not travel the public dispatch path, so
+        # no fallback exchange is materialized for it; the public
+        # ProducerMTFallbackPublicTest covers the real exchange binding.
+        self.assertFalse(
+            ProducerMTFallbackUnit.objects.filter(
+                authorization_id=authorization.pk,
+                fallback_exchange_id__isnull=False,
+            ).exists()
+        )
+
+        # Redelivery of a terminal unknown operation must not dispatch again.
+
+        primary2 = _CreditRefusingEngine("insufficient-credit")
+        fallback2 = _SuccessfulFallbackEngine()
+        machinery2 = {
+            "openrouter": lambda _cfg: primary2,
+            "litellm": lambda _cfg: fallback2,
+        }
+        with (
+            patch("weblate.trans.mt_operations.MACHINERY", machinery2),
+            patch("weblate.machinery.models.MACHINERY", machinery2),
+        ):
+            process_mt_operation(str(operation.run_id))
+        # Still exactly one authorization and one slot per unit of work;
+        # a redelivery never opens a second fallback charge.
+        self.assertEqual(
+            ProducerMTFallbackAuthorization.objects.filter(
+                run_id=operation.run_id
+            ).count(),
+            1,
+        )
+        authorization = ProducerMTFallbackAuthorization.objects.get(
+            run_id=operation.run_id
+        )
+        slots = ProducerMTFallbackUnit.objects.filter(authorization_id=authorization.pk)
+        self.assertEqual(slots.count(), 1)
+
+    def test_operation_result_omits_unjournaled_fallback(self):
+        """An unjournaled exception must not invent fallback provenance."""
+        operation = self.operation()
+        primary = _CreditRefusingEngine("insufficient-credit")
+        fallback = _SuccessfulFallbackEngine()
+        machinery = {
+            "openrouter": lambda _cfg: primary,
+            "litellm": lambda _cfg: fallback,
+        }
+        with (
+            patch("weblate.trans.mt_operations.MACHINERY", machinery),
+            patch("weblate.machinery.models.MACHINERY", machinery),
+        ):
+            process_mt_operation(str(operation.run_id))
+        operation.refresh_from_db()
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "")
+        result = operation_result(operation)
+        self.assertNotIn("fallback", result)
+        with self.assertRaises(ProtectedError):
+            operation.delete()
+        # Primary-only operations omit the fallback key entirely.
+        primary_op = ProducerMTOperation.objects.create(
+            actor=self.user,
+            project=self.project,
+            translation=self.translation,
+            run=ProducerRun.objects.create(
+                actor=self.user,
+                scope_type=ProducerRun.ScopeType.COMPONENT,
+                scope_id=str(self.component.pk),
+                scope_label=str(self.component),
+                scope_path=self.component.get_absolute_url(),
+                requested_mode="translate",
+                cap=1,
+            ),
+            key=uuid4(),
+            request_hash="a" * 64,
+            payload={"engine": "openrouter", "threshold": 80},
+        )
+        primary_result = operation_result(primary_op)
+        self.assertNotIn("fallback", primary_result)
+
+
+def _chat_completion(text: str):
+    """Build a successful chat completion payload for the mocked transport."""
+    return httpx2.Response(
+        200,
+        json={
+            "choices": [{"message": {"content": text}, "finish_reason": "stop"}],
+            "usage": {
+                "prompt_tokens": 9,
+                "completion_tokens": 2,
+                "total_tokens": 11,
+            },
+        },
+    )
+
+
+def _credit_refusal() -> httpx2.Response:
+    """Build the captured primary credit refusal response (HTTP 402)."""
+    return httpx2.Response(
+        402,
+        json={
+            "error": {
+                "message": "The credit balance is spent.",
+                "type": "insufficient_credits",
+                "code": "insufficient_credits",
+            }
+        },
+    )
+
+
+def _fallback_chat_completion(method: str, url: str, **kwargs) -> httpx2.Response:
+    """Answer every fallback slot with a usable, occurrence-aligned reply."""
+    payload = kwargs.get("json") or {}
+    request = httpx2.Request(method, url, json=payload)
+    inputs = json.loads(json.loads(request.content)["messages"][-1]["content"])[
+        "strings"
+    ]
+    content = json.dumps(
+        {
+            "translations": {
+                item["id"]: {"text": ["Fallback translated"], "placeholders": {}}
+                for item in inputs
+            }
+        }
+    )
+    return httpx2.Response(
+        200,
+        json={
+            "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+            "usage": {
+                "prompt_tokens": 9,
+                "completion_tokens": 2,
+                "total_tokens": 11,
+            },
+        },
+        request=request,
+    )
+
+
+@override_settings(
+    WEBLATE_MACHINERY=(
+        *settings.WEBLATE_MACHINERY,
+        "weblate_customization.machinery.RoutedLLMTranslation",
+        "weblate_customization.machinery.RoutedLiteLLMTranslation",
+    )
+)
+class ProducerMTFallbackPublicTest(ViewTestCase):
+    """
+    Exercise the durable fallback stage through the real public machinery HTTP path.
+
+    A captured primary credit refusal authorizes exactly one fallback
+    transport whose usage binds the returned fallback exchange.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.project.machinery_settings = {
+            "openrouter": {
+                "key": "or-key",
+                "routing": {"*": "google/gemini-3.7-flash"},
+                "mt_fallback": {
+                    "engine": "litellm",
+                    "routing": {"*": "QWEN3.7-plus"},
+                },
+            },
+            "litellm": {
+                "key": "ll-key",
+                "routing": {"*": "QWEN3.7-plus"},
+            },
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+        self.unit = self.get_unit()
+        Unit.objects.filter(pk=self.unit.pk).update(target="", state=0)
+        self.unit.refresh_from_db()
+        self.url = f"/api/producer/projects/{self.project.slug}/mt/batches/"
+        self.key = str(uuid4())
+        self.payload = {
+            "component": self.component.slug,
+            "language": "cs",
+            "engine": "openrouter",
+            "threshold": 80,
+            "units": [{"unit_id": self.unit.pk, "revision": revision(self.unit)}],
+        }
+
+    def submit(self):
+        with patch("weblate.trans.tasks.publish_producer_run_dispatch"):
+            response = self.api.post(
+                self.url, self.payload, format="json", HTTP_IDEMPOTENCY_KEY=self.key
+            )
+        self.assertEqual(response.status_code, 202)
+        return ProducerMTOperation.objects.get(run_id=response.data["run_id"])
+
+    def submit_pair(self):
+        # Ordered and source-shaped: the pair must be two single-form units of
+        # the same translation, picked deterministically so the stored target
+        # does not depend on the database's row order.
+        other = next(
+            (
+                unit
+                for unit in self.unit.translation.unit_set.exclude(
+                    pk=self.unit.pk
+                ).order_by("pk")
+                if len(unit.get_source_plurals()) == 1
+            ),
+            None,
+        )
+        self.assertIsNotNone(other)
+        Unit.objects.filter(pk=other.pk).update(target="", state=0)
+        other.refresh_from_db()
+        payload = {
+            **self.payload,
+            "units": [
+                {"unit_id": self.unit.pk, "revision": revision(self.unit)},
+                {"unit_id": other.pk, "revision": revision(other)},
+            ],
+        }
+        with patch("weblate.trans.tasks.publish_producer_run_dispatch"):
+            response = self.api.post(
+                self.url, payload, format="json", HTTP_IDEMPOTENCY_KEY=self.key
+            )
+        self.assertEqual(response.status_code, 202, response.data)
+        return ProducerMTOperation.objects.get(run_id=response.data["run_id"]), other
+
+    @staticmethod
+    def primary_reply(method: str, url: str, **kwargs) -> httpx2.Response:
+        payload = kwargs.get("json") or {}
+        request = httpx2.Request(method, url, json=payload)
+        inputs = json.loads(json.loads(request.content)["messages"][-1]["content"])[
+            "strings"
+        ]
+        content = json.dumps(
+            {
+                "translations": {
+                    item["id"]: {"text": ["Primary translated"], "placeholders": {}}
+                    for item in inputs
+                }
+            }
+        )
+        return httpx2.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 9, "completion_tokens": 2},
+            },
+            request=request,
+        )
+
+    def test_primary_reservation_binds_full_scope_before_transport(self):
+        operation, other = self.submit_pair()
+        observed = []
+
+        def respond(method, url, **kwargs):
+            authorization = ProducerMTFallbackAuthorization.objects.get(
+                operation=operation
+            )
+            stages = list(authorization.fallback_units.order_by("unit_id_snapshot"))
+            self.assertEqual(
+                {stage.unit_id_snapshot for stage in stages},
+                {self.unit.pk, other.pk},
+            )
+            members = list(
+                ProducerMTStageMember.objects.filter(
+                    unit_stage__authorization=authorization, stage="primary"
+                ).select_related("exchange", "unit_stage")
+            )
+            self.assertTrue(members)
+            for member in members:
+                exchange = member.exchange
+                self.assertEqual(exchange.state, "sending")
+                self.assertEqual(exchange.mt_authorization_id, authorization.pk)
+                self.assertTrue(exchange.request_snapshot["parser"])
+                self.assertEqual(
+                    member.unit_stage.primary_work.exchange_id, exchange.pk
+                )
+            observed.append(True)
+            return self.primary_reply(method, url, **kwargs)
+
+        with patch("weblate.utils.requests._request", side_effect=respond):
+            process_mt_operation(str(operation.run_id))
+        self.assertTrue(observed)
+        exchanges = ProducerLLMExchange.objects.filter(
+            mt_authorization__operation=operation, mt_stage="primary"
+        )
+        self.assertTrue(exchanges.exists())
+        self.assertFalse(exchanges.filter(usage_recorded=False).exists())
+        self.assertEqual(
+            LLMUsageLog.objects.filter(
+                run_id=operation.run_id, service="openrouter"
+            ).count(),
+            exchanges.count(),
+        )
+
+    def test_primary_prefix_is_not_repurchased_by_fallback(self):
+        operation, other = self.submit_pair()
+        primary_url = "https://openrouter.ai/api/v1/chat/completions"
+        primary_slots: list[list[str]] = []
+        fallback_slots: list[list[str]] = []
+
+        def respond(method: str, url: str, **kwargs) -> httpx2.Response:
+            payload = kwargs.get("json") or {}
+            ids = [
+                item["id"]
+                for item in json.loads(payload["messages"][-1]["content"])["strings"]
+            ]
+            if url == primary_url:
+                primary_slots.append(ids)
+                if len(primary_slots) == 1:
+                    return self.primary_reply(method, url, **kwargs)
+                response = _credit_refusal()
+                response.request = httpx2.Request(method, url)
+                return response
+            fallback_slots.append(ids)
+            return _fallback_chat_completion(method, url, **kwargs)
+
+        with (
+            patch("weblate.utils.requests._request", side_effect=respond),
+            patch(
+                "weblate_customization.machinery.RoutedLLMTranslation.batch_size",
+                1,
+            ),
+        ):
+            result = process_mt_operation(str(operation.run_id))
+
+        self.unit.refresh_from_db()
+        other.refresh_from_db()
+        self.assertEqual(self.unit.target, "Primary translated\n")
+        self.assertEqual(other.target, "Fallback translated\n")
+        self.assertEqual(len(primary_slots), 2)
+        self.assertEqual(len(fallback_slots), 1)
+        self.assertNotEqual(fallback_slots[0], primary_slots[0])
+        self.assertEqual(result["state"], "completed")
+
+    def _fallback_url(self) -> str:
+        return "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
+
+    def test_public_credit_refusal_binds_usage_to_fallback_exchange(self):
+        """
+        Assert one fallback charge with usage and digest on the fallback exchange.
+
+        Real engines travel the public durable path: the primary refusal is
+        captured, exactly one fallback transport is authorized, usage binds
+        the returned fallback exchange and the frozen digest is the actual
+        request digest.
+        """
+        MACHINERY.clear_cache()
+        self.addCleanup(MACHINERY.clear_cache)
+        operation = self.submit()
+        primary_url = "https://openrouter.ai/api/v1/chat/completions"
+        fallback_url = self._fallback_url()
+        sent: list[str] = []
+
+        def respond(method: str, url: str, **kwargs) -> httpx2.Response:
+            sent.append(url)
+            if url == primary_url:
+                response = _credit_refusal()
+            else:
+                response = _fallback_chat_completion(method, url, **kwargs)
+            response.request = httpx2.Request(method, url)
+            return response
+
+        with patch(
+            "weblate.utils.requests._request",
+            side_effect=respond,
+        ):
+            result = process_mt_operation(str(operation.run_id))
+
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "Fallback translated\n")
+        self.assertEqual(result["state"], "completed")
+        # Exactly one primary (refused) and one fallback (answered) transport.
+        self.assertEqual(sent.count(primary_url), 1)
+        self.assertEqual(sent.count(fallback_url), 1)
+
+        authorization = ProducerMTFallbackAuthorization.objects.get(
+            run_id=operation.run_id
+        )
+        fallback_slot = ProducerMTFallbackUnit.objects.get(
+            authorization_id=authorization.pk
+        )
+        primary_member = ProducerMTStageMember.objects.get(
+            unit_stage=fallback_slot, stage="primary"
+        )
+        self.assertEqual(
+            fallback_slot.primary_work.exchange_id, primary_member.exchange_id
+        )
+        self.assertEqual(primary_member.exchange.mt_stage, "primary")
+        self.assertEqual(fallback_slot.primary_dispositions, ["credit_refused"])
+        self.assertEqual(
+            primary_member.exchange.request_snapshot["slots"],
+            [{"unit_stage_id": str(fallback_slot.pk), "source_slot": 0}],
+        )
+        fallback_exchange = ProducerLLMExchange.objects.get(
+            pk=fallback_slot.fallback_exchange_id
+        )
+        self.assertEqual(fallback_exchange.state, "received")
+        self.assertEqual(fallback_exchange.mt_stage, "fallback")
+        # The frozen digest is the actual fallback wire request digest, not
+        # the engine configuration digest.
+        self.assertNotEqual(
+            fallback_exchange.request_digest,
+            authorization.fallback_configuration_digest,
+        )
+        self.assertEqual(fallback_exchange.request_codec, "routed-slots-v4")
+        # The secret-free wire snapshot is durable on the exchange itself.
+        self.assertIsNotNone(fallback_exchange.request_snapshot)
+        self.assertTrue(fallback_exchange.usage_recorded)
+        # Usage is attributed to the fallback exchange, not the primary.
+        receipt = operation_result(operation)
+        summary = receipt["fallback"]
+        self.assertEqual(summary["engine"], "litellm")
+        self.assertEqual(summary["model"], "QWEN3.7-plus")
+        self.assertEqual(summary["requested"], 1)
+        self.assertEqual(summary["usable"], 1)
+        self.assertEqual(summary["applied"], 1)
+        self.assertEqual(summary["unit_ids"], [self.unit.pk])
+        self.assertEqual(MTReceiptSerializer(receipt).data["fallback"], summary)
+        operation.run.refresh_from_db()
+        self.assertEqual(operation.run.summary["fallback_unit_ids"], [self.unit.pk])
+        usage = LLMUsageLog.objects.get(run_id=operation.run_id, service="litellm")
+        self.assertIsNotNone(usage)
+        # Canonical primary claims keep pointing at their primary exchange;
+        # the fallback exchange is reachable through the audited slot.
+        primary_identities = set(
+            ProducerLLMWork.objects.filter(
+                identity__startswith="mt:", exchange__mt_stage="primary"
+            ).values_list("exchange_id", flat=True)
+        )
+        self.assertNotIn(fallback_exchange.pk, primary_identities)
+
+    def test_credit_refusal_and_never_sent_tail_both_fallback(self):
+        """Each enrolled unit keeps its own credit eligibility evidence."""
+        other = next(
+            (
+                unit
+                for unit in self.unit.translation.unit_set.exclude(
+                    pk=self.unit.pk
+                ).order_by("pk")
+                if len(unit.get_source_plurals()) == 1
+            ),
+            None,
+        )
+        self.assertIsNotNone(other)
+        Unit.objects.filter(pk=other.pk).update(target="", state=0)
+        other.refresh_from_db()
+        # Use a separate operation for the second unit to keep the scope exact.
+        payload = {
+            **self.payload,
+            "units": [
+                {"unit_id": self.unit.pk, "revision": revision(self.unit)},
+                {"unit_id": other.pk, "revision": revision(other)},
+            ],
+        }
+        key = str(uuid4())
+        with patch("weblate.trans.tasks.publish_producer_run_dispatch"):
+            response = self.api.post(
+                self.url, payload, format="json", HTTP_IDEMPOTENCY_KEY=key
+            )
+        self.assertEqual(response.status_code, 202, response.data)
+        operation = ProducerMTOperation.objects.get(key=key)
+        primary_url = "https://openrouter.ai/api/v1/chat/completions"
+        sent: list[str] = []
+        primary_calls = 0
+
+        def respond(method: str, url: str, **kwargs) -> httpx2.Response:
+            nonlocal primary_calls
+            sent.append(url)
+            if url == primary_url:
+                primary_calls += 1
+                response = (
+                    _credit_refusal()
+                    if primary_calls == 1
+                    else _fallback_chat_completion(method, url, **kwargs)
+                )
+            else:
+                response = _fallback_chat_completion(method, url, **kwargs)
+            response.request = httpx2.Request(method, url)
+            return response
+
+        # Force one unit per durable outbound chunk; the first is refused.
+        with (
+            patch("weblate.utils.requests._request", side_effect=respond),
+            patch(
+                "weblate_customization.machinery.RoutedLLMTranslation.batch_size",
+                1,
+            ),
+        ):
+            process_mt_operation(str(operation.run_id))
+
+        states = dict(operation.units.values_list("unit_id", "state"))
+        self.assertEqual(states, {self.unit.pk: "applied", other.pk: "applied"})
+        authorization = ProducerMTFallbackAuthorization.objects.get(
+            run_id=operation.run_id
+        )
+        slots = list(authorization.fallback_units.all())
+        self.assertEqual(
+            {slot.unit_id_snapshot for slot in slots}, {self.unit.pk, other.pk}
+        )
+        self.assertEqual(
+            {slot.eligibility_reason for slot in slots},
+            {"credit_refused", "never_sent_due_credit"},
+        )
+        self.assertTrue(all(slot.fallback_exchange_id for slot in slots))
+
+
+@override_settings(
+    WEBLATE_MACHINERY=(
+        *settings.WEBLATE_MACHINERY,
+        "weblate_customization.machinery.RoutedLLMTranslation",
+        "weblate_customization.machinery.RoutedLiteLLMTranslation",
+    )
+)
+class ProducerMTFallbackDurableStageTest(ViewTestCase):
+    """
+    The durable public path falls back only on its own captured credit refusal.
+
+    A unit whose own internal request was refused for credit is resolved by
+    exactly one authorized fallback transport; a peer whose request succeeded,
+    was generic, partial or unknown is never repurchased and never resolved.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.project.machinery_settings = {
+            "openrouter": {
+                "key": "or-key",
+                "routing": {"*": "google/gemini-3.7-flash"},
+                "mt_fallback": {
+                    "engine": "litellm",
+                    "routing": {"*": "QWEN3.7-plus"},
+                },
+            },
+            "litellm": {"key": "ll-key", "routing": {"*": "QWEN3.7-plus"}},
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+        self.unit = self.get_unit()
+        Unit.objects.filter(pk=self.unit.pk).update(target="", state=0)
+        self.unit.refresh_from_db()
+        # A second single-form unit in the same translation, so one chunk can
+        # hold both and the classifier is exercised per unit.
+        self.other = next(
+            (
+                unit
+                for unit in self.unit.translation.unit_set.exclude(
+                    pk=self.unit.pk
+                ).order_by("pk")
+                if len(unit.get_source_plurals()) == 1
+            ),
+            None,
+        )
+        self.assertIsNotNone(self.other)
+        Unit.objects.filter(pk=self.other.pk).update(target="", state=0)
+        self.other.refresh_from_db()
+        self.url = f"/api/producer/projects/{self.project.slug}/mt/batches/"
+        self.key = str(uuid4())
+        self.payload = {
+            "component": self.component.slug,
+            "language": "cs",
+            "engine": "openrouter",
+            "threshold": 80,
+            "units": [
+                {"unit_id": self.unit.pk, "revision": revision(self.unit)},
+                {"unit_id": self.other.pk, "revision": revision(self.other)},
+            ],
+        }
+        self.primary_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.fallback_url = (
+            "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
+        )
+
+    def submit(self):
+        with patch("weblate.trans.tasks.publish_producer_run_dispatch"):
+            response = self.api.post(
+                self.url, self.payload, format="json", HTTP_IDEMPOTENCY_KEY=self.key
+            )
+        self.assertEqual(response.status_code, 202, response.data)
+        return ProducerMTOperation.objects.get(run_id=response.data["run_id"])
+
+    def test_generic_refusal_is_not_repurchased_as_credit(self) -> None:
+        """
+        A 500 on one unit is not a credit refusal for it or for its peer.
+
+        The run resolves nothing through the fallback: the first unit's own
+        request failed generically, so its slot is not eligible, and the
+        second unit - which was never asked because the chunk failed - is not
+        eligible either.
+        """
+        operation = self.submit()
+        sent: list[str] = []
+
+        def respond(method: str, url: str, **kwargs) -> httpx2.Response:
+            sent.append(url)
+            response = httpx2.Response(500, json={"error": "boom"})
+            response.request = httpx2.Request(method, url)
+            return response
+
+        with (
+            patch("weblate.utils.requests._request", side_effect=respond),
+            patch(
+                "weblate_customization.machinery.RoutedLLMTranslation.batch_size",
+                1,
+            ),
+        ):
+            process_mt_operation(str(operation.run_id))
+
+        self.assertNotIn(self.fallback_url, sent)
+        states = dict(operation.units.values_list("unit_id", "state"))
+        # Enrollment observes both units without authorizing a generic failure.
+        self.assertNotIn("applied", states.values())
+        for unit in (self.unit, self.other):
+            unit.refresh_from_db()
+            self.assertEqual(unit.target, "")
+
+    def test_credit_refusal_resolves_the_never_sent_tail(self) -> None:
+        """A stopped, never-sent peer is eligible without a fabricated 402."""
+        operation = self.submit()
+        primary_calls = 0
+
+        def respond(method: str, url: str, **kwargs) -> httpx2.Response:
+            nonlocal primary_calls
+            if url == self.primary_url:
+                primary_calls += 1
+                if primary_calls == 1:
+                    response = _credit_refusal()
+                else:
+                    response = _fallback_chat_completion(method, url, **kwargs)
+            else:
+                response = _fallback_chat_completion(method, url, **kwargs)
+            response.request = httpx2.Request(method, url)
+            return response
+
+        with (
+            patch("weblate.utils.requests._request", side_effect=respond),
+            patch(
+                "weblate_customization.machinery.RoutedLLMTranslation.batch_size",
+                1,
+            ),
+        ):
+            process_mt_operation(str(operation.run_id))
+
+        states = dict(operation.units.values_list("unit_id", "state"))
+        self.assertEqual(states[self.other.pk], "applied")
+        self.assertEqual(states[self.unit.pk], "applied")
+        authorization = ProducerMTFallbackAuthorization.objects.get(
+            run_id=operation.run_id
+        )
+        slots = list(authorization.fallback_units.all())
+        self.assertEqual(
+            {slot.unit_id_snapshot for slot in slots},
+            {self.unit.pk, self.other.pk},
+        )
+        self.assertEqual(
+            {slot.eligibility_reason for slot in slots},
+            {"credit_refused", "never_sent_due_credit"},
+        )
+        for slot in slots:
+            self.assertTrue(slot.fallback_answer)
+            self.assertIsNotNone(slot.fallback_exchange_id)
+        usage = LLMUsageLog.objects.filter(run_id=operation.run_id, service="litellm")
+        self.assertEqual(usage.count(), 2)

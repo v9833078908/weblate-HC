@@ -73,6 +73,15 @@ class MTReconciliationSerializer(serializers.Serializer):
     forbidden = serializers.ListField(child=serializers.IntegerField(min_value=1))
 
 
+class MTFallbackSummarySerializer(serializers.Serializer):
+    engine = serializers.CharField()
+    model = serializers.CharField()
+    requested = serializers.IntegerField(min_value=0)
+    usable = serializers.IntegerField(min_value=0)
+    applied = serializers.IntegerField(min_value=0)
+    unit_ids = serializers.ListField(child=serializers.IntegerField(min_value=1))
+
+
 class MTReceiptSerializer(serializers.Serializer):
     key = serializers.UUIDField()
     run_id = serializers.UUIDField()
@@ -82,6 +91,7 @@ class MTReceiptSerializer(serializers.Serializer):
     units = MTUnitResultSerializer(many=True)
     retryable = serializers.BooleanField()
     reconciliation = MTReconciliationSerializer(required=False)
+    fallback = MTFallbackSummarySerializer(required=False, read_only=True)
 
 
 def _retryable_dispatch(operation):
@@ -105,6 +115,52 @@ def _schedule(run_id):
     transaction.on_commit(dispatch)
 
 
+def _fallback_summary(operation: ProducerMTOperation) -> dict | None:
+    """
+    Additive read-only summary of the fallback stage, or ``None``.
+
+    Counts come from the stage journal, so the numbers describe the same
+    financial boundary the durable path used: requested slots, usable answers
+    and applied units. Raw receipts and prompts are never serialized.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.mt_fallback import (
+        STAGE_FALLBACK,
+        ProducerMTFallbackAuthorization,
+        ProducerMTFallbackUnit,
+        ProducerMTStageMember,
+    )
+
+    authorization = ProducerMTFallbackAuthorization.objects.filter(
+        run_id=operation.run_id
+    ).first()
+    if authorization is None:
+        return None
+    fallback_units = list(
+        ProducerMTFallbackUnit.objects.filter(
+            authorization_id=authorization.pk, fallback_exchange__isnull=False
+        )
+    )
+    if not fallback_units:
+        return None
+    requested = ProducerMTStageMember.objects.filter(
+        unit_stage__in=fallback_units, stage=STAGE_FALLBACK
+    ).count()
+    usable = sum(
+        unit.fallback_state in {"received", "applied", "suggested"}
+        for unit in fallback_units
+    )
+    applied = sum(unit.fallback_state == "applied" for unit in fallback_units)
+    return {
+        "engine": authorization.fallback_engine,
+        "model": authorization.fallback_model,
+        "requested": requested,
+        "usable": usable,
+        "applied": applied,
+        "unit_ids": sorted(unit.unit_id_snapshot for unit in fallback_units),
+    }
+
+
 def operation_result(operation: ProducerMTOperation) -> dict:
     units = [
         {
@@ -115,7 +171,7 @@ def operation_result(operation: ProducerMTOperation) -> dict:
         }
         for u in operation.units.order_by("unit_id")
     ]
-    return {
+    result = {
         "key": str(operation.key),
         "run_id": str(operation.run_id),
         "state": "failed"
@@ -126,6 +182,10 @@ def operation_result(operation: ProducerMTOperation) -> dict:
         "total": len(units),
         "applied": sum(u["state"] == "applied" for u in units),
     }
+    fallback = _fallback_summary(operation)
+    if fallback is not None:
+        result["fallback"] = fallback
+    return result
 
 
 def _check_access(actor, translation):
@@ -236,6 +296,29 @@ class ProducerMTBatch(APIView):
                 if unit_revision(unit) != revisions[unit.pk]:
                     return Response(
                         {"code": "stale-revision", "unit_id": unit.pk}, status=409
+                    )
+                # A unit whose canonical work already carries a fallback
+                # financial slot is closed for new paid intent. This is checked
+                # before the unit's own reservation intent; the canonical
+                # uniqueness stays the last protection.
+                # ruff: ignore[import-outside-top-level]
+                from weblate.trans.models.mt_fallback import (
+                    ProducerMTFallbackUnit,
+                    canonical_identity,
+                    semantic_key_for,
+                )
+
+                stage_identity = canonical_identity(
+                    unit.pk,
+                    translation.language.code,
+                    compute_decision_revision(unit.source_unit),
+                )
+                if ProducerMTFallbackUnit.objects.filter(
+                    semantic_key=semantic_key_for(stage_identity)
+                ).exists():
+                    return Response(
+                        {"code": "unit-fallback-claimed", "unit_id": unit.pk},
+                        status=409,
                     )
                 if (
                     ProducerMTUnitAttempt.objects.filter(

@@ -46,6 +46,7 @@ Weblate 2026.8.1
 * An LLM judge run now machine translates every empty string of its selected scope, in all its languages, before the first judge request; if that preparation cannot complete - no engine, missing permission, or a provider refusal - the judges do not start and the run reports why; see :ref:`llm-judge`.
 * An LLM judge run now processes its full confirmed scope in small durable chunks with automatic task continuation across worker deliveries and restarts, rather than truncating at a 2000-unit cap; the report displays cumulative progress, pending strings, and total scope, and the translation autotranslate REST endpoint now returns an asynchronous 202 response with the run ID and report URL in judge mode.
 * A machine-translation run whose every LLM request was refused by the provider now finalizes as ``PARTIAL`` instead of a clean ``COMPLETED``: the refusal reason and request count are aggregated into the run's warnings from the usage log, so a malformed source string that no amount of batch splitting can recover from no longer looks like a successful run. The REST autotranslate endpoint also returns the run's ``warnings`` list and a ``report_url`` link to the producer-run report when a run was created.
+* Added an opt-in :ref:`OpenRouter credit fallback <mt-credit-fallback>` to LiteLLM ``QWEN3.7-plus`` for ordinary and durable MT runs, with an audited one-attempt authorization and preserved unknown-payment fences.
 
 .. rubric:: Improvements
 

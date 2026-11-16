@@ -44,6 +44,47 @@ Priority of machine translation and translation memory services
 
 Each machine translation service has a predefined maximum score it can produce. The use of installed translation services is ordered according to their maximum score. For each string with translation score lower than the service's maximum, the service is asked to produce a translation. Translations with a score exceeding the current one are accepted.
 
+.. _mt-credit-fallback:
+
+Insufficient-credit fallback
+----------------------------
+
+The routed OpenRouter service can optionally use one separately budgeted
+LiteLLM attempt after a confirmed insufficient-credit refusal. The
+:guilabel:`Insufficient-credit fallback engine` field accepts only this fixed
+profile; an empty object disables it, including an inherited profile:
+
+.. code-block:: json
+
+   {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+
+Configure the LiteLLM service separately with its own credentials and endpoint.
+The fallback keeps the primary translator's persona, style, language
+instructions and protected-token checks. Its exact model alias requests
+``reasoning_effort: "none"``. Changing only this metadata on an already
+configured primary does not perform a live primary service check.
+
+This applies to ordinary automatic translation and durable producer MT only
+with one selected OpenRouter engine and overwriting disabled. It does not
+change editor suggestions, judge repair or pre-judge translation preparation.
+Several selected engines still compare results over the complete scope.
+
+Already submitted primary requests finish before the fallback starts.
+Successful primary results are preserved. Only captured credit-refused
+members and the provably unsent credit-stopped remainder of the same run are
+eligible. Timeout, unknown payment, malformed or partial replies, access
+refusals and other quotas do not authorize another charge. A fallback failure
+does not permit retrying it or using a third model.
+
+Authorization and exact request membership are persisted before sending.
+Restarting a task or changing its key does not reopen a consumed financial
+slot. Current permissions, source revisions and empty targets are checked
+before sending and writing; incomplete plural vectors are not written.
+The run report retains stage provenance and distinguishes unknown prices
+from zero cost. Disabling the profile prevents new charges without deleting
+saved receipts or financial fences.
+
+
 Managed exact repeats
 ---------------------
 

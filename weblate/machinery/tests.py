@@ -11027,6 +11027,402 @@ class ViewsTest(http_mock.MockDNSMixin, FixtureTestCase):
         project = Project.objects.get(pk=self.project.pk)
         self.assertEqual(project.machinery_settings["openrouter"]["key"], "project-key")
 
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_offers_the_fixed_fallback_route(self) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        self.make_manager()
+
+        response = self.client.get(
+            reverse(
+                "machinery-edit",
+                kwargs={"project": self.project.slug, "machinery": "openrouter"},
+            )
+        )
+
+        self.assertContains(response, 'name="mt_fallback"')
+        # The hidden project key never appears on the rendered form.
+        self.assertNotContains(response, 'name="key"')
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_enables_fallback_without_probing(
+        self,
+    ) -> None:
+        """Metadata-only save: no paid primary probe is required."""
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "openrouter"},
+        )
+
+        with patch.object(RoutedLLMTranslation, "validate_settings") as validate:
+            response = self.client.post(
+                edit_url,
+                {
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "model": "",
+                    "routing": '{"*": "google/gemini-2.5-flash"}',
+                    "persona": "",
+                    "style": "",
+                    "language_instructions": "",
+                    "mt_fallback": json.dumps(
+                        {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+                    ),
+                    "source_language": SourceLanguageChoices.AUTO,
+                },
+            )
+
+        self.assertRedirects(
+            response, reverse("machinery-list", kwargs={"project": self.project.slug})
+        )
+        validate.assert_not_called()
+        project = Project.objects.get(pk=self.project.pk)
+        self.assertEqual(
+            project.machinery_settings["openrouter"]["mt_fallback"],
+            {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}},
+        )
+        self.assertEqual(
+            project.get_machinery_settings()["openrouter"]["key"], "sitewide-key"
+        )
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_empty_fallback_disables_inherited(
+        self,
+    ) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+                "mt_fallback": {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}},
+            },
+        )
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "openrouter"},
+        )
+
+        with patch.object(RoutedLLMTranslation, "validate_settings") as validate:
+            response = self.client.post(
+                edit_url,
+                {
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "model": "",
+                    "routing": '{"*": "google/gemini-2.5-flash"}',
+                    "persona": "",
+                    "style": "",
+                    "language_instructions": "",
+                    "mt_fallback": "{}",
+                    "source_language": SourceLanguageChoices.AUTO,
+                },
+            )
+
+        self.assertRedirects(
+            response, reverse("machinery-list", kwargs={"project": self.project.slug})
+        )
+        validate.assert_not_called()
+        project = Project.objects.get(pk=self.project.pk)
+        self.assertEqual(project.machinery_settings["openrouter"]["mt_fallback"], {})
+        # An explicit empty object overrides the inherited enabled value.
+        self.assertEqual(
+            project.get_machinery_settings()["openrouter"]["mt_fallback"], {}
+        )
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_fallback_route_round_trips(self) -> None:
+        """
+        The posted JSON route survives the JSON field round-trip unchanged.
+
+        ``EmptyMappingJSONField`` parses the textarea payload and renders it
+        back with ``prepare_value``; the exact fixed route must not be
+        reordered or rewritten by either leg.
+        """
+        route = {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+        field = RoutedLLMTranslation.project_settings_form.base_fields["mt_fallback"]
+        self.assertEqual(field.clean(json.dumps(route)), route)
+        self.assertEqual(field.prepare_value(route), json.dumps(route))
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_metadata_save_keeps_sitewide_key(
+        self,
+    ) -> None:
+        """Saving fallback metadata preserves the inherited hidden credential."""
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "openrouter"},
+        )
+        route = {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+
+        with patch.object(RoutedLLMTranslation, "validate_settings") as validate:
+            response = self.client.post(
+                edit_url,
+                {
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "model": "",
+                    "routing": '{"*": "google/gemini-2.5-flash"}',
+                    "persona": "",
+                    "style": "",
+                    "language_instructions": "",
+                    "mt_fallback": json.dumps(route),
+                    "source_language": SourceLanguageChoices.AUTO,
+                },
+            )
+
+        self.assertRedirects(
+            response, reverse("machinery-list", kwargs={"project": self.project.slug})
+        )
+        validate.assert_not_called()
+        project = Project.objects.get(pk=self.project.pk)
+        self.assertNotIn("key", project.machinery_settings["openrouter"])
+        self.assertEqual(project.machinery_settings["openrouter"]["mt_fallback"], route)
+        self.assertEqual(
+            project.get_machinery_settings()["openrouter"]["key"], "sitewide-key"
+        )
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_invalid_fallback_changes_nothing(
+        self,
+    ) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "openrouter"},
+        )
+
+        for payload in (
+            '{"engine": "openrouter", "routing": {"*": "QWEN3.7-plus"}}',
+            '{"engine": "litellm", "routing": {"*": "other-model"}}',
+            '{"engine": "litellm", "routing": {"ja": "QWEN3.7-plus"}}',
+            '{"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}, "key": "x"}',
+            "[]",
+        ):
+            with self.subTest(payload=payload):
+                with patch.object(
+                    RoutedLLMTranslation, "validate_settings"
+                ) as validate:
+                    response = self.client.post(
+                        edit_url,
+                        {
+                            "base_url": "https://openrouter.ai/api/v1",
+                            "model": "",
+                            "routing": '{"*": "google/gemini-2.5-flash"}',
+                            "persona": "",
+                            "style": "",
+                            "language_instructions": "",
+                            "mt_fallback": payload,
+                            "source_language": SourceLanguageChoices.AUTO,
+                        },
+                    )
+
+                self.assertEqual(response.status_code, 200)
+                validate.assert_not_called()
+                project = Project.objects.get(pk=self.project.pk)
+                self.assertNotIn(
+                    "mt_fallback", project.machinery_settings.get("openrouter", {})
+                )
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_route_change_still_validates(self) -> None:
+        """A key/URL/routing change keeps the live primary validation."""
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+                "mt_fallback": {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}},
+            },
+        )
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "openrouter"},
+        )
+
+        with patch.object(
+            RoutedLLMTranslation,
+            "validate_settings",
+            side_effect=ValidationError("primary refused"),
+        ) as validate:
+            response = self.client.post(
+                edit_url,
+                {
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "model": "",
+                    "routing": '{"*": "google/gemini-3.7-flash"}',
+                    "persona": "",
+                    "style": "",
+                    "language_instructions": "",
+                    "mt_fallback": json.dumps(
+                        {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+                    ),
+                    "source_language": SourceLanguageChoices.AUTO,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        validate.assert_called_once()
+        project = Project.objects.get(pk=self.project.pk)
+        self.assertNotIn(
+            "mt_fallback", project.machinery_settings.get("openrouter", {})
+        )
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_unchanged_save_still_validates(self) -> None:
+        """An unchanged save keeps probing the primary on purpose."""
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+                "mt_fallback": {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}},
+            },
+        )
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "openrouter"},
+        )
+
+        with patch.object(RoutedLLMTranslation, "validate_settings") as validate:
+            response = self.client.post(
+                edit_url,
+                {
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "model": "",
+                    "routing": '{"*": "google/gemini-2.5-flash"}',
+                    "persona": "",
+                    "style": "",
+                    "language_instructions": "",
+                    "mt_fallback": json.dumps(
+                        {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+                    ),
+                    "source_language": SourceLanguageChoices.AUTO,
+                },
+            )
+
+        self.assertRedirects(
+            response, reverse("machinery-list", kwargs={"project": self.project.slug})
+        )
+        validate.assert_called_once()
+        project = Project.objects.get(pk=self.project.pk)
+        # The stored value matches the site-wide one, so nothing is overridden.
+        self.assertNotIn(
+            "mt_fallback", project.machinery_settings.get("openrouter", {})
+        )
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+            "weblate_customization.machinery.RoutedLiteLLMTranslation",
+        )
+    )
+    def test_configure_project_litellm_offers_no_fallback_route(self) -> None:
+        """Only the primary OpenRouter engine carries the fallback metadata."""
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="litellm",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://hcbifrost.herocraft.com/litellm/v1",
+                "routing": {"*": "deepseek/deepseek-chat-v3.1"},
+            },
+        )
+        self.make_manager()
+
+        response = self.client.get(
+            reverse(
+                "machinery-edit",
+                kwargs={"project": self.project.slug, "machinery": "litellm"},
+            )
+        )
+
+        self.assertNotContains(response, 'name="mt_fallback"')
+        # A disabled fallback engine is untouched by an OpenRouter-only save.
+        self.assertNotIn("litellm", self.project.machinery_settings)
+
     @http_mock.activate
     def test_configure_project_can_blank_an_inherited_field(self) -> None:
         DeepLTranslationTest.mock_response()
