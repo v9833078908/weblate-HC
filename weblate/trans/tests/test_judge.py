@@ -10,6 +10,7 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, connection
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
@@ -20,10 +21,17 @@ from weblate.auth.models import Group, Permission, Role, User, setup_project_gro
 from weblate.trans.actions import ActionEvents
 from weblate.trans.change_display import RenderJudgeResolution
 from weblate.trans.forms import JudgeResolutionForm
-from weblate.trans.judge import judge_configuration_snapshot, judge_request_upper_bound
+from weblate.trans.judge import (
+    JudgeResult,
+    judge_configuration_snapshot,
+    judge_request_upper_bound,
+    resolve_judge_seat_profile,
+)
 from weblate.trans.judge_loop import (
+    _write_verdict,
     accept_judge_candidate,
     build_request,
+    judge_project_context,
     undo_judge_application,
 )
 from weblate.trans.models import ProducerRun, Suggestion
@@ -61,6 +69,18 @@ from weblate.utils.state import (
     STATE_NEEDS_CHECKING,
     STATE_TRANSLATED,
 )
+
+
+@pytest.fixture
+def judge_test_route():
+    with (
+        override_settings(JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1"),
+        patch(
+            "weblate.trans.judge.resolve_judge_alias",
+            side_effect=lambda _url, model, _key: (model, "revision"),
+        ),
+    ):
+        yield
 
 
 def judge_context_hash(unit) -> str:
@@ -284,7 +304,29 @@ class ProducerRunIdempotencyTest(ViewTestCase):
             ProducerRun.objects.create(**values)
 
 
+@pytest.mark.usefixtures("judge_test_route")
 class ProducerRunDispatchTest(ViewTestCase):
+    @staticmethod
+    def _passing_batch(units, *, run=None, **_kwargs):
+        out = {}
+        for judged in units:
+            request = build_request(judged)
+            batch_id = run.pk if run is not None else uuid.uuid4()
+            context = judge_project_context(judged.translation.component.project)
+            for seat in (1, 2):
+                _write_verdict(
+                    judged,
+                    request,
+                    seat=seat,
+                    attempt=0,
+                    run_id=batch_id,
+                    result=JudgeResult("none", JudgeVerdict.Verdict.PASS, [], ""),
+                    profile=resolve_judge_seat_profile(seat),
+                    project_context=context,
+                )
+            out[judged.id] = judged.judge_verdicts.get(run_id=batch_id, seat=1)
+        return out
+
     def test_publishes_reserved_recheck_task_id_once(self) -> None:
         translation = self.get_translation()
         run = ProducerRun.objects.create(
@@ -394,28 +436,9 @@ class ProducerRunDispatchTest(ViewTestCase):
         original_target = unit.target
         original_state = unit.state
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
-            out = {}
-            for judged in units:
-                request = build_request(judged)
-                out[judged.id] = JudgeVerdict.objects.create(
-                    unit=judged,
-                    max_severity="none",
-                    model_verdict=JudgeVerdict.Verdict.PASS,
-                    judge_model="vendor-a/model",
-                    seat=1,
-                    target_hash=compute_target_hash(request.target_plurals),
-                    context_hash=compute_context_hash(
-                        source=request.source,
-                        note=request.note,
-                        explanation=request.explanation,
-                        glossary_terms=request.glossary_terms,
-                    ),
-                )
-            return out
-
         with patch(
-            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+            "weblate.trans.autotranslate.run_judge_batch",
+            side_effect=self._passing_batch,
         ) as run_batch:
             self.assertTrue(publish_producer_run_dispatch(run_id=run.pk))
         run.refresh_from_db()
@@ -464,7 +487,8 @@ class ProducerRunDispatchTest(ViewTestCase):
         )
         with (
             patch(
-                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+                "weblate.trans.autotranslate.run_judge_batch",
+                side_effect=self._passing_batch,
             ) as run_batch,
             patch(
                 "weblate.trans.autotranslate.BatchAutoTranslate.build_preparation_scope"
@@ -1338,6 +1362,7 @@ class JudgeResolutionLocalizationTest(SimpleTestCase):
             )
 
 
+@pytest.mark.usefixtures("judge_test_route")
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
@@ -1453,6 +1478,7 @@ class JudgeCandidateMetadataTest(SimpleTestCase):
             JudgeCandidateMetadata(broken)
 
 
+@pytest.mark.usefixtures("judge_test_route")
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
@@ -1513,18 +1539,19 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
             raise_exception=False,
             userdetails=metadata,
         )
-        candidate_hash = compute_target_hash(suggestion.target_list)
+        request = build_request(unit, target_plurals=suggestion.target_list)
+        context = judge_project_context(unit.translation.component.project)
         for seat in (1, 2):
-            JudgeVerdict.objects.create(
-                unit=unit,
-                max_severity="none",
-                judge_model=f"vendor/model-{seat}",
+            _write_verdict(
+                unit,
+                request,
                 seat=seat,
+                attempt=0,
                 run_id=verdict.run_id,
+                result=JudgeResult("none", "pass", [], ""),
+                profile=resolve_judge_seat_profile(seat),
+                project_context=context,
                 request_round=1,
-                target_hash=candidate_hash,
-                candidate_target_hash=candidate_hash,
-                context_hash=metadata["context_hash"],
                 subject=JudgeVerdict.Subject.CANDIDATE,
             )
         return suggestion
@@ -1806,6 +1833,7 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
             self.accept_as(candidate)
 
 
+@pytest.mark.usefixtures("judge_test_route")
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
@@ -1866,18 +1894,19 @@ class JudgeApplicationUndoTest(ViewTestCase):
             raise_exception=False,
             userdetails=metadata,
         )
-        candidate_hash = compute_target_hash(suggestion.target_list)
+        request = build_request(unit, target_plurals=suggestion.target_list)
+        context = judge_project_context(unit.translation.component.project)
         for seat in (1, 2):
-            JudgeVerdict.objects.create(
-                unit=unit,
-                max_severity="none",
-                judge_model=f"vendor/model-{seat}",
+            _write_verdict(
+                unit,
+                request,
                 seat=seat,
+                attempt=0,
                 run_id=verdict.run_id,
+                result=JudgeResult("none", "pass", [], ""),
+                profile=resolve_judge_seat_profile(seat),
+                project_context=context,
                 request_round=1,
-                target_hash=candidate_hash,
-                candidate_target_hash=candidate_hash,
-                context_hash=metadata["context_hash"],
                 subject=JudgeVerdict.Subject.CANDIDATE,
             )
         return suggestion

@@ -7,6 +7,7 @@ from __future__ import annotations
 from decimal import Decimal
 from unittest import mock
 
+import pytest
 from django.test import override_settings
 from django.urls import reverse
 from lxml import html
@@ -25,6 +26,19 @@ from weblate.utils.state import STATE_TRANSLATED
 from weblate.utils.stats import ProjectLanguage
 
 
+@pytest.fixture
+def judge_test_route():
+    with (
+        override_settings(JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1"),
+        mock.patch(
+            "weblate.trans.judge.resolve_judge_alias",
+            side_effect=lambda _url, model, _key: (model, "revision"),
+        ),
+    ):
+        yield
+
+
+@pytest.mark.usefixtures("judge_test_route")
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
@@ -162,6 +176,7 @@ class JudgeAutoFormTest(ViewTestCase):
         self.assertIn("engines", form.errors)
 
 
+@pytest.mark.usefixtures("judge_test_route")
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",
@@ -428,7 +443,7 @@ class VerdictOnlyJudgeLaunchTest(ViewTestCase):
             for _ in range(5):
                 LLMUsageLog.objects.create(
                     model=model,
-                    service="openrouter",
+                    service="litellm",
                     project_id_snapshot=self.project.pk,
                     project_slug=self.project.slug,
                     operation=LLMUsageLog.Operation.JUDGE,

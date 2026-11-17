@@ -305,6 +305,7 @@ class ProducerMTTest(ViewTestCase):
     @override_settings(WIZARD_SSO_ENABLED=True)
     def test_logout_between_chunks_keeps_reply_and_unsent_tail_separate(self):
         other = self.unit.translation.unit_set.exclude(pk=self.unit.pk).first()
+        assert other is not None
         Unit.objects.filter(pk=other.pk).update(
             target="", state=0, source=self.unit.source
         )
@@ -663,6 +664,7 @@ class ProducerMTTest(ViewTestCase):
 
     def test_real_engine_cached_prefix_survives_later_internal_batch_failure(self):
         other = self.unit.translation.unit_set.exclude(pk=self.unit.pk).first()
+        assert other is not None
         Unit.objects.filter(pk=other.pk).update(
             source=self.unit.source, target="", state=0, context="other-cache-identity"
         )
@@ -716,6 +718,7 @@ class ProducerMTTest(ViewTestCase):
 
     def test_engine_batch_size_limits_each_authorized_outbound(self):
         other = self.unit.translation.unit_set.exclude(pk=self.unit.pk).first()
+        assert other is not None
         Unit.objects.filter(pk=other.pk).update(
             target="", state=0, source=self.unit.source
         )
@@ -738,6 +741,7 @@ class ProducerMTTest(ViewTestCase):
 
     def test_unrequested_tail_stays_pending_after_unknown_provider_result(self):
         other = self.unit.translation.unit_set.exclude(pk=self.unit.pk).first()
+        assert other is not None
         Unit.objects.filter(pk=other.pk).update(
             target="", state=0, source=self.unit.source
         )
@@ -1189,7 +1193,7 @@ class ProducerMTFallbackPublicTest(ViewTestCase):
             ),
             None,
         )
-        self.assertIsNotNone(other)
+        assert other is not None
         Unit.objects.filter(pk=other.pk).update(target="", state=0)
         other.refresh_from_db()
         payload = {
@@ -1253,6 +1257,8 @@ class ProducerMTFallbackPublicTest(ViewTestCase):
                 exchange = member.exchange
                 self.assertEqual(exchange.state, "sending")
                 self.assertEqual(exchange.mt_authorization_id, authorization.pk)
+                assert exchange.request_snapshot is not None
+                assert member.unit_stage.primary_work is not None
                 self.assertTrue(exchange.request_snapshot["parser"])
                 self.assertEqual(
                     member.unit_stage.primary_work.exchange_id, exchange.pk
@@ -1365,6 +1371,9 @@ class ProducerMTFallbackPublicTest(ViewTestCase):
         primary_member = ProducerMTStageMember.objects.get(
             unit_stage=fallback_slot, stage="primary"
         )
+        assert fallback_slot.primary_work is not None
+        assert primary_member.exchange.request_snapshot is not None
+        assert fallback_slot.fallback_exchange_id is not None
         self.assertEqual(
             fallback_slot.primary_work.exchange_id, primary_member.exchange_id
         )
@@ -1424,7 +1433,7 @@ class ProducerMTFallbackPublicTest(ViewTestCase):
             ),
             None,
         )
-        self.assertIsNotNone(other)
+        assert other is not None
         Unit.objects.filter(pk=other.pk).update(target="", state=0)
         other.refresh_from_db()
         # Use a separate operation for the second unit to keep the scope exact.
@@ -1526,7 +1535,7 @@ class ProducerMTFallbackDurableStageTest(ViewTestCase):
         self.unit.refresh_from_db()
         # A second single-form unit in the same translation, so one chunk can
         # hold both and the classifier is exercised per unit.
-        self.other = next(
+        other = next(
             (
                 unit
                 for unit in self.unit.translation.unit_set.exclude(
@@ -1536,7 +1545,8 @@ class ProducerMTFallbackDurableStageTest(ViewTestCase):
             ),
             None,
         )
-        self.assertIsNotNone(self.other)
+        assert other is not None
+        self.other = other
         Unit.objects.filter(pk=self.other.pk).update(target="", state=0)
         self.other.refresh_from_db()
         self.url = f"/api/producer/projects/{self.project.slug}/mt/batches/"

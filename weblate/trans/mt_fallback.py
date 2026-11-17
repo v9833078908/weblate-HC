@@ -295,7 +295,7 @@ def resolve_fallback_profile(
         engine=_FALLBACK_ENGINE,
         model=_FALLBACK_MODEL,
         profile=FALLBACK_POLICY,
-        configuration_digest=configuration_digest(fallback_settings),
+        configuration_digest=configuration_digest(dict(fallback_settings)),
     )
 
 
@@ -316,7 +316,7 @@ def build_fallback_engine_settings(
         primary_settings, dict
     ):
         return None
-    engine_settings: SettingsDict = dict(fallback_settings)
+    engine_settings: SettingsDict = fallback_settings.copy()
     engine_settings["routing"] = {"*": _FALLBACK_MODEL}
     for field in ("_project", "persona", "style", "language_instructions"):
         if field in primary_settings:
@@ -391,7 +391,7 @@ def enroll_mt_credit_scope(
             scope_size=len(identities),
             policy=FALLBACK_POLICY,
             primary_engine=primary_engine,
-            primary_configuration_digest=configuration_digest(settings_block),
+            primary_configuration_digest=configuration_digest(dict(settings_block)),
             fallback_engine=profile.engine if profile else "",
             fallback_configuration_digest=(
                 profile.configuration_digest if profile else ""
@@ -511,7 +511,7 @@ def _lock_stage_rows(authorization_id: UUID | str) -> None:
     """Then this authorization's unit-stage rows and their canonical work rows."""
     unit_stages = list(
         ProducerMTFallbackUnit.objects.select_for_update()
-        .filter(authorization_id=authorization_id)
+        .filter(authorization_id=UUID(str(authorization_id)))
         .order_by("semantic_key")
     )
     _lock_work_rows([stage.identity for stage in unit_stages])
@@ -750,7 +750,7 @@ def eligible_fallback_slots(
     eligible = {"credit_refused", "never_sent_due_credit"}
     result: list[tuple[ProducerMTFallbackUnit, int, str]] = []
     for unit_stage in ProducerMTFallbackUnit.objects.filter(
-        authorization_id=authorization_id
+        authorization_id=UUID(str(authorization_id))
     ).order_by("semantic_key"):
         for index, disposition in enumerate(unit_stage.primary_dispositions):
             if disposition not in eligible:
@@ -840,6 +840,9 @@ def reserve_mt_fallback_exchange(
             raise ValueError(msg)
         if unit_stage.fallback_exchange_id is not None:
             exchange = unit_stage.fallback_exchange
+            if exchange is None:
+                msg = "Missing fallback exchange requires reconciliation"
+                raise DeliveryUnresolved(msg)
             if exchange.request_digest != request_digest:
                 msg = "Changed paid request requires reconciliation"
                 raise DeliveryUnresolved(msg)
@@ -953,7 +956,7 @@ def _stage_slots(
         msg = "Unit stage does not exist"
         raise ValueError(msg)
     for stage in stages:
-        if stage.authorization_id != authorization_id:
+        if stage.authorization_id != UUID(str(authorization_id)):
             msg = "Unit stage does not belong to this authorization"
             raise ValueError(msg)
     return stages
@@ -1136,13 +1139,19 @@ def reserve_mt_primary_exchange(
                 msg_0 = "Changed primary stage requires reconciliation"
                 raise DeliveryUnresolved(msg_0)
             if replay_only:
-                return ExchangeRef(saved.pk, authorization_id, saved.owner, False)
+                return ExchangeRef(
+                    saved.pk, unit_stages[0].authorization_id, saved.owner, False
+                )
             if saved.state == "reserved" and saved.lease_until <= timezone.now():
                 saved.owner = uuid4().hex
                 saved.lease_until = timezone.now() + _PRIMARY_LEASE
                 saved.save(update_fields=["owner", "lease_until", "updated"])
-                return ExchangeRef(saved.pk, authorization_id, saved.owner, True)
-            return ExchangeRef(saved.pk, authorization_id, saved.owner, False)
+                return ExchangeRef(
+                    saved.pk, unit_stages[0].authorization_id, saved.owner, True
+                )
+            return ExchangeRef(
+                saved.pk, unit_stages[0].authorization_id, saved.owner, False
+            )
         if replay_only:
             msg = "No saved primary delivery for replay"
             raise DeliveryUnresolved(msg)
@@ -1171,7 +1180,9 @@ def reserve_mt_primary_exchange(
                 source_slot=source_slot,
                 position=position,
             )
-        return ExchangeRef(exchange.pk, authorization_id, exchange.owner, True)
+        return ExchangeRef(
+            exchange.pk, unit_stages[0].authorization_id, exchange.owner, True
+        )
 
 
 def dispatch_mt_primary_exchange(
@@ -1286,7 +1297,7 @@ def recover_mt_stage_answers(authorization_id: UUID | str) -> StageRecoveryResul
     answers: list[StageRecoveryAnswer] = []
     fallback_state = "none"
     for unit_stage in ProducerMTFallbackUnit.objects.filter(
-        authorization_id=authorization_id
+        authorization_id=UUID(str(authorization_id))
     ).order_by("semantic_key"):
         if unit_stage.fallback_answer:
             fallback_state = unit_stage.fallback_state
@@ -1341,7 +1352,7 @@ def save_fallback_answer(
     """Persist the received fallback answer vector per canonical identity."""
     with transaction.atomic():
         for unit_stage in ProducerMTFallbackUnit.objects.filter(
-            authorization_id=authorization_id
+            authorization_id=UUID(str(authorization_id))
         ):
             vector = answers.get(unit_stage.identity)
             if vector is None:

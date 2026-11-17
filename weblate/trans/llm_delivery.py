@@ -215,8 +215,9 @@ def reserve_exchange(
                         attach_durable_primary_exchange,
                     )
 
+                    authorization_id, ordered_slots, snapshot = mt_primary_context
                     attach_durable_primary_exchange(
-                        saved, *mt_primary_context, identity
+                        saved, authorization_id, ordered_slots, snapshot, identity
                     )
                 if replay_only:
                     return ExchangeRef(saved.pk, saved.owner, False)
@@ -252,7 +253,10 @@ def reserve_exchange(
                 # ruff: ignore[import-outside-top-level]
                 from weblate.trans.mt_fallback import attach_durable_primary_exchange
 
-                attach_durable_primary_exchange(saved, *mt_primary_context, identity)
+                authorization_id, ordered_slots, snapshot = mt_primary_context
+                attach_durable_primary_exchange(
+                    saved, authorization_id, ordered_slots, snapshot, identity
+                )
             return ExchangeRef(saved.pk, saved.owner, True)
     except IntegrityError as error:
         # Concurrent claim of any member rolls the entire reservation back.
@@ -609,7 +613,7 @@ def cleanup_delivery_bodies():
                 # The same successful terminal + finished guards apply to a
                 # stage exchange as to an ordinary one: a running or unfinished
                 # run never has its private text pruned.
-                if run.status != "completed" or run.finished is None:
+                if run is None or run.status != "completed" or run.finished is None:
                     continue
                 if run.finished >= cutoff:
                     continue

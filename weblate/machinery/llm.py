@@ -164,6 +164,9 @@ def _sources_usage_scope(
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from uuid import UUID
+
     from django_stubs_ext import StrOrPromise
 
     from weblate.checks.base import Highlight, HighlightKind
@@ -176,6 +179,7 @@ if TYPE_CHECKING:
         TranslationDownloadPlan,
     )
     from .forms import LLMBasicMachineryForm
+    from .types import TranslationResultDict
 
 type JSONValue = (
     bool | int | float | str | list[JSONValue] | dict[str, JSONValue] | None
@@ -445,6 +449,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
     # Opt-in for a caller with its own durable per-unit outbound journal.
     durable_single_attempt = False
     credit_fallback_single_attempt = False
+    _mt_stage: str | None
+    _mt_fallback_authorization_id: object
+    _mt_stage_actor: object
+    _mt_stage_mode: str
     delivery_purpose = "mt"
     delivery_replay_only = False
     settings_form: type[LLMBasicMachineryForm]
@@ -1448,7 +1456,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
             return unit.get_source_plurals()
 
         secondary_language = cls._get_effective_secondary_language(component)
-        if getattr(secondary_language, "code", None) != source_language:
+        if (
+            secondary_language is None
+            or getattr(secondary_language, "code", None) != source_language
+        ):
             return []
 
         source_unit = getattr(unit, "source_unit", None) or unit
@@ -3160,7 +3171,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         self,
         source_language,
         target_language,
-        ordered_slots: list[tuple[int, int, str, Unit | None]],
+        ordered_slots: Sequence[tuple[UUID, int, str, Unit | None]],
         user=None,
         threshold: int = MACHINERY_DEFAULT_THRESHOLD,
     ):
@@ -3295,9 +3306,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 llm_mt_parser_frozen.reset(parser_token)
         finally:
             self._clear_secondary_context_cache(started_cache)
-        results: list[list[dict]] = []
+        results: list[list[TranslationResultDict]] = []
         for index, answer in enumerate(translations):
-            item = [
+            item: list[TranslationResultDict] = [
                 {
                     "text": answer,
                     "quality": self.max_score,
@@ -3448,6 +3459,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
         # fails the request closed rather than journaling a wrong slot.
         slots: list[tuple] = []
         for index, (_text, unit) in enumerate(sources):
+            if unit is None:
+                return ()
             unit_stage = unit_stage_for_unit(authorization, unit)
             source_slot = positions[index]
             if unit_stage is None:

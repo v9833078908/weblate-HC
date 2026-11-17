@@ -381,10 +381,12 @@ class MTReconciliationTest(http_mock.MockDNSMixin, ViewTestCase):
     def test_unit_with_a_fallback_slot_is_denied_new_paid_intent(self):
         """A unit that already carries a fallback slot is closed to new intent."""
         self._stage_slot_for(self.unit)
+        units = self.payload["units"]
+        assert isinstance(units, list)
         with patch("weblate.trans.tasks.publish_producer_run_dispatch"):
             response = self.api.post(
                 self.url,
-                {**self.payload, "units": [self.payload["units"][0]]},
+                {**self.payload, "units": [units[0]]},
                 format="json",
                 HTTP_IDEMPOTENCY_KEY=str(uuid4()),
             )

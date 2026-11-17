@@ -530,7 +530,8 @@ class BatchMachineTranslation(DocVersionsMixin):
 
                 stage = llm_mt_stage.get()
                 if getattr(self, "durable_single_attempt", False) or (
-                    stage is not None and self.credit_fallback_single_attempt
+                    stage is not None
+                    and getattr(self, "credit_fallback_single_attempt", False)
                 ):
                     # Capture the body before check_failure can reject/parse it.
                     # An opted-in MT stage (legacy primary witness or fallback)

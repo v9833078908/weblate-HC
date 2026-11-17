@@ -7,6 +7,7 @@ from __future__ import annotations
 from unittest import mock
 from uuid import uuid4
 
+import pytest
 from django.conf import settings
 from django.db import IntegrityError
 from django.test import SimpleTestCase, override_settings
@@ -46,6 +47,18 @@ from weblate.utils.state import (
     STATE_FUZZY,
     STATE_TRANSLATED,
 )
+
+
+@pytest.fixture
+def judge_test_route():
+    with (
+        override_settings(JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1"),
+        mock.patch(
+            "weblate.trans.judge.resolve_judge_alias",
+            side_effect=lambda _url, model, _key: (model, "revision"),
+        ),
+    ):
+        yield
 
 
 def _create_primary_pair(unit, *, severity, verdict, attempt=0, run=None):
@@ -111,6 +124,7 @@ class PreparationScopeSnapshotTest(SimpleTestCase):
                 PreparationScope.from_json({**valid, **changes})
 
 
+@pytest.mark.usefixtures("judge_test_route")
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",

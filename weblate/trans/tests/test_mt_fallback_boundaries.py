@@ -73,12 +73,14 @@ class MTStageBoundaryTest(RepoTestMixin, TransactionTestCase):
         self.user = create_test_user()
         self.user.is_superuser = True
         self.user.save(update_fields=["is_superuser"])
-        self.unit = (
+        unit = (
             self.translation.unit_set.filter(state=0)
             .select_related("source_unit")
             .first()
         )
-        self.assertIsNotNone(self.unit, "fixture needs one empty target")
+        self.assertIsNotNone(unit, "fixture needs one empty target")
+        assert unit is not None
+        self.unit = unit
         self.producer_run = self._run()
         self.authorization = enroll_mt_credit_scope(
             run=self.producer_run,
@@ -462,11 +464,15 @@ class MTStageBoundaryTest(RepoTestMixin, TransactionTestCase):
             slots = ((stage.pk, index),)
             snapshot, digest = request_fixture(slots, model="google/gemini-3.7-flash")
             receipt = json.dumps({"status": 200, "body": str(index), "headers": {}})
+
+            def send(body: str = receipt) -> str:
+                return body
+
             result = dispatch_mt_primary_exchange(
                 authorization.pk,
                 slots,
                 digest,
-                lambda body=receipt: body,
+                send,
                 request_snapshot=snapshot,
                 request_codec="routed-slots-v4",
                 run_id=run.pk,
@@ -483,7 +489,7 @@ class MTStageBoundaryTest(RepoTestMixin, TransactionTestCase):
             self.assertEqual(replay.exchange_id, result.exchange_id)
             self.assertEqual(replay.receipt, receipt)
             exchanges.append(result.exchange_id)
-        self.assertNotEqual(*exchanges)
+        self.assertNotEqual(exchanges[0], exchanges[1])
         self.assertEqual(
             list(
                 stage.stage_members.order_by("source_slot").values_list(
@@ -511,6 +517,7 @@ class MTStageBoundaryTest(RepoTestMixin, TransactionTestCase):
                 before_send=guard,
             )
         self.unit_stage.refresh_from_db()
+        assert self.unit_stage.fallback_exchange_id is not None
         exchange = ProducerLLMExchange.objects.get(
             pk=self.unit_stage.fallback_exchange_id
         )

@@ -9,6 +9,7 @@ import json
 from collections import defaultdict
 from contextvars import ContextVar
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from django.db import transaction
 from weblate_customization.machinery import RoutedLLMTranslation
@@ -34,6 +35,9 @@ from weblate.trans.models.llm_delivery import ProducerLLMExchange
 from weblate.trans.models.mt_fallback import ProducerMTFallbackUnit
 from weblate.trans.mt_fallback import compute_audit_revision, source_decision_revision
 from weblate.trans.util import join_plural
+
+if TYPE_CHECKING:
+    from uuid import UUID
 
 _replay_specs: ContextVar[dict | None] = ContextVar(
     "mt_replay_placeholder_specs", default=None
@@ -121,9 +125,12 @@ def _parse_exchange(exchange):
         and all(value == {} for value in replacements)
     ):
         cleaned = list(sources)
-    if not all(
-        isinstance(value, list) and len(value) == n
-        for value in (sources, cleaned, ids, replacements)
+    if (
+        not isinstance(sources, list)
+        or not isinstance(cleaned, list)
+        or not isinstance(ids, list)
+        or not isinstance(replacements, list)
+        or any(len(value) != n for value in (sources, cleaned, ids, replacements))
     ):
         return None
     if occurrences == []:
@@ -131,7 +138,10 @@ def _parse_exchange(exchange):
     elif (
         not isinstance(occurrences, list)
         or len(occurrences) != n
-        or any(type(value) is not int or value < 0 for value in occurrences)
+        or any(
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+            for value in occurrences
+        )
     ):
         return None
     if (
@@ -197,7 +207,7 @@ def _parse_exchange(exchange):
     if not isinstance(frozen_specs, list) or len(frozen_specs) != n:
         return None
     replay_specs = {}
-    occurrence_counts = defaultdict(int)
+    occurrence_counts: dict[tuple[int, str], int] = defaultdict(int)
     for index, member in enumerate(members):
         unit_id = member.unit_stage.unit.pk
         key = (unit_id, parser_sources[index])
@@ -228,17 +238,14 @@ def _parse_exchange(exchange):
     # Usage is tied to this original exchange, never its primary work lookup.
     translation = exchange.mt_authorization.translation
     project = translation.component.project
-    contexts = (
-        (llm_batch_project, project.slug),
-        (llm_batch_project_id, project.pk),
-        (llm_batch_component, translation.component.slug),
-        (llm_batch_component_id, translation.component_id),
-        (llm_batch_target_language, translation.language.code),
-        (llm_batch_unit_count, n),
-        (llm_usage_record, None),
-        (_replay_specs, replay_specs),
-    )
-    tokens = [(variable, variable.set(value)) for variable, value in contexts]
+    project_token = llm_batch_project.set(project.slug)
+    project_id_token = llm_batch_project_id.set(project.pk)
+    component_token = llm_batch_component.set(translation.component.slug)
+    component_id_token = llm_batch_component_id.set(translation.component_id)
+    language_token = llm_batch_target_language.set(translation.language.code)
+    unit_count_token = llm_batch_unit_count.set(n)
+    usage_token = llm_usage_record.set(None)
+    specs_token = _replay_specs.set(replay_specs)
     try:
         model = wire["payload"].get("model", "")
         # ruff: ignore[private-member-access]
@@ -264,8 +271,14 @@ def _parse_exchange(exchange):
             for i, answer in enumerate(answers)
         ]
     finally:
-        for variable, token in reversed(tokens):
-            variable.reset(token)
+        _replay_specs.reset(specs_token)
+        llm_usage_record.reset(usage_token)
+        llm_batch_unit_count.reset(unit_count_token)
+        llm_batch_target_language.reset(language_token)
+        llm_batch_component_id.reset(component_id_token)
+        llm_batch_component.reset(component_token)
+        llm_batch_project_id.reset(project_id_token)
+        llm_batch_project.reset(project_token)
 
 
 # ruff: ignore[complex-structure]
@@ -307,7 +320,7 @@ def replay_mt_stage_receipts(authorization_id) -> None:
                 rows = ProducerMTFallbackUnit.objects.select_for_update().in_bulk(
                     [member.unit_stage_id for member in members]
                 )
-                by_stage = {}
+                by_stage: dict[UUID, list[tuple[int, str]]] = {}
                 for member, answer in zip(members, answers, strict=True):
                     by_stage.setdefault(member.unit_stage_id, []).append(
                         (member.source_slot, answer)
@@ -344,8 +357,8 @@ def replay_mt_stage_receipts(authorization_id) -> None:
                             row.primary_dispositions
                         ) != len(vector):
                             continue
-                        for index in range(len(vector)):
-                            if row.primary_dispositions[index] != "primary_usable":
+                        for index, disposition in enumerate(row.primary_dispositions):
+                            if disposition != "primary_usable":
                                 vector[index] = ""
                         for index, answer in entries:
                             vector[index] = answer

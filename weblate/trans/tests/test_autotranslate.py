@@ -19,6 +19,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import httpx2
 import pytest
@@ -47,6 +48,7 @@ from weblate.machinery.base import (
     MachineTranslationServiceError,
 )
 from weblate.machinery.dummy import DummyTranslation
+from weblate.machinery.llm import BaseLLMTranslation
 from weblate.machinery.models import MACHINERY
 from weblate.trans import tasks
 from weblate.trans.actions import ActionEvents
@@ -112,8 +114,6 @@ from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    from weblate.machinery.llm import BaseLLMTranslation
 
 
 pytestmark = pytest.mark.usefixtures("judge_test_route")
@@ -3501,6 +3501,8 @@ class _FallbackPrimaryEngine:
     batch_size = 20
     batch_concurrency = 1
     usage_run_id: str | None = None
+    retry_attempts: int
+    credit_fallback_single_attempt: bool
 
     def __init__(self, *, fatal_after: int, refusal_reason: str) -> None:
         self.fatal_after = fatal_after
@@ -3630,7 +3632,9 @@ class MTFallbackLegacyTest(ViewTestCase):
     ) -> dict:
         auto = self._auto()
         auto.producer_run = run
-        machinery = {"openrouter": lambda _cfg: primary}
+        machinery: dict[
+            str, Callable[..., _FallbackPrimaryEngine | _FallbackLiteLLMEngine]
+        ] = {"openrouter": lambda _cfg: primary}
         if fallback is not None:
             machinery["litellm"] = lambda _cfg: fallback
         with (
@@ -3795,10 +3799,10 @@ class MTFallbackLegacyTest(ViewTestCase):
                 safe_message="The credit balance is spent.",
             )
 
-        fallback.translate_mt_fallback_slots = refuse
-        result = self._run_fetch_mt(
-            primary, fallback=fallback, run=self._persisted_run()
-        )
+        with patch.object(fallback, "translate_mt_fallback_slots", side_effect=refuse):
+            result = self._run_fetch_mt(
+                primary, fallback=fallback, run=self._persisted_run()
+            )
         self.assertEqual(result, {})
 
     def test_no_fallback_configured_credit_refusal_changes_nothing(self) -> None:
@@ -3892,7 +3896,7 @@ class MTFallbackLegacyHTTPTest(http_mock.MockDNSMixin, ViewTestCase):
             if len(unit.get_source_plurals()) == 1
         ]
         self.assertGreaterEqual(len(self.units), 2)
-        self.run = ProducerRun.objects.create(
+        self.producer_run = ProducerRun.objects.create(
             actor=self.user,
             scope_type=ProducerRun.ScopeType.COMPONENT,
             scope_id=str(self.component.pk),
@@ -3913,11 +3917,9 @@ class MTFallbackLegacyHTTPTest(http_mock.MockDNSMixin, ViewTestCase):
 
     def _run(self, primary_reply, fallback_reply) -> set[int]:
         auto = self._auto()
-        auto.producer_run = self.run
-        sent: list[str] = []
+        auto.producer_run = self.producer_run
 
         def respond(method: str, url: str, **kwargs) -> httpx2.Response:
-            sent.append(url)
             payload = kwargs.get("json") or {}
             if url == OPENROUTER_PRIMARY_URL:
                 return primary_reply(method, url, payload)
@@ -3931,7 +3933,6 @@ class MTFallbackLegacyHTTPTest(http_mock.MockDNSMixin, ViewTestCase):
             ),
         ):
             auto.process_mt(engines=["openrouter"], threshold=80)
-        auto.sent_urls = sent
         return auto.written
 
     def _primary_refusal(self):
@@ -3958,7 +3959,7 @@ class MTFallbackLegacyHTTPTest(http_mock.MockDNSMixin, ViewTestCase):
     def test_legacy_primary_refusal_is_journaled_as_stage_evidence(self) -> None:
         """A real 402 leaves a primary stage member and a captured receipt."""
         auto = self._auto()
-        auto.producer_run = self.run
+        auto.producer_run = self.producer_run
         seen: list[str] = []
 
         def respond(method: str, url: str, **kwargs) -> httpx2.Response:
@@ -4002,7 +4003,9 @@ class MTFallbackLegacyHTTPTest(http_mock.MockDNSMixin, ViewTestCase):
         """The fallback unit is applied from one journaled fallback exchange."""
         result = self._run(self._primary_refusal(), self._fallback_answer())
         self.assertEqual(len(result), len(self.units))
-        authorization = ProducerMTFallbackAuthorization.objects.get(run_id=self.run.pk)
+        authorization = ProducerMTFallbackAuthorization.objects.get(
+            run_id=self.producer_run.pk
+        )
         self.assertEqual(authorization.state, "authorized")
         slots = ProducerMTFallbackUnit.objects.filter(authorization_id=authorization.pk)
         self.assertEqual(slots.count(), len(self.units))
@@ -4024,13 +4027,17 @@ class MTFallbackLegacyHTTPTest(http_mock.MockDNSMixin, ViewTestCase):
     def test_legacy_fallback_usage_binds_its_own_exchange(self) -> None:
         """The usage row of the fallback request names the fallback exchange."""
         self._run(self._primary_refusal(), self._fallback_answer())
-        authorization = ProducerMTFallbackAuthorization.objects.get(run_id=self.run.pk)
+        authorization = ProducerMTFallbackAuthorization.objects.get(
+            run_id=self.producer_run.pk
+        )
         fallback_ids = set(
             ProducerMTFallbackUnit.objects.filter(
                 authorization_id=authorization.pk
             ).values_list("fallback_exchange_id", flat=True)
         )
-        usage = LLMUsageLog.objects.filter(run_id=self.run.pk, service="litellm")
+        usage = LLMUsageLog.objects.filter(
+            run_id=self.producer_run.pk, service="litellm"
+        )
         self.assertGreater(usage.count(), 0)
         exchanges = list(ProducerLLMExchange.objects.filter(pk__in=fallback_ids))
         self.assertTrue(exchanges)
@@ -4039,7 +4046,7 @@ class MTFallbackLegacyHTTPTest(http_mock.MockDNSMixin, ViewTestCase):
     def test_legacy_primary_success_never_pays_fallback(self) -> None:
         """A usable primary answer leaves no fallback member and no charge."""
         auto = self._auto()
-        auto.producer_run = self.run
+        auto.producer_run = self.producer_run
         seen: list[str] = []
 
         def respond(method: str, url: str, **kwargs) -> httpx2.Response:
@@ -4074,7 +4081,7 @@ class MTFallbackLegacyHTTPTest(http_mock.MockDNSMixin, ViewTestCase):
     def test_legacy_generic_failure_is_not_eligible(self) -> None:
         """A 500 is not a credit refusal: no fallback exchange is opened."""
         auto = self._auto()
-        auto.producer_run = self.run
+        auto.producer_run = self.producer_run
 
         def respond(method: str, url: str, **kwargs) -> httpx2.Response:
             return _attach(httpx2.Response(500, json={"error": "boom"}), method, url)
@@ -4123,6 +4130,7 @@ class MTFallbackSlotParserTest(ViewTestCase):
         engine = MACHINERY["openrouter"](
             self.project.get_machinery_settings()["openrouter"]
         )
+        assert isinstance(engine, BaseLLMTranslation)
         engine.retry_attempts = 0
         engine.credit_fallback_single_attempt = True
         return engine
@@ -4137,9 +4145,10 @@ class MTFallbackSlotParserTest(ViewTestCase):
         # The stage id is not used by the parser itself (no journal is
         # involved here); what matters is that the second element is the unit's
         # original source-slot index, so two equal texts stay two slots.
+        stage_id = uuid4()
         ordered = [
-            (0, 0, unit.get_source_plurals()[0], unit),
-            (0, 1, unit.get_source_plurals()[0], unit),
+            (stage_id, 0, unit.get_source_plurals()[0], unit),
+            (stage_id, 1, unit.get_source_plurals()[0], unit),
         ]
         inputs = [
             {"id": "example0", "source": ordered[0][2]},
@@ -4177,8 +4186,8 @@ class MTFallbackSlotParserTest(ViewTestCase):
         for unit in units:
             unit.refresh_from_db()
         ordered = [
-            (0, 0, "Same text", units[0]),
-            (1, 0, "Same text", units[1]),
+            (uuid4(), 0, "Same text", units[0]),
+            (uuid4(), 0, "Same text", units[1]),
         ]
 
         def respond(method: str, url: str, **kwargs) -> httpx2.Response:
@@ -4209,7 +4218,8 @@ class MTFallbackSlotParserTest(ViewTestCase):
         if plural is None:
             self.skipTest("no plural unit in the fixture")
         texts = plural.get_source_plurals()
-        ordered = [(0, index, text, plural) for index, text in enumerate(texts)]
+        stage_id = uuid4()
+        ordered = [(stage_id, index, text, plural) for index, text in enumerate(texts)]
 
         def respond(method: str, url: str, **kwargs) -> httpx2.Response:
             seen = _routed_strings(kwargs.get("json") or {})

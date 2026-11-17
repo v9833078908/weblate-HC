@@ -10,7 +10,7 @@ import json
 from datetime import timedelta
 from shutil import rmtree
 from tempfile import mkdtemp
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from django.db import IntegrityError, transaction
 from django.test import SimpleTestCase, override_settings
@@ -51,9 +51,12 @@ from weblate.trans.mt_fallback import (
 )
 from weblate.trans.tests.test_views import ViewTestCase
 
+if TYPE_CHECKING:
+    from weblate.machinery.types import SettingsDict
+
 LITELLM_KEY = "test-key"
 
-VALID_SETTINGS = {
+VALID_SETTINGS: dict[str, SettingsDict] = {
     "openrouter": {
         "key": "or-key",
         "routing": {"*": "google/gemini-3.7-flash"},
@@ -214,7 +217,7 @@ class MTFallbackStageSchemaTest(ViewTestCase):
             self.translation.unit_set.filter(state=0).select_related("source_unit")[:3]
         )
         self.assertGreater(len(self.units), 0, "need empty units for the stage tests")
-        self.run = self._persisted_run()
+        self.producer_run = self._persisted_run()
 
     def _persisted_run(self):
         # ruff: ignore[import-outside-top-level]
@@ -232,7 +235,7 @@ class MTFallbackStageSchemaTest(ViewTestCase):
 
     def _enroll(self) -> ProducerMTFallbackAuthorization:
         return enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=self.units,
             machinery_settings=VALID_SETTINGS,
@@ -257,7 +260,7 @@ class MTFallbackStageSchemaTest(ViewTestCase):
         self._enroll()
         with self.assertRaises(ValueError):
             enroll_mt_credit_scope(
-                run=self.run,
+                run=self.producer_run,
                 translation=self.translation,
                 units=self.units[:-1],
                 machinery_settings=VALID_SETTINGS,
@@ -272,6 +275,7 @@ class MTFallbackStageSchemaTest(ViewTestCase):
         self.assertEqual(len(rows), len(self.units))
         self.assertEqual(len({row.semantic_key for row in rows}), len(rows))
         for row in rows:
+            assert row.unit is not None
             expected = canonical_identity(
                 row.unit_id_snapshot,
                 row.language_code,
@@ -349,7 +353,7 @@ class MTFallbackStageSchemaTest(ViewTestCase):
         if plural is None:
             self.skipTest("fixture has no plural unit")
         authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=[plural],
             machinery_settings=VALID_SETTINGS,
@@ -375,13 +379,13 @@ class MTFallbackDispatchContractTest(ViewTestCase):
         self.user.save()
         self.translation = self.get_translation()
         self.component = self.translation.component
-        self.run = self._persisted_run()
+        self.producer_run = self._persisted_run()
         self.units = list(
             self.translation.unit_set.filter(state=0).select_related("source_unit")[:2]
         )
         self.assertGreater(len(self.units), 0, "need empty units for dispatch tests")
         self.authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=self.units,
             machinery_settings=VALID_SETTINGS,
@@ -430,6 +434,7 @@ class MTFallbackDispatchContractTest(ViewTestCase):
         self.assertEqual(exchange.request_codec, "routed-slots-v4")
         # The secret-free wire snapshot is durable before any transport.
         self.assertEqual(exchange.request_snapshot, snapshot)
+        assert exchange.request_snapshot is not None
         self.assertEqual(exchange.request_snapshot["method"], "post")
         self.assertEqual(exchange.request_snapshot["payload"]["model"], "QWEN3.7-plus")
         self.assertNotIn("key", exchange.request_snapshot)
@@ -438,11 +443,16 @@ class MTFallbackDispatchContractTest(ViewTestCase):
     def test_exact_replay_sends_nothing(self) -> None:
         calls = []
         snapshot, digest = request_fixture(self.slots)
+
+        def send(index: int) -> str:
+            calls.append(index)
+            return '{"answer":1}'
+
         result = dispatch_mt_fallback_exchange(
             self.authorization.pk,
             self.slots,
             digest,
-            lambda: calls.append(1) or '{"answer":1}',
+            lambda: send(1),
             request_snapshot=snapshot,
             request_codec="routed-slots-v4",
         )
@@ -451,7 +461,7 @@ class MTFallbackDispatchContractTest(ViewTestCase):
             self.authorization.pk,
             self.slots,
             digest,
-            lambda: calls.append(2) or '{"answer":1}',
+            lambda: send(2),
             request_snapshot=snapshot,
             request_codec="routed-slots-v4",
         )
@@ -640,13 +650,13 @@ class MTFallbackEligibilityContractTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         self.translation = self.get_translation()
-        self.run = self._persisted_run()
+        self.producer_run = self._persisted_run()
         self.units = list(
             self.translation.unit_set.filter(state=0).select_related("source_unit")[:1]
         )
         self.assertGreater(len(self.units), 0, "need empty units for eligibility tests")
         self.authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=self.units,
             machinery_settings=VALID_SETTINGS,
@@ -723,13 +733,13 @@ class MTFallbackRecoveryContractTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         self.translation = self.get_translation()
-        self.run = self._persisted_run()
+        self.producer_run = self._persisted_run()
         self.units = list(
             self.translation.unit_set.filter(state=0).select_related("source_unit")[:1]
         )
         self.assertGreater(len(self.units), 0, "need empty units for recovery tests")
         self.authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=self.units,
             machinery_settings=VALID_SETTINGS,
@@ -789,7 +799,7 @@ class MTFallbackAuthorizationLifecycleTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         self.translation = self.get_translation()
-        self.run = self._persisted_run()
+        self.producer_run = self._persisted_run()
         self.units = list(
             self.translation.unit_set.filter(state=0).select_related("source_unit")[:1]
         )
@@ -811,7 +821,7 @@ class MTFallbackAuthorizationLifecycleTest(ViewTestCase):
 
     def test_authorize_promotes_once(self) -> None:
         authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=self.units,
             machinery_settings=VALID_SETTINGS,
@@ -824,7 +834,7 @@ class MTFallbackAuthorizationLifecycleTest(ViewTestCase):
 
     def test_enrollment_without_fallback_profile_records_no_route(self) -> None:
         authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=self.units,
             machinery_settings={"openrouter": {"key": "or-key"}},
@@ -835,7 +845,7 @@ class MTFallbackAuthorizationLifecycleTest(ViewTestCase):
 
     def test_enrollment_without_settings_is_still_journaled(self) -> None:
         authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=self.units,
         )
@@ -851,13 +861,13 @@ class MTStageExchangePrivacyTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         self.translation = self.get_translation()
-        self.run = self._persisted_run()
+        self.producer_run = self._persisted_run()
         self.units = list(
             self.translation.unit_set.filter(state=0).select_related("source_unit")[:1]
         )
         self.assertGreater(len(self.units), 0, "need empty units for privacy tests")
         self.authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=self.units,
             machinery_settings=VALID_SETTINGS,
@@ -921,9 +931,11 @@ class MTStagePrimaryJournalTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         self.translation = self.get_translation()
-        self.unit = self.translation.unit_set.filter(state=0).first()
-        self.assertIsNotNone(self.unit)
-        self.run = ProducerRun.objects.create(
+        unit = self.translation.unit_set.filter(state=0).first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        self.unit = unit
+        self.producer_run = ProducerRun.objects.create(
             actor=self.user,
             scope_type=ProducerRun.ScopeType.COMPONENT,
             scope_id=str(self.component.pk),
@@ -933,7 +945,7 @@ class MTStagePrimaryJournalTest(ViewTestCase):
             cap=1,
         )
         self.authorization = enroll_mt_credit_scope(
-            run=self.run,
+            run=self.producer_run,
             translation=self.translation,
             units=[self.unit],
         )
@@ -1094,8 +1106,10 @@ class MTAuthorizationStateMachineTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         self.translation = self.get_translation()
-        self.unit = self.translation.unit_set.filter(state=0).first()
-        self.run = ProducerRun.objects.create(
+        unit = self.translation.unit_set.filter(state=0).first()
+        assert unit is not None
+        self.unit = unit
+        self.producer_run = ProducerRun.objects.create(
             actor=self.user,
             scope_type=ProducerRun.ScopeType.COMPONENT,
             scope_id=str(self.component.pk),
@@ -1105,7 +1119,7 @@ class MTAuthorizationStateMachineTest(ViewTestCase):
             cap=1,
         )
         self.authorization = enroll_mt_credit_scope(
-            run=self.run, translation=self.translation, units=[self.unit]
+            run=self.producer_run, translation=self.translation, units=[self.unit]
         )
 
     def test_enrollment_starts_observing(self) -> None:
@@ -1151,9 +1165,11 @@ class MTStageCrossPathArbitrationTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         self.translation = self.get_translation()
-        self.unit = self.translation.unit_set.filter(state=0).first()
-        self.assertIsNotNone(self.unit)
-        self.run = ProducerRun.objects.create(
+        unit = self.translation.unit_set.filter(state=0).first()
+        self.assertIsNotNone(unit)
+        assert unit is not None
+        self.unit = unit
+        self.producer_run = ProducerRun.objects.create(
             actor=self.user,
             scope_type=ProducerRun.ScopeType.COMPONENT,
             scope_id=str(self.component.pk),
@@ -1170,7 +1186,7 @@ class MTStageCrossPathArbitrationTest(ViewTestCase):
 
     def _authorization(self) -> ProducerMTFallbackAuthorization:
         return enroll_mt_credit_scope(
-            run=self.run, translation=self.translation, units=[self.unit]
+            run=self.producer_run, translation=self.translation, units=[self.unit]
         )
 
     def test_unknown_durable_claim_blocks_stage_enrollment(self) -> None:
@@ -1178,7 +1194,7 @@ class MTStageCrossPathArbitrationTest(ViewTestCase):
         reference = reserve_exchange(
             (self.identity,),
             "1" * 64,
-            run_id=self.run.pk,
+            run_id=self.producer_run.pk,
             request_codec="routed-slots-v4",
         )
         self.assertTrue(reference.can_send)
@@ -1193,7 +1209,7 @@ class MTStageCrossPathArbitrationTest(ViewTestCase):
         reference = reserve_exchange(
             (self.identity,),
             "2" * 64,
-            run_id=self.run.pk,
+            run_id=self.producer_run.pk,
             request_codec="routed-slots-v4",
         )
         ProducerLLMExchange.objects.filter(pk=reference.id).update(state="sending")
@@ -1205,12 +1221,13 @@ class MTStageCrossPathArbitrationTest(ViewTestCase):
         reference = reserve_exchange(
             (self.identity,),
             "3" * 64,
-            run_id=self.run.pk,
+            run_id=self.producer_run.pk,
             request_codec="routed-slots-v4",
         )
         record_response(reference.id, json.dumps({"status": 200, "body": "ok"}))
         stage = enroll_unit_stages(self._authorization(), [self.unit])[0]
         self.assertIsNotNone(stage.primary_work)
+        assert stage.primary_work is not None
         self.assertEqual(stage.primary_work.identity, self.identity)
         self.assertEqual(stage.primary_work.exchange_id, reference.id)
 
@@ -1236,7 +1253,7 @@ class MTStageCrossPathArbitrationTest(ViewTestCase):
             reserve_exchange(
                 (self.identity,),
                 "5" * 64,
-                run_id=self.run.pk,
+                run_id=self.producer_run.pk,
                 request_codec="routed-slots-v4",
             )
 
@@ -1249,12 +1266,13 @@ class MTStageCrossPathArbitrationTest(ViewTestCase):
         reference = reserve_exchange(
             (self.identity,),
             digest,
-            run_id=self.run.pk,
+            run_id=self.producer_run.pk,
             request_codec="routed-slots-v4",
             mt_primary_context=(authorization.pk, slots, snapshot),
         )
         self.assertTrue(reference.can_send)
         self.assertEqual(ProducerLLMExchange.objects.count(), 1)
         stage.refresh_from_db()
+        assert stage.primary_work is not None
         self.assertEqual(stage.primary_work.exchange_id, reference.id)
         self.assertEqual(stage.stage_members.get().exchange_id, reference.id)

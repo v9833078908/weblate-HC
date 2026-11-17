@@ -133,6 +133,8 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 run_id=self.usage_run_id,
                 before_send=before_send,
             )
+            llm_delivery_usage.set(result.exchange_id)
+            saved = json.loads(result.receipt)
         else:
             if not slots or authorization_id is None:
                 msg = "Opted-in primary stage requires an enrolled stage context"
@@ -171,9 +173,8 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                     request_codec=codec,
                     run_id=self.usage_run_id,
                 )
-        if stage == "fallback" or not self.durable_single_attempt:
-            llm_delivery_usage.set(result.exchange_id)
-            saved = json.loads(result.receipt)
+                llm_delivery_usage.set(result.exchange_id)
+                saved = json.loads(result.receipt)
         # Usage belongs to the actual primary or fallback exchange.
         response = httpx2.Response(
             saved["status"],

@@ -39305,6 +39305,34 @@ components:
       - language
       - threshold
       - units
+    MTFallbackSummary:
+      type: object
+      properties:
+        engine:
+          type: string
+        model:
+          type: string
+        requested:
+          type: integer
+          minimum: 0
+        usable:
+          type: integer
+          minimum: 0
+        applied:
+          type: integer
+          minimum: 0
+        unit_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+      required:
+      - applied
+      - engine
+      - model
+      - requested
+      - unit_ids
+      - usable
     MTReceipt:
       type: object
       properties:
@@ -39332,8 +39360,13 @@ components:
           type: boolean
         reconciliation:
           $ref: '#/components/schemas/MTReconciliation'
+        fallback:
+          allOf:
+          - $ref: '#/components/schemas/MTFallbackSummary'
+          readOnly: true
       required:
       - applied
+      - fallback
       - key
       - retryable
       - run_id

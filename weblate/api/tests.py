@@ -18845,6 +18845,7 @@ class ProducerAPITest(APIBaseTest):
                 "engine": "openrouter",
             },
         )
+        assert candidate is not None
         candidate_hash = compute_target_hash(candidate.target_list)
         candidate_request = build_request(unit, target_plurals=candidate.target_list)
         seats = JUDGE_SEATS if complete_candidate else JUDGE_SEATS[:1]

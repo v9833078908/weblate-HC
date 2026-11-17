@@ -8,7 +8,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard, cast
 from uuid import uuid4
 
 import httpx2
@@ -79,12 +79,17 @@ from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
     from weblate.auth.models import User
     from weblate.auth.results import PermissionResult
     from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
+    from weblate.machinery.llm import BaseLLMTranslation
     from weblate.trans.judge import JudgeRequest
+    from weblate.trans.models.mt_fallback import (
+        ProducerMTFallbackAuthorization,
+        ProducerMTFallbackUnit,
+    )
     from weblate.utils.state import StringState
 
 
@@ -424,8 +429,8 @@ class BaseAutoTranslate:
         # The primary engine of an opted-in credit-fallback run. Its own
         # failure classifier is the authority for what a captured receipt
         # means; ``None`` outside such a run.
-        self._primary_classifier = None
-        self._primary_stage_authorization = None
+        self._primary_classifier: BatchMachineTranslation | None = None
+        self._primary_stage_authorization: ProducerMTFallbackAuthorization | None = None
         self.coverage_total = 0
         self.coverage_seen = set()
         self.coverage_scope: set[int] | None = None
@@ -471,7 +476,7 @@ class BaseAutoTranslate:
             self.coverage_total = len(self.coverage_scope)
             self.coverage_seen = set()
 
-    def record_coverage(self, unit_ids: Sequence[int]) -> None:
+    def record_coverage(self, unit_ids: Iterable[int]) -> None:
         """
         Mark original units as terminally handled.
 
@@ -1006,12 +1011,13 @@ class AutoTranslate(BaseAutoTranslate):
             # evidence rather than a batch-wide inference. The exact slots of
             # each internal request are derived from the immutable enrollment
             # inside the engine's own batch seam, before the wire ids exist.
-            engines[0].retry_attempts = 0
-            engines[0].credit_fallback_single_attempt = True
+            primary_engine = cast("BaseLLMTranslation", engines[0])
+            primary_engine.retry_attempts = 0
+            primary_engine.credit_fallback_single_attempt = True
             # ruff: ignore[private-member-access]
-            engines[0]._mt_stage = "primary"
+            primary_engine._mt_stage = "primary"
             # ruff: ignore[private-member-access]
-            engines[0]._mt_fallback_authorization_id = fallback_authorization.pk
+            primary_engine._mt_fallback_authorization_id = fallback_authorization.pk
             self._primary_stage_authorization = fallback_authorization
             # The primary engine's own classifier is the authority for what a
             # captured receipt means, including an upstream refusal inside a
@@ -1328,7 +1334,7 @@ class AutoTranslate(BaseAutoTranslate):
         machinery_settings: dict,
         run_id: str | None,
         primary_engine_id: str,
-    ) -> object | None:
+    ) -> ProducerMTFallbackAuthorization | None:
         """
         Freeze the enrolled scope before the first primary call.
 
@@ -1366,7 +1372,9 @@ class AutoTranslate(BaseAutoTranslate):
         enroll_unit_stages(authorization, units)
         return authorization
 
-    def _mt_stage_context(self, unit: Unit, authorization) -> tuple | None:
+    def _mt_stage_context(
+        self, unit: Unit, authorization
+    ) -> ProducerMTFallbackUnit | None:
         """
         Return the immutable stage context, or ``None`` when unenrolled.
 
@@ -1485,9 +1493,6 @@ class AutoTranslate(BaseAutoTranslate):
         if not eligible_units:
             return translations
         # ruff: ignore[import-outside-top-level]
-        from weblate.machinery.models import MACHINERY as MACHINERY_REGISTRY
-
-        # ruff: ignore[import-outside-top-level]
         from weblate.trans.mt_fallback import (
             build_fallback_engine_settings,
             fallback_warning,
@@ -1502,7 +1507,9 @@ class AutoTranslate(BaseAutoTranslate):
         engine_settings = build_fallback_engine_settings(machinery_settings)
         if engine_settings is None:
             return translations
-        fallback_engine = MACHINERY_REGISTRY[profile.engine](engine_settings)
+        fallback_engine = cast(
+            "BaseLLMTranslation", MACHINERY[profile.engine](engine_settings)
+        )
         fallback_engine.retry_attempts = 0
         fallback_engine.credit_fallback_single_attempt = True
         fallback_engine.usage_run_id = run_id
@@ -1989,7 +1996,7 @@ class AutoTranslate(BaseAutoTranslate):
                 ),
                 None,
             )
-            if fatal is not None:
+            if fatal is not None and fatal.error is not None:
                 self.add_warning(fatal.error)
             return
         fatal = next(

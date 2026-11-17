@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import timedelta
+from typing import Any
 from unittest.mock import patch
 
 from django.conf import settings
@@ -31,11 +32,13 @@ class StageReceiptReplayTest(ViewTestCase):
         self.user.is_superuser = True
         self.user.save()
         self.translation = self.get_translation()
-        self.unit = (
+        unit = (
             self.translation.unit_set.filter(state=0)
             .select_related("source_unit")
             .first()
         )
+        assert unit is not None
+        self.unit = unit
         self.producer_run = ProducerRun.objects.create(
             actor=self.user,
             scope_type=ProducerRun.ScopeType.COMPONENT,
@@ -68,7 +71,7 @@ class StageReceiptReplayTest(ViewTestCase):
             "url": "https://example.invalid/chat",
             "payload": {"model": "frozen-model"},
         }
-        snapshot = {
+        snapshot: dict[str, Any] = {
             **wire,
             "codec": "routed-slots-v4",
             "slots": [
@@ -319,6 +322,7 @@ class StageReceiptReplayTest(ViewTestCase):
         self.assertIsNone(resumed.failure_message)
         self.assertEqual(sent, [OPENROUTER_PRIMARY_URL, LITELLM_FALLBACK_URL])
         summary = mt_fallback_run_summary(self.producer_run)
+        assert summary is not None
         self.assertEqual(summary["applied"], 1)
 
     def test_frozen_protected_markup_and_equal_plural_slots(self):

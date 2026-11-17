@@ -687,3 +687,62 @@ Runtime judge и его verification guards ради тестов не осла�
 Реализация и публикация плана завершены. Merge, production deployment,
 настройка/активация fallback и платные canary не выполнялись и этим закрытием
 плана не разрешаются.
+
+### Интеграционная проверка 2026-11-17
+
+Владелец отдельно поручил проверить все открытые PR агентами Luna и влить
+проверенные изменения в `main`. Это разрешение на merge, не на deployment,
+активацию fallback или платные canary.
+
+Шесть read-only Luna-проверок охватили PR24, PR25, PR33 и PR35. PR24 и PR25
+уже являются предками corporate/GitHub `main` на `778f287b`; они закрыты как
+ранее интегрированные. В конфликте PR33 сохранён более новый статус
+реализованного плана из PR34. По PR35 обе проверки — standards и spec —
+не обнаружили блокирующих security/financial или acceptance-дефектов.
+
+При подготовке merge-кандидата обновлена сгенерированная OpenAPI-схема
+fallback receipt, устранены замечания pylint и новые ошибки типизации
+fallback/replay. Устаревшие judge test fixtures переведены на корпоративный
+LiteLLM с локальным mock alias discovery и настоящей profile/request identity;
+runtime-проверки судьи не ослаблялись.
+
+Реальный локальный WSGI HTTP smoke с синтетическими ответами провайдеров:
+`POST 202 → GET 200/completed`, две строки `applied`,
+`fallback.requested=usable=applied=2`; один primary refusal, две fallback
+попытки, два сохранённых fallback exchange с `usage_recorded` и две usage rows.
+Smoke использовал изолированную тестовую БД; lifecycle соединения удерживался
+внешней fixture-транзакцией. Production и платные API не вызывались.
+
+Scoped `prek` hooks прошли; scoped pylint — **10.00/10**, exit 0.
+`makemigrations --check --dry-run`: **No changes detected**; предупреждение
+об отсутствующем `git svn` остаётся ограничением локального окружения.
+Полный mypy не зелёный: **1282 errors / 158 files** против
+**1295 errors / 156 files** на чистом `origin/main` в том же окружении.
+Три новых `import-untyped` относятся к пакетам `weblate_customization` без
+`py.typed`; остальные новые сообщения относительно базы устранены без
+ослабления runtime guards или type-ignore.
+
+Начальные прогоны с coverage остановлены по таймауту на машине с высокой
+swap-нагрузкой и не считаются зелёным gate. Прогон без coverage установил
+один fixture-дефект оценки стоимости: после перевода судьи на LiteLLM
+история usage всё ещё была помечена `service="openrouter"`. Исправлен только
+provider в fixture; runtime-оценка стоимости не менялась.
+Дополнительно исправлен end-to-end dispatch fixture: подмена возвращала
+один устаревший verdict без подтверждённой пары, и запуск правомерно
+завершался `partial`. Fixture теперь создаёт оба primary verdict через
+настоящий `_write_verdict`; ожидаемый `completed` и runtime guards сохранены.
+
+Финальный единый прогон 14 файлов (API, machinery, legacy/durable MT,
+fallback/replay/reconciliation и judge/client/form/deferrals) на итоговом
+дереве: **3035 passed, 54 skipped, 2 warnings**, 1895.38 s.
+Команда использовала `pytest --no-cov -n 2 --dist=loadscope --tb=short`;
+предупреждения — `ResourceWarning` незакрытых fixture-файлов. Отдельный
+`test_judge.py`: **99 passed**. После исправления fixtures повторные scoped
+hooks и pylint прошли.
+
+Непосредственно перед публикацией merge повторён настоящий `git fetch origin`:
+corporate `origin/main` и живой GitHub `main` по-прежнему совпадают на
+`778f287b2f426753f8a622fa84177bc5142cf05c`; более новых corporate-only
+коммитов `main` нет. Ветка интеграции сохраняет эту базу и обе проверенные
+истории PR33/PR35. Владелец разрешил closing merge с существующим admin bypass;
+branch protection не менялась.

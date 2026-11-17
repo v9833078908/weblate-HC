@@ -8,6 +8,7 @@ import uuid
 from datetime import timedelta
 from unittest import mock
 
+import pytest
 from django.test import override_settings
 from django.utils import timezone
 
@@ -41,6 +42,18 @@ from weblate.utils.state import STATE_FUZZY
 DEAD = JudgeResult("none", "", [], "", unparsed=True, failure_kind="transport")
 
 
+@pytest.fixture
+def judge_test_route():
+    with (
+        override_settings(JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1"),
+        mock.patch(
+            "weblate.trans.judge.resolve_judge_alias",
+            side_effect=lambda _url, model, _key: (model, "revision"),
+        ),
+    ):
+        yield
+
+
 def mock_request_verdicts(results):
     """Fake ``request_verdicts``: each call consumes one single-result batch."""
     batches = iter([[item] for item in results])
@@ -53,6 +66,7 @@ def mock_request_verdicts(results):
     return request
 
 
+@pytest.mark.usefixtures("judge_test_route")
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",

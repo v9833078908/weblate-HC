@@ -521,7 +521,6 @@ def _persist_chunk_results(
                     # generic, it is never released or retried as unsent.
                     saved.state = "provider_unknown" if answers is None else "failed"
             saved.save(update_fields=["state", "answer"])
-    return False
 
 
 # ruff: ignore[complex-structure]
@@ -631,10 +630,9 @@ def _run_fallback_stage(operation, owner, translation, actor) -> bool:
     engine_settings = build_fallback_engine_settings(machinery_settings)
     if engine_settings is None:
         return False
-    # ruff: ignore[import-outside-top-level]
-    from weblate.machinery.models import MACHINERY as MACHINERY_REGISTRY
-
-    fallback_engine = MACHINERY_REGISTRY[profile.engine](engine_settings)
+    fallback_engine = cast(
+        "BaseLLMTranslation", MACHINERY[profile.engine](engine_settings)
+    )
     # The journal, not machinery retry/split heuristics, owns the spend. The
     # durable identity is enabled for the fallback stage alone: it carries the
     # canonical work identity the shared reservation fences. The legacy
