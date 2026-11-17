@@ -13,6 +13,7 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from hashlib import md5
 from html import escape, unescape
 from itertools import chain
@@ -145,6 +146,10 @@ class TranslationDownloadPlan:
     cache_keys: dict[str, str | None]
     # Whether the stop kept a string that had no cached answer from being asked.
     stopped: bool = False
+    #: Original unit source-slot index of every pending position, keyed by the
+    #: position in ``sources``. A stage request journals exactly these slots,
+    #: so a repeated source text can never claim a sibling's slot.
+    source_slots: dict[int, int] = dataclass_field(default_factory=dict)
 
 
 class BatchMachineTranslation(DocVersionsMixin):
@@ -517,9 +522,22 @@ class BatchMachineTranslation(DocVersionsMixin):
                 if not self.should_retry_exception(error, attempt):
                     raise
             else:
-                if getattr(self, "durable_single_attempt", False):
+                # The stage of this internal request comes from the per-request
+                # context, so the capture decision and the stage journal see
+                # exactly the same request.
+                # ruff: ignore[import-outside-top-level]
+                from weblate.machinery.llm import llm_mt_stage
+
+                stage = llm_mt_stage.get()
+                if getattr(self, "durable_single_attempt", False) or (
+                    stage is not None and self.credit_fallback_single_attempt
+                ):
                     # Capture the body before check_failure can reject/parse it.
-                    from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+                    # An opted-in MT stage (legacy primary witness or fallback)
+                    # needs its receipt even when the request is refused, so the
+                    # classifier still sees the exact body.
+                    # ruff: ignore[import-outside-top-level]
+                    from weblate.trans.llm_delivery import (
                         capture_transport_response,
                         encode_http_response,
                     )
@@ -1179,6 +1197,13 @@ class BatchMachineTranslation(DocVersionsMixin):
         pending_texts: dict[str, str] = {}
         pending_occurrences: dict[str, int] = {}
         cache_keys: dict[str, str | None] = {}
+        #: Original unit source-slot index of every pending position. The
+        #: primary path builds its sources from ``unit.plural_map``, so the
+        #: position of the text inside that unit's own mapped input IS the
+        #: unit's source slot. It is counted per unit independently of the
+        #: text, so two equal texts of one unit keep distinct indices.
+        source_slots: dict[int, int] = {}
+        unit_positions: dict[int, int] = defaultdict(int)
         source_occurrences: dict[tuple[int | None, str], int] = defaultdict(int)
         result: list[TranslationResultDict] | None
         # A stop must not be asked for anything, but its cached answers stay
@@ -1187,6 +1212,12 @@ class BatchMachineTranslation(DocVersionsMixin):
         stopped = False
         for index, (text, unit) in enumerate(sources):
             original_source = text
+            unit_key = unit.pk if unit is not None else -index
+            # The unit's own source-slot index of this position. It advances
+            # for every source of the unit - cached, empty, rate-limit-skipped
+            # or pending - so a later source never claims an earlier slot.
+            source_slot = unit_positions[unit_key]
+            unit_positions[unit_key] += 1
             replacements: dict[str, str]
             if unit is None:
                 replacements = {}
@@ -1237,6 +1268,7 @@ class BatchMachineTranslation(DocVersionsMixin):
             pending_texts[pending_key] = text
             pending_occurrences[pending_key] = source_occurrence
             cache_keys[pending_key] = cache_key
+            source_slots[index] = source_slot
 
         return TranslationDownloadPlan(
             output=output,
@@ -1246,6 +1278,7 @@ class BatchMachineTranslation(DocVersionsMixin):
             pending_occurrences=pending_occurrences,
             cache_keys=cache_keys,
             stopped=stopped,
+            source_slots=source_slots,
         )
 
     def _download_pending_translations(
@@ -1265,23 +1298,42 @@ class BatchMachineTranslation(DocVersionsMixin):
 
             # Unit is only used in WeblateMemory and it is used only to get a project
             # so it doesn't matter we potentially flatten this.
+            batch_sources = [
+                (
+                    plan.pending_texts[pending_key],
+                    plan.pending_units[pending_key],
+                    plan.pending_occurrences[pending_key],
+                )
+                for pending_key in batch_keys
+            ]
+            # The exact original source-slot indices this request carries, so
+            # the stage journals what it sends and never a text-matched sibling.
+            # ruff: ignore[import-outside-top-level]
+            from weblate.machinery.llm import llm_mt_source_slots
+
+            batch_positions = [
+                entry[0]
+                for entries in (plan.pending[key] for key in batch_keys)
+                for entry in entries
+            ]
+            slot_token = llm_mt_source_slots.set(
+                tuple(
+                    plan.source_slots.get(position, position)
+                    for position in batch_positions
+                )
+            )
             try:
                 translations = self.download_pending_translations(
                     source_language,
                     target_language,
-                    [
-                        (
-                            plan.pending_texts[pending_key],
-                            plan.pending_units[pending_key],
-                            plan.pending_occurrences[pending_key],
-                        )
-                        for pending_key in batch_keys
-                    ],
+                    batch_sources,
                     user,
                     threshold,
                 )
             except Exception as exc:
                 self._handle_download_error(exc)
+            finally:
+                llm_mt_source_slots.reset(slot_token)
 
             self._apply_downloaded_translations(plan, batch_keys, translations)
 
@@ -1298,6 +1350,21 @@ class BatchMachineTranslation(DocVersionsMixin):
         while remaining_keys:
             batch_keys, remaining_keys = self._get_pending_batch(
                 remaining_keys, plan.pending_texts
+            )
+            # The exact original source-slot indices this request carries.
+            # ruff: ignore[import-outside-top-level]
+            from weblate.machinery.llm import llm_mt_source_slots
+
+            batch_positions = [
+                entry[0]
+                for entries in (plan.pending[key] for key in batch_keys)
+                for entry in entries
+            ]
+            slot_token = llm_mt_source_slots.set(
+                tuple(
+                    plan.source_slots.get(position, position)
+                    for position in batch_positions
+                )
             )
             try:
                 translations = await self.adownload_pending_translations(
@@ -1316,6 +1383,8 @@ class BatchMachineTranslation(DocVersionsMixin):
                 )
             except Exception as exc:
                 await sync_to_async(self._handle_download_error)(exc)
+            finally:
+                llm_mt_source_slots.reset(slot_token)
 
             await sync_to_async(self._apply_downloaded_translations)(
                 plan, batch_keys, translations

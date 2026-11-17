@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from datetime import timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -333,3 +334,84 @@ class MTReconciliationTest(http_mock.MockDNSMixin, ViewTestCase):
         response = self.reconcile()
         self.assertEqual(response.status_code, 200)
         self.assertIn(self.other.pk, response.data["reconciliation"]["stale"])
+
+    def _stage_slot_for(self, unit):
+        """Create the durable stage slot of one unit's canonical work."""
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.mt_fallback import (
+            ProducerMTFallbackAuthorization,
+            ProducerMTFallbackUnit,
+            canonical_identity,
+            semantic_key_for,
+        )
+
+        # The slot must belong to the same run as the operation under
+        # reconciliation, because the stage journal is what forbids the release.
+        authorization = ProducerMTFallbackAuthorization.objects.create(
+            run=self.operation.run,
+            translation=self.unit.translation,
+            project=self.project,
+            scope_digest="a" * 64,
+            scope_size=1,
+            primary_engine="openrouter",
+            primary_configuration_digest="b" * 64,
+            fallback_engine="litellm",
+            fallback_configuration_digest="c" * 64,
+            fallback_model="QWEN3.7-plus",
+        )
+        identity = canonical_identity(
+            unit.pk,
+            self.unit.translation.language.code,
+            compute_decision_revision(unit.source_unit),
+        )
+        return ProducerMTFallbackUnit.objects.create(
+            authorization=authorization,
+            identity=identity,
+            semantic_key=semantic_key_for(identity),
+            unit=unit,
+            unit_id_snapshot=unit.pk,
+            source_decision_revision=compute_decision_revision(unit.source_unit),
+            language_code="cs",
+            source_slots=list(unit.get_source_plurals()),
+            primary_dispositions=["credit_refused"] * len(unit.get_source_plurals()),
+            primary_answers=[""] * len(unit.get_source_plurals()),
+            eligibility_reason="credit_refused",
+        )
+
+    def test_unit_with_a_fallback_slot_is_denied_new_paid_intent(self):
+        """A unit that already carries a fallback slot is closed to new intent."""
+        self._stage_slot_for(self.unit)
+        with patch("weblate.trans.tasks.publish_producer_run_dispatch"):
+            response = self.api.post(
+                self.url,
+                {**self.payload, "units": [self.payload["units"][0]]},
+                format="json",
+                HTTP_IDEMPOTENCY_KEY=str(uuid4()),
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["code"], "unit-fallback-claimed")
+        self.assertEqual(response.data["unit_id"], self.unit.pk)
+
+    def test_pending_unit_with_reserved_fallback_exchange_is_not_released(self):
+        """Reconciliation never releases a fallback reservation as never_sent."""
+        slot = self._stage_slot_for(self.unit)
+        exchange = ProducerLLMExchange.objects.create(
+            request_digest="d" * 64,
+            request_codec="routed-slots-v4",
+            owner="owner",
+            lease_until=timezone.now() + timedelta(hours=1),
+            mt_authorization=slot.authorization,
+            mt_stage="fallback",
+        )
+        slot.fallback_exchange = exchange
+        slot.fallback_state = "reserved"
+        slot.save(update_fields=["fallback_exchange", "fallback_state"])
+        # The operation's own attempt stays pending: the stage journal, not the
+        # attempt row, is the financial witness that forbids the release.
+        self.operation.units.filter(unit=self.unit).update(state="pending")
+        response = self.reconcile()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.unit.pk, response.data["reconciliation"]["paid_unknown"])
+        self.assertNotIn(self.unit.pk, response.data["reconciliation"]["never_sent"])
+        self.operation.units.get(unit=self.unit).refresh_from_db()
+        self.assertNotEqual(self.operation.units.get(unit=self.unit).state, "released")

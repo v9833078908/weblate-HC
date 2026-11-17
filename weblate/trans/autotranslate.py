@@ -4,11 +4,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard
 from uuid import uuid4
 
+import httpx2
 from celery import current_task
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
@@ -387,6 +390,14 @@ class BaseAutoTranslate:
     # over the remaining `state:empty` units instead of summing incomparable
     # snapshots.
     batch_counter: _AttemptCounter | None = None
+    # Truthful coverage of the original run scope, separate from the mutation
+    # counters above. ``coverage_total`` is fixed once, before the first fetch,
+    # and includes reuse and guard skips; ``coverage_done`` is the set of
+    # original unit ids that reached a terminal outcome, so it only ever grows
+    # across fetch, store, chunks and components. ``done``/``total`` in the
+    # Celery meta stay mutation counters and are never masked by coverage.
+    coverage_total: int = 0
+    coverage_seen: set[int]
 
     def __init__(
         self,
@@ -410,6 +421,16 @@ class BaseAutoTranslate:
         self.repair_failure: str | None = None
         self.warnings: list[str] = []
         self.judge_summary: JudgeSummary | None = None
+        # The primary engine of an opted-in credit-fallback run. Its own
+        # failure classifier is the authority for what a captured receipt
+        # means; ``None`` outside such a run.
+        self._primary_classifier = None
+        self._primary_stage_authorization = None
+        self.coverage_total = 0
+        self.coverage_seen = set()
+        self.coverage_scope: set[int] | None = None
+        self._coverage_local_ids: set[int] = set()
+        self._legacy_recovery_ids: set[int] | None = None
 
     def get_message(self) -> str:
         if self.mode == "judge" and self.judge_summary is not None:
@@ -437,6 +458,36 @@ class BaseAutoTranslate:
     def get_warnings(self) -> list[str]:
         return self.warnings
 
+    def init_coverage(self, unit_ids: Sequence[int]) -> None:
+        """
+        Fix the coverage denominator once, before the first fetch.
+
+        The denominator is the original run scope: it includes units a repeat
+        reuse or a guard skip resolved without any request, so the reported
+        coverage never grows past what the run was actually asked to cover.
+        """
+        if self.coverage_scope is None:
+            self.coverage_scope = set(unit_ids)
+            self.coverage_total = len(self.coverage_scope)
+            self.coverage_seen = set()
+
+    def record_coverage(self, unit_ids: Sequence[int]) -> None:
+        """
+        Mark original units as terminally handled.
+
+        The set of terminal ids only grows: a later fetch, store, chunk or
+        component can add to it, never remove from it, so progress is
+        monotonic across a whole run.
+        """
+        if self.coverage_scope is not None:
+            self.coverage_seen.update(self.coverage_scope.intersection(unit_ids))
+
+    def report_coverage(self) -> None:
+        """Publish the current coverage as the run's progress, on this thread."""
+        if not self.coverage_total:
+            return
+        self.set_progress(len(self.coverage_seen))
+
     def set_progress(
         self,
         current: int,
@@ -458,7 +509,16 @@ class BaseAutoTranslate:
                 counter = self.batch_counter
                 meta["done"] = counter.updated
                 meta["total"] = counter.eligible or counter.updated
-            meta["progress"] = low + (high - low) * current // self.progress_steps
+            # Truthful coverage of the original run scope, published next to
+            # the mutation counters and never replacing them. The real
+            # progress percentage is derived from coverage once it exists.
+            denominator = self.progress_steps
+            if self.coverage_total:
+                meta["coverage_done"] = len(self.coverage_seen)
+                meta["coverage_total"] = self.coverage_total
+                current = min(len(self.coverage_seen), self.coverage_total)
+                denominator = self.coverage_total
+            meta["progress"] = low + (high - low) * current // denominator
             if phase is not None:
                 meta["phase"] = phase
                 meta["phase_current"] = phase_current
@@ -830,15 +890,25 @@ class AutoTranslate(BaseAutoTranslate):
 
         self.post_process()
 
+    # ruff: ignore[complex-structure]
     def fetch_mt(
         self,
         engines_list: list[str],
         threshold: int,
         on_batch: Callable[[list[Unit]], None] | None = None,
         on_failure: Callable[[MachineryBatchOutcome], None] | None = None,
+        *,
+        allow_credit_fallback: bool = True,
     ) -> dict[int, UnitMemoryResultDict]:
         """Get the translations."""
         units: list[Unit] = list(self.get_units().select_related("source_unit"))
+        self._coverage_local_ids = {unit.pk for unit in units}
+        if allow_credit_fallback and not self.overwrite_existing:
+            recovered = self._recover_legacy_stage_receipts(
+                units, engines_list=engines_list, threshold=threshold
+            )
+            if recovered is not None:
+                return recovered
         # An accepted explicit repeat decision is a stronger source than a
         # fresh machinery candidate. Apply it only to units the caller already
         # selected, then remove those units before machinery forms batches.
@@ -856,11 +926,25 @@ class AutoTranslate(BaseAutoTranslate):
             if unit.get_target_plurals() != target:
                 self.update(unit, self.target_state, target)
                 self.reused.add(unit.pk)
+            self.record_coverage([unit.pk])
             create_membership(group=group, unit=unit, mode="shared", reason="mt-reuse")
         units = pending
         num_units = len(units)
         if not num_units:
+            self.report_coverage()
             return {}
+
+        original_units = units + list(
+            self.translation.unit_set.filter(pk__in=self.reused).select_related(
+                "source_unit"
+            )
+        )
+        if self.producer_run is not None and self.producer_run.scope_snapshot:
+            original_units = list(
+                self.translation.unit_set.filter(
+                    pk__in=self.producer_run.scope_snapshot
+                ).select_related("source_unit")
+            )
 
         machinery_settings = self.translation.component.project.get_machinery_settings()
 
@@ -889,9 +973,50 @@ class AutoTranslate(BaseAutoTranslate):
                         "were machine translated."
                     )
                 )
-        run_id = str(self.producer_run.pk) if self.producer_run is not None else None
+        run_id = (
+            str(self.producer_run.pk)
+            if self.producer_run is not None
+            and ProducerRun.objects.filter(pk=self.producer_run.pk).exists()
+            else None
+        )
         for engine in engines:
             engine.usage_run_id = run_id
+        credit_fallback = (
+            allow_credit_fallback
+            and not self.overwrite_existing
+            and len(engines) == 1
+            and run_id is not None
+        )
+        fallback_authorization = None
+        if credit_fallback:
+            # The enrolled scope is frozen before the first primary call, so
+            # a credit stop mid-run has an immutable scope to fall back over.
+            fallback_authorization = self._enroll_credit_fallback_scope(
+                units=original_units,
+                machinery_settings=machinery_settings,
+                run_id=run_id,
+                primary_engine_id=engines[0].get_identifier(),
+            )
+        if fallback_authorization is not None:
+            self.init_coverage([unit.pk for unit in original_units])
+            self.record_coverage(self.reused)
+            # A fallback never retries or splits a paid request: the journal,
+            # not the heuristics, owns the spend. The primary engine also
+            # journals every internal request it makes, so a 402 is durable
+            # evidence rather than a batch-wide inference. The exact slots of
+            # each internal request are derived from the immutable enrollment
+            # inside the engine's own batch seam, before the wire ids exist.
+            engines[0].retry_attempts = 0
+            engines[0].credit_fallback_single_attempt = True
+            # ruff: ignore[private-member-access]
+            engines[0]._mt_stage = "primary"
+            # ruff: ignore[private-member-access]
+            engines[0]._mt_fallback_authorization_id = fallback_authorization.pk
+            self._primary_stage_authorization = fallback_authorization
+            # The primary engine's own classifier is the authority for what a
+            # captured receipt means, including an upstream refusal inside a
+            # 200 envelope.
+            self._primary_classifier = engines[0]
 
         # With a single service each batch is fetched and stored in one step,
         # so the bar counts strings once; otherwise fetching fills its first
@@ -901,6 +1026,21 @@ class AutoTranslate(BaseAutoTranslate):
         # Estimate number of strings to translate, this is adjusted in process_mt
         self.progress_steps = self.progress_base + num_units
 
+        # Collect classified outcomes so the fallback arbiter can decide.
+        outcomes: list[MachineryBatchOutcome] = []
+
+        def _observe_and_forward(outcome: MachineryBatchOutcome) -> None:
+            if outcome.status == "failed":
+                outcomes.append(outcome)
+            if on_failure is not None:
+                on_failure(outcome)
+
+        def _observe_outcome(outcome: MachineryBatchOutcome) -> None:
+            if outcome.status != "failed":
+                outcomes.append(outcome)
+
+        batch_callback = on_batch
+
         translations = fetch_machinery_matches(
             units=units,
             user=self.user,
@@ -908,9 +1048,19 @@ class AutoTranslate(BaseAutoTranslate):
             threshold=threshold,
             set_progress=self.set_progress,
             log_translation=self.translation,
-            on_batch=on_batch,
-            on_failure=on_failure,
+            on_batch=batch_callback,
+            on_failure=_observe_and_forward,
+            on_outcome=_observe_outcome,
         )
+        if fallback_authorization is not None:
+            translations = {
+                unit_id: result
+                for unit_id, result in translations.items()
+                if result.get("translation")
+                and all(result["translation"])
+                and all(result["quality"])
+            }
+        self.report_coverage()
         for engine in engines:
             if not engine.is_rate_limited():
                 continue
@@ -925,15 +1075,760 @@ class AutoTranslate(BaseAutoTranslate):
                 )
                 % {"service": engine.name}
             )
+
+        # A confirmed primary credit refusal may authorise exactly one
+        # fallback run over the units from credit-refused batches.
+        if allow_credit_fallback and not self.overwrite_existing and len(engines) == 1:
+            translations = self._fetch_mt_fallback(
+                units=units,
+                translations=translations,
+                outcomes=outcomes,
+                machinery_settings=machinery_settings,
+                threshold=threshold,
+                run_id=run_id,
+                primary_engine_id=engines[0].get_identifier(),
+                authorization=fallback_authorization,
+            )
+        self.report_coverage()
+
         if not incremental:
             self.set_progress(self.progress_base)
         return translations
+
+    # ruff: ignore[complex-structure]
+    def _recover_legacy_stage_receipts(
+        self, units: list[Unit], *, engines_list: list[str], threshold: int
+    ) -> dict[int, UnitMemoryResultDict] | None:
+        """Replay locally, then continue only the original credit-stopped scope."""
+        if self.producer_run is None:
+            return None
+        from weblate.trans.models.mt_fallback import (  # ruff: ignore[import-outside-top-level]
+            ProducerMTFallbackAuthorization,
+            ProducerMTFallbackUnit,
+        )
+        from weblate.trans.mt_fallback import (  # ruff: ignore[import-outside-top-level]
+            compute_audit_revision,
+            source_decision_revision,
+        )
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback_replay import (
+            replay_mt_stage_receipts,
+        )
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.wizard_auth.grants import (
+            run_delegation_active,
+        )
+
+        authorization = (
+            ProducerMTFallbackAuthorization.objects.filter(
+                run=self.producer_run,
+                translation=self.translation,
+                operation__isnull=True,
+            )
+            .select_related("actor", "run")
+            .first()
+        )
+        if authorization is None:
+            return None
+        self._primary_stage_authorization = authorization
+        replay_mt_stage_receipts(authorization.pk)
+        all_stages = {
+            stage.unit_id_snapshot: stage
+            for stage in ProducerMTFallbackUnit.objects.filter(
+                authorization=authorization
+            )
+        }
+        selected_ids = {unit.pk for unit in units}
+        self._legacy_recovery_ids = selected_ids
+        self._coverage_local_ids = selected_ids
+        stages = {
+            key: stage for key, stage in all_stages.items() if key in selected_ids
+        }
+        self.init_coverage(list(all_stages))
+        actor = authorization.actor
+        self.record_coverage(
+            [
+                stage.unit_id_snapshot
+                for stage in all_stages.values()
+                if stage.fallback_state in {"applied", "suggested"}
+            ]
+        )
+        for unit_id, stage in stages.items():
+            if stage.fallback_state in {"applied", "suggested"}:
+                self.record_coverage([unit_id])
+                continue
+            if stage.fallback_answer:
+                vector = split_plural(stage.fallback_answer)
+                fallback = True
+            elif (
+                stage.source_slots
+                and len(stage.primary_answers) == len(stage.source_slots)
+                and len(stage.primary_dispositions) == len(stage.source_slots)
+                and all(item == "primary_usable" for item in stage.primary_dispositions)
+                and all(stage.primary_answers)
+            ):
+                vector = stage.primary_answers
+                fallback = False
+            else:
+                continue
+            with transaction.atomic():
+                run = ProducerRun.objects.select_for_update().get(
+                    pk=authorization.run_id
+                )
+                unit = (
+                    Unit.objects.select_for_update()
+                    .select_related("source_unit")
+                    .filter(pk=unit_id)
+                    .first()
+                )
+                self.translation.refresh_from_db()
+                self.translation.component.refresh_from_db()
+                if (
+                    # ruff: ignore[too-many-boolean-expressions]
+                    unit is None
+                    or actor is None
+                    or actor.pk != authorization.actor_id_snapshot
+                    or self.user is None
+                    or self.user.pk != actor.pk
+                    or run.status
+                    in {"cancel_requested", "cancelled", "failed", "completed"}
+                    or not run_delegation_active(run)
+                    or not check_auto_translate_permission(
+                        actor, self.translation, self.mode
+                    )
+                    or self.translation.is_readonly
+                    or self.translation.component.locked
+                    or unit.readonly
+                    or any(unit.get_target_plurals())
+                    or source_decision_revision(unit) != stage.source_decision_revision
+                    or (
+                        stage.audit_revision
+                        and compute_audit_revision(unit) != stage.audit_revision
+                    )
+                ):
+                    continue
+                before = self.updated
+                self.update(unit, self.target_state, vector, user=actor)
+                if self.updated == before:
+                    continue
+                self.written.add(unit_id)
+                self.record_coverage([unit_id])
+                if fallback:
+                    unit.refresh_from_db()
+                    stage.fallback_state = (
+                        "applied" if any(unit.get_target_plurals()) else "suggested"
+                    )
+                    stage.save(update_fields=["fallback_state"])
+                self.translation.store_update_changes()
+        self.report_coverage()
+        # Only a demonstrably unsubmitted continuation chunk may re-enter
+        # the primary scheduler; prior unknown or reserved work stays fenced.
+        pending = [
+            stage
+            for stage in stages.values()
+            if (
+                stage.fallback_exchange_id is None
+                and stage.fallback_state not in {"applied", "suggested", "received"}
+                and not stage.fallback_answer
+                and any(item != "primary_usable" for item in stage.primary_dispositions)
+            )
+        ]
+        if not pending or engines_list != [authorization.primary_engine]:
+            return {}
+        machinery_settings = self.translation.component.project.get_machinery_settings()
+        if not self._fallback_configured(
+            authorization.primary_engine, machinery_settings
+        ):
+            return {}
+        primary_settings = machinery_settings.get(authorization.primary_engine)
+        if not primary_settings or authorization.primary_engine not in MACHINERY:
+            return {}
+        self._primary_classifier = MACHINERY[authorization.primary_engine](
+            primary_settings
+        )
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.mt_fallback import (
+            ProducerMTStageMember,
+        )
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import (
+            mark_slot_disposition,
+        )
+
+        credit_seen = False
+        for stage in all_stages.values():
+            for member in ProducerMTStageMember.objects.filter(
+                unit_stage=stage, stage="primary"
+            ).select_related("exchange"):
+                if self._primary_slot_disposition(member.exchange) == "credit_refused":
+                    if stage.primary_dispositions[member.source_slot] == "unknown":
+                        mark_slot_disposition(
+                            stage, member.source_slot, "credit_refused"
+                        )
+                    credit_seen = True
+        if not credit_seen:
+            credit_seen = any(
+                "credit_refused" in stage.primary_dispositions
+                for stage in all_stages.values()
+            )
+        if not credit_seen:
+            run = self.producer_run
+            snapshot = run.scope_snapshot or []
+            current_chunk = set(
+                snapshot[run.scope_cursor : run.scope_cursor + JUDGE_CHUNK_SIZE]
+            )
+            if (
+                run.execution_version >= 1
+                and run.scope_cursor > 0
+                and selected_ids
+                and selected_ids <= current_chunk
+                and selected_ids == set(stages)
+                and all(
+                    stage.primary_work_id is None
+                    and stage.fallback_exchange_id is None
+                    and all(value == "unknown" for value in stage.primary_dispositions)
+                    for stage in stages.values()
+                )
+                and not ProducerMTStageMember.objects.filter(
+                    unit_stage__in=stages.values()
+                ).exists()
+            ):
+                self._legacy_recovery_ids = None
+                return None
+            return {}
+        return self._fetch_mt_fallback(
+            units=units,
+            translations={},
+            outcomes=[],
+            machinery_settings=machinery_settings,
+            threshold=threshold,
+            run_id=str(self.producer_run.pk),
+            primary_engine_id=authorization.primary_engine,
+            authorization=authorization,
+        )
+
+    def _fallback_configured(
+        self, primary_engine_id: str, machinery_settings: dict
+    ) -> bool:
+        """Whether the exact fixed fallback pilot route is configured."""
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import fallback_profile_configured
+
+        return fallback_profile_configured(
+            machinery_settings, primary_engine=primary_engine_id
+        )
+
+    def _enroll_credit_fallback_scope(
+        self,
+        *,
+        units: list[Unit],
+        machinery_settings: dict,
+        run_id: str | None,
+        primary_engine_id: str,
+    ) -> object | None:
+        """
+        Freeze the enrolled scope before the first primary call.
+
+        Legacy MT with a persisted ``producer_run`` enrolls its full selected
+        translation scope once, before any provider I/O: the standing
+        authorization and one immutable unit-stage row per unit of the scope,
+        with its frozen ordered source slots. A direct ``AutoTranslate``
+        without a stable run stays primary-only: an unjournaled second paid
+        route is never taken silently.
+        """
+        if run_id is None:
+            return None
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import (
+            enroll_mt_credit_scope,
+            enroll_unit_stages,
+            fallback_profile_configured,
+        )
+
+        if not fallback_profile_configured(
+            machinery_settings, primary_engine=primary_engine_id
+        ):
+            return None
+        if self.producer_run is None:
+            return None
+        authorization = enroll_mt_credit_scope(
+            run=self.producer_run,
+            translation=self.translation,
+            units=units,
+            machinery_settings=machinery_settings,
+        )
+        # One immutable unit-stage row per enrolled unit, with its frozen
+        # ordered source slots, so every internal primary request can be
+        # journaled against exact membership before it is sent.
+        enroll_unit_stages(authorization, units)
+        return authorization
+
+    def _mt_stage_context(self, unit: Unit, authorization) -> tuple | None:
+        """
+        Return the immutable stage context, or ``None`` when unenrolled.
+
+        A stage context is required for every opted-in primary send: without
+        one the request would travel without a financial witness, so the
+        caller must refuse rather than send silently.
+        """
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import unit_stage_for_unit
+
+        return unit_stage_for_unit(authorization, unit)
+
+    def _primary_stage_slots(self, authorization, unit: Unit) -> tuple:
+        """Ordered ``(unit_stage_id, source_slot)`` pairs of one unit's slots."""
+        unit_stage = self._mt_stage_context(unit, authorization)
+        if unit_stage is None:
+            return ()
+        return tuple(
+            (unit_stage.pk, index) for index in range(len(unit_stage.source_slots))
+        )
+
+    # ruff: ignore[complex-structure]
+    def _fetch_mt_fallback(
+        self,
+        *,
+        units: list[Unit],
+        translations: dict[int, UnitMemoryResultDict],
+        outcomes: list[MachineryBatchOutcome],
+        machinery_settings: dict,
+        threshold: int,
+        run_id: str | None,
+        primary_engine_id: str,
+        authorization=None,
+    ) -> dict[int, UnitMemoryResultDict]:
+        """
+        Ask the fallback engine for the exact unresolved credit-stopped slots.
+
+        Only a confirmed ``insufficient-credit`` refusal from the primary
+        engine authorises this; quota, auth, permission, rate-limit, generic
+        provider errors, timeouts and lost replies keep their existing
+        semantics. The fallback never runs twice for one unit of work.
+
+        Eligibility is receipt-driven, not batch-wide: a slot is eligible only
+        when its own primary request confirmed the credit refusal, or when it
+        was in the enrolled scope and never sent because the run was stopped
+        by that refusal. A slot whose own outcome was unknown, invalid,
+        partial or another quota never becomes eligible.
+        """
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import (
+            eligible_fallback_slots,
+            primary_saw_confirmed_credit_refusal,
+        )
+
+        if outcomes and not primary_saw_confirmed_credit_refusal(
+            [outcome.reason_code for outcome in outcomes]
+        ):
+            return translations
+        if authorization is None and not outcomes:
+            return translations
+        if run_id is None or self.producer_run is None:
+            # A fallback is a second paid route: without a persisted run it
+            # would be an unjournaled charge. Direct callers without a stable
+            # run stay primary-only with an explicit diagnostic.
+            self.add_warning(
+                gettext(
+                    "%(service)s refused the request: the credit balance is "
+                    "spent. A fallback engine is not used because this run is "
+                    "not journaled."
+                )
+                % {"service": primary_engine_id}
+            )
+            return translations
+        if authorization is None:
+            authorization = self._enroll_credit_fallback_scope(
+                units=units,
+                machinery_settings=machinery_settings,
+                run_id=run_id,
+                primary_engine_id=primary_engine_id,
+            )
+        if authorization is not None and outcomes:
+            self._record_primary_dispositions(authorization, units, outcomes)
+        if authorization is None:
+            return translations
+        # Freeze the per-slot primary evidence from the stage journal: every
+        # slot whose own internal request was sent carries the disposition
+        # that request's own classifier produced. Only a slot the scheduler
+        # never asked, skipped by the terminal credit refusal, is
+        # never_sent_due_credit.
+        # Dispositions on recovery come from each captured primary receipt.
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback_replay import (
+            replay_mt_stage_receipts,
+        )
+
+        replay_mt_stage_receipts(authorization.pk)
+        slots = eligible_fallback_slots(authorization.pk)
+        if not slots:
+            return translations
+        # In-flight primary successes and already-applied units are excluded;
+        # a successful prefix is never repurchased.
+        selected_ids = {unit.pk for unit in units}
+        slots = [
+            (stage, index, text)
+            for stage, index, text in slots
+            if stage.unit_id_snapshot in selected_ids
+            and stage.fallback_exchange_id is None
+            and stage.fallback_state
+            not in {"received", "applied", "suggested", "unknown"}
+        ]
+        eligible_units = {
+            unit_stage.unit
+            for unit_stage, _index, _text in slots
+            if unit_stage.unit is not None and unit_stage.unit.id not in translations
+        }
+        if not eligible_units:
+            return translations
+        # ruff: ignore[import-outside-top-level]
+        from weblate.machinery.models import MACHINERY as MACHINERY_REGISTRY
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import (
+            build_fallback_engine_settings,
+            fallback_warning,
+            resolve_fallback_profile,
+        )
+
+        profile = resolve_fallback_profile(
+            machinery_settings, primary_engine=primary_engine_id
+        )
+        if profile is None:
+            return translations
+        engine_settings = build_fallback_engine_settings(machinery_settings)
+        if engine_settings is None:
+            return translations
+        fallback_engine = MACHINERY_REGISTRY[profile.engine](engine_settings)
+        fallback_engine.retry_attempts = 0
+        fallback_engine.credit_fallback_single_attempt = True
+        fallback_engine.usage_run_id = run_id
+        # ruff: ignore[private-member-access]
+        fallback_engine._mt_stage = "fallback"
+        # ruff: ignore[private-member-access]
+        fallback_engine._mt_fallback_authorization_id = authorization.pk
+        # ruff: ignore[private-member-access]
+        fallback_engine._mt_stage_actor = self.user
+        # ruff: ignore[private-member-access]
+        fallback_engine._mt_stage_mode = self.mode
+        self.translation.log_info(
+            "primary engine credit exhausted; falling back to %s for %d strings",
+            fallback_engine.name,
+            len(eligible_units),
+        )
+        before = set(translations)
+        # One occurrence-safe pass per unit: every eligible unresolved source
+        # slot of that unit travels together in one request, and the results
+        # stay private until the whole vector can be applied under the
+        # empty-target guard.
+        private: dict[int, list[str]] = {}
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.llm_delivery import (
+            DeliveryUnresolved,
+        )
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import (
+            stage_send_guard,
+        )
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.wizard_auth.grants import (
+            run_delegation_active,
+        )
+
+        visited = set()
+        # ruff: ignore[too-many-statements-in-try-clause]
+        try:
+            for unit_stage, _index, _text in slots:
+                if unit_stage.pk in visited:
+                    continue
+                visited.add(unit_stage.pk)
+                unit = unit_stage.unit
+                if unit is None or unit not in eligible_units:
+                    continue
+                eligible_slots = [
+                    index
+                    for index, disposition in enumerate(unit_stage.primary_dispositions)
+                    if disposition in {"credit_refused", "never_sent_due_credit"}
+                ]
+                if not eligible_slots:
+                    continue
+                # The first element is the immutable stage row this slot
+                # belongs to; the second is the unit's original source-slot
+                # index. Both travel into the journal, so they must be exact.
+                ordered = [
+                    (unit_stage.pk, index, unit_stage.source_slots[index], unit)
+                    for index in eligible_slots
+                ]
+                if (
+                    self.user is None
+                    or self.user.pk != authorization.actor_id_snapshot
+                    or not run_delegation_active(authorization.run)
+                ):
+                    continue
+                try:
+                    stage_send_guard(
+                        authorization,
+                        actor=self.user,
+                        mode=self.mode,
+                        slots=[(unit_stage.pk, index) for index in eligible_slots],
+                    )()
+                except DeliveryUnresolved:
+                    continue
+                results = fallback_engine.translate_mt_fallback_slots(
+                    self.translation.component.source_language.code,
+                    self.translation.language.code,
+                    ordered,
+                    user=self.user,
+                    threshold=threshold,
+                )
+                answers = [
+                    item["text"]
+                    for group in results
+                    for item in group
+                    if item.get("quality", 0) >= threshold
+                ]
+                if not answers:
+                    continue
+                # A mixed-stage unit keeps its successful primary answers
+                # private until the combined vector is complete: no
+                # intermediate partial target is ever written.
+                combined = self._combine_stage_vectors(
+                    unit_stage, eligible_slots, answers
+                )
+                if combined is None:
+                    continue
+                private[unit.id] = combined
+        except MachineTranslationServiceError:
+            # A fallback refusal is terminal: there is no third paid route.
+            # The durable primary evidence and the stage journal stay as they
+            # are, and nothing already captured is discarded.
+            return translations
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import (
+            save_fallback_answer,
+        )
+
+        save_fallback_answer(
+            authorization.pk,
+            {
+                row.identity: private[row.unit_id_snapshot]
+                for row, _, _ in slots
+                if row.unit_id_snapshot in private
+            },
+        )
+        for unit_id, answers in private.items():
+            translations[unit_id] = {
+                "translation": answers,
+                "quality": [threshold] * len(answers),
+                "origin": [fallback_engine] * len(answers),
+            }
+        newly = set(translations) - before
+        if newly:
+            self.add_warning(fallback_warning(fallback_engine.name, len(newly)))
+        return translations
+
+    def _record_primary_dispositions(
+        self, authorization, units: list[Unit], outcomes: list[MachineryBatchOutcome]
+    ) -> None:
+        """
+        Promote per-slot primary dispositions from real captured evidence.
+
+        A slot becomes ``credit_refused`` only when its own primary request
+        produced a full qualifying response the engine's own classifier reads
+        as insufficient credit (HTTP 402, a confirmed 403 or an upstream 402
+        inside a 200 envelope); it becomes ``primary_usable`` only when that
+        request produced a usable answer the parser accepted. A lost, partial,
+        invalid, generic, quota or auth outcome keeps its own ``unknown``
+        disposition.
+
+        A slot whose unit was never asked at all becomes
+        ``never_sent_due_credit`` only when the scheduler reports its batch as
+        skipped by the terminal credit refusal - never merely because no
+        membership row exists.
+        """
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.llm_delivery import ProducerLLMExchange
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.mt_fallback import (
+            ProducerMTFallbackUnit,
+            ProducerMTStageMember,
+        )
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import (
+            mark_slot_disposition,
+            unit_stage_for_unit,
+        )
+
+        # Units the scheduler never asked, and the reason it gives for that.
+        never_asked = {
+            unit_id
+            for outcome in outcomes
+            if outcome.status == "skipped"
+            and outcome.skip_cause == "terminal-refusal"
+            and outcome.reason_code
+            == MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
+            for unit_id in outcome.unit_ids
+        }
+        confirmed_credit = False
+        for unit in units:
+            unit_stage = unit_stage_for_unit(authorization, unit)
+            if unit_stage is None:
+                continue
+            members = list(
+                ProducerMTStageMember.objects.filter(
+                    unit_stage=unit_stage, stage="primary"
+                ).order_by("position")
+            )
+            if not members:
+                if (
+                    unit.pk not in never_asked
+                    or unit_stage.primary_work_id is not None
+                    or unit_stage.fallback_exchange_id is not None
+                ):
+                    # Not asked for another reason (a rate-limit wait, a guard,
+                    # an empty batch) is not a credit stop: never eligible.
+                    continue
+                for index in range(len(unit_stage.source_slots)):
+                    mark_slot_disposition(unit_stage, index, "never_sent_due_credit")
+                continue
+            for member in members:
+                disposition = self._primary_slot_disposition(
+                    ProducerLLMExchange.objects.get(pk=member.exchange_id)
+                )
+                if disposition == "credit_refused":
+                    mark_slot_disposition(unit_stage, member.source_slot, disposition)
+                    confirmed_credit = True
+        run = self.producer_run
+        if (
+            confirmed_credit
+            and run is not None
+            and run.execution_version >= 1
+            and run.scope_snapshot
+            and len(set(run.scope_snapshot)) == len(run.scope_snapshot)
+        ):
+            # The frozen cursor proves that later chunks have never been
+            # submitted by this run. Do not extend this inference to the
+            # current chunk, whose missing members could be rate-limit skips.
+            future = run.scope_snapshot[run.scope_cursor + JUDGE_CHUNK_SIZE :]
+            for stage in ProducerMTFallbackUnit.objects.filter(
+                authorization=authorization,
+                unit_id_snapshot__in=future,
+                primary_work__isnull=True,
+                fallback_exchange__isnull=True,
+            ):
+                if ProducerMTStageMember.objects.filter(unit_stage=stage).exists():
+                    continue
+                for index, disposition in enumerate(stage.primary_dispositions):
+                    if disposition == "unknown":
+                        mark_slot_disposition(stage, index, "never_sent_due_credit")
+
+    def _primary_slot_disposition(self, exchange) -> str:
+        """
+        Classify one captured primary exchange with the engine's own reader.
+
+        The stored receipt is replayed through the same failure classifier the
+        live request used, so an upstream refusal inside a 200 envelope is read
+        exactly as the engine read it - as a credit refusal, not as a success.
+        """
+        if exchange.state != "received":
+            # A lost or unknown reply is never a credit refusal.
+            return "unknown"
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.llm_delivery import read_response
+
+        snapshot = exchange.request_snapshot
+        if not isinstance(snapshot, dict) or exchange.mt_stage != "primary":
+            return "unknown"
+        wire = {key: snapshot.get(key) for key in ("url", "method", "payload")}
+        digest = hashlib.sha256(
+            json.dumps(wire, sort_keys=True, ensure_ascii=False, default=str).encode()
+        ).hexdigest()
+        members = list(exchange.stage_members.order_by("position"))
+        slots = [
+            {
+                "unit_stage_id": str(member.unit_stage_id),
+                "source_slot": member.source_slot,
+            }
+            for member in members
+        ]
+        if (
+            digest != exchange.request_digest
+            or not members
+            or snapshot.get("slots") != slots
+            or any(
+                member.stage != "primary" or member.position != position
+                for position, member in enumerate(members)
+            )
+        ):
+            return "unknown"
+        try:
+            saved = json.loads(read_response(exchange.pk))
+        except Exception:
+            return "unknown"
+        status = saved.get("status")
+        if not isinstance(status, int):
+            return "unknown"
+        classifier = self._primary_classifier
+        if classifier is None:
+            # Without the primary engine there is no authority for what the
+            # receipt means, so nothing is inferred from it.
+            return "unknown"
+        response = httpx2.Response(
+            status,
+            content=saved.get("body", "").encode(),
+            headers=saved.get("headers") or {},
+            request=httpx2.Request(snapshot["method"], snapshot["url"]),
+        )
+        try:
+            classifier.check_failure(response)
+        except MachineTranslationServiceError as error:
+            if error.reason_code == (
+                MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
+            ):
+                return "credit_refused"
+            return "unknown"
+        except Exception:
+            return "unknown"
+        if 200 <= status < 300:
+            return "primary_usable"
+        return "unknown"
+
+    @staticmethod
+    def _combine_stage_vectors(
+        unit_stage, eligible_slots: list[int], answers: list[str]
+    ) -> list[str] | None:
+        """
+        Build the one complete vector of a mixed-stage unit, or nothing.
+
+        Primary answers of usable slots and fallback answers of eligible slots
+        are combined by original source-slot index. A unit whose vector is
+        still incomplete stays private instead of being written partially.
+        """
+        if len(answers) != len(eligible_slots):
+            return None
+        vector = list(unit_stage.primary_answers)
+        while len(vector) < len(unit_stage.source_slots):
+            vector.append("")
+        for slot, answer in zip(eligible_slots, answers, strict=True):
+            vector[slot] = answer
+        if any(not text for text in vector):
+            return None
+        return vector
 
     def fetch_mt_checked(
         self,
         engines_list: list[str],
         threshold: int,
         on_batch: Callable[[list[Unit]], None] | None = None,
+        *,
+        allow_credit_fallback: bool = True,
     ) -> tuple[dict[int, UnitMemoryResultDict], list[MachineryBatchOutcome]]:
         """Fetch translations and report every classified batch failure."""
         failures: list[MachineryBatchOutcome] = []
@@ -973,6 +1868,7 @@ class AutoTranslate(BaseAutoTranslate):
             threshold,
             on_batch=on_batch,
             on_failure=observe,
+            allow_credit_fallback=allow_credit_fallback,
         )
         return translations, failures
 
@@ -1002,7 +1898,9 @@ class AutoTranslate(BaseAutoTranslate):
             }
             self.preparation_write_lock = True
             try:
-                translations, failures = self.fetch_mt_checked(engines, int(threshold))
+                translations, failures = self.fetch_mt_checked(
+                    engines, int(threshold), allow_credit_fallback=False
+                )
                 translations = {
                     unit_id: result
                     for unit_id, result in translations.items()
@@ -1040,7 +1938,9 @@ class AutoTranslate(BaseAutoTranslate):
             engines, int(threshold), on_batch=self.store_batch
         )
 
-        # Adjust total number to show correct progress
+        # Adjust total number to show correct progress. The coverage
+        # denominator is the original run scope fixed before the fetch, so the
+        # number of answers received never shrinks it.
         self.progress_steps = self.progress_base + len(translations)
 
         # Anything a batch callback did not cover, for instance when several
@@ -1053,6 +1953,45 @@ class AutoTranslate(BaseAutoTranslate):
         if remaining:
             self.store_results(remaining)
         self.post_process()
+        if self._legacy_recovery_ids:
+            unresolved = self.translation.unit_set.filter(
+                pk__in=self._legacy_recovery_ids
+            ).exclude(pk__in=self.written | self.reused)
+            if any(
+                not any(unit.get_target_plurals()) and not unit.suggestion_set.exists()
+                for unit in unresolved
+                if not unit.readonly
+            ):
+                self.failure_message = gettext(
+                    "Automatic translation could not recover all requested strings."
+                )
+                self.add_warning(self.failure_message)
+        # Full coverage means every unit of the original scope reached a
+        # usable outcome - stored, suggested or already covered by reuse or a
+        # guard skip - not merely that its batch reached some terminal
+        # outcome. A refused or skipped batch that left strings unresolved is
+        # not coverage, so it still fails the run.
+        covered = (
+            self.coverage_total > 0
+            and self._coverage_local_ids <= self.coverage_seen
+            and not self._unresolved_units(translations)
+        )
+        if covered:
+            # A primary credit stop whose remainder the fallback stage fully
+            # resolved completes the run with the refusal as a warning, not a
+            # failure. Every other fatal refusal keeps failing the run.
+            fatal = next(
+                (
+                    outcome
+                    for outcome in failures
+                    if outcome.reason_code
+                    == MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT
+                ),
+                None,
+            )
+            if fatal is not None:
+                self.add_warning(fatal.error)
+            return
         fatal = next(
             (
                 outcome
@@ -1077,6 +2016,36 @@ class AutoTranslate(BaseAutoTranslate):
             if fatal.error not in self.warnings:
                 self.add_warning(self.failure_message)
 
+    def _unresolved_units(
+        self, translations: dict[int, UnitMemoryResultDict]
+    ) -> list[int]:
+        """
+        Original-scope units still missing a translation or a suggestion.
+
+        This is the honest denominator of coverage: a unit counts as resolved
+        only when it actually carries a target or a suggestion after the run,
+        so a terminal failure, a skip or a guard refusal never inflates it.
+        """
+        unresolved: list[int] = []
+        for unit in (
+            self.translation.unit_set.filter(pk__in=self.coverage_seen)
+            .exclude(state=STATE_READONLY)
+            .prefetch_bulk()
+        ):
+            if unit.pk in self.reused or unit.pk in self.written:
+                continue
+            if any(unit.get_target_plurals()):
+                continue
+            if unit.suggestion_set.exists():
+                continue
+            result = translations.get(unit.pk)
+            if result is not None and any(
+                form for form in result.get("translation") or []
+            ):
+                continue
+            unresolved.append(unit.pk)
+        return unresolved
+
     def store_batch(self, units: list[Unit]) -> None:
         """Store one fetched batch so a crash cannot discard the whole run."""
         results = {
@@ -1096,6 +2065,12 @@ class AutoTranslate(BaseAutoTranslate):
                 .prefetch_bulk()
             ):
                 translation: UnitMemoryResultDict = translations[unit.pk]
+                if self._primary_stage_authorization is not None and (
+                    not translation.get("translation")
+                    or not all(translation["translation"])
+                    or not all(translation.get("quality") or ())
+                ):
+                    continue
                 # Use first existing origin for user
                 # (there can be blanks for missing plurals)
                 user: User | None = None
@@ -1103,6 +2078,68 @@ class AutoTranslate(BaseAutoTranslate):
                     if origin is not None:
                         user = origin.user
                         break
+                fallback_stage = None
+                if self._primary_stage_authorization is not None:
+                    # ruff: ignore[import-outside-top-level]
+                    from weblate.trans.models.mt_fallback import (
+                        ProducerMTFallbackUnit,
+                    )
+                    from weblate.trans.mt_fallback import (  # ruff: ignore[import-outside-top-level]
+                        compute_audit_revision,
+                        source_decision_revision,
+                    )
+
+                    # ruff: ignore[import-outside-top-level]
+                    from weblate.wizard_auth.grants import (
+                        run_delegation_active,
+                    )
+
+                    fallback_stage = (
+                        ProducerMTFallbackUnit.objects.select_for_update(of=("self",))
+                        .select_related("authorization__run", "authorization__actor")
+                        .filter(
+                            authorization=self._primary_stage_authorization,
+                            authorization__translation=self.translation,
+                            unit_id_snapshot=unit.pk,
+                            fallback_state="received",
+                            fallback_answer__gt="",
+                        )
+                        .first()
+                    )
+                    if fallback_stage is not None:
+                        authorization = fallback_stage.authorization
+                        run = ProducerRun.objects.select_for_update().get(
+                            pk=authorization.run_id
+                        )
+                        self.translation.refresh_from_db()
+                        self.translation.component.refresh_from_db()
+                        if (
+                            # ruff: ignore[too-many-boolean-expressions]
+                            authorization.actor is None
+                            or self.user is None
+                            or authorization.actor_id_snapshot != self.user.pk
+                            or run.status
+                            in {"cancel_requested", "cancelled", "completed", "failed"}
+                            or not run_delegation_active(run)
+                            or not check_auto_translate_permission(
+                                authorization.actor, self.translation, self.mode
+                            )
+                            or self.translation.is_readonly
+                            or self.translation.component.locked
+                            or unit.readonly
+                            or any(unit.get_target_plurals())
+                            or source_decision_revision(unit)
+                            != fallback_stage.source_decision_revision
+                            or (
+                                fallback_stage.audit_revision
+                                and compute_audit_revision(unit)
+                                != fallback_stage.audit_revision
+                            )
+                        ):
+                            if any(unit.get_target_plurals()):
+                                self.record_coverage([unit.pk])
+                            continue
+                before_update = self.updated
                 if self.preparation_write_lock:
                     # Empty-only preparation: re-read under the row lock and
                     # never overwrite a target a human wrote since the fetch.
@@ -1145,9 +2182,21 @@ class AutoTranslate(BaseAutoTranslate):
                         user=user,
                     )
                     self.written.add(unit.pk)
+                if self.updated > before_update:
+                    self.record_coverage([unit.pk])
+                if fallback_stage is not None and self.updated > before_update:
+                    unit.refresh_from_db()
+                    fallback_stage.fallback_state = (
+                        "applied" if any(unit.get_target_plurals()) else "suggested"
+                    )
+                    fallback_stage.save(update_fields=["fallback_state"])
             # Flush the deferred changes of this transaction; a later crash
             # then leaves stored translations with their history intact.
             self.translation.store_update_changes()
+        # Coverage only grows here: the stored units are terminal for the run,
+        # and the denominator fixed before the first fetch is never shrunk to
+        # the number of answers this store happened to receive.
+        self.report_coverage()
         self.set_progress(self.progress_base + len(self.written))
 
     def preview_judge_scope(self) -> tuple[JudgeScopePreview, list[Unit]]:
@@ -2749,6 +3798,16 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 status = ProducerRun.Status.PARTIAL
                 run.status = status
         summary["written"] = self.updated
+        # Additive MT credit-fallback provenance: the run summary reports the
+        # primary and fallback engines, the fallback model and the requested,
+        # usable, applied and suggested counts read from the stage journal.
+        # It is a report, never a financial record; the journal owns the spend.
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import mt_fallback_run_summary
+
+        fallback_summary = mt_fallback_run_summary(run)
+        if fallback_summary is not None:
+            summary["mt_fallback"] = fallback_summary
         if run.preparation_snapshot:
             # C5/C6: the preparation outcome survives finalization as its
             # own summary block, never merged into the judge tally.
@@ -2797,6 +3856,59 @@ class BatchAutoTranslate(BaseAutoTranslate):
         return not self.enforce_permissions or bool(
             check_auto_translate_permission(self.user, translation, self.mode)
         )
+
+    def _init_mt_coverage(self, run: ProducerRun, engines: list[str]) -> None:
+        """Freeze and share the original selected scope for an opted-in run."""
+        if self.mode == "judge" or self.overwrite_existing or engines != ["openrouter"]:
+            return
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import (
+            fallback_profile_configured,
+        )
+
+        if not any(
+            fallback_profile_configured(
+                translation.component.project.get_machinery_settings(),
+                primary_engine="openrouter",
+            )
+            for translation in self.translations
+            if self._can_process_translation(translation)
+        ):
+            return
+        if run.scope_snapshot:
+            ids = list(run.scope_snapshot)
+        else:
+            ids = []
+            for translation in self.translations:
+                units = translation.unit_set.exclude(state=STATE_READONLY)
+                if self.unit_ids is not None:
+                    units = units.filter(pk__in=self.unit_ids)
+                if self.mode == "suggest":
+                    units = units.filter(suggestion__isnull=True)
+                ids.extend(
+                    units.search(self.q, parser="unit").values_list("pk", flat=True)
+                )
+            ids = list(dict.fromkeys(ids))
+            with transaction.atomic():
+                locked = ProducerRun.objects.select_for_update().get(pk=run.pk)
+                if locked.scope_snapshot:
+                    ids = list(locked.scope_snapshot)
+                else:
+                    locked.scope_snapshot = ids
+                    locked.save(update_fields=["scope_snapshot"])
+                run.scope_snapshot = ids
+        self.init_coverage(ids)
+        for unit in Unit.objects.filter(pk__in=ids).prefetch_bulk():
+            if any(unit.get_target_plurals()) or unit.suggestion_set.exists():
+                self.record_coverage([unit.pk])
+
+    def _share_mt_coverage(self, child: AutoTranslate) -> None:
+        if self.coverage_scope is None:
+            return
+        child.coverage_scope = self.coverage_scope
+        child.coverage_total = self.coverage_total
+        child.coverage_seen = self.coverage_seen
+        child.progress_range = (0, 100)
 
     def _finish_translation(
         self, auto_translate: AutoTranslate, judge_remaining: int | None
@@ -2897,6 +4009,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 )
         return message
 
+    # ruff: ignore[too-many-branches, too-many-statements]
     def _perform(  # ruff: ignore[complex-structure]
         self,
         *,
@@ -3120,6 +4233,8 @@ class BatchAutoTranslate(BaseAutoTranslate):
             and preparation_requested
             and producer_run.preparation_phase == "ready"
         )
+        if producer_run is not None and auto_source == "mt":
+            self._init_mt_coverage(producer_run, engines)
         if producer_run is not None and producer_run.execution_version >= 1:
             return self._perform_chunk_loop(
                 producer_run=producer_run,
@@ -3150,12 +4265,19 @@ class BatchAutoTranslate(BaseAutoTranslate):
             # Share the attempt-local counter so every nested progress write
             # reports the batch-wide `done/total`, not one translation's.
             auto_translate.batch_counter = self._attempt_counter
+            self._share_mt_coverage(auto_translate)
             if not self._can_process_translation(translation):
                 if self.mode == "judge" and producer_run is not None:
                     self._record_skipped_judge_units(
                         producer_run,
                         list(auto_translate.get_units().order_by("position", "pk")),
                         JudgeRunUnit.SkipReason.PERMISSION,
+                    )
+                if self.coverage_scope is not None:
+                    self.record_coverage(
+                        translation.unit_set.filter(
+                            pk__in=self.coverage_scope
+                        ).values_list("pk", flat=True)
                     )
                 self.set_progress(pos)
                 continue
@@ -3173,6 +4295,8 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 100 * (pos - 1) // self.progress_steps,
                 100 * pos // self.progress_steps,
             )
+            if self.coverage_scope is not None:
+                auto_translate.progress_range = (0, 100)
 
             effective_source_component_ids = source_component_ids
             if (
@@ -3323,12 +4447,14 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 judge_proposal_only=self.judge_proposal_only,
             )
             auto_translate.batch_counter = self._attempt_counter
+            self._share_mt_coverage(auto_translate)
             if not self._can_process_translation(translation):
                 self._record_skipped_judge_units(
                     producer_run,
                     list(auto_translate.get_units().order_by("position", "pk")),
                     JudgeRunUnit.SkipReason.PERMISSION,
                 )
+                self.record_coverage(trans_chunk_ids)
                 self.set_progress(pos)
                 continue
 

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
 from django.conf import settings
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 from weblate.trans.models.llm_delivery import ProducerLLMExchange, ProducerLLMWork
@@ -97,6 +97,7 @@ def _keys(identity: Sequence[str]) -> list[str]:
     return result
 
 
+# ruff: ignore[complex-structure]
 def reserve_exchange(
     identity: Sequence[str],
     request_digest: str,
@@ -106,6 +107,7 @@ def reserve_exchange(
     request_codec: str | None = None,
     replay_only: bool = False,
     judge_primary_identity: Sequence[str] | None = None,
+    mt_primary_context=None,
 ) -> ExchangeRef:
     """One transaction claims every semantic member before network I/O."""
     keys = _keys(identity)
@@ -115,6 +117,7 @@ def reserve_exchange(
         "routed-parts-v1",
         "routed-slots-v2",
         "routed-slots-v3",
+        "routed-slots-v4",
     }:
         msg = "Invalid delivery codec"
         raise ValueError(msg)
@@ -128,6 +131,51 @@ def reserve_exchange(
         raise ValueError(msg)
     try:  # ruff: ignore[too-many-statements-in-try-clause]
         with transaction.atomic():
+            # Shared arbitration boundary, identical to the MT stage path:
+            # the Unit rows these identities belong to (sorted PK), then any
+            # existing MT stage row for the same canonical work, then the
+            # canonical work rows, then the exchange rows. A concurrent legacy
+            # enrollment or fallback reservation therefore waits here instead
+            # of both passing the absence-of-claim check.
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.models import Unit
+
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.models.mt_fallback import ProducerMTFallbackUnit
+
+            unit_ids = sorted(
+                {
+                    int(item.split(":")[1])
+                    for item in identity
+                    if len(item.split(":")) == 4 and item.split(":")[0] == "mt"
+                }
+            )
+            if unit_ids:
+                list(
+                    Unit.objects.select_for_update()
+                    .filter(pk__in=unit_ids)
+                    .order_by("pk")
+                )
+                stage_rows = list(
+                    ProducerMTFallbackUnit.objects.select_for_update()
+                    .filter(semantic_key__in=keys)
+                    .order_by("semantic_key")
+                )
+                # A live stage claim on the same canonical work blocks a new
+                # primary reservation: the stage owns that unit of work now.
+                if any(
+                    row.fallback_exchange_id is not None or row.state_blocks_primary
+                    for row in stage_rows
+                ):
+                    msg_0 = "MT stage already claims this canonical work"
+                    raise DeliveryUnresolved(msg_0)
+                if any(
+                    mt_primary_context is None
+                    or str(row.authorization_id) != str(mt_primary_context[0])
+                    for row in stage_rows
+                ):
+                    msg_1 = "MT stage belongs to another primary"
+                    raise DeliveryUnresolved(msg_1)
             if judge_primary_identity is not None:
                 # Lock the original reservation while deciding whether this stage
                 # may reserve work. Its exact ordered membership is immutable.
@@ -143,6 +191,7 @@ def reserve_exchange(
             existing = list(
                 ProducerLLMWork.objects.select_for_update()
                 .filter(semantic_key__in=keys)
+                .order_by("semantic_key")
                 .values_list("exchange_id", flat=True)
             )
             if existing:
@@ -160,6 +209,15 @@ def reserve_exchange(
                 if saved.request_codec and saved.request_codec != request_codec:
                     msg_0 = "Changed paid codec requires reconciliation"
                     raise DeliveryUnresolved(msg_0)
+                if mt_primary_context is not None:
+                    # ruff: ignore[import-outside-top-level]
+                    from weblate.trans.mt_fallback import (
+                        attach_durable_primary_exchange,
+                    )
+
+                    attach_durable_primary_exchange(
+                        saved, *mt_primary_context, identity
+                    )
                 if replay_only:
                     return ExchangeRef(saved.pk, saved.owner, False)
                 # Only a reserved (provably unsent) operation may be reclaimed.
@@ -190,6 +248,11 @@ def reserve_exchange(
                     for position, item in enumerate(identity)
                 ]
             )
+            if mt_primary_context is not None:
+                # ruff: ignore[import-outside-top-level]
+                from weblate.trans.mt_fallback import attach_durable_primary_exchange
+
+                attach_durable_primary_exchange(saved, *mt_primary_context, identity)
             return ExchangeRef(saved.pk, saved.owner, True)
     except IntegrityError as error:
         # Concurrent claim of any member rolls the entire reservation back.
@@ -406,6 +469,7 @@ def dispatch_exchange(
     on_response: Callable[[ProducerLLMExchange, str], None] | None = None,
     judge_primary_identity: Sequence[str] | None = None,
     before_send: Callable[[], None] | None = None,
+    mt_primary_context=None,
 ) -> str:
     if not replay_only:
         guard_paid_run(run_id)
@@ -416,6 +480,7 @@ def dispatch_exchange(
         request_codec=request_codec,
         replay_only=replay_only,
         judge_primary_identity=judge_primary_identity,
+        mt_primary_context=mt_primary_context,
     )
     if not reference.can_send:
         body = read_response(reference.id)
@@ -431,55 +496,106 @@ def dispatch_exchange(
                     saved.request_codec = request_codec
                     saved.save(update_fields=["request_codec", "updated"])
         return body
+    return dispatch_reserved_exchange(
+        reference.id,
+        reference.owner,
+        send,
+        before_send=before_send,
+        on_response=on_response,
+    )
+
+
+def dispatch_reserved_exchange(
+    exchange_id: UUID,
+    owner: str,
+    send: Callable[[], str],
+    *,
+    before_send: Callable[[], None] | None = None,
+    on_response: Callable[[ProducerLLMExchange, str], None] | None = None,
+) -> str:
+    """Send an owned reservation with capture active before status validation."""
     if before_send is not None:
         before_send()
     claimed = ProducerLLMExchange.objects.filter(
-        pk=reference.id,
-        owner=reference.owner,
+        pk=exchange_id,
+        owner=owner,
         state="reserved",
         lease_until__gt=timezone.now(),
     ).update(state="sending", updated=timezone.now())
     if not claimed:
         msg = "Delivery ownership changed"
         raise DeliveryUnresolved(msg)
-    token = _active_exchange.set(reference.id)
+    token = _active_exchange.set(exchange_id)
     try:
-        response = _send_and_record_response(reference.id, send, on_response)
+        return _send_and_record_response(exchange_id, send, on_response)
     except BaseException:
-        # Never release semantic claims on timeout, cancellation, parser failure
-        # or process redelivery. The saved raw reply (if any) remains recoverable.
-        ProducerLLMExchange.objects.filter(pk=reference.id, state="sending").update(
+        # A captured refusal remains received; only a genuinely missing body
+        # becomes unknown. Neither outcome releases the financial reservation.
+        ProducerLLMExchange.objects.filter(pk=exchange_id, state="sending").update(
             state="unknown", updated=timezone.now()
         )
         raise
     finally:
         _active_exchange.reset(token)
-    return response
 
 
 def resolve_run_deliveries(run):
     """Close raw retention only after a successful, fully parsed domain run."""
     if run.status != "completed" or run.finished is None:
         return
-    if run.summary.get("mt_state") != "completed" and (
-        "unparsed" not in run.summary or run.summary["unparsed"] != 0
-    ):
+    # A durable MT run reports its own state in the summary; a legacy run has
+    # no ``mt_state`` key at all and closes on its successful terminal status.
+    mt_state = run.summary.get("mt_state")
+    if mt_state is not None and mt_state != "completed":
         return
+    if run.summary.get("unparsed"):
+        return
+    # Both the primary and the fallback stage exchange of the same run count:
+    # an unresolved receipt is never deleted, and pruning only happens after
+    # a terminal processed result.
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.mt_fallback import ProducerMTStageMember
+
+    stage_exchanges = set(
+        ProducerMTStageMember.objects.filter(exchange__run=run).values_list(
+            "exchange_id", flat=True
+        )
+    )
     ProducerLLMExchange.objects.filter(
-        run=run, state="received", resolved_at=None
+        models.Q(run=run, state="received", resolved_at=None)
+        | models.Q(pk__in=stage_exchanges, state="received", resolved_at=None)
     ).update(resolved_at=timezone.now())
 
 
 def cleanup_delivery_bodies():
-    """Delete resolved raw content after 30 days; keep permanent spend fences."""
+    """
+    Delete resolved raw content after 30 days; keep permanent spend fences.
+
+    The stage journal keeps its textual material under the same resolved
+    30-day retention: occurrence indices, hashes, membership and the canonical
+    financial claims survive, so a pruned text never opens a new charge.
+    """
+    from weblate.trans.models.mt_fallback import (  # ruff: ignore[import-outside-top-level]
+        ProducerMTFallbackUnit,
+    )
+
     cutoff = timezone.now() - timedelta(days=30)
     removed = 0
-    for ident in ProducerLLMExchange.objects.filter(
-        resolved_at__lt=cutoff,
-        run__status="completed",
-        run__finished__lt=cutoff,
-        state="received",
-    ).values_list("pk", flat=True):
+    for ident in (
+        ProducerLLMExchange.objects.filter(
+            resolved_at__lt=cutoff,
+            state="received",
+        )
+        .filter(
+            models.Q(run__status="completed", run__finished__lt=cutoff)
+            | models.Q(
+                stage_members__unit_stage__authorization__run__status="completed",
+                stage_members__unit_stage__authorization__run__finished__lt=cutoff,
+            )
+        )
+        .values_list("pk", flat=True)
+        .distinct()
+    ):
         with transaction.atomic():
             record = ProducerLLMExchange.objects.select_for_update().get(pk=ident)
             if (
@@ -488,11 +604,63 @@ def cleanup_delivery_bodies():
                 or record.resolved_at >= cutoff
             ):
                 continue
+            if record.run_id is not None:
+                run = record.run
+                # The same successful terminal + finished guards apply to a
+                # stage exchange as to an ordinary one: a running or unfinished
+                # run never has its private text pruned.
+                if run.status != "completed" or run.finished is None:
+                    continue
+                if run.finished >= cutoff:
+                    continue
+            stage_units = list(
+                ProducerMTFallbackUnit.objects.filter(
+                    models.Q(stage_members__exchange_id=ident)
+                    | models.Q(fallback_exchange_id=ident)
+                )
+                .select_related("authorization__run")
+                .distinct()
+            )
+            if any(
+                unit.authorization.run.status != "completed"
+                or unit.authorization.run.finished is None
+                or unit.authorization.run.finished >= cutoff
+                for unit in stage_units
+            ):
+                continue
             path = _response_path(ident)
             if path.is_symlink():
                 continue
             path.unlink(missing_ok=True)
             record.state = "purged"
-            record.save(update_fields=["state", "updated"])
+            # The frozen wire snapshot is the same private class of data as
+            # the raw reply: it is cleared with the body, not kept forever.
+            record.request_snapshot = None
+            record.save(update_fields=["state", "request_snapshot", "updated"])
+            # Private source and answer copies survive until every associated
+            # receipt is pruned; unknown or unresolved exchanges retain them.
+            for unit in stage_units:
+                if not unit.stage_members.exclude(exchange__state="purged").exists():
+                    ProducerMTFallbackUnit.objects.filter(pk=unit.pk).update(
+                        source_slots=[], primary_answers=[], fallback_answer=""
+                    )
             removed += 1
+    # Reused or guarded-out members may never have an exchange to visit above.
+    # Their private source copies still expire with the successful original run.
+    ProducerMTFallbackUnit.objects.filter(
+        authorization__run__status="completed",
+        authorization__run__finished__lt=cutoff,
+    ).exclude(
+        stage_members__exchange__state__in=(
+            "reserved",
+            "sending",
+            "received",
+            "unknown",
+        )
+    ).exclude(
+        models.Q(fallback_exchange__isnull=False)
+        & ~models.Q(fallback_exchange__state="purged")
+    ).exclude(source_slots=[], primary_answers=[], fallback_answer="").update(
+        source_slots=[], primary_answers=[], fallback_answer=""
+    )
     return removed

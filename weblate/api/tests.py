@@ -18,11 +18,13 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
+import pytest
 import yaml
 from django.conf import settings
 from django.contrib import messages as django_messages
 from django.contrib.messages import get_messages
 from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files import File
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
@@ -159,6 +161,22 @@ from weblate.vcs.base import RepositoryError, RepositoryLock
 from weblate.vcs.github import GitHubInstallation
 from weblate.vcs.models import VCS_REGISTRY
 from weblate.workspaces.models import Workspace
+
+pytestmark = pytest.mark.usefixtures("judge_test_route")
+
+
+@pytest.fixture
+def judge_test_route():
+    """Keep judge API fixtures on the supported route without provider I/O."""
+    with (
+        override_settings(JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1"),
+        patch(
+            "weblate.trans.judge.resolve_judge_alias",
+            side_effect=lambda _url, model, _key: (model, "revision"),
+        ),
+    ):
+        yield
+
 
 TEST_PO = get_test_file("cs.po")
 TEST_POT = get_test_file("hello-charset.pot")
@@ -6462,6 +6480,429 @@ class ProjectAPITest(APIBaseTest):
             project.get_machinery_settings()["deepl"]["key"], "sitewide-key"
         )
 
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @patch("weblate_customization.machinery.RoutedLLMTranslation.validate_settings")
+    def test_project_machinery_metadata_only_post_skips_primary_probe(
+        self, validate
+    ) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        fallback = {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+
+        self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="post",
+            code=201,
+            superuser=True,
+            request={
+                "service": "openrouter",
+                "configuration": {"mt_fallback": fallback},
+            },
+            format="json",
+        )
+
+        validate.assert_not_called()
+        project = Project.objects.get(slug=self.project_kwargs["slug"])
+        self.assertEqual(
+            project.machinery_settings["openrouter"]["mt_fallback"], fallback
+        )
+        # The hidden project key is not stored and the site-wide one survives.
+        self.assertNotIn("key", project.machinery_settings["openrouter"])
+        self.assertEqual(
+            project.get_machinery_settings()["openrouter"]["key"], "sitewide-key"
+        )
+
+        response = self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="get",
+            code=200,
+            superuser=True,
+        )
+        self.assertEqual(response.data["openrouter"]["mt_fallback"], fallback)
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @patch("weblate_customization.machinery.RoutedLLMTranslation.validate_settings")
+    def test_project_machinery_metadata_only_patch_and_put(self, validate) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        fallback = {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+
+        self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="post",
+            code=201,
+            superuser=True,
+            request={
+                "service": "openrouter",
+                "configuration": {"mt_fallback": fallback},
+            },
+            format="json",
+        )
+
+        # PATCH replaces only the fallback metadata.
+        self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="patch",
+            code=200,
+            superuser=True,
+            request={
+                "service": "openrouter",
+                "configuration": {"mt_fallback": {}},
+            },
+            format="json",
+        )
+        project = Project.objects.get(slug=self.project_kwargs["slug"])
+        self.assertEqual(project.machinery_settings["openrouter"]["mt_fallback"], {})
+
+        # PUT replaces the whole map and must carry the same shape.
+        self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="put",
+            code=201,
+            superuser=True,
+            request={"openrouter": {"mt_fallback": fallback}},
+            format="json",
+        )
+        project = Project.objects.get(slug=self.project_kwargs["slug"])
+        self.assertEqual(
+            project.machinery_settings["openrouter"]["mt_fallback"], fallback
+        )
+        validate.assert_not_called()
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @patch("weblate_customization.machinery.RoutedLLMTranslation.validate_settings")
+    def test_project_machinery_invalid_fallback_shape_stores_nothing(
+        self, validate
+    ) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        for method, payload in (
+            ("post", {"mt_fallback": {"engine": "litellm", "routing": {"*": "other"}}}),
+            ("post", {"mt_fallback": {"engine": "openrouter"}}),
+            ("post", {"mt_fallback": ["litellm"]}),
+            (
+                "put",
+                {"openrouter": {"mt_fallback": {"engine": "litellm", "key": "x"}}},
+            ),
+        ):
+            with self.subTest(method=method, payload=payload):
+                self.do_request(
+                    "api:project-machinery-settings",
+                    self.project_kwargs,
+                    method=method,
+                    code=400,
+                    superuser=True,
+                    request=(
+                        payload
+                        if method == "put"
+                        else {"service": "openrouter", "configuration": payload}
+                    ),
+                    format="json",
+                )
+                project = Project.objects.get(slug=self.project_kwargs["slug"])
+                self.assertNotIn("openrouter", project.machinery_settings)
+        validate.assert_not_called()
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+            "weblate_customization.machinery.RoutedLiteLLMTranslation",
+        )
+    )
+    @patch("weblate_customization.machinery.RoutedLiteLLMTranslation.validate_settings")
+    def test_project_machinery_rejects_fallback_metadata_on_other_service(
+        self, validate
+    ) -> None:
+        response = self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="post",
+            code=400,
+            superuser=True,
+            request={
+                "service": "litellm",
+                "configuration": {
+                    "key": "proxy-key",
+                    "base_url": "https://hcbifrost.herocraft.com/litellm/v1",
+                    "routing": {"*": "deepseek/deepseek-chat-v3.1"},
+                    "mt_fallback": {
+                        "engine": "litellm",
+                        "routing": {"*": "QWEN3.7-plus"},
+                    },
+                },
+            },
+            format="json",
+        )
+        self.assertIn(
+            "MT fallback metadata is only valid for OpenRouter", str(response.data)
+        )
+        project = Project.objects.get(slug=self.project_kwargs["slug"])
+        self.assertNotIn("litellm", project.machinery_settings)
+        validate.assert_not_called()
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+            "weblate_customization.machinery.RoutedLiteLLMTranslation",
+        )
+    )
+    def test_project_machinery_disabled_litellm_is_untouched(self) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        fallback = {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+        with patch(
+            "weblate_customization.machinery.RoutedLLMTranslation.validate_settings"
+        ):
+            self.do_request(
+                "api:project-machinery-settings",
+                self.project_kwargs,
+                method="post",
+                code=201,
+                superuser=True,
+                request={
+                    "service": "openrouter",
+                    "configuration": {"mt_fallback": fallback},
+                },
+                format="json",
+            )
+
+        response = self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="get",
+            code=200,
+            superuser=True,
+        )
+        # No litellm entry appears for a project that never configured one.
+        self.assertNotIn("litellm", response.data)
+        self.assertEqual(response.data["openrouter"]["mt_fallback"], fallback)
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @patch("weblate_customization.machinery.RoutedLLMTranslation.validate_settings")
+    def test_project_machinery_metadata_patch_validates_changed_primary(
+        self, validate
+    ) -> None:
+        """
+        A metadata-only PATCH that drops prior project overrides must validate.
+
+        PATCH replaces the service's whole override map, so a payload that
+        carries only ``mt_fallback`` silently drops the persona and routing the
+        project used to override. That is an effective-configuration change,
+        not a metadata toggle, and the primary must be probed.
+        """
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        prior_overrides = {
+            "persona": "project persona",
+            "style": "project style",
+            "routing": {"*": "deepseek/deepseek-chat-v3.1"},
+        }
+        self.component.project.machinery_settings = {"openrouter": prior_overrides}
+        self.component.project.save(update_fields=["machinery_settings"])
+
+        validate.side_effect = DjangoValidationError("primary unavailable")
+
+        response = self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="patch",
+            code=400,
+            superuser=True,
+            request={
+                "service": "openrouter",
+                "configuration": {
+                    "mt_fallback": {
+                        "engine": "litellm",
+                        "routing": {"*": "QWEN3.7-plus"},
+                    }
+                },
+            },
+            format="json",
+        )
+        self.assertIn("primary unavailable", str(response.data))
+        validate.assert_called_once()
+
+        project = Project.objects.get(pk=self.component.project.pk)
+        # The refused PATCH left the prior overrides untouched.
+        self.assertEqual(project.machinery_settings["openrouter"], prior_overrides)
+        self.assertNotIn(
+            "mt_fallback", project.machinery_settings.get("openrouter", {})
+        )
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @patch("weblate_customization.machinery.RoutedLLMTranslation.validate_settings")
+    def test_project_machinery_metadata_patch_keeps_explicit_overrides(
+        self, validate
+    ) -> None:
+        """
+        The same PATCH carrying the full prior override is metadata-only.
+
+        The only real change is the fallback metadata and the effective
+        primary is unchanged, so the probe is skipped and the explicit project
+        values survive instead of being replaced by the site-wide ones.
+        """
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        prior_overrides = {
+            "persona": "project persona",
+            "routing": {"*": "deepseek/deepseek-chat-v3.1"},
+        }
+        self.component.project.machinery_settings = {"openrouter": prior_overrides}
+        self.component.project.save(update_fields=["machinery_settings"])
+
+        self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="patch",
+            code=200,
+            superuser=True,
+            request={
+                "service": "openrouter",
+                "configuration": {
+                    **prior_overrides,
+                    "mt_fallback": {
+                        "engine": "litellm",
+                        "routing": {"*": "QWEN3.7-plus"},
+                    },
+                },
+            },
+            format="json",
+        )
+        validate.assert_not_called()
+
+        project = Project.objects.get(pk=self.component.project.pk)
+        stored = project.machinery_settings["openrouter"]
+        # The API stores the submitted map verbatim: the explicit project
+        # values are preserved rather than replaced by the site-wide ones.
+        self.assertEqual(
+            stored,
+            {
+                **prior_overrides,
+                "mt_fallback": {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}},
+            },
+        )
+        effective = project.get_machinery_settings()["openrouter"]
+        self.assertEqual(effective["key"], "sitewide-key")
+        self.assertEqual(effective["persona"], "project persona")
+        self.assertEqual(effective["routing"], prior_overrides["routing"])
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    @patch("weblate_customization.machinery.RoutedLLMTranslation.validate_settings")
+    def test_project_machinery_metadata_put_analogue(self, validate) -> None:
+        """
+        PUT accepts a fallback-only payload against the site-wide base.
+
+        PUT replaces the whole override map, and with no prior project
+        override the effective initial is the site-wide configuration, so the
+        fallback metadata is the only real change and no probe is needed.
+        """
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        fallback = {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+
+        self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="put",
+            code=201,
+            superuser=True,
+            request={"openrouter": {"mt_fallback": fallback}},
+            format="json",
+        )
+        validate.assert_not_called()
+        project = Project.objects.get(pk=self.component.project.pk)
+        self.assertEqual(
+            project.machinery_settings["openrouter"]["mt_fallback"], fallback
+        )
+        # The prior project persona is gone: PUT replaced the whole map.
+        self.assertNotIn("persona", project.machinery_settings["openrouter"])
+
     def test_project_backups(self) -> None:
         self.do_request(
             "api:project-backups",
@@ -12211,7 +12652,7 @@ class TranslationJudgeAutotranslateAPITest(
     grant_perm_to_user = APIBaseTest.grant_perm_to_user
     create_acl = APIBaseTest.create_acl
 
-    CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+    CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
 
     def setUp(self) -> None:
         super().setUp()
@@ -12384,7 +12825,7 @@ class TranslationJudgeAutotranslateAPITest(
         )
         http_mock.register(
             "POST",
-            self.CHAT_URL,
+            "https://openrouter.ai/api/v1/chat/completions",
             status_code=403,
             json={
                 "error": {"code": 403, "message": "Access denied by security policy."}
@@ -14313,6 +14754,14 @@ class SuggestionAPITest(APIBaseTest):
     # -- Task 4: judge repair candidates go through the guarded service ---
 
     def _make_judge_verdict(self, unit, severity="critical"):
+        self.enterContext(
+            override_settings(
+                JUDGE_ENABLED=True,
+                JUDGE_API_KEY="synthetic-only",
+                JUDGE_MODEL_SEAT_1=settings.JUDGE_MODEL_SEAT_1 or "vendor-1/model",
+                JUDGE_MODEL_SEAT_2=settings.JUDGE_MODEL_SEAT_2 or "vendor-2/model",
+            )
+        )
         request = build_request(unit)
         return JudgeVerdict.objects.create(
             unit=unit,
@@ -14360,7 +14809,10 @@ class SuggestionAPITest(APIBaseTest):
         # A fresh run id: the live verdict's own (unit, run_id, attempt,
         # request_round, seat) key is already taken by `verdict` itself.
         candidate_run_id = uuid.uuid4()
+        candidate_request = build_request(unit, target_plurals=suggestion.target_list)
+        context = judge_project_context(unit.translation.component.project)
         for seat in JUDGE_SEATS:
+            profile = resolve_judge_seat_profile(seat)
             JudgeVerdict.objects.create(
                 unit=unit,
                 subject=JudgeVerdict.Subject.CANDIDATE,
@@ -14372,6 +14824,13 @@ class SuggestionAPITest(APIBaseTest):
                 ),
                 run_id=candidate_run_id,
                 seat=seat,
+                profile_fingerprint=profile.profile_fingerprint,
+                prompt_schema_version=profile.prompt_schema_version,
+                request_identity=_request_identity(
+                    unit, candidate_request, profile, context
+                ),
+                source_language=candidate_request.source_language,
+                target_language=candidate_request.target_language,
                 judge_model=f"vendor-{seat}/model",
                 model_verdict=JudgeVerdict.Verdict.PASS,
                 max_severity=JudgeVerdict.Severity.NONE,
@@ -20217,7 +20676,7 @@ class ProducerConsoleRealRunEndToEndTest(RepoTestMixin, APITransactionTestCase):
     do_request = cast("Any", APIBaseTest.do_request)
     grant_perm_to_user = APIBaseTest.grant_perm_to_user
     create_acl = APIBaseTest.create_acl
-    CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+    CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
 
     def setUp(self) -> None:
         # Transaction tests flush users, but the anonymous prototype cache

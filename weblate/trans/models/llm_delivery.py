@@ -22,6 +22,7 @@ class ProducerLLMExchange(models.Model):
             ("routed-parts-v1", "Routed parts v1"),
             ("routed-slots-v2", "Routed slots v2"),
             ("routed-slots-v3", "Routed slots v3"),
+            ("routed-slots-v4", "Routed slots v4"),
         ],
     )
     state = models.CharField(max_length=20, default="reserved")
@@ -38,6 +39,27 @@ class ProducerLLMExchange(models.Model):
         on_delete=models.PROTECT,
         related_name="delivery_exchange",
     )
+    #: The audited fallback authorization this exchange was reserved for.
+    mt_authorization = models.ForeignKey(
+        "trans.ProducerMTFallbackAuthorization",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="exchanges",
+    )
+    mt_stage = models.CharField(
+        max_length=20,
+        choices=[
+            ("primary", "Primary"),
+            ("fallback", "Fallback"),
+        ],
+        blank=True,
+        default="",
+    )
+    #: Private, secret-free snapshot of the request actually sent: method, URL,
+    #: payload, codec and occurrence mapping. Never contains auth headers or a
+    #: key; it is the same private class of data as the raw reply.
+    request_snapshot = models.JSONField(null=True, blank=True)
     run = models.ForeignKey(
         "trans.ProducerRun", null=True, blank=True, on_delete=models.PROTECT
     )

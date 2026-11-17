@@ -42,6 +42,11 @@ from weblate.trans.models.label import Label
 from weblate.trans.models.llm_delivery import ProducerLLMExchange, ProducerLLMWork
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.models.loc_kit import LocKitImportDraft
+from weblate.trans.models.mt_fallback import (
+    ProducerMTFallbackAuthorization,
+    ProducerMTFallbackUnit,
+    ProducerMTStageMember,
+)
 from weblate.trans.models.multilingual_spreadsheet import (
     ComponentSpreadsheetImportDraft,
 )
@@ -98,7 +103,10 @@ __all__ = [
     "PendingUnitChange",
     "ProducerLLMExchange",
     "ProducerLLMWork",
+    "ProducerMTFallbackAuthorization",
+    "ProducerMTFallbackUnit",
     "ProducerMTOperation",
+    "ProducerMTStageMember",
     "ProducerMTUnitAttempt",
     "ProducerQualityOperation",
     "ProducerRun",

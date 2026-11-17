@@ -38,16 +38,161 @@ from .llm import (
 
 
 class BaseOpenAITranslation(BaseLLMTranslation):
+    #: Stage of the opted-in MT requests this instance makes, set by the
+    #: orchestrator before the first send. The per-request stage context is
+    #: carried by ContextVars, never by this attribute alone.
+    _mt_stage: str | None = None
+    _mt_fallback_authorization_id = None
+    #: The original actor a fallback stage acts for. The pre-send guard
+    #: re-reads this account's current rights, never the worker's.
+    _mt_stage_actor = None
+    _mt_stage_mode: str = "translate"
+
     def request(self, method, url, skip_auth=False, **kwargs):
+        # The stage of this internal request comes from the per-request
+        # context, never from the engine instance: a scheduler thread sharing
+        # one engine must not leak another unit's stage into this request.
+        stage, slots, authorization_id = self._mt_stage_context()
         work = llm_delivery_work.get()
-        if not self.durable_single_attempt or not work or method.lower() != "post":
+        if method.lower() != "post":
             return super().request(method, url, skip_auth=skip_auth, **kwargs)
-        from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
+        if self.durable_single_attempt and stage is None:
+            # The durable journal owns its own identity and spend fence; it is
+            # not an opted-in MT stage and keeps its original lifecycle.
+            if not work:
+                return super().request(method, url, skip_auth=skip_auth, **kwargs)
+            return self._durable_request(method, url, skip_auth, work, **kwargs)
+        if stage is None or not self.credit_fallback_single_attempt:
+            return super().request(method, url, skip_auth=skip_auth, **kwargs)
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.llm_delivery import encode_http_response
+
+        codec = getattr(self, "delivery_request_codec", "opaque-v1")
+        digest = hashlib.sha256(
+            json.dumps(
+                {"url": url, "method": method.lower(), "payload": kwargs.get("json")},
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+            ).encode()
+        ).hexdigest()
+        # Secret-free snapshot of the wire request actually sent, committed
+        # before transport: method, URL, payload, codec and occurrence mapping.
+        # The parser data below it is frozen too, so a local replay restores
+        # the same answer from the same sources without rebuilding a request
+        # from the current configuration.
+        snapshot = {
+            "method": method.lower(),
+            "url": url,
+            "payload": kwargs.get("json"),
+            "codec": codec,
+            "slots": [
+                {"unit_stage_id": str(unit_stage_id), "source_slot": source_slot}
+                for unit_stage_id, source_slot in slots
+            ],
+            "parser": self._frozen_parser_state(codec),
+        }
+        request = super().request
+
+        def send():
+            return encode_http_response(
+                request(method, url, skip_auth=skip_auth, **kwargs)
+            )
+
+        if stage == "fallback":
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.models.mt_fallback import (
+                ProducerMTFallbackAuthorization,
+            )
+
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.mt_fallback import (
+                dispatch_mt_fallback_exchange,
+                stage_send_guard,
+            )
+
+            # The guard is rebuilt per request from the exact members this
+            # request is about to pay for, so a target a human wrote in the
+            # meantime blocks this send.
+            authorization = ProducerMTFallbackAuthorization.objects.get(
+                pk=authorization_id
+            )
+            before_send = stage_send_guard(
+                authorization,
+                actor=getattr(self, "_mt_stage_actor", None),
+                slots=slots,
+                mode=self._mt_stage_mode,
+            )
+            result = dispatch_mt_fallback_exchange(
+                authorization_id,
+                slots,
+                digest,
+                send,
+                request_snapshot=snapshot,
+                request_codec=codec,
+                run_id=self.usage_run_id,
+                before_send=before_send,
+            )
+        else:
+            if not slots or authorization_id is None:
+                msg = "Opted-in primary stage requires an enrolled stage context"
+                raise MachineTranslationError(msg)
+            if self.durable_single_attempt:
+                if not work:
+                    msg_0 = "Durable primary stage requires canonical work"
+                    raise MachineTranslationError(msg_0)
+                # ruff: ignore[import-outside-top-level]
+                from weblate.trans.llm_delivery import (
+                    dispatch_exchange,
+                    exchange_for_work,
+                )
+
+                receipt = dispatch_exchange(
+                    work,
+                    digest,
+                    send,
+                    run_id=self.usage_run_id,
+                    request_codec=codec,
+                    replay_only=self.delivery_replay_only or codec == "routed-parts-v1",
+                    mt_primary_context=(authorization_id, slots, snapshot),
+                )
+                llm_delivery_usage.set(exchange_for_work(work))
+                saved = json.loads(receipt)
+            else:
+                # ruff: ignore[import-outside-top-level]
+                from weblate.trans.mt_fallback import dispatch_mt_primary_exchange
+
+                result = dispatch_mt_primary_exchange(
+                    authorization_id,
+                    slots,
+                    digest,
+                    send,
+                    request_snapshot=snapshot,
+                    request_codec=codec,
+                    run_id=self.usage_run_id,
+                )
+        if stage == "fallback" or not self.durable_single_attempt:
+            llm_delivery_usage.set(result.exchange_id)
+            saved = json.loads(result.receipt)
+        # Usage belongs to the actual primary or fallback exchange.
+        response = httpx2.Response(
+            saved["status"],
+            content=saved["body"].encode(),
+            headers=saved["headers"],
+            request=httpx2.Request(method, url),
+        )
+        self.check_failure(response)
+        return response
+
+    def _durable_request(self, method, url, skip_auth, work, **kwargs):
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.llm_delivery import (
             dispatch_exchange,
             encode_http_response,
             exchange_for_work,
         )
 
+        codec = getattr(self, "delivery_request_codec", "opaque-v1")
         digest = hashlib.sha256(
             json.dumps(
                 {"url": url, "method": method.lower(), "payload": kwargs.get("json")},
@@ -69,9 +214,8 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 digest,
                 send,
                 run_id=self.usage_run_id,
-                request_codec=getattr(self, "delivery_request_codec", "opaque-v1"),
-                replay_only=self.delivery_replay_only
-                or getattr(self, "delivery_request_codec", None) == "routed-parts-v1",
+                request_codec=codec,
+                replay_only=self.delivery_replay_only or codec == "routed-parts-v1",
             )
         )
         llm_delivery_usage.set(exchange_for_work(work))
@@ -223,7 +367,9 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         """
         try:  # ruff: ignore[too-many-statements-in-try-clause]
             delivery_id = llm_delivery_usage.get()
-            if self.durable_single_attempt and delivery_id is not None:
+            if (
+                self.durable_single_attempt or self.credit_fallback_single_attempt
+            ) and delivery_id is not None:
                 from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
                     record_usage_once,
                 )

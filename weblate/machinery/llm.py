@@ -13,6 +13,7 @@ import re
 import string
 from collections import Counter, defaultdict
 from contextvars import ContextVar
+from dataclasses import asdict
 from itertools import chain
 from operator import itemgetter
 from secrets import token_hex
@@ -86,6 +87,32 @@ llm_delivery_work: ContextVar[tuple[str, ...]] = ContextVar(
 )
 llm_delivery_usage: ContextVar[object | None] = ContextVar(
     "llm_delivery_usage", default=None
+)
+#: The stage of the internal LLM request currently in flight. Set by the
+#: orchestrator before rendering and reset in ``finally``, so a scheduler
+#: thread that shares an engine instance never leaks one unit's stage into
+#: another unit's request. ``None`` means no opted-in MT stage.
+llm_mt_stage: ContextVar[str | None] = ContextVar("llm_mt_stage", default=None)
+#: Ordered ``(unit_stage_id, source_slot)`` pairs of the request in flight.
+llm_mt_stage_slots: ContextVar[tuple] = ContextVar("llm_mt_stage_slots", default=())
+#: The fallback authorization a fallback-stage request belongs to.
+llm_mt_stage_authorization: ContextVar[object | None] = ContextVar(
+    "llm_mt_stage_authorization", default=None
+)
+#: The frozen parser inputs of the internal request in flight: its original
+#: sources, their per-slot occurrence indices, the deterministic wire ids the
+#: reply echoes, the protected-token replacement map and the source snapshot.
+#: Set before sending so a local replay restores the same answer offline,
+#: never rebuilding a request from the current configuration.
+llm_mt_parser_frozen: ContextVar[dict | None] = ContextVar(
+    "llm_mt_parser_frozen", default=None
+)
+#: Original unit source-slot index of every source position of the internal
+#: request in flight. It is carried from the download plan, so a stage
+#: journals exactly the slots this request sends: a repeated source text can
+#: never claim a sibling's slot.
+llm_mt_source_slots: ContextVar[tuple[int, ...]] = ContextVar(
+    "llm_mt_source_slots", default=()
 )
 
 #: How a measured request was resolved, mirroring ``LLMUsageLog.Outcome``.
@@ -417,6 +444,7 @@ class LLMStringPayload(LLMStringContext):
 class BaseLLMTranslation(BatchMachineTranslation):
     # Opt-in for a caller with its own durable per-unit outbound journal.
     durable_single_attempt = False
+    credit_fallback_single_attempt = False
     delivery_purpose = "mt"
     delivery_replay_only = False
     settings_form: type[LLMBasicMachineryForm]
@@ -1145,6 +1173,123 @@ class BaseLLMTranslation(BatchMachineTranslation):
             seen.add(candidate)
             ids.append(candidate)
         return ids
+
+    @staticmethod
+    def _mt_stage_context():
+        """
+        Publish the current MT stage to the transport for one request.
+
+        A stage context is per internal request, never per engine instance:
+        the tokens are reset in ``finally`` so a scheduler thread that shares
+        an engine cannot leak one unit's stage into another unit's request.
+        """
+        stage = llm_mt_stage.get()
+        slots = llm_mt_stage_slots.get()
+        authorization_id = llm_mt_stage_authorization.get()
+        return stage, tuple(slots), authorization_id
+
+    def _frozen_parser_state(self, codec: str) -> dict:
+        """
+        Freeze the secret-free parser inputs needed for local replay.
+
+        A replay must restore the same answer from the same sources without
+        contacting the provider and without rebuilding the request from the
+        current configuration: the cleaned and original sources this request
+        actually carried, the occurrence index of every slot, the
+        deterministic wire ids the reply echoes, the protected-token
+        replacement map and the relevant source snapshot. No credential, key
+        or raw provider body is included.
+        """
+        frozen = llm_mt_parser_frozen.get()
+        if frozen is None:
+            # No batch context (a direct or demonstration call): the wire
+            # request itself is still the exact record of what was sent.
+            return {"codec": codec}
+        return {
+            "codec": codec,
+            "sources": frozen.get("sources", []),
+            "cleaned": frozen.get("cleaned", []),
+            "source_occurrences": frozen.get("source_occurrences", []),
+            "string_ids": frozen.get("string_ids", []),
+            "placeholder_specs": frozen.get("placeholder_specs"),
+            "replacements": frozen.get("replacements", []),
+            "project": frozen.get("project"),
+            "unit_count": frozen.get("unit_count", 0),
+            "do_cleanup": bool(getattr(self, "do_cleanup", False)),
+            "force_uncleanup": bool(getattr(self, "force_uncleanup", False)),
+            "max_score": self.max_score,
+            "name": self.name,
+        }
+
+    def _freeze_parser_inputs(
+        self,
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None,
+        string_ids: list[str],
+        project: str | None,
+    ) -> dict:
+        """
+        Freeze the exact inputs a local replay needs, in request order.
+
+        Both the cleaned and the original text of every source are kept: the
+        prompt saw the cleaned one, the stored answer is restored from the
+        original one, and a replay must do both without asking the provider
+        again.
+        """
+        cleaned: list[str] = []
+        originals: list[str] = []
+        replacements: list[dict[str, str]] = []
+        slots = llm_mt_stage_slots.get()
+        stages = {}
+        if llm_mt_stage.get() == "primary" and slots:
+            from weblate.trans.models.mt_fallback import (  # ruff: ignore[import-outside-top-level]
+                ProducerMTFallbackUnit,
+            )
+
+            stages = ProducerMTFallbackUnit.objects.in_bulk(
+                [stage_id for stage_id, _slot in slots]
+            )
+        for index, (text, unit) in enumerate(sources):
+            original = text
+            if stages and index < len(slots):
+                stage_id, slot = slots[index]
+                stage = stages.get(stage_id)
+                if stage is not None and slot < len(stage.source_slots):
+                    original = stage.source_slots[slot]
+            originals.append(original)
+            if unit is None:
+                cleaned.append(text)
+                replacements.append({})
+                continue
+            cleaned_text, replacement = self.cleanup_text(original, unit)
+            cleaned.append(cleaned_text)
+            replacements.append(replacement)
+        occurrence_counts: dict[tuple[int | None, str], int] = defaultdict(int)
+        frozen_specs = []
+        for index, (text, unit) in enumerate(sources):
+            key = (id(unit) if unit is not None else None, text)
+            occurrence = (
+                source_occurrences[index]
+                if source_occurrences is not None
+                else occurrence_counts[key]
+            )
+            occurrence_counts[key] += 1
+            specs = self._iter_source_placeholder_specs(text, unit, occurrence)
+            frozen_specs.append(
+                None
+                if specs is None
+                else [[token, asdict(highlight)] for token, highlight in specs]
+            )
+        return {
+            "sources": originals,
+            "cleaned": cleaned,
+            "source_occurrences": list(source_occurrences or []),
+            "string_ids": list(string_ids),
+            "replacements": replacements,
+            "placeholder_specs": frozen_specs,
+            "project": project,
+            "unit_count": len(sources),
+        }
 
     def _build_string_payload(
         self,
@@ -2894,7 +3039,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             # Splitting a refused batch only sends more refused requests.
             raise
         except PartialLLMReplyError as error:
-            if self.durable_single_attempt:
+            if self.durable_single_attempt or self.credit_fallback_single_attempt:
                 return {
                     text: error.translations.get(text, []) for text, _unit in sources
                 }
@@ -2923,7 +3068,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             # Splitting a refused batch only sends more refused requests.
             raise
         except MachineTranslationError as error:
-            if self.durable_single_attempt:
+            if self.durable_single_attempt or self.credit_fallback_single_attempt:
                 raise
             halves = self._split_sources(sources, source_occurrences)
             if halves is None:
@@ -3010,6 +3155,311 @@ class BaseLLMTranslation(BatchMachineTranslation):
             for _text, unit in sources
         )
 
+    # ruff: ignore[too-many-locals]
+    def translate_mt_fallback_slots(
+        self,
+        source_language,
+        target_language,
+        ordered_slots: list[tuple[int, int, str, Unit | None]],
+        user=None,
+        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+    ):
+        """
+        Translate the frozen ordered fallback slots of the eligible units.
+
+        Every eligible unresolved source slot of every enabled unit travels in
+        one request, even when the source texts are equal: a unit is never
+        split into two fallback HTTP requests, and equal text never silently
+        merges two different units. Results are returned aligned to the input
+        order, so the pairing is by position, never by text.
+
+        ``ordered_slots`` entries are ``(unit_stage_id, source_slot, text,
+        unit)``. ``source_slot`` is the unit's original source-slot index, so
+        a plural unit's forms keep their own identity even when two forms have
+        the same text.
+        """
+        if not ordered_slots:
+            return []
+        sources = [(text, unit) for _stage, _slot, text, unit in ordered_slots]
+        # The prompt sees cleaned text; the answer is restored with the same
+        # replacements the primary path uses, so leading/trailing whitespace
+        # and markup of the source survive into the stored target.
+        cleaned: list[tuple[str, Unit | None]] = []
+        replacements: list[dict[str, str]] = []
+        for text, unit in sources:
+            if unit is None:
+                cleaned.append((text, unit))
+                replacements.append({})
+                continue
+            cleaned_text, replacement = self.cleanup_text(text, unit)
+            cleaned.append((cleaned_text, unit))
+            replacements.append(replacement)
+        # The canonical work identity is what the shared reservation fences;
+        # the positional occurrence ids below only pair the reply with its
+        # source slots and are never a financial identity.
+        identity = self._delivery_identity(cleaned)
+        # Occurrences are counted per (unit, text), exactly as the ordinary
+        # parser does, so the second equal text of one unit is occurrence 1
+        # and a protected-part normalization sees its own occurrence index.
+        occurrence_counts: dict[tuple[int | None, str], int] = defaultdict(int)
+        source_occurrences: list[int] = []
+        for text, unit in cleaned:
+            occurrence_key = (id(unit) if unit is not None else None, text)
+            source_occurrences.append(occurrence_counts[occurrence_key])
+            occurrence_counts[occurrence_key] += 1
+        string_ids = [
+            "fb"
+            + hmac.new(
+                settings.SECRET_KEY.encode(),
+                f"{stage}:{slot}:{unit.pk if unit else 0}".encode(),
+                hashlib.sha256,
+            ).hexdigest()[:16]
+            for stage, slot, _text, unit in ordered_slots
+        ]
+        started_cache = self._ensure_secondary_context_cache()
+        try:
+            self._prefetch_glossary_terms(cleaned)
+            prompt, content, previous_content, previous_response = (
+                self._prepare_llm_translation(
+                    source_language,
+                    target_language,
+                    cleaned,
+                    source_occurrences,
+                    string_ids,
+                )
+            )
+            (
+                project_slug,
+                project_id_snapshot,
+                component_id_snapshot,
+                component_slug,
+                target_language_code,
+            ) = _sources_usage_scope(cleaned)
+            project_token = llm_batch_project.set(project_slug)
+            project_id_token = llm_batch_project_id.set(project_id_snapshot)
+            component_id_token = llm_batch_component_id.set(component_id_snapshot)
+            component_token = llm_batch_component.set(component_slug)
+            language_token = llm_batch_target_language.set(target_language_code)
+            unit_count_token = llm_batch_unit_count.set(len(cleaned))
+            usage_token = llm_usage_record.set(None)
+            delivery_token = None
+            usage_delivery_token = llm_delivery_usage.set(None)
+            if identity:
+                delivery_token = llm_delivery_work.set(identity)
+            # The stage of this internal request is published per request and
+            # reset in ``finally``, so a scheduler thread sharing this engine
+            # never leaks one unit's stage into another unit's request.
+            stage_token = llm_mt_stage.set(getattr(self, "_mt_stage", None))
+            slots_token = llm_mt_stage_slots.set(
+                tuple(
+                    (stage_id, source_slot)
+                    for stage_id, source_slot, _text, _unit in ordered_slots
+                )
+            )
+            authorization_token = llm_mt_stage_authorization.set(
+                getattr(self, "_mt_fallback_authorization_id", None)
+            )
+            # Freeze the exact parser inputs of this request, so a local replay
+            # restores the same answer from the same sources offline.
+            parser_token = llm_mt_parser_frozen.set(
+                self._freeze_parser_inputs(
+                    sources, source_occurrences, string_ids, project_slug
+                )
+            )
+            try:
+                try:
+                    translations_string = self.fetch_llm_translations(
+                        prompt, content, previous_content, previous_response
+                    )
+                finally:
+                    llm_batch_project.reset(project_token)
+                    llm_batch_project_id.reset(project_id_token)
+                    llm_batch_component_id.reset(component_id_token)
+                    llm_batch_component.reset(component_token)
+                    llm_batch_target_language.reset(language_token)
+                translations = self._parse_llm_slot_translations(
+                    translations_string,
+                    sources,
+                    source_occurrences,
+                    string_ids=string_ids,
+                )
+            finally:
+                if delivery_token is not None:
+                    llm_delivery_work.reset(delivery_token)
+                llm_delivery_usage.reset(usage_delivery_token)
+                llm_batch_unit_count.reset(unit_count_token)
+                llm_usage_record.reset(usage_token)
+                llm_mt_stage.reset(stage_token)
+                llm_mt_stage_slots.reset(slots_token)
+                llm_mt_stage_authorization.reset(authorization_token)
+                llm_mt_parser_frozen.reset(parser_token)
+        finally:
+            self._clear_secondary_context_cache(started_cache)
+        results: list[list[dict]] = []
+        for index, answer in enumerate(translations):
+            item = [
+                {
+                    "text": answer,
+                    "quality": self.max_score,
+                    "service": self.name,
+                    "source": sources[index][0],
+                }
+            ]
+            if replacements[index] or self.force_uncleanup:
+                self.uncleanup_results(replacements[index], item)
+            results.append(item)
+        return results
+
+    def _parse_llm_slot_translations(
+        self,
+        translations_string: str | None,
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None,
+        *,
+        string_ids: list[str],
+    ) -> list[str]:
+        """
+        Validate a reply and return one answer per source slot, in order.
+
+        This is the positional counterpart of ``_parse_llm_translations``: the
+        ordinary result groups by source text, which collapses equal-text
+        slots of different units or plural forms into one answer. Here every
+        reply item is paired with its own source position, so equal text in
+        different contexts keeps distinct answers. Validation, repair and the
+        usage-outcome recording are the shared ones.
+        """
+        add_breadcrumb(self.name, "response", translations_string=translations_string)
+        if translations_string is None or not translations_string:
+            msg = "Blank assistant reply"
+            self.log_handled_error(msg, extra_log=translations_string)
+            self._record_llm_outcome("refused", reason=msg, reply=translations_string)
+            raise MachineTranslationError(msg)
+        codec = getattr(self, "delivery_request_codec", "")
+        decoder = getattr(self, "_decode_reply", None)
+        if decoder is not None and codec.startswith("routed-slots-"):
+            try:
+                translations_string = json.dumps(
+                    decoder(
+                        translations_string, sources, source_occurrences, string_ids
+                    ),
+                    ensure_ascii=False,
+                )
+            except (ValueError, TypeError) as error:
+                raise MachineTranslationError(str(error)) from error
+        elif decoder is not None and codec == "routed-parts-v1":
+            # ruff: ignore[import-outside-top-level]
+            from weblate_customization.routed_reply import (
+                legacy_unwrap_reply,
+            )
+
+            translations_string = legacy_unwrap_reply(translations_string)
+
+        try:
+            translations = json.loads(translations_string)
+        except json.JSONDecodeError as error:
+            repaired_translations_string = self._repair_json_string_array(
+                translations_string
+            )
+            if repaired_translations_string is None:
+                msg = "Could not parse assistant reply as JSON."
+                self.log_handled_error(msg, extra_log=translations_string)
+                self._record_llm_outcome(
+                    "refused", reason=msg, reply=translations_string
+                )
+                raise MachineTranslationError(msg) from error
+
+            try:
+                translations = json.loads(repaired_translations_string)
+            except json.JSONDecodeError as repaired_error:
+                msg = "Could not parse assistant reply as JSON."
+                self.log_handled_error(msg, extra_log=translations_string)
+                self._record_llm_outcome(
+                    "refused", reason=msg, reply=translations_string
+                )
+                raise MachineTranslationError(msg) from repaired_error
+
+            add_breadcrumb(self.name, "response-repaired")
+
+        try:
+            answers = self._validate_translations(
+                translations, sources, source_occurrences, string_ids=string_ids
+            )
+        except MachineTranslationError as error:
+            # A reply that ends early still answered its first strings
+            # correctly; keep them and let the caller ask for the rest.
+            prefix = self._validate_translation_prefix(
+                self._normalize_translations(translations, len(sources)),
+                sources,
+                source_occurrences,
+                string_ids=string_ids,
+            )
+            if prefix and len(prefix) < len(sources):
+                msg = f"Incomplete assistant reply: {len(prefix)}/{len(sources)}."
+                self.log_handled_error(msg, extra_log=translations_string)
+                self._record_llm_outcome(
+                    "partial", reason=msg, reply=translations_string
+                )
+                raise PartialLLMReplyError(
+                    self._build_translation_results(prefix, sources), len(prefix)
+                ) from error
+            msg = str(error)
+            self.log_handled_error(msg, extra_log=translations_string)
+            self._record_llm_outcome("refused", reason=msg, reply=translations_string)
+            raise MachineTranslationError(msg) from error
+
+        self._record_llm_outcome("applied")
+        return answers
+
+    def _mt_stage_slots_for_batch(
+        self, sources: list[tuple[str, Unit | None]]
+    ) -> tuple:
+        """
+        Return this batch's exact ordered ``(unit_stage_id, source_slot)`` pairs.
+
+        The source-slot indices are the ones this request actually carries,
+        published by the download plan for this batch - not a text match - so
+        a split sub-batch or a repeated source text journals exactly its own
+        slots and never a sibling's. ``()`` means no enrolled stage for these
+        sources.
+        """
+        authorization_id = getattr(self, "_mt_fallback_authorization_id", None)
+        if authorization_id is None or any(unit is None for _text, unit in sources):
+            return ()
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.mt_fallback import ProducerMTFallbackAuthorization
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.mt_fallback import unit_stage_for_unit
+
+        authorization = ProducerMTFallbackAuthorization.objects.get(pk=authorization_id)
+        # Fall back to the per-unit position when the caller published none.
+        carried = llm_mt_source_slots.get()
+        positions: list[int] = []
+        unit_positions: dict[int, int] = defaultdict(int)
+        for index, (_text, unit) in enumerate(sources):
+            if index < len(carried):
+                positions.append(carried[index])
+                continue
+            unit_key = unit.pk if unit is not None else -index
+            positions.append(unit_positions[unit_key])
+            unit_positions[unit_key] += 1
+        # One member per wire position: a plural unit contributes every slot
+        # it sends, and an index that does not belong to the enrolled unit
+        # fails the request closed rather than journaling a wrong slot.
+        slots: list[tuple] = []
+        for index, (_text, unit) in enumerate(sources):
+            unit_stage = unit_stage_for_unit(authorization, unit)
+            source_slot = positions[index]
+            if unit_stage is None:
+                msg = "Opted-in primary stage lacks an enrolled unit context"
+                raise MachineTranslationError(msg)
+            if source_slot >= len(unit_stage.source_slots):
+                msg = "Opted-in primary stage slot is out of range"
+                raise MachineTranslationError(msg)
+            slots.append((unit_stage.pk, source_slot))
+        return tuple(slots)
+
+    # ruff: ignore[too-many-locals]
     def _fetch_llm_batch(
         self,
         source_language,
@@ -3029,6 +3479,13 @@ class BaseLLMTranslation(BatchMachineTranslation):
         else:
             identity = ()
             string_ids = self._build_string_ids(len(sources))
+        # The stage of this internal request is derived here, before any wire
+        # id or payload exists, from the immutable enrollment of the sources
+        # this batch really carries. Rendering, string-id generation and the
+        # stage journal therefore all describe the same request. The
+        # deterministic per member+occurrence wire ids are a mapping, never a
+        # financial identity.
+        stage_slots = self._mt_stage_slots_for_batch(sources)
         prompt, content, previous_content, previous_response = (
             self._prepare_llm_translation(
                 source_language,
@@ -3059,6 +3516,22 @@ class BaseLLMTranslation(BatchMachineTranslation):
         usage_delivery_token = llm_delivery_usage.set(None)
         if identity:
             delivery_token = llm_delivery_work.set(identity)
+        # The stage of this internal request travels per request, not per
+        # engine instance: an orchestrator publishes it before rendering and
+        # the tokens are reset in ``finally`` below, so a scheduler thread
+        # sharing this engine never leaks one unit's stage into another's.
+        stage_token = llm_mt_stage.set(getattr(self, "_mt_stage", None))
+        slots_token = llm_mt_stage_slots.set(stage_slots)
+        authorization_token = llm_mt_stage_authorization.set(
+            getattr(self, "_mt_fallback_authorization_id", None)
+        )
+        # Freeze the exact parser inputs of this request, so a local replay
+        # restores the same answer from the same sources offline.
+        parser_token = llm_mt_parser_frozen.set(
+            self._freeze_parser_inputs(
+                sources, source_occurrences, string_ids, project_slug
+            )
+        )
         try:
             try:
                 translations_string = self.fetch_llm_translations(
@@ -3079,6 +3552,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
             llm_delivery_usage.reset(usage_delivery_token)
             llm_batch_unit_count.reset(unit_count_token)
             llm_usage_record.reset(usage_token)
+            llm_mt_stage.reset(stage_token)
+            llm_mt_stage_slots.reset(slots_token)
+            llm_mt_stage_authorization.reset(authorization_token)
+            llm_mt_parser_frozen.reset(parser_token)
 
     async def _adownload_multiple_translations(
         self,
@@ -3114,7 +3591,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         source_occurrences: list[int] | None = None,
         rescue_budget: int = LLM_PREFIX_RESCUE_LIMIT,
     ) -> DownloadMultipleTranslations:
-        if self.durable_single_attempt:
+        if self.durable_single_attempt or self.credit_fallback_single_attempt:
             return await sync_to_async(
                 self._download_multiple_translations_with_context_cache
             )(

@@ -61,6 +61,79 @@ class RoutedLLMMachineryForm(BaseOpenAIMachineryForm):
         widget=forms.Textarea,
     )
 
+    mt_fallback = EmptyMappingJSONField(
+        label=pgettext_lazy(
+            "Automatic suggestion service configuration",
+            "Insufficient-credit fallback engine",
+        ),
+        help_text=gettext_lazy(
+            "Fixed pilot route used only after the primary engine confirms "
+            '"insufficient-credit". Accepted value is exactly '
+            '{"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}; '
+            "an empty object disables the inherited fallback."
+        ),
+        widget=forms.Textarea,
+        required=False,
+    )
+
+    def needs_service_check(self) -> bool:
+        if (
+            self._effective_changed_fields() == {"mt_fallback"}
+            and self._primary_is_usable()
+        ):
+            # Toggling only the fallback metadata cannot change the primary
+            # wire request, and the primary is already usable: a key and a
+            # route exist. Skip the live probe instead of demanding a paid
+            # successful call from a service whose credit is spent. Any other
+            # change, including an unchanged save, keeps being checked.
+            return False
+        return super().needs_service_check()
+
+    def _primary_is_usable(self) -> bool:
+        key = self.initial.get("key")
+        routing = self.initial.get("routing")
+        return (
+            isinstance(key, str)
+            and bool(key)
+            and isinstance(routing, dict)
+            and bool(routing)
+        )
+
+    def _effective_changed_fields(self) -> set[str]:
+        """
+        Fields whose submitted value really differs from what was in effect.
+
+        ``changed_data`` alone cannot answer that. Django's ``JSONField``
+        reports a re-submitted empty object as changed, because ``to_python``
+        maps ``{}`` to ``None`` (an empty value), and the textarea round-trip
+        posts an empty string where the initial carries ``{}``. A field absent
+        from both sides is likewise flagged, because a ``ChoiceField``
+        initialises to its enum default. Comparing the parsed values on both
+        sides removes those artefacts, so an empty ``language_instructions``
+        textarea is not mistaken for a cleared instruction set, while a
+        payload that drops a prior project override still counts as changed.
+        """
+        changed = set()
+        for field in self.changed_data:
+            if not self._is_unchanged(field):
+                changed.add(field)
+        return changed
+
+    def _is_unchanged(self, field: str) -> bool:
+        submitted = self.data.get(field)
+        current = self.initial.get(field)
+        if submitted == current:
+            return True
+        form_field = self.fields.get(field)
+        if form_field is None:
+            return False
+        try:
+            return form_field.to_python(submitted) == form_field.to_python(current)
+        except ValidationError:
+            # An unparsable submission is a real change; the field error it
+            # raises is reported by the normal validation path.
+            return False
+
     def clean_routing(self) -> dict[str, str]:
         value = self.cleaned_data["routing"]
         if not isinstance(value, dict) or not value:
@@ -106,6 +179,49 @@ class RoutedLLMMachineryForm(BaseOpenAIMachineryForm):
             result[key] = model
         return result
 
+    def clean_mt_fallback(self):
+        """
+        Validate the fixed MT credit-fallback pilot route.
+
+        Accepted shapes:
+        * absent/``None``/empty string — inherit whatever the project or
+          site-wide configuration carries; a project-level empty object
+          explicitly disables the inherited route.
+        * ``{}`` — explicitly disabled.
+        * the exact fixed pilot route — any other engine, model or extra key
+          is rejected. Credentials and endpoints never live here.
+        """
+        value = self.cleaned_data["mt_fallback"]
+        if value is None or (isinstance(value, str) and not value):
+            return {}
+        if not isinstance(value, dict):
+            raise ValidationError(
+                gettext("MT fallback configuration must be a JSON object.")
+            )
+        if not value:
+            return {}
+        if set(value) != {"engine", "routing"}:
+            raise ValidationError(
+                gettext(
+                    'MT fallback accepts only the fixed keys "engine" and "routing".'
+                )
+            )
+        engine = value["engine"]
+        routing = value["routing"]
+        if engine != "litellm":
+            raise ValidationError(
+                gettext('MT fallback engine must be exactly "litellm".')
+            )
+        if not isinstance(routing, dict) or set(routing) != {FALLBACK_KEY}:
+            raise ValidationError(
+                gettext('MT fallback routing must map only the "*" fallback key.')
+            )
+        if routing[FALLBACK_KEY] != "QWEN3.7-plus":
+            raise ValidationError(
+                gettext('MT fallback model must be exactly "QWEN3.7-plus".')
+            )
+        return {"engine": "litellm", "routing": {FALLBACK_KEY: "QWEN3.7-plus"}}
+
 
 class RoutedProjectOpenRouterMachineryForm(RoutedLLMMachineryForm):
     """Project settings form without an editable OpenRouter API key."""
@@ -125,6 +241,8 @@ class RoutedProjectOpenRouterMachineryForm(RoutedLLMMachineryForm):
 
 class RoutedLiteLLMMachineryForm(RoutedLLMMachineryForm):
     """Settings form for routing against the corporate LiteLLM proxy."""
+
+    mt_fallback = None
 
     routing = EmptyMappingJSONField(
         label=pgettext_lazy(
@@ -170,7 +288,7 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
             "routed_llm_target", default=None
         )
         self._reply_codec: ContextVar[str] = ContextVar(
-            "routed_reply_codec", default="routed-slots-v3"
+            "routed_reply_codec", default="routed-slots-v4"
         )
 
     @property
@@ -180,9 +298,14 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
     def _fetch_llm_batch(
         self, source_language, target_language, sources, source_occurrences
     ):
-        codec = "routed-slots-v3"
+        codec = self._select_request_codec()
         identity = self._delivery_identity(sources)
-        if identity:
+        # A fallback-stage engine owns its own wire profile (for example the
+        # Qwen v4 reasoning_effort=none shape); the canonical identity's saved
+        # primary codec must not silently replace it. Replay of the fallback
+        # exchange itself is fenced by the digest/codec check in
+        # reserve_fallback_exchange inside dispatch_exchange.
+        if identity and getattr(self, "_mt_stage", None) != "fallback":
             from weblate.trans.llm_delivery import (  # ruff: ignore[import-outside-top-level]
                 DeliveryUnresolved,
                 saved_request_codec,
@@ -191,7 +314,7 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
             saved = saved_request_codec(identity)
             if saved in {"", "routed-parts-v1"}:
                 codec = "routed-parts-v1"
-            elif saved == "routed-slots-v2":
+            elif saved in {"routed-slots-v2", "routed-slots-v3", "routed-slots-v4"}:
                 codec = saved
             elif saved not in {None, codec}:
                 msg = "Stored routed codec requires reconciliation"
@@ -203,6 +326,10 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
             )
         finally:
             self._reply_codec.reset(token)
+
+    def _select_request_codec(self) -> str:
+        """Use v4 for new requests; saved exchanges select their frozen codec."""
+        return "routed-slots-v4"
 
     def _get_prompt(self, target_language: str) -> str:
         if self.delivery_request_codec != "routed-parts-v1":
@@ -218,10 +345,17 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
 
     def _build_string_ids(self, count: int) -> list[str]:
         # Durable batch ids are separately derived from semantic identities.
-        # Demonstration ids must also be stable for exact request-digest replay.
-        if self.durable_single_attempt and self.delivery_request_codec in {
+        # Demonstration ids must also be stable for exact request-digest replay,
+        # which applies to every explicit MT stage (an opted-in legacy primary
+        # or the fallback engine) as well as the durable single-attempt path.
+        # A stage is a plain class attribute core sets before rendering, so it
+        # needs no per-request context of its own.
+        if (
+            self.durable_single_attempt or getattr(self, "_mt_stage", None) is not None
+        ) and self.delivery_request_codec in {
             "routed-slots-v2",
             "routed-slots-v3",
+            "routed-slots-v4",
         }:
             return [f"example{index}" for index in range(count)]
         return super()._build_string_ids(count)
@@ -366,7 +500,7 @@ Respond ONLY with the required JSON object. Follow the supplied response schema.
             self.get_identifier() == "openrouter"
             and urlsplit(self.get_runtime_base_url()).hostname == "openrouter.ai"
             and model == "google/gemini-3.7-flash"
-            and self.delivery_request_codec == "routed-slots-v3"
+            and self.delivery_request_codec in {"routed-slots-v3", "routed-slots-v4"}
         ):
             payload["reasoning"] = {"effort": "medium"}
         strings = self._request_strings(content)
@@ -637,4 +771,10 @@ class RoutedLiteLLMTranslation(RoutedLLMTranslation):
         # The corporate proxy passes response_format through without
         # enforcing it, and rejects OpenRouter-only request fields.
         payload.pop("provider", None)
+        # QWEN3.7-plus generates reasoning by default on this proxy; only the
+        # alias-exact reasoning_effort=none profile disables it (verified by
+        # synthetic probes on 2026-11-16). Never send this to OpenRouter or
+        # apply it to other models.
+        if self.delivery_request_codec == "routed-slots-v4" and model == "QWEN3.7-plus":
+            payload["reasoning_effort"] = "none"
         return payload

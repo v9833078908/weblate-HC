@@ -33,6 +33,7 @@ from weblate_customization.machinery import (
 from weblate.checks import models as check_models
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.llm import BaseLLMTranslation
+from weblate.machinery.models import validate_service_configuration
 from weblate.machinery.openai import OpenAITranslation
 from weblate.trans.llm_delivery import (
     DeliveryUnresolved,
@@ -41,6 +42,11 @@ from weblate.trans.llm_delivery import (
 )
 from weblate.trans.models.llm_delivery import ProducerLLMExchange
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.mt_fallback import (
+    build_fallback_engine_settings,
+    fallback_profile_configured,
+    resolve_fallback_profile,
+)
 from weblate.trans.tests.factories import make_unit
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.tests import http_mock
@@ -152,6 +158,17 @@ def litellm_sent_models() -> list[str]:
     return models
 
 
+def litellm_sent_payloads() -> list[dict[str, object]]:
+    payloads: list[dict[str, object]] = []
+    for call in http_mock.calls:
+        if str(call.request.url) != LITELLM_CHAT_URL:
+            continue
+        payload = json.loads(call.request.content)
+        if isinstance(payload, dict):
+            payloads.append(payload)
+    return payloads
+
+
 def as_settings(value: dict[str, object]) -> SettingsDict:
     return cast("SettingsDict", value)
 
@@ -164,6 +181,93 @@ class FormOnlyMachinery:
 
     def validate_settings(self) -> None:
         pass
+
+
+class FallbackConfigurationBoundaryTest(SimpleTestCase):
+    def test_litellm_form_does_not_offer_primary_fallback(self) -> None:
+        self.assertNotIn(
+            "mt_fallback", RoutedLiteLLMTranslation.settings_form.base_fields
+        )
+
+    def test_historical_invalid_fallback_never_resolves(self) -> None:
+        settings_map = {
+            "openrouter": {
+                "mt_fallback": {
+                    "engine": "litellm",
+                    "routing": {"*": "unexpected-model"},
+                }
+            },
+            "litellm": {"key": "test-key"},
+        }
+        self.assertFalse(fallback_profile_configured(settings_map))
+        self.assertIsNone(resolve_fallback_profile(settings_map))
+
+    def test_disabled_fallback_configuration_is_off(self) -> None:
+        for mapping in (
+            None,
+            {},
+            {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}},
+        ):
+            with self.subTest(mapping=mapping):
+                settings_map = {
+                    "openrouter": {
+                        "mt_fallback": {}
+                        if mapping is None
+                        else {"mt_fallback": mapping},
+                    },
+                    "litellm": {"key": "test-key"},
+                }
+                self.assertFalse(fallback_profile_configured(settings_map))
+
+    def test_fallback_keeps_primary_project_and_prompt_context(self) -> None:
+        project = object()
+        settings_map = {
+            "openrouter": {
+                "_project": project,
+                "persona": "",
+                "style": "primary style",
+                "language_instructions": {},
+                "mt_fallback": {
+                    "engine": "litellm",
+                    "routing": {"*": "QWEN3.7-plus"},
+                },
+            },
+            "litellm": {
+                "key": "fallback-key",
+                "persona": "wrong persona",
+                "style": "wrong style",
+            },
+        }
+        engine_settings = build_fallback_engine_settings(settings_map)
+        self.assertIsNotNone(engine_settings)
+        self.assertIs(engine_settings["_project"], project)
+        self.assertIsNone(engine_settings.get("base_url"))
+        self.assertEqual(engine_settings["persona"], "")
+        self.assertEqual(engine_settings["style"], "primary style")
+        self.assertEqual(engine_settings["language_instructions"], {})
+        self.assertEqual(engine_settings["key"], "fallback-key")
+        self.assertEqual(engine_settings["routing"], {"*": "QWEN3.7-plus"})
+
+    def test_api_rejects_fallback_metadata_on_other_service(self) -> None:
+        with (
+            patch(
+                "weblate.machinery.models.MACHINERY",
+                {"litellm": RoutedLiteLLMTranslation},
+            ),
+            patch.object(RoutedLiteLLMTranslation, "validate_settings"),
+        ):
+            _, _, errors = validate_service_configuration(
+                "litellm",
+                {
+                    **LITELLM_CONFIGURATION,
+                    "routing": {"*": "test-model"},
+                    "mt_fallback": {
+                        "engine": "litellm",
+                        "routing": {"*": "QWEN3.7-plus"},
+                    },
+                },
+            )
+        self.assertTrue(errors)
 
 
 class RoutedLLMFormTest(TestCase):
@@ -210,6 +314,64 @@ class RoutedLLMFormTest(TestCase):
         form = self.validate({"ja": f"  {DEEPSEEK}  "})
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["routing"], {"ja": DEEPSEEK})
+
+    def validate_fallback(self, mt_fallback: object) -> RoutedLLMMachineryForm:
+        return RoutedLLMMachineryForm(
+            FormOnlyMachinery,
+            data={**CONFIGURATION, "mt_fallback": mt_fallback},
+        )
+
+    def test_mt_fallback_absent_is_valid(self) -> None:
+        form = RoutedLLMMachineryForm(FormOnlyMachinery, data=dict(CONFIGURATION))
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data.get("mt_fallback"), {})
+
+    def test_mt_fallback_empty_object_disables(self) -> None:
+        form = self.validate_fallback({})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["mt_fallback"], {})
+
+    def test_mt_fallback_fixed_route_is_valid(self) -> None:
+        form = self.validate_fallback(
+            {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(
+            form.cleaned_data["mt_fallback"],
+            {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}},
+        )
+
+    def test_mt_fallback_rejects_wrong_engine(self) -> None:
+        form = self.validate_fallback(
+            {"engine": "openrouter", "routing": {"*": "QWEN3.7-plus"}}
+        )
+        self.assertFalse(form.is_valid())
+
+    def test_mt_fallback_rejects_wrong_model(self) -> None:
+        form = self.validate_fallback(
+            {"engine": "litellm", "routing": {"*": "some-other-model"}}
+        )
+        self.assertFalse(form.is_valid())
+
+    def test_mt_fallback_rejects_extra_keys(self) -> None:
+        form = self.validate_fallback(
+            {
+                "engine": "litellm",
+                "routing": {"*": "QWEN3.7-plus"},
+                "credentials": "secret",
+            }
+        )
+        self.assertFalse(form.is_valid())
+
+    def test_mt_fallback_rejects_non_dict(self) -> None:
+        form = self.validate_fallback(["litellm"])
+        self.assertFalse(form.is_valid())
+
+    def test_mt_fallback_rejects_language_specific_routing(self) -> None:
+        form = self.validate_fallback(
+            {"engine": "litellm", "routing": {"ja": "QWEN3.7-plus"}}
+        )
+        self.assertFalse(form.is_valid())
 
 
 class RoutedResolveTest(SimpleTestCase):
@@ -782,6 +944,211 @@ class RoutedProtectedSlotsTest(SimpleTestCase):
 
 
 class RoutedSettingsValidationTest(TestCase):
+    def test_metadata_only_change_does_not_probe_primary(self) -> None:
+        initial = {**CONFIGURATION, "routing": {"*": GEMINI}, "source_language": "auto"}
+        data = {
+            **initial,
+            "language_instructions": "",
+            "routing": json.dumps(initial["routing"]),
+            "mt_fallback": json.dumps(
+                {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}}
+            ),
+        }
+        with patch.object(RoutedLLMTranslation, "validate_settings") as validate:
+            form = RoutedLLMMachineryForm(
+                RoutedLLMTranslation, data=data, initial=initial
+            )
+            self.assertTrue(form.is_valid(), form.errors)
+        # Only mt_fallback really changed; the empty language_instructions
+        # textarea and the re-posted routing are artefacts of Django's
+        # JSONField.has_changed mapping {} to None.
+        self.assertEqual(form._effective_changed_fields(), {"mt_fallback"})  # ruff: ignore[private-member-access]
+        self.assertEqual(validate.call_count, 0)
+
+    def test_api_metadata_toggle_uses_effective_initial_configuration(self) -> None:
+        """
+        A payload carrying the full effective configuration is metadata-only.
+
+        The API replaces the project override map, so the toggle only skips
+        the probe when the payload itself re-states every field the effective
+        configuration already carries; otherwise the primary would silently
+        change to the site-wide base.
+        """
+        initial = {**CONFIGURATION, "routing": {"*": GEMINI}}
+        with (
+            patch(
+                "weblate.machinery.models.MACHINERY",
+                {"openrouter": RoutedLLMTranslation},
+            ),
+            patch.object(RoutedLLMTranslation, "validate_settings") as validate,
+        ):
+            _, _, errors = validate_service_configuration(
+                "openrouter",
+                {
+                    **initial,
+                    "mt_fallback": {
+                        "engine": "litellm",
+                        "routing": {"*": "QWEN3.7-plus"},
+                    },
+                },
+                base_configuration=initial,
+                initial_configuration=initial,
+            )
+        self.assertEqual(errors, [])
+        validate.assert_not_called()
+
+    def test_api_dropping_prior_overrides_is_not_metadata_only(self) -> None:
+        """
+        A payload that drops prior project overrides must be validated.
+
+        PATCH replaces the whole override map, so a payload carrying only
+        ``mt_fallback`` silently drops the persona and routing the project
+        used to override. That is an effective-configuration change, so the
+        primary is probed instead of skipped as metadata-only.
+        """
+        sitewide = {**CONFIGURATION, "routing": {"*": GEMINI}}
+        effective = {
+            **sitewide,
+            "persona": "project persona",
+            "routing": {"*": "deepseek/deepseek-chat-v3.1"},
+        }
+        with (
+            patch(
+                "weblate.machinery.models.MACHINERY",
+                {"openrouter": RoutedLLMTranslation},
+            ),
+            patch.object(RoutedLLMTranslation, "validate_settings") as validate,
+        ):
+            _, _, errors = validate_service_configuration(
+                "openrouter",
+                {
+                    "mt_fallback": {
+                        "engine": "litellm",
+                        "routing": {"*": "QWEN3.7-plus"},
+                    }
+                },
+                base_configuration=sitewide,
+                initial_configuration=effective,
+            )
+        self.assertEqual(errors, [])
+        validate.assert_called_once()
+
+    def test_api_unchanged_save_still_validates_the_primary(self) -> None:
+        initial = {**CONFIGURATION, "routing": {"*": GEMINI}}
+        with (
+            patch(
+                "weblate.machinery.models.MACHINERY",
+                {"openrouter": RoutedLLMTranslation},
+            ),
+            patch.object(RoutedLLMTranslation, "validate_settings") as validate,
+        ):
+            _, _, errors = validate_service_configuration(
+                "openrouter",
+                dict(initial),
+                base_configuration=initial,
+                initial_configuration=initial,
+            )
+        self.assertEqual(errors, [])
+        validate.assert_called_once()
+
+    def test_metadata_only_exception_needs_a_usable_primary(self) -> None:
+        """
+        Without a configured key or route the toggle does probe.
+
+        An empty key or route makes the form invalid, so the API path never
+        reaches the probe at all; the decision is driven directly here.
+        """
+        for initial in (
+            {**CONFIGURATION, "routing": {"*": GEMINI}, "key": ""},
+            {**CONFIGURATION, "key": "sitewide-key", "routing": {}},
+        ):
+            with self.subTest(initial=initial):
+                form = RoutedLLMMachineryForm(
+                    RoutedLLMTranslation,
+                    data={
+                        **initial,
+                        "mt_fallback": {
+                            "engine": "litellm",
+                            "routing": {"*": "QWEN3.7-plus"},
+                        },
+                    },
+                    initial=initial,
+                )
+                self.assertTrue(form.needs_service_check())
+
+    def test_api_key_and_routing_changes_still_validate(self) -> None:
+        initial = {**CONFIGURATION, "routing": {"*": GEMINI}}
+        for payload in (
+            {"key": "rotated-key"},
+            {"routing": {"ja": DEEPSEEK}},
+            {"base_url": "https://openrouter.ai/api/v1/"},
+        ):
+            with self.subTest(payload=payload):
+                with (
+                    patch(
+                        "weblate.machinery.models.MACHINERY",
+                        {"openrouter": RoutedLLMTranslation},
+                    ),
+                    patch.object(RoutedLLMTranslation, "validate_settings") as validate,
+                ):
+                    _, _, errors = validate_service_configuration(
+                        "openrouter",
+                        payload,
+                        base_configuration=initial,
+                        initial_configuration=initial,
+                    )
+                self.assertEqual(errors, [])
+                validate.assert_called_once()
+
+    def test_api_invalid_fallback_shape_reports_an_error(self) -> None:
+        initial = {**CONFIGURATION, "routing": {"*": GEMINI}}
+        for payload in (
+            {"engine": "litellm", "routing": {"*": "other"}},
+            {"engine": "openrouter", "routing": {"*": "QWEN3.7-plus"}},
+            {"engine": "litellm", "routing": {"ja": "QWEN3.7-plus"}},
+            {"engine": "litellm"},
+            ["litellm"],
+        ):
+            with self.subTest(payload=payload):
+                with (
+                    patch(
+                        "weblate.machinery.models.MACHINERY",
+                        {"openrouter": RoutedLLMTranslation},
+                    ),
+                    patch.object(RoutedLLMTranslation, "validate_settings"),
+                ):
+                    _, _, errors = validate_service_configuration(
+                        "openrouter",
+                        {"mt_fallback": payload},
+                        base_configuration=initial,
+                        initial_configuration=initial,
+                    )
+                self.assertTrue(errors)
+
+    def test_api_metadata_only_disabled_value_is_accepted(self) -> None:
+        initial = {
+            **CONFIGURATION,
+            "routing": {"*": GEMINI},
+            "mt_fallback": {"engine": "litellm", "routing": {"*": "QWEN3.7-plus"}},
+        }
+        with (
+            patch(
+                "weblate.machinery.models.MACHINERY",
+                {"openrouter": RoutedLLMTranslation},
+            ),
+            patch.object(RoutedLLMTranslation, "validate_settings") as validate,
+        ):
+            _, configuration, errors = validate_service_configuration(
+                "openrouter",
+                {"mt_fallback": {}},
+                base_configuration=initial,
+                initial_configuration=initial,
+            )
+        self.assertEqual(errors, [])
+        validate.assert_not_called()
+        # Only the difference is stored: the empty object that disables.
+        self.assertEqual(configuration, {"mt_fallback": {}})
+
     @http_mock.activate
     def test_actual_form_validates_route_without_fallback(self) -> None:
         mock_chat()
@@ -814,6 +1181,17 @@ class RoutedDownloadTest(TestCase):
         machine.delete_cache()
         machine.cache_translations = False
         return machine
+
+    @http_mock.activate
+    def test_credit_pilot_does_not_split_invalid_paid_reply(self) -> None:
+        engine = self.machine()
+        engine.credit_fallback_single_attempt = True
+        mock_chat(invalid_reply='{"translations":[]}')
+        with self.assertRaises(MachineTranslationError):
+            engine.download_multiple_translations(
+                "en", "fr", [("First", None), ("Second", None)]
+            )
+        self.assertEqual(len(http_mock.calls), 1)
 
     @http_mock.activate
     def test_sync_multiple_routes_cjk(self) -> None:
@@ -1115,6 +1493,45 @@ class RoutedLiteLLMTest(SimpleTestCase):
         self.assertNotIn("response_format", payload)
         self.assertNotIn("provider", payload)
 
+    def test_qwen37_plus_gets_reasoning_effort_none(self) -> None:
+        configuration = {
+            **LITELLM_CONFIGURATION,
+            "routing": {"*": "QWEN3.7-plus"},
+        }
+        machine = RoutedLiteLLMTranslation(as_settings(configuration))
+        payload = machine.get_chat_payload(
+            "QWEN3.7-plus", "prompt", batch_content(2), "", ""
+        )
+        self.assertEqual(payload.get("reasoning_effort"), "none")
+
+    def test_qwen37_plus_lowercase_alias_omits_reasoning_effort(self) -> None:
+        configuration = {
+            **LITELLM_CONFIGURATION,
+            "routing": {"*": "qwen3.7-plus"},
+        }
+        machine = RoutedLiteLLMTranslation(as_settings(configuration))
+        payload = machine.get_chat_payload(
+            "qwen3.7-plus", "prompt", batch_content(1), "", ""
+        )
+        self.assertNotIn("reasoning_effort", payload)
+
+    def test_other_litellm_model_omits_reasoning_effort(self) -> None:
+        payload = self.machine().get_chat_payload(
+            DEEPSEEK, "prompt", batch_content(1), "", ""
+        )
+        self.assertNotIn("reasoning_effort", payload)
+
+    def test_openrouter_payload_omits_reasoning_effort_for_qwen(self) -> None:
+        configuration = {
+            **CONFIGURATION,
+            "routing": {"*": "QWEN3.7-plus"},
+        }
+        machine = RoutedLLMTranslation(as_settings(configuration))
+        payload = machine.get_chat_payload(
+            "QWEN3.7-plus", "prompt", batch_content(1), "", ""
+        )
+        self.assertNotIn("reasoning_effort", payload)
+
 
 class RoutedLiteLLMDownloadTest(TestCase):
     @http_mock.activate
@@ -1129,8 +1546,54 @@ class RoutedLiteLLMDownloadTest(TestCase):
         self.assertTrue(result)
         self.assertEqual(litellm_sent_models(), [DEEPSEEK])
 
+    @http_mock.activate
+    def test_qwen37_plus_sends_top_level_reasoning_effort_none(self) -> None:
+        for asynchronous in (False, True):
+            with self.subTest(asynchronous=asynchronous):
+                http_mock.reset()
+                mock_litellm_chat("Přeloženo")
+                machine = RoutedLiteLLMTranslation(
+                    as_settings(
+                        {**LITELLM_CONFIGURATION, "routing": {"*": "QWEN3.7-plus"}}
+                    )
+                )
+                machine.delete_cache()
+                machine.cache_translations = False
+                if asynchronous:
+                    async_to_sync(machine.adownload_multiple_translations)(
+                        "en", "cs", [("Hello", None)]
+                    )
+                else:
+                    machine.download_multiple_translations(
+                        "en", "cs", [("Hello", None)]
+                    )
+                (payload,) = litellm_sent_payloads()
+                self.assertEqual(payload["model"], "QWEN3.7-plus")
+                # The proxy reads the top-level field; no provider object and
+                # no nested reasoning block reach the wire for Qwen.
+                self.assertEqual(payload.get("reasoning_effort"), "none")
+                self.assertNotIn("reasoning", payload)
+                self.assertNotIn("provider", payload)
 
-class RoutedDeliveryTest(ViewTestCase):
+    @http_mock.activate
+    def test_other_litellm_model_omits_reasoning_effort(self) -> None:
+        mock_litellm_chat("Přeloženo")
+        machine = RoutedLiteLLMTranslation(
+            as_settings({**LITELLM_CONFIGURATION, "routing": {"*": GEMINI}})
+        )
+        machine.delete_cache()
+        machine.cache_translations = False
+
+        machine.download_multiple_translations("en", "cs", [("Hello", None)])
+
+        (payload,) = litellm_sent_payloads()
+        self.assertNotIn("reasoning_effort", payload)
+        self.assertNotIn("reasoning", payload)
+
+
+class RoutedDeliveryTestMixin:
+    """Shared delivery fixtures: a durable engine and a unit-bound source."""
+
     def setUp(self):
         super().setUp()
         directory = TemporaryDirectory()
@@ -1149,6 +1612,34 @@ class RoutedDeliveryTest(ViewTestCase):
         engine.cache_translations = False
         return engine
 
+
+class RoutedDeliveryTest(RoutedDeliveryTestMixin, ViewTestCase):
+    @http_mock.activate
+    def test_new_gemini_uses_v4_and_preserves_medium_reasoning(self):
+        engine = self.machine()
+        engine.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        mock_chat("Přeloženo")
+        engine.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v4"
+        )
+        self.assertEqual(sent_payloads()[0]["reasoning"], {"effort": "medium"})
+
+    @http_mock.activate
+    def test_new_qwen_request_is_v4_with_top_level_reasoning_effort_none(self):
+        engine = self.machine(RoutedLiteLLMTranslation)
+        engine.settings["routing"] = {"*": "QWEN3.7-plus"}
+        mock_litellm_chat("Přeloženo")
+        engine.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v4"
+        )
+        (payload,) = litellm_sent_payloads()
+        self.assertEqual(payload["model"], "QWEN3.7-plus")
+        self.assertEqual(payload.get("reasoning_effort"), "none")
+        self.assertNotIn("reasoning", payload)
+        self.assertNotIn("provider", payload)
+
     @http_mock.activate
     def assert_fresh_engine_replay(self, cls):
         engine = self.machine(cls)
@@ -1161,7 +1652,7 @@ class RoutedDeliveryTest(ViewTestCase):
         self.assertEqual(len(http_mock.calls), 1)
         self.assertEqual(LLMUsageLog.objects.count(), 1)
         self.assertEqual(
-            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v3"
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v4"
         )
 
     def test_new_openrouter_reply_replays_across_fresh_engines(self):
@@ -1327,7 +1818,7 @@ class RoutedDeliveryTest(ViewTestCase):
                 self.machine().download_multiple_translations("en", "cs", self.sources)
         self.assertEqual(len(http_mock.calls), 1)
         self.assertEqual(
-            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v3"
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v4"
         )
 
     def test_frozen_contract_matches_independently_rendered_old_request(self):
@@ -1349,3 +1840,70 @@ class RoutedDeliveryTest(ViewTestCase):
             )
         finally:
             engine._reply_codec.reset(token)  # ruff: ignore[private-member-access]
+
+
+class RoutedFrozenCodecWireTest(RoutedDeliveryTestMixin, ViewTestCase):
+    """A frozen historical codec never receives the v4-only wire parameters."""
+
+    @http_mock.activate
+    def test_frozen_qwen_v3_request_omits_reasoning_effort(self) -> None:
+        engine = self.machine(RoutedLiteLLMTranslation)
+        engine.settings["routing"] = {"*": "QWEN3.7-plus"}
+        mock_litellm_chat("Přeloženo")
+        with patch(
+            "weblate.trans.llm_delivery.saved_request_codec",
+            return_value="routed-slots-v3",
+        ):
+            engine.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v3"
+        )
+        (payload,) = litellm_sent_payloads()
+        self.assertNotIn("reasoning_effort", payload)
+
+    @http_mock.activate
+    def test_frozen_qwen_v2_request_omits_reasoning_effort(self) -> None:
+        engine = self.machine(RoutedLiteLLMTranslation)
+        engine.settings["routing"] = {"*": "QWEN3.7-plus"}
+        mock_litellm_chat("Přeloženo")
+        with patch(
+            "weblate.trans.llm_delivery.saved_request_codec",
+            return_value="routed-slots-v2",
+        ):
+            engine.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(
+            ProducerLLMExchange.objects.get().request_codec, "routed-slots-v2"
+        )
+        (payload,) = litellm_sent_payloads()
+        self.assertNotIn("reasoning_effort", payload)
+
+    @http_mock.activate
+    def test_frozen_gemini_v3_request_preserves_reasoning_block(self) -> None:
+        # v3 is the frozen wire that first carried reasoning={effort:medium};
+        # only v2 and earlier omit it. The digest never changes, only the
+        # assertion now names what v3 actually sends.
+        engine = self.machine()
+        engine.settings["routing"] = {"*": "google/gemini-3.7-flash"}
+        register_chat(engine.get_chat_completions_url(), "Přeloženo")
+        with patch(
+            "weblate.trans.llm_delivery.saved_request_codec",
+            return_value="routed-slots-v3",
+        ):
+            engine.download_multiple_translations("en", "cs", self.sources)
+        (payload,) = sent_payloads()
+        self.assertEqual(payload["reasoning"], {"effort": "medium"})
+
+    @http_mock.activate
+    def test_frozen_legacy_v1_request_omits_v4_wire_fields(self) -> None:
+        engine = self.machine(RoutedLiteLLMTranslation)
+        engine.settings["routing"] = {"*": "QWEN3.7-plus"}
+        mock_litellm_chat("Přeloženo")
+        with (
+            patch(
+                "weblate.trans.llm_delivery.saved_request_codec",
+                return_value="routed-parts-v1",
+            ),
+            self.assertRaises(DeliveryUnresolved),
+        ):
+            engine.download_multiple_translations("en", "cs", self.sources)
+        self.assertEqual(litellm_sent_payloads(), [])

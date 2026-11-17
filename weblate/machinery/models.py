@@ -8,6 +8,7 @@ import json
 from typing import TYPE_CHECKING, cast
 
 from appconf import AppConf
+from django.utils.translation import gettext
 
 from weblate.utils.classloader import ClassRegistry
 
@@ -40,6 +41,7 @@ def validate_service_configuration(
     *,
     allow_private_targets: bool = True,
     base_configuration: SettingsDict | None = None,
+    initial_configuration: SettingsDict | None = None,
 ) -> tuple[type[BatchMachineTranslation] | None, SettingsDict, list[str]]:
     """
     Validate given service configuration.
@@ -71,6 +73,17 @@ def validate_service_configuration(
     else:
         service_configuration = configuration
 
+    if (
+        service_name != "openrouter"
+        and isinstance(service_configuration, dict)
+        and "mt_fallback" in service_configuration
+    ):
+        return (
+            service,
+            service_configuration,
+            [gettext("MT fallback metadata is only valid for OpenRouter.")],
+        )
+
     errors = []
     if service.settings_form is not None:
         validated_configuration = service_configuration
@@ -81,6 +94,7 @@ def validate_service_configuration(
         form = service.settings_form(
             service,
             data=validated_configuration,
+            initial=initial_configuration,
             allow_private_targets=allow_private_targets,
         )
         # validate form

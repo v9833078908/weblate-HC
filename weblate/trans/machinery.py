@@ -8,7 +8,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from functools import partial
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 from django.db import connections
 from django.utils.translation import gettext
@@ -43,7 +43,9 @@ class MachineryBatchOutcome:
     it refused with an error ("failed"), and one that was never asked
     because the service was already stopped ("skipped"). ``reason_code``
     carries the confirmed classification from
-    :class:`MachineTranslationServiceError` when one exists.
+    :class:`MachineTranslationServiceError` when one exists. ``skip_cause``
+    says why a skipped batch was never asked: a terminal refusal that stopped
+    the service, or a rate limit that ran out of patience.
     """
 
     status: Literal["success", "failed", "skipped"]
@@ -51,6 +53,7 @@ class MachineryBatchOutcome:
     unit_ids: tuple[int, ...]
     reason_code: str | None = None
     error: str | None = None
+    skip_cause: Literal["terminal-refusal", "rate-limit"] | None = None
 
 
 @dataclass(slots=True)
@@ -59,6 +62,7 @@ class _ServiceRun:
 
     failures: list[MachineryBatchOutcome] = field(default_factory=list)
     fatal_reason: str | None = None
+    outcomes: dict[tuple[int, ...], MachineryBatchOutcome] = field(default_factory=dict)
 
     @property
     def fatally_stopped(self) -> bool:
@@ -72,10 +76,31 @@ class _ServiceRun:
         }
 
     def observe(self, outcome: MachineryBatchOutcome) -> None:
-        if outcome.status == "failed":
-            self.failures.append(outcome)
-            if outcome.reason_code is not None and self.fatal_reason is None:
-                self.fatal_reason = outcome.reason_code
+        self.outcomes[outcome.unit_ids] = outcome
+        if outcome.status != "failed":
+            return
+        self.failures.append(outcome)
+        reason = outcome.reason_code
+        if reason is None:
+            return
+        # A confirmed terminal refusal (quota, credit, auth, permission)
+        # outranks any earlier non-terminal classification: the first generic
+        # provider error must not hide a later credit exhaustion. Conversely a
+        # later non-terminal error never downgrades a terminal stop.
+        if self.fatal_reason is None or (
+            reason in self._FATAL_REASONS
+            and self.fatal_reason not in self._FATAL_REASONS
+        ):
+            self.fatal_reason = reason
+
+    _FATAL_REASONS: ClassVar[frozenset[str]] = frozenset(
+        {
+            MachineTranslationServiceError.REASON_QUOTA_EXHAUSTED,
+            MachineTranslationServiceError.REASON_INSUFFICIENT_CREDIT,
+            MachineTranslationServiceError.REASON_AUTHENTICATION,
+            MachineTranslationServiceError.REASON_PERMISSION,
+        }
+    )
 
 
 def _fetch_machinery_batch(
@@ -94,7 +119,10 @@ def _fetch_machinery_batch(
             # The service refused often enough to be stopped for everyone; every
             # remaining string would be dropped without a request anyway.
             return MachineryBatchOutcome(
-                status="skipped", service=service.name, unit_ids=unit_ids
+                status="skipped",
+                service=service.name,
+                unit_ids=unit_ids,
+                skip_cause="rate-limit",
             )
         service.batch_translate(batch, user, threshold=threshold)
     except MachineTranslationServiceError as error:
@@ -183,6 +211,15 @@ def _fetch_machinery_batches(
     if concurrency < 2:
         for batch in batches:
             if run.fatally_stopped:
+                run.observe(
+                    MachineryBatchOutcome(
+                        status="skipped",
+                        service=service.name,
+                        unit_ids=tuple(unit.id for unit in batch),
+                        reason_code=run.fatal_reason,
+                        skip_cause="terminal-refusal",
+                    )
+                )
                 skipped.append(batch)
                 continue
             outcome = _fetch_machinery_batch(
@@ -199,7 +236,6 @@ def _fetch_machinery_batches(
             else:
                 done(batch)
         return skipped
-
     # Progress is reported from this thread because Celery keeps the current
     # task in thread-local storage. Batches submitted while the service is
     # healthy stay in flight and their results are kept; a fatal refusal
@@ -236,7 +272,17 @@ def _fetch_machinery_batches(
                 else:
                     done(batch)
         # Everything never submitted after a fatal refusal is skipped.
-        skipped.extend(remaining)
+        for batch in remaining:
+            run.observe(
+                MachineryBatchOutcome(
+                    status="skipped",
+                    service=service.name,
+                    unit_ids=tuple(unit.id for unit in batch),
+                    reason_code=run.fatal_reason,
+                    skip_cause="terminal-refusal",
+                )
+            )
+            skipped.append(batch)
 
     with ThreadPoolExecutor(
         max_workers=concurrency, thread_name_prefix="machinery-batch"
@@ -257,6 +303,7 @@ def _fetch_machinery_service(
     concurrency: int,
     on_batch: Callable[[list[Unit]], None] | None,
     run: _ServiceRun,
+    on_outcome: Callable[[MachineryBatchOutcome], None] | None = None,
 ) -> None:
     """Fetch all batches of one service, in parallel when it allows it."""
     fetched = 0
@@ -290,6 +337,9 @@ def _fetch_machinery_service(
     # Keep the progress total honest: every batch counts once, asked or not.
     for batch in skipped:
         done(batch)
+    if on_outcome is not None:
+        for outcome in run.outcomes.values():
+            on_outcome(outcome)
 
 
 def fetch_machinery_matches(
@@ -302,6 +352,7 @@ def fetch_machinery_matches(
     log_translation: Translation | None = None,
     on_batch: Callable[[list[Unit]], None] | None = None,
     on_failure: Callable[[MachineryBatchOutcome], None] | None = None,
+    on_outcome: Callable[[MachineryBatchOutcome], None] | None = None,
 ) -> dict[int, UnitMemoryResultDict]:
     """
     Fetch machinery matches without applying them to units.
@@ -311,6 +362,8 @@ def fetch_machinery_matches(
     result is only known once every service has answered. ``on_failure``
     receives each classified batch failure on the calling thread; without it
     failures are only logged, preserving the previous silent behavior.
+    ``on_outcome`` receives every final outcome, including the batches a
+    stopped service never asked, after the drain and on the calling thread.
     """
     num_units = len(units)
     if len(services) != 1:
@@ -344,6 +397,7 @@ def fetch_machinery_matches(
             concurrency=concurrency,
             on_batch=on_batch,
             run=run,
+            on_outcome=on_outcome,
         )
         if on_failure is not None:
             for outcome in run.failures:

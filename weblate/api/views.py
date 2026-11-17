@@ -2441,6 +2441,7 @@ class ProjectViewSet(
             "dict[str, SettingsDict]",
             Setting.objects.get_settings_dict(SettingCategory.MT),
         )
+        effective_settings = project.get_machinery_settings()
 
         if request.method in {"POST", "PATCH"}:
             try:
@@ -2453,6 +2454,7 @@ class ProjectViewSet(
                 request.data.get("configuration", "{}"),
                 allow_private_targets=False,
                 base_configuration=sitewide_settings.get(service_name),
+                initial_configuration=effective_settings.get(service_name),
             )
 
             if service is None or errors:
@@ -2495,6 +2497,7 @@ class ProjectViewSet(
                     configuration,
                     allow_private_targets=False,
                     base_configuration=sitewide_settings.get(service_name),
+                    initial_configuration=effective_settings.get(service_name),
                 )
 
                 if service is None or errors:
