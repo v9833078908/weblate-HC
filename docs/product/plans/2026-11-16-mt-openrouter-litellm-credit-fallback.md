@@ -779,8 +779,12 @@ private-конфигурация machinery и database dump размером 193
 Новый образ собирается без сети поверх прежнего amd64 runtime:
 меняется приложение, версии зависимостей сохраняются. При recreation
 должны остаться прежние mounts, environment и OIDC signing-key bind.
-Активация меняет только `openrouter.mt_fallback` в общей конфигурации;
-основные маршруты и project persona/style/language instructions сохраняются.
+Активация добавляет `openrouter.mt_fallback` в общей конфигурации.
+В production отсутствовала отдельная MT-настройка `litellm`: наличие
+корпоративного ключа у judge не делает его настройкой machinery.
+Добавлена site-wide MT-настройка LiteLLM с существующим корпоративным ключом,
+тем же корпоративным endpoint и маршрутом `QWEN3.7-plus`. Основные маршруты
+и project persona/style/language instructions сохраняются.
 
 Release-регрессии запускались отдельно от проверки `main`: 2010 собранных
 тестов Wizard, machinery, legacy/durable MT, fallback/replay/reconciliation.
@@ -794,3 +798,33 @@ Release-регрессии запускались отдельно от пров
 После исправления весь recovery-класс отдельно: **3 passed**, 38.04 s.
 Финальные scoped hooks прошли. Изменение касается только fixture,
 а не runtime-языков или правил MT.
+
+Release source `ed05334ed482bc8a254124592f0863f5886f2b54` опубликован
+через `origin` в corporate Git и GitHub; оба branch tip проверены независимо.
+Образ `sha256:41d57ee0eaca7df8d65448472802501ec3fc320eb97c7811dcf3daecdcb13952`
+построен offline поверх прежнего runtime; полный набор версий установленных
+пакетов совпал с прежним образом. Первоначальный tar включал служебные
+macOS `._*` файлы и был отклонён whitelist-проверкой до сборки;
+повторная упаковка с `COPYFILE_DISABLE=1` устранила их без изменения приложения.
+
+Первый cutover был автоматически откачен после проверки `Mount set changed`;
+повторный cutover прошёл проверки точного совпадения mounts и environment.
+Итоговый контейнер `healthy`, 13 runtime source hashes совпали с релизом,
+миграции 0157/0158 применены, login HTTP 200, все Supervisor-процессы запущены.
+При activation отсутствие MT LiteLLM вызвало rollback транзакции;
+после добавления отдельной MT-настройки activation завершилась.
+Проектные сохранённые конфигурации не изменялись; эффективный fallback
+разрешился как `litellm` / `QWEN3.7-plus`.
+
+Финальное чтение production подтвердило release `ed05334e`, `healthy`,
+login HTTP 200 и эффективный `litellm` / `QWEN3.7-plus` для всех 20 проектов,
+включая Anvil Saga. Web и все Celery-процессы `RUNNING`; одноразовый
+Supervisor `check` завершён (`EXITED`). Его статус заставляет
+`supervisorctl status` вернуть 3, поэтому финальная проверка проверяет
+состояния процессов, а не требует нулевого кода этого CLI.
+
+В `/srv/hcgameloc-releases/mt-fallback-20261117/` сохранены
+`release.json`, `build-result.json`, `rollout-result.json`,
+`activation-result.json`, `final-result.json` и private rollback-артефакты.
+Production rollout и activation завершены. Платные verification-вызовы,
+canary и массовые переводы не запускались.
