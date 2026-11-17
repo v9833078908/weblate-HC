@@ -31,6 +31,7 @@ from .llm import (
     llm_batch_project_id,
     llm_batch_target_language,
     llm_batch_unit_count,
+    llm_delivery_unit_ids,
     llm_delivery_usage,
     llm_delivery_work,
     llm_usage_record,
@@ -95,6 +96,14 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         request = super().request
 
         def send():
+            # ruff: ignore[import-outside-top-level]
+            from weblate.wizard_auth.grants import guard_paid_run
+
+            guard_paid_run(
+                self.usage_run_id,
+                unit_ids=llm_delivery_unit_ids.get(),
+                review=getattr(self, "delivery_purpose", None) == "repair",
+            )
             return encode_http_response(
                 request(method, url, skip_auth=skip_auth, **kwargs)
             )
@@ -157,6 +166,8 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                     request_codec=codec,
                     replay_only=self.delivery_replay_only or codec == "routed-parts-v1",
                     mt_primary_context=(authorization_id, slots, snapshot),
+                    unit_ids=llm_delivery_unit_ids.get(),
+                    review=getattr(self, "delivery_purpose", None) == "repair",
                 )
                 llm_delivery_usage.set(exchange_for_work(work))
                 saved = json.loads(receipt)
@@ -217,6 +228,8 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 run_id=self.usage_run_id,
                 request_codec=codec,
                 replay_only=self.delivery_replay_only or codec == "routed-parts-v1",
+                unit_ids=llm_delivery_unit_ids.get(),
+                review=getattr(self, "delivery_purpose", None) == "repair",
             )
         )
         llm_delivery_usage.set(exchange_for_work(work))

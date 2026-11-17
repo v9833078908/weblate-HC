@@ -38,6 +38,8 @@ from weblate.api.throttling import (
 )
 from weblate.trans.models.producer_quality import ProducerQualityOperation
 from weblate.trans.quality_execution import reject_verification_mutation
+from weblate.wizard_auth.grants import request_binding
+from weblate.wizard_auth.policy import require_wizard_project
 
 
 def _resource(request, token, action, *, lock=False):
@@ -78,7 +80,10 @@ class ProducerProjectRepeatPlan(APIView):
             serializer = ProducerRepeatPlanRequestSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             operation.private_data = build_producer_repeat_plan(
-                project=project, actor=request.user, **serializer.validated_data
+                project=project,
+                actor=request.user,
+                wizard_delegation=request_binding(request).get("_wizard_delegation"),
+                **serializer.validated_data,
             )
             operation.save(update_fields=["private_data", "updated"])
             return Response(
@@ -118,11 +123,15 @@ class ProducerRepeatPlanApply(APIView):
         _require_key(request)
         plan = _resource(request, token, "repeat-plan")
 
+        require_wizard_project(request.user, plan.project, write=True)
         reject_verification_mutation(request, plan.project)
 
         def apply(operation):
             payload = apply_producer_repeat_plan(
-                plan=plan, operation=operation, actor=request.user
+                plan=plan,
+                operation=operation,
+                actor=request.user,
+                wizard_delegation=request_binding(request).get("_wizard_delegation"),
             )
             return Response(ProducerRepeatRunSerializer(payload).data)
 

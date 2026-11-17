@@ -502,7 +502,11 @@ class PersistedProducerRunRecoveryTest(RepoTestMixin, TransactionTestCase):
     def setUp(self) -> None:
         self.clone_test_repos()
         super().setUp()
-        self.component = self.create_component()
+        self.component = self.create_po(
+            source_language=Language.objects.get(
+                code=settings.DEFAULT_LANGUAGE, skip_cache=True
+            )
+        )
         self.component.create_path()
         self.project = self.component.project
         setup_project_groups(self, self.project)

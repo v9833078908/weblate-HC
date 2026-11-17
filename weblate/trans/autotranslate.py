@@ -76,6 +76,7 @@ from weblate.utils.state import (
     STATE_TRANSLATED,
 )
 from weblate.utils.stats import ProjectLanguage
+from weblate.wizard_auth.grants import guard_run_result
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
@@ -660,6 +661,11 @@ class AutoTranslate(BaseAutoTranslate):
     def update(
         self, unit: Unit, state: StringState, target: list[str], user=None
     ) -> None:
+        if self.producer_run is not None and self.producer_run.execution_options.get(
+            "_wizard_delegation"
+        ):
+            self.user = guard_run_result(self.producer_run, self.user, unit=unit)
+            user = self.user
         if isinstance(target, str):
             target = [target]
         max_length = unit.get_max_length()
@@ -1124,7 +1130,7 @@ class AutoTranslate(BaseAutoTranslate):
 
         # ruff: ignore[import-outside-top-level]
         from weblate.wizard_auth.grants import (
-            run_delegation_active,
+            delegated_run_actor,
         )
 
         authorization = (
@@ -1191,6 +1197,9 @@ class AutoTranslate(BaseAutoTranslate):
                 )
                 self.translation.refresh_from_db()
                 self.translation.component.refresh_from_db()
+                actor = delegated_run_actor(
+                    run, actor, component=self.translation.component
+                )
                 if (
                     # ruff: ignore[too-many-boolean-expressions]
                     unit is None
@@ -1200,7 +1209,6 @@ class AutoTranslate(BaseAutoTranslate):
                     or self.user.pk != actor.pk
                     or run.status
                     in {"cancel_requested", "cancelled", "failed", "completed"}
-                    or not run_delegation_active(run)
                     or not check_auto_translate_permission(
                         actor, self.translation, self.mode
                     )
@@ -1544,7 +1552,7 @@ class AutoTranslate(BaseAutoTranslate):
 
         # ruff: ignore[import-outside-top-level]
         from weblate.wizard_auth.grants import (
-            run_delegation_active,
+            delegated_run_actor,
         )
 
         visited = set()
@@ -1571,16 +1579,21 @@ class AutoTranslate(BaseAutoTranslate):
                     (unit_stage.pk, index, unit_stage.source_slots[index], unit)
                     for index in eligible_slots
                 ]
+                actor = delegated_run_actor(
+                    authorization.run,
+                    self.user,
+                    component=self.translation.component,
+                )
                 if (
                     self.user is None
                     or self.user.pk != authorization.actor_id_snapshot
-                    or not run_delegation_active(authorization.run)
+                    or actor is None
                 ):
                     continue
                 try:
                     stage_send_guard(
                         authorization,
-                        actor=self.user,
+                        actor=actor,
                         mode=self.mode,
                         slots=[(unit_stage.pk, index) for index in eligible_slots],
                     )()
@@ -1590,7 +1603,7 @@ class AutoTranslate(BaseAutoTranslate):
                     self.translation.component.source_language.code,
                     self.translation.language.code,
                     ordered,
-                    user=self.user,
+                    user=actor,
                     threshold=threshold,
                 )
                 answers = [
@@ -2098,7 +2111,7 @@ class AutoTranslate(BaseAutoTranslate):
 
                     # ruff: ignore[import-outside-top-level]
                     from weblate.wizard_auth.grants import (
-                        run_delegation_active,
+                        delegated_run_actor,
                     )
 
                     fallback_stage = (
@@ -2120,16 +2133,20 @@ class AutoTranslate(BaseAutoTranslate):
                         )
                         self.translation.refresh_from_db()
                         self.translation.component.refresh_from_db()
+                        actor = delegated_run_actor(
+                            run,
+                            authorization.actor,
+                            component=self.translation.component,
+                        )
                         if (
                             # ruff: ignore[too-many-boolean-expressions]
-                            authorization.actor is None
+                            actor is None
                             or self.user is None
                             or authorization.actor_id_snapshot != self.user.pk
                             or run.status
                             in {"cancel_requested", "cancelled", "completed", "failed"}
-                            or not run_delegation_active(run)
                             or not check_auto_translate_permission(
-                                authorization.actor, self.translation, self.mode
+                                actor, self.translation, self.mode
                             )
                             or self.translation.is_readonly
                             or self.translation.component.locked
@@ -3936,6 +3953,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
             )
         return judge_remaining
 
+    def _authorize_delegated_run(self, run: ProducerRun | None) -> None:
+        if run is not None and run.execution_options.get("_wizard_delegation"):
+            self.active_producer_run = run
+            self.user = guard_run_result(run, self.user)
+
     def perform(
         self,
         *,
@@ -3951,6 +3973,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 if self.producer_run_id
                 else None
             )
+            self._authorize_delegated_run(run)
             with verification_context(run):
                 message = self._perform(
                     auto_source=auto_source,

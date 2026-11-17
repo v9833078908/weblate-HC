@@ -2028,6 +2028,8 @@ def _durable_judge_response(
                     if phase == "fallback"
                     else None
                 ),
+                unit_ids=[request.unit_id for request in batch],
+                review=True,
             )
         )
         if "body" in saved:

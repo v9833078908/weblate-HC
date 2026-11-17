@@ -34,6 +34,7 @@ from weblate.trans.models.judge import compute_decision_revision
 from weblate.trans.models.producer_mt import unit_revision
 from weblate.trans.mt_operations import machinery_config_digest, reconcile_mt_operation
 from weblate.wizard_auth.grants import request_binding
+from weblate.wizard_auth.policy import require_wizard_profile, require_wizard_project
 
 
 class MTUnitSerializer(serializers.Serializer):
@@ -214,6 +215,7 @@ class ProducerMTBatch(APIView):
     )
     def post(self, request, slug):
         project = get_object_or_404(request.user.allowed_projects, slug=slug)
+        require_wizard_profile(request.user, project)
         try:
             key = UUID(request.headers.get("Idempotency-Key", ""))
         except (ValueError, AttributeError):
@@ -233,6 +235,7 @@ class ProducerMTBatch(APIView):
             component__slug=payload["component"],
             language__code=payload["language"],
         )
+        require_wizard_project(request.user, translation.component, write=True)
         _check_access(request.user, translation)
         # Project lock serializes acceptance, including two keys for the same unit.
         with transaction.atomic():
@@ -248,6 +251,13 @@ class ProducerMTBatch(APIView):
                 )
                 if _retryable_dispatch(existing):
                     run = existing.run
+                    if (
+                        request.user.wizard_project_roles is not None
+                        and not run.execution_options.get("_wizard_delegation")
+                    ):
+                        return Response(
+                            {"code": "wizard-authorization-required"}, status=409
+                        )
                     run.status = "queued"
                     run.finished = None
                     run.dispatch_attempts = 0
@@ -417,6 +427,9 @@ class ProducerMTBatchReconcile(ProducerMTBatchDetail):
             actor=request.user,
             project=project,
             key=key,
+        )
+        require_wizard_project(
+            request.user, operation.translation.component, write=True
         )
         _check_access(request.user, operation.translation)
         reconciliation = reconcile_mt_operation(

@@ -54,6 +54,7 @@ from weblate.trans.mt_fallback import (
 from weblate.trans.tests.test_mt_fallback import VALID_SETTINGS, request_fixture
 from weblate.trans.tests.utils import RepoTestMixin, create_test_user
 from weblate.wizard_auth.grants import WizardAuthorizationRequired
+from weblate.wizard_auth.models import DelegationFamily
 
 
 class MTStageBoundaryTest(RepoTestMixin, TransactionTestCase):
@@ -501,17 +502,20 @@ class MTStageBoundaryTest(RepoTestMixin, TransactionTestCase):
 
     def test_revoked_delegation_blocks_fallback_immediately_before_transport(self):
         self._credit_receipt()
+        family = DelegationFamily.objects.create(
+            user=self.user,
+            client_id="synthetic",
+            expires=timezone.now() + timedelta(hours=1),
+            revoked=True,
+        )
+        self.producer_run.execution_options = {"_wizard_delegation": str(family.pk)}
+        self.producer_run.save(update_fields=["execution_options"])
         guard = stage_send_guard(
             self.authorization,
             actor=self.user,
             slots=((self.unit_stage.pk, 0),),
         )
-        with (
-            patch(
-                "weblate.wizard_auth.grants.run_delegation_active", return_value=False
-            ),
-            self.assertRaises(WizardAuthorizationRequired),
-        ):
+        with self.assertRaises(WizardAuthorizationRequired):
             self._fallback(
                 lambda: self.fail("a revoked delegation paid for fallback"),
                 before_send=guard,

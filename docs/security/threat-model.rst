@@ -48,16 +48,31 @@ credentials, query or fragment; it is hidden unless Wizard SSO is enabled and
 the user is signed in. The link does not contain OAuth tokens.
 Wizard links issuer/immutable subject explicitly; matching login names do not
 merge accounts. Delegated scopes restrict a closed API route/method list and
-never replace current native object permissions. Translator-profile access
-excludes credentials, endpoints and routing. Existing API credentials keep their
-authentication model. Wizard encrypts access/refresh tokens server-side, keeps
+work alongside native object permissions. The Wizard bearer principal uses
+explicit project assignments, ignores site superuser and public visibility
+grants, and requires project ownership for writes. An optional per-user filter
+intersects delegated project permissions with creation events attributed to
+the actor and operator-verified legacy project IDs. Only configured team
+membership grants access to the corporate knowledge base. Other users need
+explicit project permissions within a workspace or project allowlist keyed by
+stable IDs. Missing policy configuration grants no access. Delegated creation
+uses native creation permissions and creates private projects with the creator
+assigned to the project administration team. External users can create only in
+an allowed workspace. These restrictions also apply to nested resources and
+scope-bound task results. Translator-profile access excludes credentials,
+endpoints and routing. External Wizard actors can only read or use empty
+profiles and instructions signed by Weblate when saved through the external
+manual workflow. The signature binds the effective instructions to the
+project and service, including inherited settings. Existing API credentials
+keep their authentication model. Wizard encrypts access/refresh tokens server-side, keeps
 its encryption key separately, limits login attempts durably and never falls
 back to a service token after failed authentication. Backups containing OAuth
 tokens, signing/encryption keys or identities require private handling.
 
 An authorization family has a non-sliding 24-hour lifetime and refresh rotation
-with reuse protection. Workers check the actor and delegation before new paid
-delivery; already accepted responses and financial witnesses survive expiry or
+with reuse protection. Workers check the actor, delegation and current project
+ownership before new paid delivery. Already accepted responses and financial
+witnesses survive expiry or
 revocation. A network partition can delay remote revocation: a durable Wizard
 outbox retries revocation only, and local logout is not proof that accepted
 remote work stopped. Shared logout is not claimed. Legacy service-account runs

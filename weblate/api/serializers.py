@@ -2123,7 +2123,11 @@ class ComponentSerializer(RemovableSerializer[Component]):
             for field in self.linked_repository_setting_fields:
                 result[field] = getattr(linked_component, field)
         user = self.context["request"].user
-        if not user.has_perm("vcs.view", instance):
+        if not user.has_perm("vcs.view", instance) or (
+            user.wizard_project_roles is not None
+            and instance.linked_component_id is not None
+            and not user.can_access_component(instance.linked_component)
+        ):
             result["vcs"] = None
             result["repo"] = None
             result["branch"] = None
@@ -2138,6 +2142,13 @@ class ComponentSerializer(RemovableSerializer[Component]):
 
     def to_internal_value(self, data):
         # Preprocess to inject params based on content
+        if (
+            "from_component" in data
+            and self.context["request"].user.wizard_project_roles is not None
+        ):
+            raise serializers.ValidationError(
+                {"from_component": "Wizard cannot clone an existing component."}
+            )
         # QueryDict.copy() deep-copies values, which breaks multipart uploads
         # backed by TemporaryUploadedFile on Python 3.13.
         data = copy(data)
@@ -2202,6 +2213,13 @@ class ComponentSerializer(RemovableSerializer[Component]):
     def get_linked_repository_component(self, instance: Component) -> Component | None:
         return self.get_linked_component_or_none(instance.repo)
 
+    def can_edit_linked_repository(self, component: Component) -> bool:
+        user = self.context["request"].user
+        roles = user.wizard_project_roles
+        return (roles is None or roles.get(component.project_id) == "owner") and bool(
+            user.has_perm("component.edit", component)
+        )
+
     def validate_linked_repository_setting_overrides(
         self, attrs, instance: Component
     ) -> None:
@@ -2227,9 +2245,7 @@ class ComponentSerializer(RemovableSerializer[Component]):
                     attrs.pop(field, None)
             return
 
-        if not self.context["request"].user.has_perm(
-            "component.edit", linked_component
-        ):
+        if not self.can_edit_linked_repository(linked_component):
             raise serializers.ValidationError(
                 {
                     "repo": gettext_lazy(
@@ -2486,8 +2502,8 @@ class ComponentSerializer(RemovableSerializer[Component]):
         if not self.instance and not disable_autoshare and source_component is None:
             repo = instance.suggest_repo_link()
             linked_component = self.get_linked_component_or_none(repo)
-            if linked_component is not None and self.context["request"].user.has_perm(
-                "component.edit", linked_component
+            if linked_component is not None and self.can_edit_linked_repository(
+                linked_component
             ):
                 attrs["repo"] = instance.repo = repo
                 attrs["branch"] = instance.branch = ""
@@ -2694,6 +2710,8 @@ class TranslationCreateSerializer(ReadOnlySerializer):
             models.Q(project_id=component.project_id)
             | models.Q(project__contribute_shared_tm=True)
         )
+        if request.user.wizard_project_roles is not None:
+            source_queryset = source_queryset.filter_access(request.user)
         for reference in attrs.get("from_component", []):
             source_component = resolve_component_reference_with_error(
                 source_queryset,

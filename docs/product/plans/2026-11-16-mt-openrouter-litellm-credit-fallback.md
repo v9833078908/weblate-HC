@@ -746,3 +746,51 @@ corporate `origin/main` и живой GitHub `main` по-прежнему сов
 коммитов `main` нет. Ветка интеграции сохраняет эту базу и обе проверенные
 истории PR33/PR35. Владелец разрешил closing merge с существующим admin bypass;
 branch protection не менялась.
+
+### Production release 2026-11-17
+
+Владелец отдельно разрешил deployment и включение MT credit fallback;
+платные canary и массовые переводы не запускать. Прямая выкладка `main`
+`5c8a00b9` откатила бы production-only Wizard-ограничения из `c6cabed9` и
+`a708c2ee`. Release-ветка объединяет обе истории и сохраняет эти ограничения.
+
+При объединении сохранены per-request unit IDs, stage context и frozen parser
+context, а также проверки текущих Wizard-прав перед новым HTTP-запросом.
+Вызовы удалённого `run_delegation_active` мигрированы на
+`delegated_run_actor`; durable fallback восстанавливает `producer_run` перед
+применением результата, чтобы действовала текущая per-unit проверка.
+Регрессия отзыва делегирования использует настоящую отозванную
+`DelegationFamily`, а не подмену удалённого helper.
+
+Два независимых Luna-review не нашли блокеров в сохранении Wizard-доступа,
+delivery fences, codec/replay и последовательности миграций 0157/0158.
+Scoped hooks прошли; pylint — **10.00/10**; `makemigrations --check --dry-run`
+не обнаружил изменений. Неподдерживаемый локальный `git svn` даёт прежнее
+предупреждение и не влияет на MT.
+
+Локальный настоящий WSGI HTTP smoke на изолированной БД:
+`POST 202 → GET 200`, `completed`, две строки `applied`, один primary
+credit refusal, две fallback-попытки и две связанные usage-записи.
+Ответы провайдеров синтетические; платных вызовов нет.
+
+Точка отката: `/srv/hcgameloc-releases/mt-fallback-20261117/`.
+Сохранены прежний образ, исходная цепочка из 15 Compose-файлов,
+private-конфигурация machinery и database dump размером 193539388 байт.
+Новый образ собирается без сети поверх прежнего amd64 runtime:
+меняется приложение, версии зависимостей сохраняются. При recreation
+должны остаться прежние mounts, environment и OIDC signing-key bind.
+Активация меняет только `openrouter.mt_fallback` в общей конфигурации;
+основные маршруты и project persona/style/language instructions сохраняются.
+
+Release-регрессии запускались отдельно от проверки `main`: 2010 собранных
+тестов Wizard, machinery, legacy/durable MT, fallback/replay/reconciliation.
+Последний широкий прогон: **1953 passed, 54 skipped**, три сбоя setup в
+`PersistedProducerRunRecoveryTest`. Причина — cached default language
+с устаревшим PK после `TransactionTestCase` flush; fixture теперь получает
+свежий source language через `Language.objects.get(..., skip_cache=True)`
+и передаёт его в `create_po(source_language=...)`.
+Первоначальная попытка передать source language в `create_component`
+не соответствовала сигнатуре helper и заменена вызовом `create_po`.
+После исправления весь recovery-класс отдельно: **3 passed**, 38.04 s.
+Финальные scoped hooks прошли. Изменение касается только fixture,
+а не runtime-языков или правил MT.

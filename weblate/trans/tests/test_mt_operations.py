@@ -54,6 +54,7 @@ from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.util import join_plural
 from weblate.wizard_auth.grants import WizardAuthorizationRequired
 from weblate.wizard_auth.models import DelegationFamily
+from weblate.wizard_auth.policy import wizard_principal
 
 
 def revision(unit):
@@ -208,6 +209,10 @@ class ProducerMTTest(ViewTestCase):
 
     def delegated_operation(self):
         operation = self.operation()
+        self.enterContext(
+            override_settings(WIZARD_EXTERNAL_PROJECT_IDS=(self.project.pk,))
+        )
+        self.project.add_user(self.user, "Administration")
         family = DelegationFamily.objects.create(
             user=self.user,
             client_id="synthetic",
@@ -300,6 +305,28 @@ class ProducerMTTest(ViewTestCase):
         )
         groups = reconcile_mt_operation(operation.pk, reauthorize_family=renewed)
         self.assertEqual(groups["ready"], [self.unit.pk])
+        self.assertEqual(paid, [self.unit.pk])
+
+    @override_settings(WIZARD_SSO_ENABLED=True)
+    def test_owner_permission_removed_after_reply_keeps_answer_unapplied(self):
+        operation, family = self.delegated_operation()
+        engine, paid = self.engine()
+        translate = engine._translate_sources  # ruff: ignore[private-member-access]
+
+        def reply(*args, **kwargs):
+            values = translate(*args, **kwargs)
+            self.project.remove_user(self.user)
+            return values
+
+        engine._translate_sources = reply  # ruff: ignore[private-member-access]
+        with patch("weblate.trans.mt_operations.build_engine", return_value=engine):
+            result = process_mt_operation(operation.run_id)
+        self.assertEqual(result["state"], "auth_required")
+        self.assertEqual(operation.units.get().state, "received")
+        self.unit.refresh_from_db()
+        family.refresh_from_db()
+        self.assertFalse(family.revoked)
+        self.assertEqual(self.unit.target, "")
         self.assertEqual(paid, [self.unit.pk])
 
     @override_settings(WIZARD_SSO_ENABLED=True)
@@ -634,6 +661,21 @@ class ProducerMTTest(ViewTestCase):
         self.assertEqual(retry.status_code, 202)
         self.assertEqual(retry.data["run_id"], str(operation.run_id))
         self.assertEqual(retry.data["state"], "accepted")
+
+    def test_wizard_cannot_redispatch_failed_native_operation(self):
+        operation = self.operation()
+        run = operation.run
+        run.status = "failed"
+        run.dispatch_error = "Synthetic broker unavailable"
+        run.save(update_fields=["status", "dispatch_error"])
+        self.project.add_user(self.user, "Administration")
+        with override_settings(WIZARD_EXTERNAL_PROJECT_IDS=[self.project.pk]):
+            self.api.force_authenticate(wizard_principal(self.user))
+        self.assertEqual(self.api.get(self.url + self.key + "/").status_code, 200)
+        self.assertEqual(self.submit().status_code, 409)
+        run.refresh_from_db()
+        self.assertEqual(run.status, "failed")
+        self.assertNotIn("_wizard_delegation", run.execution_options)
 
     def test_mt_dispatch_cannot_execute_as_legacy_auto_translate(self):
         operation = self.operation()

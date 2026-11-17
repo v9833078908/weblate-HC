@@ -29,6 +29,7 @@ from weblate.api.producer.views import (
     ProducerProjectQualitySnapshot,
     ProducerProjectRunStart,
     ProducerProjects,
+    ProducerProjectWizardAccess,
     ProducerQualityOperationDetail,
     ProducerRunCancel,
     ProducerRunDetail,
@@ -60,6 +61,11 @@ urlpatterns = [
     ),
     path("me/", ProducerMe.as_view(), name="producer-me"),
     path("projects/", ProducerProjects.as_view(), name="producer-projects"),
+    path(
+        "projects/<slug:slug>/wizard-access/",
+        ProducerProjectWizardAccess.as_view(),
+        name="producer-project-wizard-access",
+    ),
     path(
         "projects/<slug:slug>/quality/repeats/plan/",
         ProducerProjectRepeatPlan.as_view(),

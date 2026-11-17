@@ -474,9 +474,11 @@ def dispatch_exchange(
     judge_primary_identity: Sequence[str] | None = None,
     before_send: Callable[[], None] | None = None,
     mt_primary_context=None,
+    unit_ids: Sequence[int | None] | None = None,
+    review: bool = False,
 ) -> str:
     if not replay_only:
-        guard_paid_run(run_id)
+        guard_paid_run(run_id, unit_ids=unit_ids, review=review)
     reference = reserve_exchange(
         identity,
         request_digest,

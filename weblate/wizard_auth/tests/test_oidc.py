@@ -17,12 +17,14 @@ from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework.exceptions import PermissionDenied
 
-from weblate.auth.models import User
+from weblate.auth.models import Group, User
+from weblate.lang.models import Language
 from weblate.trans.llm_delivery import dispatch_exchange
-from weblate.trans.models import Project
+from weblate.trans.models import Component, Project, Translation, Unit
 from weblate.trans.models.judge import ProducerRun
 from weblate.wizard_auth.grants import family_for, guard_paid_run, subject_for
 from weblate.wizard_auth.models import DelegationFamily
+from weblate.workspaces.models import Workspace
 
 if not settings.WIZARD_SSO_ENABLED:
     pytest.skip(
@@ -181,6 +183,228 @@ class WizardOIDCTest(TestCase):
         )
         self.assertEqual(response.status_code, 401)
 
+    def test_delegated_superuser_cannot_see_unassigned_projects(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        group = Group.objects.create(name="Internal Wizard")
+        self.user.add_team(None, group)
+        project = Project.objects.create(
+            name="Native only", slug="native-only", access_control=Project.ACCESS_PUBLIC
+        )
+        private = Project.objects.create(
+            name="Native private",
+            slug="native-private",
+            access_control=Project.ACCESS_PRIVATE,
+        )
+        language = Language.objects.get(code="en")
+        component = Component.objects.bulk_create(
+            [
+                Component(
+                    name="Hidden",
+                    slug="hidden",
+                    project=private,
+                    source_language=language,
+                )
+            ]
+        )[0]
+        translation = Translation.objects.bulk_create(
+            [
+                Translation(
+                    component=component, language=language, plural=language.plural
+                )
+            ]
+        )[0]
+        unit = Unit.objects.bulk_create(
+            [Unit(translation=translation, id_hash=1, position=1, source="Hidden")]
+        )[0]
+        token, _ = self.issue()
+        headers = {
+            "HTTP_AUTHORIZATION": "Bearer " + token["access_token"],
+            "secure": True,
+        }
+        self.enterContext(override_settings(WIZARD_INTERNAL_GROUP_ID=group.pk))
+        me = self.client.get("/api/producer/me/", **headers)
+        self.assertTrue(me.json()["bdhc_access"])
+        self.assertEqual(me.json()["wizard_access_policy"], 1)
+        self.assertFalse(me.json()["is_superuser"])
+        for url in ("/api/projects/", "/api/producer/projects/"):
+            self.assertEqual(self.client.get(url, **headers).json()["results"], [])
+        for url in (
+            f"/api/projects/{project.slug}/",
+            f"/api/projects/{project.slug}/components/",
+            f"/api/producer/projects/{project.slug}/wizard-access/",
+            f"/api/components/{private.slug}/{component.slug}/",
+            f"/api/translations/{private.slug}/{component.slug}/{language.code}/units/",
+            f"/api/units/{unit.pk}/",
+        ):
+            self.assertEqual(self.client.get(url, **headers).status_code, 404)
+        self.assertEqual(
+            self.client.get(
+                f"/api/projects/{private.slug}/",
+                HTTP_AUTHORIZATION=f"Token {self.user.auth_token.key}",
+                secure=True,
+            ).status_code,
+            200,
+        )
+        web_project = Project.objects.create(
+            name="Native web session",
+            slug="native-web-session",
+            access_control=Project.ACCESS_PRIVATE,
+        )
+        self.assertEqual(
+            self.client.get(web_project.get_absolute_url(), secure=True).status_code,
+            200,
+        )
+
+    def test_creator_only_scope_filters_wizard_access_without_changing_native_api(self):
+        internal = Group.objects.create(name="Wizard internal")
+        self.user.add_team(None, internal)
+        projects = {
+            slug: Project.objects.create(
+                name=slug, slug=slug, access_control=Project.ACCESS_PRIVATE
+            )
+            for slug in (
+                "own-project",
+                "legacy-project",
+                "other-project",
+                "unassigned-project",
+            )
+        }
+        own = projects["own-project"]
+        own.post_create(self.user)
+        legacy = projects["legacy-project"]
+        legacy.add_user(self.user, "Translate")
+        other = projects["other-project"]
+        other.add_user(self.user, "Administration")
+        unassigned = projects["unassigned-project"]
+        token, _ = self.issue()
+        wizard = {
+            "HTTP_AUTHORIZATION": "Bearer " + token["access_token"],
+            "secure": True,
+        }
+        with override_settings(
+            WIZARD_INTERNAL_GROUP_ID=internal.pk,
+            WIZARD_CREATOR_ONLY_PROJECTS={
+                str(self.user.pk): [legacy.pk, unassigned.pk]
+            },
+        ):
+            response = self.client.get("/api/producer/projects/", **wizard)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(
+                {row["slug"]: row["wizard_role"] for row in response.json()["results"]},
+                {"own-project": "owner", "legacy-project": "read"},
+            )
+            for slug in ("other-project", "unassigned-project"):
+                with self.subTest(slug=slug):
+                    self.assertEqual(
+                        self.client.get(
+                            f"/api/producer/projects/{slug}/wizard-access/", **wizard
+                        ).status_code,
+                        404,
+                    )
+                    self.assertEqual(
+                        self.client.get(f"/api/projects/{slug}/", **wizard).status_code,
+                        404,
+                    )
+            self.assertEqual(
+                self.client.get(
+                    f"/api/projects/{other.slug}/",
+                    HTTP_AUTHORIZATION=f"Token {self.user.auth_token.key}",
+                    secure=True,
+                ).status_code,
+                200,
+            )
+
+    def test_explicit_reader_can_view_external_project_but_cannot_mutate(self):
+        project = Project.objects.create(
+            name="External project",
+            slug="external-project",
+            access_control=Project.ACCESS_PRIVATE,
+        )
+        project.add_user(self.user, "Translate")
+        token, _ = self.issue(scope="openid wizard.read wizard.import")
+        headers = {
+            "HTTP_AUTHORIZATION": "Bearer " + token["access_token"],
+            "secure": True,
+        }
+        with override_settings(WIZARD_EXTERNAL_PROJECT_IDS=[project.pk]):
+            self.assertFalse(
+                self.client.get("/api/producer/me/", **headers).json()["bdhc_access"]
+            )
+            access = self.client.get(
+                f"/api/producer/projects/{project.slug}/wizard-access/", **headers
+            )
+            self.assertEqual(
+                access.json(),
+                {"slug": project.slug, "project_id": project.pk, "wizard_role": "read"},
+            )
+            listed = self.client.get("/api/producer/projects/", **headers).json()[
+                "results"
+            ]
+            self.assertEqual(
+                [
+                    (entry["slug"], entry["project_id"], entry["wizard_role"])
+                    for entry in listed
+                ],
+                [(project.slug, project.pk, "read")],
+            )
+            self.assertEqual(
+                self.client.post(
+                    f"/api/projects/{project.slug}/components/", {}, **headers
+                ).status_code,
+                403,
+            )
+        self.assertEqual(
+            self.client.get(f"/api/projects/{project.slug}/", **headers).status_code,
+            404,
+        )
+
+    def test_external_creation_uses_allowed_workspace_and_grants_ownership(self):
+        workspace = Workspace.objects.create(name="External workspace")
+        workspace.add_owner(self.user)
+        other = Workspace.objects.create(name="Outside workspace")
+        other.add_owner(self.user)
+        token, _ = self.issue(scope="openid wizard.read wizard.import")
+        headers = {
+            "HTTP_AUTHORIZATION": "Bearer " + token["access_token"],
+            "secure": True,
+        }
+        self.enterContext(
+            override_settings(WIZARD_EXTERNAL_WORKSPACE_IDS=[str(workspace.pk)])
+        )
+        body = {"name": "Delegated creation", "slug": "delegated-creation"}
+        blocked = self.client.post(
+            "/api/projects/",
+            {**body, "workspace": str(other.pk)},
+            content_type="application/json",
+            **headers,
+        )
+        self.assertEqual(blocked.status_code, 404)
+        self.assertFalse(Project.objects.filter(slug=body["slug"]).exists())
+        created = self.client.post(
+            "/api/projects/", body, content_type="application/json", **headers
+        )
+        self.assertEqual(created.status_code, 201, created.content[:200])
+        project = Project.objects.get(slug=body["slug"])
+        self.assertEqual(project.workspace_id, workspace.pk)
+        self.assertEqual(project.access_control, Project.ACCESS_PRIVATE)
+        access = self.client.get(
+            f"/api/producer/projects/{project.slug}/wizard-access/", **headers
+        )
+        self.assertEqual(
+            access.json(),
+            {"slug": project.slug, "project_id": project.pk, "wizard_role": "owner"},
+        )
+        clone = self.client.post(
+            f"/api/projects/{project.slug}/components/",
+            {"from_component": "another-component"},
+            content_type="application/json",
+            **headers,
+        )
+        self.assertEqual(clone.status_code, 400)
+        self.assertEqual(clone.json()["errors"][0]["attr"], "from_component")
+        self.assertFalse(project.component_set.exists())
+
     def test_refresh_does_not_extend_absolute_lifetime(self):
         token, _ = self.issue()
         family = family_for(token["refresh_token"], "refresh")
@@ -278,22 +502,38 @@ class WizardOIDCTest(TestCase):
             cap=1,
             execution_options={"_wizard_delegation": str(family.pk)},
         )
-        guard_paid_run(run.pk)
-        User.objects.filter(pk=self.user.pk).update(is_superuser=False)
         send = Mock(return_value="never")
-        with self.assertRaises(PermissionDenied):
-            dispatch_exchange(
-                ["permission-revoked-work"], "b" * 64, send, run_id=run.pk
-            )
+        with override_settings(WIZARD_EXTERNAL_PROJECT_IDS=(project.pk,)):
+            with self.assertRaises(PermissionDenied):
+                dispatch_exchange(
+                    ["superuser-without-project-access"], "b" * 64, send, run_id=run.pk
+                )
+            project.add_user(self.user, "Administration")
+            guard_paid_run(run.pk)
+            with self.assertRaises(PermissionDenied):
+                dispatch_exchange(
+                    ["unavailable-unit"], "d" * 64, send, run_id=run.pk, unit_ids=[-1]
+                )
+            project.remove_user(self.user)
+            with self.assertRaises(PermissionDenied):
+                dispatch_exchange(
+                    ["permission-revoked-work"], "c" * 64, send, run_id=run.pk
+                )
         send.assert_not_called()
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_superuser)
 
     @override_settings(JUDGE_ENABLED=True)
     def test_delegated_api_cannot_resume_a_legacy_service_account_run(self):
         self.user.is_superuser = True
         self.user.save(update_fields=["is_superuser"])
         project = Project.objects.create(
-            name="Legacy isolated scope", slug="legacy-scope", translation_review=True
+            name="Legacy isolated scope",
+            slug="legacy-scope",
+            translation_review=True,
+            access_control=Project.ACCESS_PRIVATE,
         )
+        project.add_user(self.user, "Administration")
         run = ProducerRun.objects.create(
             actor=self.user,
             scope_type="project",
@@ -304,13 +544,14 @@ class WizardOIDCTest(TestCase):
             status="failed",
         )
         token, _ = self.issue(scope="openid wizard.read wizard.quality")
-        response = self.client.post(
-            f"/api/producer/runs/{run.pk}/resume/",
-            {"attempt": 1},
-            content_type="application/json",
-            headers={"authorization": "Bearer " + token["access_token"]},
-            secure=True,
-        )
+        with override_settings(WIZARD_EXTERNAL_PROJECT_IDS=[project.pk]):
+            response = self.client.post(
+                f"/api/producer/runs/{run.pk}/resume/",
+                {"attempt": 1},
+                content_type="application/json",
+                headers={"authorization": "Bearer " + token["access_token"]},
+                secure=True,
+            )
         self.assertEqual(response.status_code, 409)
         self.assertFalse(ProducerRun.objects.filter(resumed_from=run).exists())
 
@@ -380,6 +621,10 @@ class WizardOIDCTest(TestCase):
                 }
             },
         )
+        project.add_user(self.user, "Administration")
+        internal = Group.objects.create(name="Internal profile readers")
+        self.user.add_team(None, internal)
+        self.enterContext(override_settings(WIZARD_INTERNAL_GROUP_ID=internal.pk))
         token, _ = self.issue(scope="openid profile wizard.read wizard.import")
         url = "/api/producer/projects/sso-private/translation-profile/"
         headers = {
@@ -420,3 +665,48 @@ class WizardOIDCTest(TestCase):
             secure=True,
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_external_profile_needs_current_manual_provenance(self):
+        project = Project.objects.create(
+            name="External profile",
+            slug="external-profile",
+            access_control=Project.ACCESS_PRIVATE,
+            machinery_settings={"openrouter": {"persona": "Legacy synthetic context"}},
+        )
+        project.add_user(self.user, "Administration")
+        self.enterContext(override_settings(WIZARD_EXTERNAL_PROJECT_IDS=[project.pk]))
+        token, _ = self.issue(scope="openid wizard.read wizard.import")
+        headers = {
+            "HTTP_AUTHORIZATION": "Bearer " + token["access_token"],
+            "secure": True,
+        }
+        url = f"/api/producer/projects/{project.slug}/translation-profile/"
+        body = {"service": "openrouter", "configuration": {"persona": "Manual"}}
+        self.assertEqual(self.client.get(url, **headers).json(), {})
+        self.assertEqual(
+            self.client.patch(
+                url, body, content_type="application/json", **headers
+            ).status_code,
+            403,
+        )
+        project.refresh_from_db()
+        self.assertEqual(
+            project.machinery_settings["openrouter"]["persona"],
+            "Legacy synthetic context",
+        )
+        project.machinery_settings = {}
+        project.save(update_fields=["machinery_settings"])
+        self.assertEqual(
+            self.client.patch(
+                url, body, content_type="application/json", **headers
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(url, **headers).json(),
+            {"openrouter": {"persona": "Manual"}},
+        )
+        project.refresh_from_db()
+        project.machinery_settings["openrouter"]["style"] = "Changed outside Wizard"
+        project.save(update_fields=["machinery_settings"])
+        self.assertEqual(self.client.get(url, **headers).json(), {})

@@ -21,7 +21,7 @@ from weblate.trans.judge_loop import (
 )
 from weblate.trans.judge_quality import current_quality_round
 from weblate.trans.models import ProducerRun, Project, Unit
-from weblate.trans.models.judge import active_verdicts
+from weblate.trans.models.judge import JudgeRunUnit, active_verdicts
 from weblate.trans.quality_execution import (
     VerificationChangedError,
     project_digest,
@@ -29,11 +29,13 @@ from weblate.trans.quality_execution import (
     verification_context,
 )
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.wizard_auth.policy import wizard_principal
 
 
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="offline-only",
+    JUDGE_BASE_URL="https://test.invalid/litellm/v1",
     JUDGE_REQUEST_SLEEP=0.0,
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
@@ -41,6 +43,12 @@ from weblate.trans.tests.test_views import ViewTestCase
 class QualityExecutionPolicyTest(ViewTestCase):
     def setUp(self):
         super().setUp()
+        self.enterContext(
+            patch(
+                "weblate.trans.judge.resolve_judge_alias",
+                side_effect=lambda _url, model, _key: (model, "synthetic-alias-revision"),
+            )
+        )
         self.user.is_superuser = True
         self.user.save()
         self.project.translation_review = True
@@ -67,6 +75,33 @@ class QualityExecutionPolicyTest(ViewTestCase):
                 "protected_project": project_digest(self.project),
             },
         )
+
+    def test_wizard_decisions_hide_restricted_units_before_pagination(self):
+        run = self.verification_run()
+        JudgeRunUnit.objects.create(
+            run=run,
+            unit=self.unit,
+            unit_id_snapshot=self.unit.pk,
+            translation_id=self.unit.translation_id,
+            component_id=self.component.pk,
+            project_id=self.project.pk,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+        )
+        self.component.restricted = True
+        self.component.save(update_fields=["restricted"])
+        url = f"/api/producer/projects/{self.project.slug}/decisions/"
+        query = {"run": str(run.pk), "kind": "judge"}
+        native = self.api.get(url, query)
+        self.assertEqual(native.status_code, 200)
+        self.assertEqual(native.data["count"], 1)
+        self.project.add_user(self.user, "Administration")
+        with override_settings(WIZARD_EXTERNAL_PROJECT_IDS=[self.project.pk]):
+            actor = wizard_principal(self.user)
+        self.assertFalse(actor.can_access_component(self.component))
+        self.api.force_authenticate(actor)
+        delegated = self.api.get(url, query)
+        self.assertEqual(delegated.status_code, 200)
+        self.assertEqual(delegated.data["count"], 0)
 
     def test_unit_save_cannot_change_target_state_flags_or_explanation(self):
 

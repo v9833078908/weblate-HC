@@ -237,7 +237,14 @@ def _make_ready(
 
 
 def build_producer_repeat_plan(
-    *, project, language, scope, issue_snapshot_hash, application_ids, actor
+    *,
+    project,
+    language,
+    scope,
+    issue_snapshot_hash,
+    application_ids,
+    actor,
+    wizard_delegation=None,
 ):
     if not actor.has_perm("project.edit", project):
         raise PermissionDenied
@@ -339,6 +346,7 @@ def build_producer_repeat_plan(
                     actor=actor,
                     request_cap=1,
                     group_ids=[group.pk],
+                    wizard_delegation=wizard_delegation,
                 )
                 entry.update(
                     outcome="pending", reason=origin, recommendation_run=run.pk
@@ -501,7 +509,7 @@ def _plan_recommendation(entry):
     return result
 
 
-def apply_producer_repeat_plan(*, plan, operation, actor):
+def apply_producer_repeat_plan(*, plan, operation, actor, wizard_delegation=None):
     """Create native bulk resources once, bound to the original signed scope."""
     plan = ProducerQualityOperation.objects.select_for_update().get(pk=plan.pk)
     if not actor.has_perm("project.edit", plan.project):
@@ -546,6 +554,8 @@ def apply_producer_repeat_plan(*, plan, operation, actor):
         "failures": failures,
         "plan": str(plan.pk),
     }
+    if wizard_delegation is not None:
+        operation.private_data["_wizard_delegation"] = wizard_delegation
     operation.save(update_fields=["private_data", "updated"])
     plan.private_data["applied_token"] = str(operation.pk)
     plan.save(update_fields=["private_data", "updated"])

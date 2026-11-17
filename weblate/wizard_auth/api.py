@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from django.apps import apps
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 
 from weblate.wizard_auth.grants import checksum, family_for
-from weblate.wizard_auth.permissions import required_scope
+from weblate.wizard_auth.permissions import required_route
+from weblate.wizard_auth.policy import require_wizard_project, wizard_principal
 
 
 class WizardOAuthAuthentication(BaseAuthentication):
@@ -60,7 +62,7 @@ class WizardOAuthAuthentication(BaseAuthentication):
             if prefix and request.path.startswith(prefix + "/")
             else request.path
         )
-        scope = required_scope(request.method, path)
+        scope, project_slug = required_route(request.method, path)
         if scope not in token.scope.split():
             msg = "Wizard scope is not granted"
             raise PermissionDenied(msg)
@@ -77,7 +79,11 @@ class WizardOAuthAuthentication(BaseAuthentication):
             msg = "Wizard cannot change these unit fields"
             raise PermissionDenied(msg)
         request.wizard_delegation = family
-        return token.user, token
+        user = wizard_principal(token.user)
+        if project_slug is not None:
+            project = get_object_or_404(user.allowed_projects, slug=project_slug)
+            require_wizard_project(user, project, write=True)
+        return user, token
 
     def authenticate_header(self, request):
         header = get_authorization_header(request).split()

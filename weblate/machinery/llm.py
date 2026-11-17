@@ -85,6 +85,9 @@ llm_usage_record: ContextVar[int | None] = ContextVar("llm_usage_record", defaul
 llm_delivery_work: ContextVar[tuple[str, ...]] = ContextVar(
     "llm_delivery_work", default=()
 )
+llm_delivery_unit_ids: ContextVar[tuple[int | None, ...]] = ContextVar(
+    "llm_delivery_unit_ids", default=()
+)
 llm_delivery_usage: ContextVar[object | None] = ContextVar(
     "llm_delivery_usage", default=None
 )
@@ -3526,9 +3529,14 @@ class BaseLLMTranslation(BatchMachineTranslation):
         # variable at None so nothing is marked at all.
         usage_token = llm_usage_record.set(None)
         delivery_token = None
+        delivery_unit_token = None
         usage_delivery_token = llm_delivery_usage.set(None)
         if identity:
             delivery_token = llm_delivery_work.set(identity)
+        if identity or stage_slots:
+            delivery_unit_token = llm_delivery_unit_ids.set(
+                tuple(unit.pk if unit is not None else None for _, unit in sources)
+            )
         # The stage of this internal request travels per request, not per
         # engine instance: an orchestrator publishes it before rendering and
         # the tokens are reset in ``finally`` below, so a scheduler thread
@@ -3562,6 +3570,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
         finally:
             if delivery_token is not None:
                 llm_delivery_work.reset(delivery_token)
+            if delivery_unit_token is not None:
+                llm_delivery_unit_ids.reset(delivery_unit_token)
             llm_delivery_usage.reset(usage_delivery_token)
             llm_batch_unit_count.reset(unit_count_token)
             llm_usage_record.reset(usage_token)

@@ -8,7 +8,7 @@ from html import escape
 from logging.handlers import SysLogHandler
 from pathlib import Path
 
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.http import Http404
 
 from weblate.accounts import defaults as accounts_defaults
@@ -1972,6 +1972,21 @@ WIZARD_PUBLIC_URL = os.environ.get("WEBLATE_WIZARD_PUBLIC_URL", "")
 WIZARD_SSO_ISSUER = os.environ.get("WEBLATE_WIZARD_SSO_ISSUER", "")
 WIZARD_SSO_CLIENT_ID = os.environ.get("WEBLATE_WIZARD_SSO_CLIENT_ID", "")
 WIZARD_SSO_PRIVATE_KEY_FILE = os.environ.get("WEBLATE_WIZARD_SSO_PRIVATE_KEY_FILE", "")
+WIZARD_INTERNAL_GROUP_ID = get_env_int("WEBLATE_WIZARD_INTERNAL_GROUP_ID")
+WIZARD_EXTERNAL_WORKSPACE_IDS = get_env_list("WEBLATE_WIZARD_EXTERNAL_WORKSPACE_IDS")
+WIZARD_EXTERNAL_PROJECT_IDS = get_env_list("WEBLATE_WIZARD_EXTERNAL_PROJECT_IDS")
+WIZARD_CREATOR_ONLY_PROJECTS = get_env_json("WEBLATE_WIZARD_CREATOR_ONLY_PROJECTS", {})
+if not isinstance(WIZARD_CREATOR_ONLY_PROJECTS, dict) or any(
+    not user_id.isascii()
+    or not user_id.isdecimal()
+    or user_id.startswith("0")
+    or not isinstance(project_ids, list)
+    or any(type(project_id) is not int or project_id <= 0 for project_id in project_ids)
+    for user_id, project_ids in WIZARD_CREATOR_ONLY_PROJECTS.items()
+):
+    msg = "WEBLATE_WIZARD_CREATOR_ONLY_PROJECTS requires user IDs mapped to lists of project IDs"
+    raise ImproperlyConfigured(msg)
+
 if ADDITIONAL_CONFIG.exists():
     code = compile(
         ADDITIONAL_CONFIG.read_text(encoding="utf-8"), ADDITIONAL_CONFIG, "exec"
